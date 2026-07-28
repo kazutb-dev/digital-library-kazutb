@@ -279,7 +279,17 @@
     transition: color 250ms ease;
   }
 
-  .hdr-icon .material-symbols-outlined { font-size: 21px; }
+  .hdr-icon svg,
+  .hdr-lang__trigger svg {
+    width: 21px;
+    height: 21px;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .hdr-icon:hover { color: #ffffff; }
   .site-header.is-solid .hdr-icon { color: var(--hdr-ink); }
   .site-header.is-solid .hdr-icon:hover { color: var(--hdr-accent); }
@@ -303,7 +313,6 @@
     transition: color 250ms ease;
   }
 
-  .hdr-lang__trigger .material-symbols-outlined { font-size: 21px; }
   .hdr-lang__trigger:hover { color: #ffffff; }
   .site-header.is-solid .hdr-lang__trigger { color: var(--hdr-ink); }
   .site-header.is-solid .hdr-lang__trigger:hover { color: var(--hdr-accent); }
@@ -548,7 +557,10 @@
     <div class="hdr-actions">
       <details class="hdr-disclosure">
         <summary class="hdr-icon" role="button" aria-label="{{ $headerCopy['search'] }}">
-          <span class="material-symbols-outlined" aria-hidden="true">search</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="6.5"></circle>
+            <path d="M16 16l4.5 4.5"></path>
+          </svg>
         </summary>
         <div class="hdr-panel hdr-panel--search">
           <form class="hdr-search__form" action="{{ $routeWithLang('/catalog') }}" method="get" role="search">
@@ -568,18 +580,29 @@
       </details>
 
       <a class="hdr-icon hdr-icon--shortlist" href="{{ $routeWithLang('/shortlist') }}" aria-label="{{ $headerCopy['shortlist'] }}" title="{{ $headerCopy['shortlist'] }}">
-        <span class="material-symbols-outlined" aria-hidden="true">bookmark</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 4.5h10a1 1 0 0 1 1 1v14.5l-6-3.5-6 3.5V5.5a1 1 0 0 1 1-1Z"></path>
+        </svg>
       </a>
 
       @if($isAuthenticated)
         <a class="hdr-icon" href="{{ $routeWithLang('/dashboard/notifications') }}" aria-label="{{ $headerCopy['notifications'] }}" title="{{ $headerCopy['notifications'] }}">
-          <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M15.5 17.5H8.5"></path>
+            <path d="M6.5 17.5h11"></path>
+            <path d="M18 17.5H6l1.2-1.8c.5-.8.8-1.7.8-2.7V10a4 4 0 0 1 8 0v3c0 1 .3 1.9.8 2.7L18 17.5Z"></path>
+            <path d="M10.5 19.5a1.5 1.5 0 0 0 3 0"></path>
+          </svg>
         </a>
       @endif
 
       <details class="hdr-disclosure hdr-lang" data-locale-switcher>
         <summary class="hdr-lang__trigger" role="button" aria-label="{{ $headerCopy['lang_aria'] }}">
-          <span class="material-symbols-outlined" aria-hidden="true">language</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="8.5"></circle>
+            <path d="M3.5 12h17"></path>
+            <path d="M12 3.5c2.6 2.2 4 5 4 8.5s-1.4 6.3-4 8.5c-2.6-2.2-4-5-4-8.5s1.4-6.3 4-8.5Z"></path>
+          </svg>
         </summary>
         <div class="hdr-lang__panel" role="menu" aria-label="{{ $headerCopy['lang_aria'] }}">
           @foreach(['kk', 'ru', 'en'] as $locale)
@@ -588,7 +611,9 @@
                @if($pageLang === $locale) aria-current="true" @endif>
               <span>{{ $localeLabels[$locale] }}</span>
               @if($pageLang === $locale)
-                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px;">check</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" style="width:16px;height:16px;">
+                  <path d="M5.5 12.5l4 4 9-10"></path>
+                </svg>
               @endif
             </a>
           @endforeach
@@ -605,7 +630,11 @@
       {{-- Menu: full navigation on mobile, overflow + institution links on desktop --}}
       <details class="hdr-disclosure hdr-burger">
         <summary class="hdr-icon" role="button" aria-label="{{ $headerCopy['menu'] }}">
-          <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4.5 7h15"></path>
+            <path d="M4.5 12h15"></path>
+            <path d="M4.5 17h15"></path>
+          </svg>
         </summary>
         <nav class="hdr-panel hdr-panel--menu" aria-label="{{ $headerCopy['menu'] }}">
           @foreach($headerCopy['links'] as [$key, $label, $href])

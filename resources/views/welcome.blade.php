@@ -381,6 +381,17 @@
 .homepage .page-main {
     margin-top: 0;
 }
+[data-section="homepage-canonical-page"] {
+    --homepage-gutter: clamp(18px, 3vw, 32px);
+}
+[data-section="homepage-canonical-page"] > section,
+[data-section="homepage-canonical-page"] > div:not(.sr-only) {
+    width: 100%;
+    max-width: none;
+    margin-inline: auto;
+    padding-inline: var(--homepage-gutter);
+    box-sizing: border-box;
+}
 [data-section="homepage-canonical-hero"] {
     min-height: 52vh;
     min-height: 52svh;
@@ -426,47 +437,26 @@
 }
 .homepage-hero__content {
     width: 100%;
-    max-width: 1370px;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
     min-height: 52vh;
     min-height: 52svh;
-    padding: clamp(120px, 14vh, 150px) 32px clamp(34px, 5vh, 48px);
+    padding: clamp(120px, 14vh, 150px) clamp(16px, 3vw, 40px) clamp(34px, 5vh, 48px);
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+    gap: clamp(24px, 4vw, 48px);
     align-items: end;
 }
 .homepage-hero__copy {
-    max-width: 820px;
+    max-width: 980px;
     position: relative;
     padding: 28px 24px 24px;
-    margin-left: -24px;
+    margin-left: 0;
     border-radius: 8px;
-    background: linear-gradient(180deg, rgba(6, 18, 30, .34), rgba(6, 18, 30, .12));
+    background: transparent;
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
     box-shadow: 0 14px 40px rgba(0, 0, 0, .12);
-}
-.homepage-hero__kicker {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 15px;
-    border: 1px solid rgba(255, 255, 255, .24);
-    background: rgba(255, 255, 255, .08);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: .18em;
-    text-transform: uppercase;
-}
-.homepage-hero__kicker::before {
-    content: "";
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #e8a020;
-    box-shadow: 0 0 14px rgba(232, 160, 32, .9);
 }
 .homepage-hero__title {
     max-width: 760px;
@@ -475,7 +465,7 @@
     font-size: clamp(42px, 5vw, 68px);
     font-weight: 700;
     letter-spacing: -.045em;
-    line-height: .96;
+    line-height: .88;
     text-wrap: balance;
     text-shadow: 0 4px 40px rgba(0, 0, 0, .38);
 }
@@ -528,26 +518,122 @@
 .homepage-hero__search button:hover {
     filter: brightness(1.08);
 }
-.homepage-hero__topics {
-    margin-top: 12px;
+.homepage-hero__book {
+    justify-self: end;
+    align-self: end;
+    width: min(100%, 360px);
+    aspect-ratio: 0.66 / 1;
+    position: relative;
+    padding: 22px 24px 20px 34px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.08), transparent 28%),
+      radial-gradient(circle at 18% 18%, rgba(255,255,255,.14), transparent 22%),
+      radial-gradient(circle at 85% 78%, rgba(255,255,255,.06), transparent 28%),
+      linear-gradient(180deg, #a86d51 0%, #8c5a42 42%, #744934 100%);
+    border-radius: 10px 12px 12px 10px;
+    box-shadow: 0 28px 70px rgba(0, 0, 0, .28);
+    overflow: hidden;
+}
+.homepage-hero__book::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 20px;
+    background:
+      linear-gradient(90deg, rgba(62, 35, 23, .98), rgba(94, 58, 42, .96) 52%, rgba(132, 83, 60, .92));
+    border-radius: 10px 0 0 10px;
+    box-shadow:
+      inset -1px 0 0 rgba(255, 233, 221, .18),
+      inset -5px 0 0 rgba(40, 24, 15, .18),
+      1px 0 0 rgba(58, 34, 22, .26);
+    pointer-events: none;
+}
+.homepage-hero__book::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(255, 230, 210, .18);
+    border-radius: 10px;
+    pointer-events: none;
+}
+.homepage-hero__book-grain {
+    position: absolute;
+    inset: 0;
+    opacity: .14;
+    mix-blend-mode: soft-light;
+    background-image:
+      radial-gradient(rgba(255,255,255,.22) 0.7px, transparent 0.8px),
+      radial-gradient(rgba(255,255,255,.12) 0.6px, transparent 0.7px);
+    background-size: 7px 7px, 11px 11px;
+    background-position: 0 0, 3px 5px;
+    pointer-events: none;
+}
+.homepage-hero__book-shadow {
+    position: absolute;
+    inset: 16px 16px 16px auto;
+    width: 1px;
+    background: rgba(255, 235, 220, .18);
+    box-shadow:
+      -6px 0 0 rgba(255, 235, 220, .08),
+      -12px 0 0 rgba(58, 34, 22, .16);
+    pointer-events: none;
+}
+.homepage-hero__book-badge {
+    width: 58px;
+    height: 58px;
+    margin-top: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 240, 230, .42);
+    background: rgba(255, 246, 240, .08);
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 9px;
+    justify-content: center;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(58, 34, 22, .18);
 }
-.homepage-hero__topics a {
-    padding: 7px 11px;
-    border: 1px solid rgba(255, 255, 255, .14);
-    background: rgba(255, 255, 255, .06);
-    color: rgba(255, 255, 255, .78);
+.homepage-hero__book-badge img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 9px;
+}
+.homepage-hero__book-title {
+    margin-top: 22px;
+    color: #fff7f1;
+    font-family: "Literata", serif;
+    font-size: clamp(22px, 2.35vw, 30px);
+    font-weight: 800;
+    line-height: .95;
+    letter-spacing: -.035em;
+    text-wrap: balance;
+}
+.homepage-hero__book-title small {
+    display: block;
+    margin-top: 12px;
+    color: rgba(255, 233, 221, .82);
+    font-family: "Google Sans", sans-serif;
     font-size: 12px;
-    font-weight: 650;
-    transition: color .2s ease, border-color .2s ease, background .2s ease;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
 }
-.homepage-hero__topics a:hover {
-    color: #fff;
-    border-color: rgba(232, 160, 32, .65);
-    background: rgba(232, 160, 32, .13);
+.homepage-hero__book-ring {
+    position: absolute;
+    right: -46px;
+    bottom: -48px;
+    width: 160px;
+    height: 160px;
+    border: 1px solid rgba(255, 236, 226, .12);
+    border-radius: 50%;
+}
+.homepage-hero__book-ring::before {
+    content: "";
+    position: absolute;
+    inset: 18px;
+    border: 1px solid rgba(255, 236, 226, .1);
+    border-radius: 50%;
 }
 .homepage-hero__scroll {
     position: absolute;
@@ -573,7 +659,8 @@
     padding: 0 32px 22px;
 }
 .homepage-hero__bridge-inner {
-    width: min(100%, 1370px);
+    width: 100%;
+    max-width: none;
     margin: 0 auto;
     padding: 26px 24px 26px;
     background: rgba(255, 255, 255, .92);
@@ -687,12 +774,12 @@
 [data-section="homepage-canonical-gateway"],
 [data-section="homepage-canonical-hub-slices"],
 [data-section="homepage-canonical-updates"] {
-    width: min(100%, 1370px) !important;
-    max-width: 1370px !important;
+    width: 100% !important;
+    max-width: none !important;
     margin-inline: auto !important;
 }
 [data-section="homepage-canonical-gateway"] {
-    padding: 132px 32px 142px !important;
+    padding: 132px var(--homepage-gutter) 142px !important;
 }
 [data-section="homepage-canonical-gateway"] > div:first-child {
     padding-bottom: 34px;
@@ -747,7 +834,7 @@
 }
 
 [data-section="homepage-canonical-hub-slices"] {
-    padding: 132px 32px 150px !important;
+    padding: 132px var(--homepage-gutter) 150px !important;
     background: #fff;
     box-shadow: 50vw 0 #fff, -50vw 0 #fff;
 }
@@ -779,7 +866,7 @@
 }
 
 [data-section="homepage-canonical-updates"] {
-    padding: 198px 32px 160px !important;
+    padding: 198px var(--homepage-gutter) 160px !important;
 }
 [data-section="homepage-canonical-updates"] > div:last-child {
     grid-template-columns: 1.12fr .88fr !important;
@@ -872,10 +959,10 @@
     .homepage-hero__content {
         height: auto;
         min-height: 100svh;
-        padding: 154px 24px 80px;
+        padding: 154px clamp(16px, 3vw, 40px) 80px;
+        grid-template-columns: 1fr;
     }
     .homepage-hero__copy {
-        margin-left: 0;
         padding: 22px 18px 20px;
     }
     .homepage-hero__scroll {
@@ -909,22 +996,11 @@
 }
 @media (max-width: 640px) {
     .homepage-hero__content {
-        padding: 72px 18px 64px;
+        padding: 72px clamp(16px, 3vw, 40px) 64px;
+        grid-template-columns: 1fr;
     }
     .homepage-hero__title {
         font-size: clamp(42px, 13vw, 58px);
-    }
-    .homepage-hero__search {
-        align-items: stretch;
-    }
-    .homepage-hero__search button {
-        padding: 0 18px;
-    }
-    .homepage-hero__topics > span {
-        width: 100%;
-    }
-    .homepage-hero__content {
-        padding-right: 24px;
     }
     [data-section="homepage-canonical-gateway"],
     [data-section="homepage-canonical-hub-slices"],
@@ -944,6 +1020,9 @@
     .homepage-hero__bridge-head {
         flex-direction: column;
         align-items: flex-start;
+    }
+    .homepage-hero__book {
+        display: none;
     }
     .homepage-canonical__gateway-card {
         min-height: 140px;
@@ -2650,10 +2729,6 @@
 
     <div class="homepage-hero__content">
       <div class="homepage-hero__copy">
-        <span data-test-id="homepage-canonical-kicker" class="homepage-hero__kicker">
-          {{ $copy['hero_kicker'] }}
-        </span>
-
         <h1 class="homepage-hero__title">
           {{ $copy['hero_h1'] }}<br>
           <em>{{ $copy['hero_h1_accent'] }}</em>
@@ -2666,7 +2741,10 @@
               class="homepage-hero__search"
               action="{{ $withLang('/catalog') }}"
               method="get">
-          <span class="material-symbols-outlined ml-5 text-xl text-[#627083]" aria-hidden="true">search</span>
+          <svg class="ml-5" viewBox="0 0 24 24" aria-hidden="true" focusable="false" width="20" height="20" style="flex:0 0 auto; fill:none; stroke:#627083; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;">
+            <circle cx="11" cy="11" r="6.5"></circle>
+            <path d="M16 16l4.5 4.5"></path>
+          </svg>
           <label class="sr-only" for="homepage-search">{{ $copy['search_placeholder'] }}</label>
           <input id="homepage-search"
                  type="search"
@@ -2674,13 +2752,19 @@
                  placeholder="{{ $copy['search_placeholder'] }}">
           <button type="submit">{{ $copy['search_cta'] }}</button>
         </form>
+      </div>
 
-        <div id="hero-quick-links" class="homepage-hero__topics">
-          <span class="text-[10px] font-bold uppercase tracking-[0.15em] text-white/50">{{ $copy['trending'] }}</span>
-          @foreach (array_slice($topics, 0, 2) as $link)
-            <a href="{{ $link['href'] }}">{{ $link['label'] }}</a>
-          @endforeach
+      <div class="homepage-hero__book" aria-hidden="true">
+        <div class="homepage-hero__book-grain" aria-hidden="true"></div>
+        <div class="homepage-hero__book-badge">
+          <img src="{{ asset('logo.png') }}" alt="" aria-hidden="true">
         </div>
+        <div class="homepage-hero__book-title">
+          {{ $lang === 'en' ? 'Kazakh University of Technology and Business' : ($lang === 'kk' ? 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті' : 'Казахский университет технологии и бизнеса имени К. Кулажанова') }}
+          <small>{{ $lang === 'en' ? 'Academic library' : ($lang === 'kk' ? 'Академиялық кітапхана' : 'Академическая библиотека') }}</small>
+        </div>
+        <div class="homepage-hero__book-shadow" aria-hidden="true"></div>
+        <div class="homepage-hero__book-ring" aria-hidden="true"></div>
       </div>
 
     </div>
