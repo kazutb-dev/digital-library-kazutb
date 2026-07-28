@@ -145,7 +145,7 @@
   }
   .university-footer__grid {
     display: grid;
-    grid-template-columns: minmax(300px, 1.35fr) repeat(4, minmax(150px, 1fr));
+    grid-template-columns: minmax(260px, 1.35fr) repeat(4, minmax(150px, 1fr));
     gap: clamp(38px, 5vw, 72px);
     width: 100%;
     max-width: 1440px;
@@ -256,7 +256,7 @@
     font-size: 11px;
     line-height: 1.6;
   }
-  @media (max-width: 1040px) {
+  @media (max-width: 1279px) {
     .university-footer__grid {
       grid-template-columns: 1fr 1fr;
     }

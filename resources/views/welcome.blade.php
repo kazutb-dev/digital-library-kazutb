@@ -34,30 +34,9 @@
           'stats_archives_value'     => '120 000+',
           'stats_scholars_label'     => 'Активных читателей',
           'stats_scholars_value'     => '8 400+',
-          'collections_heading'      => 'Избранные коллекции',
-          'collections_lead'         => 'Тематические подборки по ключевым дисциплинам КазТБУ',
-          'collections_all_cta'      => 'Все коллекции',
-          'collection_featured_badge'   => 'Основной фонд',
-          'collection_featured_title'   => 'Академические ресурсы',
-          'collection_featured_body'    => 'Монографии, диссертации и периодика по профильным направлениям университета: инженерия, экономика, право.',
-          'collection_featured_cta'     => 'Открыть каталог',
-          'collection_featured_img_alt' => 'Читальный зал библиотеки КазТБУ',
-          'collection_tile1_title'   => 'Прикладные науки',
-          'collection_tile1_body'    => 'Технические и инженерные дисциплины (УДК 5)',
-          'collection_tile1_img_alt' => 'Семинар ИИ',
-          'collection_tile2_title'   => 'Экономика и право',
-          'collection_tile2_body'    => 'Правовые и экономические исследования (УДК 33)',
-          'collection_tile2_img_alt' => 'Классический фонд',
-          'services_heading'         => 'Научные сервисы',
-          'services_lead'            => 'Инструменты и ресурсы для академической работы',
           'gateway_heading'          => 'Навигационный центр библиотеки',
           'gateway_lead'             => 'Переходите к ключевым публичным разделам: от каталога и репозитория до новостей, правил и контактов.',
           'gateway_meta'             => 'Public Gateway',
-          'services'                 => [
-              ['icon' => 'library_books', 'title' => 'Справочное обслуживание', 'body' => 'Помощь с поиском источников, составлением библиографических списков и тематических подборок.', 'cta' => 'Задать вопрос'],
-              ['icon' => 'school',        'title' => 'Учебные коллекции',      'body' => 'Рекомендуемая литература по учебным программам: учебники, методические пособия и статьи.', 'cta' => 'Каталог программ'],
-              ['icon' => 'workspace_premium', 'title' => 'Личный кабинет',    'body' => 'Управление займами, бронированием и персональными списками чтения.',                       'cta' => session('library.user') ? 'Открыть кабинет' : 'Войти'],
-          ],
           'identity_brand' => 'Библиотека КазТБУ',
       ],
       'kk' => [
@@ -74,30 +53,9 @@
           'stats_archives_value'     => '120 000+',
           'stats_scholars_label'     => 'Белсенді оқырмандар',
           'stats_scholars_value'     => '8 400+',
-          'collections_heading'      => 'Таңдаулы жинақтар',
-          'collections_lead'         => 'КазТБУ негізгі пәндері бойынша тақырыптық іріктемелер',
-          'collections_all_cta'      => 'Барлық жинақтар',
-          'collection_featured_badge'   => 'Негізгі қор',
-          'collection_featured_title'   => 'Академиялық ресурстар',
-          'collection_featured_body'    => 'Университеттің профильді бағыттары: инженерия, экономика, құқық бойынша монографиялар, диссертациялар және мерзімді басылымдар.',
-          'collection_featured_cta'     => 'Каталогты ашу',
-          'collection_featured_img_alt' => 'КазТБУ кітапханасының оқу залы',
-          'collection_tile1_title'   => 'Қолданбалы ғылымдар',
-          'collection_tile1_body'    => 'Техникалық және инженерлік пәндер (ӘЖЖ 5)',
-          'collection_tile1_img_alt' => 'AI семинары',
-          'collection_tile2_title'   => 'Экономика және құқық',
-          'collection_tile2_body'    => 'Құқықтық және экономикалық зерттеулер (ӘЖЖ 33)',
-          'collection_tile2_img_alt' => 'Классикалық қор',
-          'services_heading'         => 'Ғылыми сервистер',
-          'services_lead'            => 'Академиялық жұмыс үшін құралдар мен ресурстар',
           'gateway_heading'          => 'Кітапхана навигация орталығы',
           'gateway_lead'             => 'Каталогтан репозиторийге дейін, жаңалықтардан ережелер мен байланысқа дейін негізгі қоғамдық бөлімдерге өтіңіз.',
           'gateway_meta'             => 'Public Gateway',
-          'services'                 => [
-              ['icon' => 'library_books', 'title' => 'Анықтамалық қызмет',  'body' => 'Дереккөздерді іздеуге, библиографиялық тізімдер мен тақырыптық іріктемелер жасауға көмек.', 'cta' => 'Сұрақ қою'],
-              ['icon' => 'school',        'title' => 'Оқу жинақтары',       'body' => 'Оқу бағдарламалары бойынша ұсынылған әдебиет: оқулықтар, әдістемелік құралдар және мақалалар.', 'cta' => 'Бағдарламалар каталогы'],
-              ['icon' => 'workspace_premium', 'title' => 'Жеке кабинет',   'body' => 'Қарыздарды, броньдарды және жеке оқу тізімдерін басқару.',                                        'cta' => session('library.user') ? 'Кабинетті ашу' : 'Кіру'],
-          ],
           'identity_brand' => 'КазТБУ Кітапханасы',
       ],
       'en' => [
@@ -114,30 +72,9 @@
           'stats_archives_value'     => '120,000+',
           'stats_scholars_label'     => 'Active Readers',
           'stats_scholars_value'     => '8,400+',
-          'collections_heading'      => 'Curated Collections',
-          'collections_lead'         => 'Thematic selections across KazUTB\'s key disciplines',
-          'collections_all_cta'      => 'All Collections',
-          'collection_featured_badge'   => 'Core Collection',
-          'collection_featured_title'   => 'Academic Resources',
-          'collection_featured_body'    => 'Monographs, dissertations and periodicals across KazUTB\'s flagship disciplines: engineering, economics, and law.',
-          'collection_featured_cta'     => 'Open Catalog',
-          'collection_featured_img_alt' => 'KazUTB Library Reading Room',
-          'collection_tile1_title'   => 'Applied Sciences',
-          'collection_tile1_body'    => 'Technical & engineering disciplines (UDC 5)',
-          'collection_tile1_img_alt' => 'AI Workshop',
-          'collection_tile2_title'   => 'Economics & Law',
-          'collection_tile2_body'    => 'Legal and economic research (UDC 33)',
-          'collection_tile2_img_alt' => 'Classics Collection',
-          'services_heading'         => 'Scholarly Services',
-          'services_lead'            => 'Tools and resources for academic work',
           'gateway_heading'          => 'Library Navigation Hub',
           'gateway_lead'             => 'Jump to all core public sections, from catalog and repository to news, rules, leadership, and contacts.',
           'gateway_meta'             => 'Public Gateway',
-          'services'                 => [
-              ['icon' => 'library_books',    'title' => 'Reference Services',  'body' => 'Expert help with source discovery, bibliography building, and subject-specific reading lists.', 'cta' => 'Ask a Question'],
-              ['icon' => 'school',           'title' => 'Course Collections',  'body' => 'Recommended reading aligned with academic programmes: textbooks, guides, and articles.',       'cta' => 'Browse Programmes'],
-              ['icon' => 'workspace_premium','title' => 'Member Workspace',    'body' => 'Manage your loans, reservations, and personal reading lists.',                                  'cta' => session('library.user') ? 'Open Workspace' : 'Sign In'],
-          ],
             'identity_brand' => 'KazUTB Smart Library',
       ],
   ];
@@ -162,18 +99,6 @@
       ],
   ];
   $topics = $topicLinks[$lang];
-
-  $serviceHrefs = [
-      $withLang('/contacts'),
-      $withLang('/contacts'),
-      session('library.user') ? $withLang('/dashboard') : $withLang('/login'),
-  ];
-
-  $serviceIconBg = [
-      'bg-tertiary-fixed/30 text-on-tertiary-fixed-variant',
-      'bg-primary-fixed/30 text-on-primary-fixed-variant',
-      'bg-secondary-container/30 text-on-secondary-container',
-  ];
 
   $gatewayLinks = [
       ['label' => $lang === 'ru' ? 'Каталог' : ($lang === 'kk' ? 'Каталог' : 'Catalog'), 'href' => $withLang('/catalog')],
@@ -705,12 +630,6 @@
 }
 .homepage-canonical__bento-tile:hover .homepage-canonical__bento-img { transform: scale(1.05); }
 .homepage-canonical__bento-tile:hover { transform: translateY(-4px); }
-.homepage-canonical__stats-card {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-}
-
-/* Premium library system */
 [data-section="homepage-canonical-page"] {
     overflow: hidden;
     background: #f5f3ee;
@@ -720,7 +639,6 @@
 [data-section="homepage-canonical-page"] h4 {
     text-wrap: balance;
 }
-[data-section="homepage-canonical-collections"],
 [data-section="homepage-canonical-gateway"],
 [data-section="homepage-canonical-hub-slices"],
 [data-section="homepage-canonical-updates"] {
@@ -728,156 +646,6 @@
     max-width: 1370px !important;
     margin-inline: auto !important;
 }
-[data-section="homepage-canonical-collections"] {
-    position: relative;
-    padding: 124px 32px 132px !important;
-    margin-bottom: 0 !important;
-}
-[data-section="homepage-canonical-collections"]::before {
-    content: "COLLECTIONS / 01";
-    position: absolute;
-    top: 68px;
-    right: 32px;
-    color: rgba(16, 41, 69, .34);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: .22em;
-}
-[data-section="homepage-canonical-collections"] > div:first-child {
-    align-items: flex-end;
-    padding-bottom: 30px;
-    border-bottom: 1px solid rgba(16, 41, 69, .14);
-}
-[data-section="homepage-canonical-collections"] h2,
-[data-section="homepage-canonical-gateway"] h2,
-[data-section="homepage-canonical-hub-slices"] h2,
-[data-section="homepage-canonical-updates"] h2 {
-    color: #102945;
-    font-family: "Newsreader", serif;
-    font-size: clamp(38px, 4.5vw, 58px) !important;
-    font-weight: 650;
-    letter-spacing: -.035em;
-    line-height: 1;
-}
-[data-section="homepage-canonical-collections"] > div:nth-child(2) {
-    height: 660px !important;
-    display: grid;
-    grid-template-columns: minmax(0, 1.55fr) minmax(300px, .7fr);
-    grid-template-rows: 1fr 1fr;
-    gap: 16px;
-}
-[data-section="homepage-canonical-collections"] .homepage-canonical__bento-tile {
-    min-height: 0 !important;
-    height: auto !important;
-    border-radius: 0 !important;
-    box-shadow: 0 24px 70px rgba(11, 24, 48, .1);
-}
-[data-section="homepage-canonical-collections"] .homepage-canonical__bento-tile:first-child {
-    grid-row: 1 / 3;
-}
-[data-section="homepage-canonical-collections"] .homepage-canonical__bento-tile::after {
-    content: "";
-    position: absolute;
-    inset: 12px;
-    z-index: 1;
-    border: 1px solid rgba(255, 255, 255, .28);
-    pointer-events: none;
-}
-[data-section="homepage-canonical-collections"] .homepage-canonical__bento-tile img {
-    filter: saturate(.82) contrast(1.04);
-}
-[data-section="homepage-canonical-collections"] .homepage-canonical__bento-tile:hover img {
-    transform: scale(1.045);
-}
-
-[data-section="homepage-canonical-services"] {
-    position: relative;
-    margin-bottom: 0 !important;
-    padding: 126px 0 136px !important;
-    color: #fff;
-    background:
-      radial-gradient(circle at 8% 12%, rgba(232, 160, 32, .11), transparent 25%),
-      radial-gradient(circle at 92% 82%, rgba(0, 172, 172, .1), transparent 28%),
-      #0c2037 !important;
-}
-[data-section="homepage-canonical-services"]::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: .45;
-    background-image:
-      linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
-    background-size: 64px 64px;
-}
-[data-section="homepage-canonical-services"] > div {
-    position: relative;
-    z-index: 1;
-    max-width: 1370px !important;
-    padding-inline: 32px !important;
-}
-[data-section="homepage-canonical-services"] > div > div:first-child {
-    max-width: 760px;
-    margin: 0 0 64px !important;
-    text-align: left !important;
-}
-[data-section="homepage-canonical-services"] h2 {
-    margin-bottom: 16px !important;
-    color: #fff !important;
-    font-family: "Newsreader", serif;
-    font-size: clamp(40px, 4.8vw, 62px) !important;
-    font-weight: 650;
-    letter-spacing: -.035em;
-    line-height: 1;
-}
-[data-section="homepage-canonical-services"] > div > div:first-child p {
-    color: rgba(255, 255, 255, .58) !important;
-    font-size: 17px;
-}
-[data-section="homepage-canonical-services"] > div > div:last-child {
-    gap: 0 !important;
-    border-top: 1px solid rgba(255, 255, 255, .16);
-    border-bottom: 1px solid rgba(255, 255, 255, .16);
-}
-[data-section="homepage-canonical-services"] > div > div:last-child > div {
-    position: relative;
-    min-height: 330px;
-    padding: 42px 38px !important;
-    border-radius: 0 !important;
-    border-right: 1px solid rgba(255, 255, 255, .16);
-    color: #fff;
-    background: transparent !important;
-    box-shadow: none !important;
-    transition: background .35s ease, transform .35s ease !important;
-}
-[data-section="homepage-canonical-services"] > div > div:last-child > div:last-child {
-    border-right: 0;
-}
-[data-section="homepage-canonical-services"] > div > div:last-child > div:hover {
-    z-index: 2;
-    background: rgba(255, 255, 255, .065) !important;
-    transform: translateY(-8px);
-}
-[data-section="homepage-canonical-services"] h3 {
-    color: #fff !important;
-    font-family: "Newsreader", serif;
-    font-size: 25px !important;
-}
-[data-section="homepage-canonical-services"] p {
-    color: rgba(255, 255, 255, .58) !important;
-}
-[data-section="homepage-canonical-services"] a {
-    color: #f3bd46 !important;
-}
-[data-section="homepage-canonical-services"] .w-12 {
-    width: 54px !important;
-    height: 54px !important;
-    border-radius: 0 !important;
-    color: #102945 !important;
-    background: #e8a020 !important;
-}
-
 [data-section="homepage-canonical-gateway"] {
     padding: 132px 32px 142px !important;
 }
@@ -1071,34 +839,10 @@
     .homepage-hero__scroll {
         display: none;
     }
-    [data-section="homepage-canonical-collections"],
     [data-section="homepage-canonical-gateway"],
     [data-section="homepage-canonical-hub-slices"],
     [data-section="homepage-canonical-updates"] {
         padding: 88px 24px 96px !important;
-    }
-    [data-section="homepage-canonical-collections"] > div:nth-child(2) {
-        height: auto !important;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 520px 300px;
-    }
-    [data-section="homepage-canonical-collections"] .homepage-canonical__bento-tile:first-child {
-        grid-column: 1 / 3;
-        grid-row: 1;
-    }
-    [data-section="homepage-canonical-services"] {
-        padding: 92px 0 100px !important;
-    }
-    [data-section="homepage-canonical-services"] > div {
-        padding-inline: 24px !important;
-    }
-    [data-section="homepage-canonical-services"] > div > div:last-child {
-        grid-template-columns: 1fr !important;
-    }
-    [data-section="homepage-canonical-services"] > div > div:last-child > div {
-        min-height: auto;
-        border-right: 0;
-        border-bottom: 1px solid rgba(255, 255, 255, .16);
     }
     [data-section="homepage-canonical-gateway"] > div:last-child {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -1126,35 +870,15 @@
     .homepage-hero__topics > span {
         width: 100%;
     }
-    [data-section="homepage-canonical-collections"],
     [data-section="homepage-canonical-gateway"],
     [data-section="homepage-canonical-hub-slices"],
     [data-section="homepage-canonical-updates"] {
         padding: 72px 18px 78px !important;
     }
-    [data-section="homepage-canonical-collections"]::before {
-        display: none;
-    }
-    [data-section="homepage-canonical-collections"] > div:first-child,
     [data-section="homepage-canonical-gateway"] > div:first-child,
     [data-section="homepage-canonical-hub-slices"] > div:first-child,
     [data-section="homepage-canonical-updates"] > div:first-child {
         margin-bottom: 34px !important;
-    }
-    [data-section="homepage-canonical-collections"] > div:nth-child(2) {
-        display: grid;
-        grid-template-columns: 1fr;
-        grid-template-rows: 470px 270px 270px;
-    }
-    [data-section="homepage-canonical-collections"] .homepage-canonical__bento-tile:first-child {
-        grid-column: 1;
-        grid-row: 1;
-    }
-    [data-section="homepage-canonical-services"] > div {
-        padding-inline: 18px !important;
-    }
-    [data-section="homepage-canonical-services"] > div > div:last-child > div {
-        padding: 34px 26px !important;
     }
     [data-section="homepage-canonical-gateway"] > div:last-child,
     [data-section="homepage-canonical-hub-slices"] > div:last-child,
@@ -2079,10 +1803,6 @@
 .library-intelligence__section--white {
     background: var(--archive-white) !important;
 }
-[data-section="homepage-canonical-collections"].library-intelligence__section::before,
-[data-section="homepage-canonical-services"].library-intelligence__section::after {
-    display: none;
-}
 .library-intelligence__head {
     display: grid !important;
     grid-template-columns: minmax(0, 1.15fr) minmax(280px, .7fr);
@@ -2166,11 +1886,6 @@
     height: auto !important;
     max-width: 1440px;
     margin: 0 auto;
-}
-.library-intelligence > section[data-section="homepage-canonical-collections"] > div.library-overview__layout {
-    height: auto !important;
-    grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr) !important;
-    grid-template-rows: none !important;
 }
 .library-metrics {
     display: grid;
@@ -2383,7 +2098,7 @@
     max-width: none !important;
     margin: 0 !important;
 }
-.library-intelligence [data-section="homepage-canonical-services"] .library-categories__intro h2 {
+.library-categories__intro h2 {
     max-width: 520px;
     margin: 0;
     color: var(--archive-ink) !important;
@@ -2395,13 +2110,13 @@
     overflow-wrap: normal;
     word-break: normal;
 }
-.library-intelligence [data-section="homepage-canonical-services"] .library-categories__intro > p {
+.library-categories__intro > p {
     margin-top: 25px;
     color: rgba(37, 49, 45, .67) !important;
     font-size: 15px;
     line-height: 1.8;
 }
-.library-intelligence [data-section="homepage-canonical-services"] .library-intelligence__link {
+.library-intelligence__link {
     color: var(--archive-ink) !important;
 }
 .library-category-grid {
@@ -2420,7 +2135,7 @@
     overflow: hidden;
     transition: color .28s ease, background .28s ease;
 }
-.library-intelligence [data-section="homepage-canonical-services"] .library-category {
+.library-category {
     color: var(--archive-ink) !important;
 }
 .library-category::after {
@@ -2464,7 +2179,7 @@
     font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
     letter-spacing: .08em;
 }
-.library-intelligence [data-section="homepage-canonical-services"] .library-category h3 {
+.library-category h3 {
     position: relative;
     z-index: 1;
     max-width: 260px;
@@ -2870,241 +2585,6 @@
     }
 }
 
-  /* ── Canonical Curated Collections bento ─────────────────────── */
-  .homepage-collections,
-  .homepage-services {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 96px 24px 0;
-    font-family: 'Manrope', sans-serif;
-  }
-
-  .homepage-collections__head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 20px;
-    margin-bottom: 40px;
-  }
-
-  .homepage-collections__head h2,
-  .homepage-services__head h2 {
-    font-family: 'Newsreader', serif;
-    font-weight: 400;
-    font-size: clamp(2rem, 3.6vw, 2.75rem);
-    line-height: 1.1;
-    letter-spacing: -0.015em;
-    color: #000613;
-    margin: 0 0 10px;
-  }
-
-  .homepage-collections__head p,
-  .homepage-services__head p {
-    margin: 0;
-    font-size: 1rem;
-    line-height: 1.6;
-    color: #43474e;
-    max-width: 560px;
-  }
-
-  .homepage-collections__all {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #006a6a;
-    text-decoration: none;
-    border-bottom: 1px solid transparent;
-    padding-bottom: 2px;
-    transition: border-color 0.2s ease;
-  }
-
-  .homepage-collections__all:hover {
-    border-bottom-color: #006a6a;
-  }
-
-  .homepage-collections__bento {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  @media (min-width: 900px) {
-    .homepage-collections__bento {
-      grid-template-columns: 1.4fr 1fr;
-      grid-template-rows: 240px 240px;
-    }
-
-    .homepage-collections__tile--featured {
-      grid-row: 1 / span 2;
-    }
-  }
-
-  .homepage-collections__tile {
-    position: relative;
-    display: block;
-    min-height: 220px;
-    border-radius: 8px;
-    overflow: hidden;
-    text-decoration: none;
-  }
-
-  .homepage-collections__tile img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
-  }
-
-  .homepage-collections__tile:hover img {
-    transform: scale(1.04);
-  }
-
-  .homepage-collections__tile-overlay {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(0, 6, 19, 0.05) 20%, rgba(0, 6, 19, 0.82) 100%);
-  }
-
-  .homepage-collections__tile-content {
-    position: absolute;
-    inset-inline: 0;
-    bottom: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 28px;
-  }
-
-  .homepage-collections__badge {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #ffffff;
-    background: #006a6a;
-    border-radius: 4px;
-    padding: 4px 10px;
-    margin-bottom: 4px;
-  }
-
-  .homepage-collections__tile-title {
-    font-family: 'Newsreader', serif;
-    font-size: 24px;
-    line-height: 1.2;
-    color: #ffffff;
-  }
-
-  .homepage-collections__tile--featured .homepage-collections__tile-title {
-    font-size: 30px;
-  }
-
-  .homepage-collections__tile-body {
-    font-size: 14px;
-    line-height: 1.55;
-    color: rgba(255, 255, 255, 0.82);
-    max-width: 420px;
-  }
-
-  .homepage-collections__tile-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 8px;
-    font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #ffffff;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.6);
-    padding-bottom: 2px;
-  }
-
-  /* ── Canonical Scholarly Services ────────────────────────────── */
-  .homepage-services__head {
-    max-width: 640px;
-    margin-bottom: 40px;
-  }
-
-  .homepage-services__grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  @media (min-width: 768px) {
-    .homepage-services__grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-  }
-
-  .homepage-services__card {
-    background: #ffffff;
-    border-radius: 8px;
-    padding: 32px 28px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 14px;
-    transition: background-color 0.3s ease;
-  }
-
-  .homepage-services__card:hover {
-    background: #eef1f1;
-  }
-
-  .homepage-services__icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 52px;
-    height: 52px;
-    border-radius: 8px;
-    background: rgba(0, 106, 106, 0.1);
-    color: #006a6a;
-  }
-
-  .homepage-services__icon .material-symbols-outlined {
-    font-size: 26px;
-  }
-
-  .homepage-services__card h3 {
-    font-family: 'Newsreader', serif;
-    font-size: 21px;
-    line-height: 1.25;
-    color: #000613;
-    margin: 0;
-  }
-
-  .homepage-services__card p {
-    font-size: 14px;
-    line-height: 1.65;
-    color: #43474e;
-    margin: 0;
-    flex: 1;
-  }
-
-  .homepage-services__card a {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #006a6a;
-    text-decoration: none;
-    border-bottom: 1px solid transparent;
-    padding-bottom: 2px;
-    transition: border-color 0.2s ease;
-  }
-
-  .homepage-services__card a:hover {
-    border-bottom-color: #006a6a;
-  }
 </style>
 @endsection
 
@@ -3189,94 +2669,19 @@
 
         <a href="{{ $withLang('/catalog') }}"
            class="mt-8 inline-flex items-center gap-2 border-b border-[#e8a020] pb-1 text-xs font-extrabold uppercase tracking-[0.12em] text-white transition hover:text-[#f3bd46]">
-          {{ $copy['collection_featured_cta'] }}
+          {{ $lang === 'en' ? 'Open Catalog' : ($lang === 'kk' ? 'Каталогты ашу' : 'Открыть каталог') }}
           <span aria-hidden="true">→</span>
         </a>
       </aside>
     </div>
 
-    <a href="#featured-collections" class="homepage-hero__scroll">
+    <a href="#homepage-navigation" class="homepage-hero__scroll">
       {{ $lang === 'en' ? 'Explore' : ($lang === 'kk' ? 'Төмен' : 'Далее') }}
     </a>
   </section>
 
-  {{-- ══════════════════════════════════════════════════════════════
-       SECTION 2 — CURATED COLLECTIONS (canonical bento)
-       ════════════════════════════════════════════════════════════ --}}
-  <section id="featured-collections" data-section="homepage-canonical-collections" class="homepage-collections">
-    <header class="homepage-collections__head">
-      <div>
-        <h2 data-test-id="homepage-canonical-collections-heading">{{ $copy['collections_heading'] }}</h2>
-        <p>{{ $copy['collections_lead'] }}</p>
-      </div>
-      <a class="homepage-collections__all" href="{{ $withLang('/discover') }}">
-        {{ $copy['collections_all_cta'] }} <span aria-hidden="true">→</span>
-      </a>
-    </header>
-
-    <div class="homepage-collections__bento">
-      <a class="homepage-collections__tile homepage-collections__tile--featured"
-         href="{{ $withLang('/discover') }}"
-         data-test-id="homepage-canonical-bento-featured">
-        <img src="/images/news/campus-library.jpg" alt="{{ $copy['collection_featured_img_alt'] }}" loading="lazy">
-        <span class="homepage-collections__tile-overlay" aria-hidden="true"></span>
-        <span class="homepage-collections__tile-content">
-          <span class="homepage-collections__badge">{{ $copy['collection_featured_badge'] }}</span>
-          <span class="homepage-collections__tile-title">{{ $copy['collection_featured_title'] }}</span>
-          <span class="homepage-collections__tile-body">{{ $copy['collection_featured_body'] }}</span>
-          <span class="homepage-collections__tile-cta">{{ $copy['collection_featured_cta'] }} <span aria-hidden="true">→</span></span>
-        </span>
-      </a>
-
-      <a class="homepage-collections__tile"
-         href="{{ $withLang('/catalog', ['udc' => '5']) }}"
-         data-test-id="homepage-canonical-bento-tile-1">
-        <img src="/images/news/ai-workshop.jpg" alt="{{ $copy['collection_tile1_img_alt'] }}" loading="lazy">
-        <span class="homepage-collections__tile-overlay" aria-hidden="true"></span>
-        <span class="homepage-collections__tile-content">
-          <span class="homepage-collections__tile-title">{{ $copy['collection_tile1_title'] }}</span>
-          <span class="homepage-collections__tile-body">{{ $copy['collection_tile1_body'] }}</span>
-        </span>
-      </a>
-
-      <a class="homepage-collections__tile"
-         href="{{ $withLang('/catalog', ['udc' => '33']) }}"
-         data-test-id="homepage-canonical-bento-tile-2">
-        <img src="/images/news/classics-event.jpg" alt="{{ $copy['collection_tile2_img_alt'] }}" loading="lazy">
-        <span class="homepage-collections__tile-overlay" aria-hidden="true"></span>
-        <span class="homepage-collections__tile-content">
-          <span class="homepage-collections__tile-title">{{ $copy['collection_tile2_title'] }}</span>
-          <span class="homepage-collections__tile-body">{{ $copy['collection_tile2_body'] }}</span>
-        </span>
-      </a>
-    </div>
-  </section>
-
-  {{-- ══════════════════════════════════════════════════════════════
-       SECTION 3 — SCHOLARLY SERVICES (canonical)
-       ════════════════════════════════════════════════════════════ --}}
-  <section data-section="homepage-canonical-services" class="homepage-services">
-    <header class="homepage-services__head">
-      <h2 data-test-id="homepage-canonical-services-heading">{{ $copy['services_heading'] }}</h2>
-      <p>{{ $copy['services_lead'] }}</p>
-    </header>
-
-    <div class="homepage-services__grid">
-      @foreach($copy['services'] as $index => $service)
-        <article class="homepage-services__card">
-          <span class="homepage-services__icon">
-            <span class="material-symbols-outlined" aria-hidden="true">{{ $service['icon'] }}</span>
-          </span>
-          <h3>{{ $service['title'] }}</h3>
-          <p>{{ $service['body'] }}</p>
-          <a href="{{ $serviceHrefs[$index] }}">{{ $service['cta'] }} <span aria-hidden="true">→</span></a>
-        </article>
-      @endforeach
-    </div>
-  </section>
-
   <div class="library-intelligence">
-    <section data-section="homepage-canonical-updates" class="library-intelligence__section library-intelligence__section--white">
+    <section id="homepage-navigation" data-section="homepage-canonical-updates" class="library-intelligence__section library-intelligence__section--white">
       <header class="library-intelligence__head">
         <div>
           <span class="library-intelligence__eyebrow">{{ $libraryData['overview_kicker'] }}</span>

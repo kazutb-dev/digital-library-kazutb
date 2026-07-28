@@ -7,361 +7,664 @@
 
   $headerCopy = [
     'ru' => [
-      'utility' => [['Главная', '/'], ['Подборка', '/shortlist']],
+      'org' => 'Казахский университет технологии и бизнеса имени К. Кулажанова',
       'links' => [
+        ['home', 'Главная', '/'],
         ['catalog', 'Каталог', '/catalog'],
-        ['discover', 'Обзор', '/discover'],
         ['resources', 'Ресурсы', '/resources'],
         ['repository', 'Репозиторий', '/repository'],
         ['news', 'Новости', '/news'],
         ['events', 'События', '/events'],
+        ['contacts', 'Контакты', '/contacts'],
       ],
       'institution' => 'Об институте',
       'institution_links' => [
         ['О библиотеке', '/about'],
         ['Руководство', '/leadership'],
         ['Правила библиотеки', '/rules'],
-        ['Контакты', '/contacts'],
+        ['Обзор фонда', '/discover'],
       ],
-      'name' => 'КАЗАХСКИЙ УНИВЕРСИТЕТ ТЕХНОЛОГИИ И БИЗНЕСА ИМЕНИ К. КУЛАЖАНОВА',
-      'menu' => 'Меню', 'guest' => 'Войти', 'dashboard' => 'Открыть кабинет', 'signout' => 'Выйти', 'lang_aria' => 'Переключатель языка',
+      'search' => 'Поиск',
+      'search_placeholder' => 'Название, автор, УДК…',
+      'shortlist' => 'Подборка',
+      'notifications' => 'Уведомления',
+      'menu' => 'Меню',
+      'guest' => 'Войти',
+      'dashboard' => 'Открыть кабинет',
+      'signout' => 'Выйти',
+      'lang_aria' => 'Переключатель языка',
     ],
     'kk' => [
-      'utility' => [['Басты бет', '/'], ['Іріктеме', '/shortlist']],
+      'org' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
       'links' => [
+        ['home', 'Басты бет', '/'],
         ['catalog', 'Каталог', '/catalog'],
-        ['discover', 'Шолу', '/discover'],
         ['resources', 'Ресурстар', '/resources'],
         ['repository', 'Репозиторий', '/repository'],
         ['news', 'Жаңалықтар', '/news'],
         ['events', 'Іс-шаралар', '/events'],
+        ['contacts', 'Байланыс', '/contacts'],
       ],
       'institution' => 'Институт туралы',
       'institution_links' => [
         ['Кітапхана туралы', '/about'],
         ['Басшылық', '/leadership'],
         ['Кітапхана ережелері', '/rules'],
-        ['Байланыс', '/contacts'],
+        ['Қорға шолу', '/discover'],
       ],
-      'name' => 'Қ. ҚҰЛАЖАНОВ АТЫНДАҒЫ ҚАЗАҚ ТЕХНОЛОГИЯ ЖӘНЕ БИЗНЕС УНИВЕРСИТЕТІ',
-      'menu' => 'Мәзір', 'guest' => 'Кіру', 'dashboard' => 'Кабинетті ашу', 'signout' => 'Шығу', 'lang_aria' => 'Тіл ауыстырғыш',
+      'search' => 'Іздеу',
+      'search_placeholder' => 'Атауы, авторы, ӘОЖ…',
+      'shortlist' => 'Іріктеме',
+      'notifications' => 'Хабарламалар',
+      'menu' => 'Мәзір',
+      'guest' => 'Кіру',
+      'dashboard' => 'Кабинетті ашу',
+      'signout' => 'Шығу',
+      'lang_aria' => 'Тіл ауыстырғыш',
     ],
     'en' => [
-      'utility' => [['Home', '/'], ['Shortlist', '/shortlist']],
+      'org' => 'Kazakh University of Technology and Business named after K. Kulazhanov',
       'links' => [
+        ['home', 'Home', '/'],
         ['catalog', 'Catalog', '/catalog'],
-        ['discover', 'Discover', '/discover'],
         ['resources', 'Resources', '/resources'],
         ['repository', 'Repository', '/repository'],
         ['news', 'News', '/news'],
         ['events', 'Events', '/events'],
+        ['contacts', 'Contacts', '/contacts'],
       ],
       'institution' => 'Institution',
       'institution_links' => [
         ['About the Library', '/about'],
         ['Leadership', '/leadership'],
         ['Library Rules', '/rules'],
-        ['Contacts', '/contacts'],
+        ['Browse the collection', '/discover'],
       ],
-      'name' => 'KAZAKH UNIVERSITY OF TECHNOLOGY AND BUSINESS NAMED AFTER K. KULAZHANOV',
-      'menu' => 'Menu', 'guest' => 'Sign in', 'dashboard' => 'Open portal', 'signout' => 'Sign out', 'lang_aria' => 'Language switcher',
+      'search' => 'Search',
+      'search_placeholder' => 'Title, author, UDC…',
+      'shortlist' => 'Shortlist',
+      'notifications' => 'Notifications',
+      'menu' => 'Menu',
+      'guest' => 'Sign in',
+      'dashboard' => 'Open portal',
+      'signout' => 'Sign out',
+      'lang_aria' => 'Language switcher',
     ],
   ][$pageLang];
 
   $routeWithLang = static function (string $path, array $query = []) use ($pageLang): string {
+      [$path, $existing] = array_pad(explode('?', $path, 2), 2, '');
+      parse_str($existing, $inherited);
+      $query = array_merge($inherited, $query);
+
       $normalizedPath = '/' . ltrim($path, '/');
       if ($normalizedPath === '//') $normalizedPath = '/';
       if ($pageLang !== 'ru') $query['lang'] = $pageLang;
       $query = array_filter($query, static fn ($value) => $value !== null && $value !== '');
+
       return $normalizedPath . ($query ? ('?' . http_build_query($query)) : '');
   };
-  $headerHref = static fn (string $href): string => str_starts_with($href, 'http') ? $href : $routeWithLang($href);
   $localeLabels = ['kk' => 'KZ', 'ru' => 'RU', 'en' => 'EN'];
 @endphp
 
 <style>
-  .brand-mark {
-    width: 108px;
-    height: 108px;
-    border: 3.5px solid rgba(255, 255, 255, 0.92);
-    border-radius: 50%;
-    background:
-      radial-gradient(circle at 50% 48%, #fff 0 31%, transparent 32%),
-      conic-gradient(from 210deg, #006a6a 0 18%, #fff 18% 50%, #0b2037 50% 100%);
-    box-shadow:
-      0 0 0 0.5px rgba(255, 255, 255, 0.3),
-      0 16px 48px rgba(0, 0, 0, 0.38),
-      0 2px 10px rgba(0, 0, 0, 0.2);
-    position: relative;
-    flex: 0 0 auto;
-    overflow: hidden;
-    will-change: transform, width, height;
-    transition:
-      width 0.42s cubic-bezier(0.23, 1, 0.32, 1),
-      height 0.42s cubic-bezier(0.23, 1, 0.32, 1),
-      border-color 0.42s ease,
-      box-shadow 0.42s ease,
-      transform 0.36s cubic-bezier(0.23, 1, 0.32, 1);
+  /* ============================================================
+     Site header — single row, institutional.
+     Transparent over the homepage hero, solid white once scrolled
+     or on any inner page. No second tier, no centred wordmark.
+     ============================================================ */
+  :root {
+    --site-header-h: 88px;
+    --hdr-ink: #1f2937;
+    --hdr-ink-soft: #4b5563;
+    --hdr-accent: #0f4c81;
+    --hdr-line: #e5e7eb;
   }
 
-  .brand-mark.has-image {
-    background: #fff;
-  }
-
-  .brand-mark img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    object-position: center;
-    display: block;
-  }
-
-  .brand-mark:hover {
-    transform: scale(1.09) rotate(-5deg);
-    box-shadow:
-      0 0 0 4px rgba(0, 106, 106, 0.45),
-      0 22px 60px rgba(0, 0, 0, 0.45),
-      0 4px 18px rgba(0, 0, 0, 0.26);
-  }
-
-  .official-header {
+  .site-header {
     position: fixed;
+    inset-inline: 0;
     top: 0;
-    right: 0;
-    left: 0;
     z-index: 140;
+    height: var(--site-header-h);
+    display: flex;
+    align-items: center;
     background: transparent;
-    border: 0;
-    box-shadow: none;
+    border-bottom: 1px solid transparent;
     transition:
-      background 0.22s ease,
-      border-color 0.22s ease,
-      box-shadow 0.22s ease;
+      background-color 250ms ease,
+      border-color 250ms ease,
+      box-shadow 250ms ease;
   }
 
-  .official-header:not(.scrolled) {
-    background: linear-gradient(180deg, rgba(7, 25, 43, 0.24), transparent);
+  .site-header.is-solid {
+    background: #ffffff;
+    border-bottom-color: var(--hdr-line);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   }
 
-  .official-header-main {
-    min-height: 150px;
-    transition: min-height 0.36s cubic-bezier(0.23, 1, 0.32, 1);
+  .site-header__inner {
+    width: 100%;
+    max-width: 1440px;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 3vw, 40px);
+    display: flex;
+    align-items: center;
+    gap: clamp(16px, 2.5vw, 40px);
   }
 
-  .official-header .official-nav-link,
-  .official-header .official-brand-name {
-    color: #fff;
-    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.72);
-    transition:
-      color 0.22s ease,
-      text-shadow 0.22s ease;
+  /* ── Brand ─────────────────────────────────────────────── */
+  .hdr-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: 0 0 auto;
+    text-decoration: none;
+    min-width: 0;
   }
 
-  .official-header.scrolled {
-    background: rgba(255, 255, 255, 0.99);
-    border: 0;
-    box-shadow: 0 8px 30px rgba(15, 38, 66, 0.08);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  .official-header.scrolled .official-header-main {
-    min-height: 104px;
-  }
-
-  .official-header.scrolled .brand-mark {
+  .hdr-brand__mark {
+    flex: 0 0 auto;
     width: 72px;
     height: 72px;
-    border-width: 2.5px;
-    border-color: rgba(11, 32, 55, 0.28);
-    box-shadow:
-      0 6px 22px rgba(11, 32, 55, 0.18),
-      0 0 0 0.5px rgba(255, 255, 255, 0.35);
+    object-fit: contain;
+    display: block;
+    background: transparent;
   }
 
-  .official-header.scrolled .official-nav-link,
-  .official-header.scrolled .official-brand-name {
-    color: #1c2b39;
-    text-shadow: none;
+  .hdr-brand__text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
   }
 
-  .official-header .official-nav-link:hover,
-  .official-header.scrolled .official-nav-link:hover {
-    color: #006a6a;
+  .hdr-brand__name {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.005em;
+    color: #ffffff;
+    white-space: nowrap;
+    transition: color 250ms ease;
   }
 
-  .official-header:not(.scrolled) .official-nav-link:hover {
-    color: #fff;
-    border-color: #fff;
-  }
-
-  .official-brand-name {
-    transition:
-      color 0.42s ease,
-      text-shadow 0.42s ease,
-      font-size 0.42s ease,
-      letter-spacing 0.42s ease;
-  }
-
-  .official-header.scrolled .official-brand-name {
-    font-size: 12px;
-    letter-spacing: 0.07em;
-  }
-
-  .utility-dropdown summary {
-    list-style: none;
-  }
-  .utility-dropdown summary::-webkit-details-marker {
+  .hdr-brand__org {
     display: none;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.72);
+    max-width: 252px;
+    /* Two lines keeps the lockup balanced against the single-line name. */
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    overflow: hidden;
+    transition: color 250ms ease;
   }
-  .utility-dropdown[open] summary {
-    background: rgba(255, 255, 255, 0.06);
+
+  .site-header.is-solid .hdr-brand__name { color: var(--hdr-ink); }
+  .site-header.is-solid .hdr-brand__org { color: #6b7280; }
+
+  /* ── Primary navigation ────────────────────────────────── */
+  .hdr-nav {
+    display: none;
+    flex: 1 1 0;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(12px, 1.3vw, 22px);
+  }
+
+  .hdr-nav__link {
+    position: relative;
+    padding: 6px 0;
+    font-size: 14.5px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: 0.005em;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.92);
+    text-decoration: none;
+    transition: color 250ms ease;
+  }
+
+  /* Hover is a colour change plus a hairline — never a filled pill. */
+  .hdr-nav__link::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 0;
+    height: 1px;
+    background: currentColor;
+    transition: width 250ms ease;
+  }
+
+  .hdr-nav__link:hover::after,
+  .hdr-nav__link[aria-current='page']::after {
+    width: 100%;
+  }
+
+  .site-header.is-solid .hdr-nav__link { color: var(--hdr-ink); }
+  .site-header.is-solid .hdr-nav__link:hover,
+  .site-header.is-solid .hdr-nav__link[aria-current='page'] { color: var(--hdr-accent); }
+
+  /* ── Right-hand actions ────────────────────────────────── */
+  .hdr-actions {
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 1vw, 14px);
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 12px;
+  }
+
+  .hdr-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.92);
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 250ms ease;
+  }
+
+  .hdr-icon .material-symbols-outlined { font-size: 21px; }
+  .hdr-icon:hover { color: #ffffff; }
+  .site-header.is-solid .hdr-icon { color: var(--hdr-ink); }
+  .site-header.is-solid .hdr-icon:hover { color: var(--hdr-accent); }
+
+  /* Language switcher — plain text, no chips. */
+  .hdr-lang {
+    display: none;
+    position: relative;
+  }
+
+  .hdr-lang__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.92);
+    cursor: pointer;
+    transition: color 250ms ease;
+  }
+
+  .hdr-lang__trigger .material-symbols-outlined { font-size: 21px; }
+  .hdr-lang__trigger:hover { color: #ffffff; }
+  .site-header.is-solid .hdr-lang__trigger { color: var(--hdr-ink); }
+  .site-header.is-solid .hdr-lang__trigger:hover { color: var(--hdr-accent); }
+
+  .hdr-lang__panel {
+    position: absolute;
+    top: calc(100% + 14px);
+    right: 0;
+    z-index: 10;
+    min-width: 120px;
+    padding: 8px 0;
+    background: #ffffff;
+    border: 1px solid var(--hdr-line);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  }
+
+  .hdr-lang__link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    color: var(--hdr-ink);
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+  }
+
+  .hdr-lang__link:hover {
+    background: #f3f4f6;
+    color: var(--hdr-accent);
+  }
+
+  .hdr-lang__link[aria-current='true'] {
+    color: var(--hdr-accent);
+  }
+
+  /* The single accent element in the header. */
+  .hdr-cta {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 22px;
+    background: var(--hdr-accent);
+    border: 1px solid var(--hdr-accent);
+    color: #ffffff;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background-color 250ms ease, border-color 250ms ease;
+  }
+
+  .hdr-cta:hover { background: #0c3c68; border-color: #0c3c68; }
+
+  .hdr-signout {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 250ms ease;
+  }
+
+  .hdr-signout:hover { color: #ffffff; }
+  .site-header.is-solid .hdr-signout { color: var(--hdr-ink-soft); }
+  .site-header.is-solid .hdr-signout:hover { color: var(--hdr-accent); }
+
+  /* ── Disclosure panels (search / burger) ───────────────── */
+  .hdr-disclosure { position: relative; display: flex; }
+  .hdr-disclosure > summary { list-style: none; }
+  .hdr-disclosure > summary::-webkit-details-marker { display: none; }
+
+  .hdr-panel {
+    position: absolute;
+    top: calc(100% + 14px);
+    right: 0;
+    z-index: 10;
+    background: #ffffff;
+    border: 1px solid var(--hdr-line);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  }
+
+  .hdr-panel--search { width: min(92vw, 420px); padding: 16px; }
+
+  .hdr-search__form { display: flex; align-items: center; gap: 8px; }
+
+  .hdr-search__input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--hdr-line);
+    background: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--hdr-ink);
+  }
+
+  .hdr-search__input:focus {
+    outline: none;
+    border-color: var(--hdr-accent);
+  }
+
+  .hdr-search__submit {
+    padding: 10px 18px;
+    border: 1px solid var(--hdr-accent);
+    background: var(--hdr-accent);
     color: #fff;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
   }
 
+  .hdr-panel--menu { width: min(92vw, 320px); padding: 10px 0; max-height: 74vh; overflow-y: auto; }
+
+  .hdr-menu__link {
+    display: block;
+    padding: 10px 20px;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--hdr-ink);
+    text-decoration: none;
+  }
+
+  .hdr-menu__link:hover { background: #f3f4f6; color: var(--hdr-accent); }
+
+  .hdr-menu__group {
+    padding: 14px 20px 6px;
+    margin-top: 6px;
+    border-top: 1px solid var(--hdr-line);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #9ca3af;
+  }
+
+  .hdr-menu__link--muted { font-size: 13.5px; color: var(--hdr-ink-soft); }
+  .hdr-menu__link--accent { font-weight: 600; color: var(--hdr-accent); }
+
+  .hdr-burger { display: inline-flex; }
+
+  /* ── Focus ─────────────────────────────────────────────── */
+  .site-header a:focus-visible,
+  .site-header button:focus-visible,
+  .site-header summary:focus-visible,
+  .site-header input:focus-visible {
+    outline: 2px solid var(--hdr-accent);
+    outline-offset: 3px;
+  }
+
+  .site-header:not(.is-solid) a:focus-visible,
+  .site-header:not(.is-solid) summary:focus-visible {
+    outline-color: #ffffff;
+  }
+
+  /* ── Breakpoints ───────────────────────────────────────── */
   @media (max-width: 1023px) {
-    .brand-mark {
-      width: 58px;
-      height: 58px;
-      border-width: 2px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    :root { --site-header-h: 72px; }
+
+    .site-header,
+    .site-header.is-solid {
+      background: #ffffff;
+      border-bottom-color: var(--hdr-line);
     }
 
-    .official-header,
-    .official-header.scrolled {
-      background: rgba(255, 255, 255, 0.99);
-    }
-
-    .official-header .official-brand-name {
-      color: #1c2b39;
-      text-shadow: none;
-    }
-
-    .official-header-main,
-    .official-header.scrolled .official-header-main {
-      min-height: 74px;
-    }
-
-    .site-shell:not(.homepage) .page-main {
-      padding-top: 114px;
-    }
+    .hdr-brand__mark { width: 58px; height: 58px; }
+    .hdr-brand__name { font-size: 16px; color: var(--hdr-ink); }
+    .hdr-brand__org { display: none; }
+    .hdr-icon { color: var(--hdr-ink); }
+    .hdr-icon:hover { color: var(--hdr-accent); }
+    .hdr-lang a { color: #9ca3af; }
+    .hdr-lang a[aria-current='true'] { color: var(--hdr-accent); }
+    .hdr-lang__sep { color: var(--hdr-line); }
+    .hdr-cta, .hdr-signout { display: none; }
   }
 
+  @media (min-width: 640px) {
+    .hdr-lang { display: inline-flex; }
+  }
+
+  /* Tablet keeps a compact set; the rest moves into the menu. */
   @media (min-width: 1024px) {
-    .site-shell:not(.homepage) .page-main {
-      padding-top: 144px;
+    .hdr-nav { display: flex; }
+    .hdr-burger { display: none; }
+  }
+
+  /* Tablet: a compact four-item nav; the remainder lives in the menu. */
+  @media (min-width: 1024px) and (max-width: 1279px) {
+    .hdr-nav { gap: 13px; }
+    .hdr-nav__link { font-size: 13.5px; }
+    .hdr-nav__link:not([data-nav-index='0']):not([data-nav-index='1']):not([data-nav-index='2']):not([data-nav-index='3']) {
+      display: none;
     }
+    .hdr-icon--shortlist { display: none; }
+    .hdr-burger { display: inline-flex; }
+  }
+
+  @media (min-width: 1440px) {
+    .hdr-brand__org { display: -webkit-box; }
+  }
+
+  /* Inner pages start below the fixed header. */
+  .site-shell:not(.homepage) .page-main {
+    padding-top: var(--site-header-h);
   }
 </style>
 
-<header id="mainHeader" class="official-header {{ $isHomePage ? '' : 'scrolled' }}">
-  <div class="bg-[#0b2037]/95 text-white/75 backdrop-blur-md">
-    <div class="mx-auto flex min-h-10 w-full max-w-[1370px] items-stretch justify-between px-4 sm:px-6">
-      <nav class="hidden items-stretch md:flex" aria-label="University services">
-        @foreach($headerCopy['utility'] as [$label, $href])
-          <a href="{{ $headerHref($href) }}" class="flex items-center border-x border-white/[0.05] px-4 text-[12px] font-semibold transition hover:bg-white/[0.06] hover:text-white" @if(str_starts_with($href, 'http')) target="_blank" rel="noopener" @endif>{{ $label }}</a>
-        @endforeach
+<header id="siteHeader" class="site-header {{ $isHomePage ? '' : 'is-solid' }}">
+  <div class="site-header__inner">
 
-        <details class="utility-dropdown relative flex">
-          <summary class="flex cursor-pointer items-center gap-1 border-x border-white/[0.05] px-4 text-[12px] font-semibold transition hover:bg-white/[0.06] hover:text-white">
-            {{ $headerCopy['institution'] }}
-            <span aria-hidden="true" class="text-[10px] opacity-70">⌄</span>
-          </summary>
-          <nav class="absolute left-0 top-full z-50 grid w-60 overflow-hidden rounded-b-sm border border-slate-200 bg-white py-2 shadow-2xl" aria-label="{{ $headerCopy['institution'] }}">
-            @foreach($headerCopy['institution_links'] as [$label, $href])
-              <a href="{{ $headerHref($href) }}" class="px-5 py-2.5 text-[13px] font-semibold text-[#1c2b39] hover:bg-[#f2f6f5] hover:text-[#006a6a]">{{ $label }}</a>
-            @endforeach
-          </nav>
-        </details>
+    {{-- Left: logo + institutional lockup --}}
+    <a class="hdr-brand" href="{{ $routeWithLang('/') }}" aria-label="{{ __('ui.brand.home_aria') }}">
+      <img class="hdr-brand__mark"
+           src="{{ asset('logo.png') }}"
+           alt=""
+           width="72" height="72"
+           loading="eager" decoding="async">
+      <span class="hdr-brand__text">
+        <span class="hdr-brand__name">{{ __('ui.brand.title') }}</span>
+        <span class="hdr-brand__org">{{ $headerCopy['org'] }}</span>
+      </span>
+    </a>
 
-        @unless($isAuthenticated)
-          <a href="{{ $routeWithLang('/login') }}" class="flex items-center border-x border-white/[0.05] px-4 text-[12px] font-semibold transition hover:bg-white/[0.06] hover:text-white">{{ $headerCopy['guest'] }}</a>
-        @endunless
-        <a href="{{ $routeWithLang('/dashboard') }}" class="flex items-center border-x border-white/[0.05] px-4 text-[12px] font-semibold transition hover:bg-white/[0.06] hover:text-white">{{ $headerCopy['dashboard'] }}</a>
-        @if($isAuthenticated)
-          <a href="{{ $routeWithLang('/logout') }}" class="flex items-center border-x border-white/[0.05] px-4 text-[12px] font-semibold transition hover:bg-white/[0.06] hover:text-white">{{ $headerCopy['signout'] }}</a>
-        @endif
-      </nav>
-      <div class="ml-auto flex items-stretch text-[11px] font-bold tracking-wide" role="group" data-locale-switcher aria-label="{{ $headerCopy['lang_aria'] }}">
-        @foreach(['kk', 'ru', 'en'] as $locale)
-          <a href="{{ request()->fullUrlWithQuery(['lang' => $locale]) }}" class="flex min-w-11 items-center justify-center border-x border-white/[0.05] px-3 transition {{ $pageLang === $locale ? 'bg-[#006a6a] text-white' : 'hover:bg-white/[0.06] hover:text-white' }}">{{ $localeLabels[$locale] }}</a>
-        @endforeach
-      </div>
-    </div>
-  </div>
+    {{-- Centre: single-row primary navigation --}}
+    <nav class="hdr-nav" aria-label="{{ __('ui.aria.main_navigation') }}">
+      @foreach($headerCopy['links'] as $i => [$key, $label, $href])
+        <a class="hdr-nav__link"
+           href="{{ $routeWithLang($href) }}"
+           data-nav-index="{{ $i }}"
+           @if($activePage === $key) aria-current="page" @endif>{{ $label }}</a>
+      @endforeach
+    </nav>
 
-  <div class="relative mx-auto w-full max-w-[1370px] px-4 sm:px-6">
-    <div class="official-header-main hidden items-center justify-center gap-5 lg:flex">
-      <nav class="flex flex-1 items-center justify-end gap-5" aria-label="{{ __('ui.aria.main_navigation') }}">
-        @foreach(array_slice($headerCopy['links'], 0, 3) as [$key, $label, $href])
-          <a href="{{ $headerHref($href) }}" class="official-nav-link inline-flex items-center gap-1 whitespace-nowrap border-b-[3px] border-transparent px-2 py-2 text-[15px] font-extrabold transition hover:-translate-y-0.5 {{ $activePage === $key ? 'border-[#006a6a]' : '' }}">{{ $label }}</a>
-        @endforeach
-      </nav>
+    {{-- Right: search, quick links, language, single accent action --}}
+    <div class="hdr-actions">
+      <details class="hdr-disclosure">
+        <summary class="hdr-icon" role="button" aria-label="{{ $headerCopy['search'] }}">
+          <span class="material-symbols-outlined" aria-hidden="true">search</span>
+        </summary>
+        <div class="hdr-panel hdr-panel--search">
+          <form class="hdr-search__form" action="{{ $routeWithLang('/catalog') }}" method="get" role="search">
+            @if($pageLang !== 'ru')
+              <input type="hidden" name="lang" value="{{ $pageLang }}">
+            @endif
+            <label class="sr-only" for="site-search-input">{{ $headerCopy['search'] }}</label>
+            <input id="site-search-input"
+                   class="hdr-search__input"
+                   type="search"
+                   name="q"
+                   autocomplete="off"
+                   placeholder="{{ $headerCopy['search_placeholder'] }}">
+            <button type="submit" class="hdr-search__submit">{{ $headerCopy['search'] }}</button>
+          </form>
+        </div>
+      </details>
 
-      <a href="{{ $routeWithLang('/') }}" class="relative z-10 flex shrink-0 items-center justify-center self-start pt-2" aria-label="{{ __('ui.brand.home_aria') }}">
-        <span class="brand-mark has-image">
-          <img src="{{ asset('logo.png') }}" alt="{{ __('ui.brand.title') }} logo" loading="eager" decoding="async">
-        </span>
+      <a class="hdr-icon hdr-icon--shortlist" href="{{ $routeWithLang('/shortlist') }}" aria-label="{{ $headerCopy['shortlist'] }}" title="{{ $headerCopy['shortlist'] }}">
+        <span class="material-symbols-outlined" aria-hidden="true">bookmark</span>
       </a>
 
-      <nav class="flex flex-1 items-center justify-start gap-5" aria-label="University navigation continued">
-        @foreach(array_slice($headerCopy['links'], 3) as [$key, $label, $href])
-          <a href="{{ $headerHref($href) }}" class="official-nav-link inline-flex items-center gap-1 whitespace-nowrap border-b-[3px] border-transparent px-2 py-2 text-[15px] font-extrabold transition hover:-translate-y-0.5 {{ $activePage === $key ? 'border-[#006a6a]' : '' }}">{{ $label }}</a>
-        @endforeach
-      </nav>
-    </div>
+      @if($isAuthenticated)
+        <a class="hdr-icon" href="{{ $routeWithLang('/dashboard/notifications') }}" aria-label="{{ $headerCopy['notifications'] }}" title="{{ $headerCopy['notifications'] }}">
+          <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
+        </a>
+      @endif
 
-    <div class="flex min-h-[74px] items-center justify-between gap-4 lg:hidden">
-      <a href="{{ $routeWithLang('/') }}" class="flex items-center gap-3 text-[#1c2b39]">
-        <span class="brand-mark has-image">
-          <img src="{{ asset('logo.png') }}" alt="{{ __('ui.brand.title') }} logo" loading="eager" decoding="async">
-        </span>
-        <span class="official-brand-name max-w-[220px] font-serif text-[11px] font-bold leading-tight sm:max-w-md sm:text-sm">{{ $headerCopy['name'] }}</span>
-      </a>
-      <details class="relative">
-        <summary class="cursor-pointer list-none rounded-sm bg-[#0b2037] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white">{{ $headerCopy['menu'] }}</summary>
-        <nav class="absolute right-0 top-[calc(100%+10px)] z-50 grid w-64 overflow-hidden rounded-sm border border-slate-200 bg-white py-2 shadow-2xl">
-          <a href="{{ $routeWithLang('/') }}" class="px-5 py-2.5 text-sm font-semibold text-[#1c2b39] hover:bg-[#f2f6f5] hover:text-[#006a6a]">{{ $headerCopy['utility'][0][0] }}</a>
+      <details class="hdr-disclosure hdr-lang" data-locale-switcher>
+        <summary class="hdr-lang__trigger" role="button" aria-label="{{ $headerCopy['lang_aria'] }}">
+          <span class="material-symbols-outlined" aria-hidden="true">language</span>
+        </summary>
+        <div class="hdr-lang__panel" role="menu" aria-label="{{ $headerCopy['lang_aria'] }}">
+          @foreach(['kk', 'ru', 'en'] as $locale)
+            <a class="hdr-lang__link"
+               href="{{ request()->fullUrlWithQuery(['lang' => $locale]) }}"
+               @if($pageLang === $locale) aria-current="true" @endif>
+              <span>{{ $localeLabels[$locale] }}</span>
+              @if($pageLang === $locale)
+                <span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px;">check</span>
+              @endif
+            </a>
+          @endforeach
+        </div>
+      </details>
+
+      @if($isAuthenticated)
+        <a class="hdr-cta" href="{{ $routeWithLang('/dashboard') }}">{{ $headerCopy['dashboard'] }}</a>
+        <a class="hdr-signout" href="{{ $routeWithLang('/logout') }}">{{ $headerCopy['signout'] }}</a>
+      @else
+        <a class="hdr-cta" href="{{ $routeWithLang('/login') }}">{{ $headerCopy['guest'] }}</a>
+      @endif
+
+      {{-- Menu: full navigation on mobile, overflow + institution links on desktop --}}
+      <details class="hdr-disclosure hdr-burger">
+        <summary class="hdr-icon" role="button" aria-label="{{ $headerCopy['menu'] }}">
+          <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+        </summary>
+        <nav class="hdr-panel hdr-panel--menu" aria-label="{{ $headerCopy['menu'] }}">
           @foreach($headerCopy['links'] as [$key, $label, $href])
-            <a href="{{ $headerHref($href) }}" class="px-5 py-2.5 text-sm font-semibold text-[#1c2b39] hover:bg-[#f2f6f5] hover:text-[#006a6a]">{{ $label }}</a>
+            <a class="hdr-menu__link" href="{{ $routeWithLang($href) }}">{{ $label }}</a>
           @endforeach
-          <div class="mx-5 my-2 border-t border-slate-200"></div>
+
+          <p class="hdr-menu__group">{{ $headerCopy['institution'] }}</p>
           @foreach($headerCopy['institution_links'] as [$label, $href])
-            <a href="{{ $headerHref($href) }}" class="px-5 py-2 text-[13px] font-medium text-[#43474f] hover:bg-[#f2f6f5] hover:text-[#006a6a]">{{ $label }}</a>
+            <a class="hdr-menu__link hdr-menu__link--muted" href="{{ $routeWithLang($href) }}">{{ $label }}</a>
           @endforeach
-          <a href="{{ $headerHref('/shortlist') }}" class="px-5 py-2 text-[13px] font-medium text-[#43474f] hover:bg-[#f2f6f5] hover:text-[#006a6a]">{{ $headerCopy['utility'][1][0] }}</a>
-          <div class="mx-5 my-2 border-t border-slate-200"></div>
-          <a href="{{ $routeWithLang($isAuthenticated ? '/dashboard' : '/login') }}" class="px-5 py-2.5 text-sm font-bold text-[#006a6a]">{{ $isAuthenticated ? $headerCopy['dashboard'] : $headerCopy['guest'] }}</a>
+          <a class="hdr-menu__link hdr-menu__link--muted" href="{{ $routeWithLang('/shortlist') }}">{{ $headerCopy['shortlist'] }}</a>
+
+          <p class="hdr-menu__group">{{ $headerCopy['dashboard'] }}</p>
+          @unless($isAuthenticated)
+            <a class="hdr-menu__link hdr-menu__link--accent" href="{{ $routeWithLang('/login') }}">{{ $headerCopy['guest'] }}</a>
+          @endunless
+          <a class="hdr-menu__link hdr-menu__link--accent" href="{{ $routeWithLang('/dashboard') }}">{{ $headerCopy['dashboard'] }}</a>
           @if($isAuthenticated)
-            <a href="{{ $routeWithLang('/logout') }}" class="px-5 py-2 text-[13px] font-medium text-[#43474f] hover:bg-[#f2f6f5] hover:text-[#006a6a]">{{ $headerCopy['signout'] }}</a>
+            <a class="hdr-menu__link hdr-menu__link--muted" href="{{ $routeWithLang('/logout') }}">{{ $headerCopy['signout'] }}</a>
           @endif
         </nav>
       </details>
     </div>
-
-    <p class="official-brand-name pointer-events-none absolute inset-x-0 bottom-2 hidden px-8 text-center font-serif text-[17px] font-extrabold uppercase leading-tight tracking-[0.01em] lg:block">{{ $headerCopy['name'] }}</p>
   </div>
 </header>
 
 @if($isHomePage)
 <script>
   (() => {
-    const mainHeader = document.getElementById('mainHeader');
-    if (!mainHeader) return;
+    const header = document.getElementById('siteHeader');
+    if (!header) return;
 
     let scheduled = false;
-    const syncHeader = () => {
-      mainHeader.classList.toggle('scrolled', window.scrollY > 30);
+    const sync = () => {
+      header.classList.toggle('is-solid', window.scrollY > 24);
       scheduled = false;
     };
-    const scheduleHeaderSync = () => {
+
+    const schedule = () => {
       if (scheduled) return;
       scheduled = true;
-      window.requestAnimationFrame(syncHeader);
+      window.requestAnimationFrame(sync);
     };
 
-    syncHeader();
-    window.addEventListener('scroll', scheduleHeaderSync, { passive: true });
+    sync();
+    window.addEventListener('scroll', schedule, { passive: true });
   })();
 </script>
 @endif
+
+<script>
+  // Close header disclosures on outside click and on Escape.
+  (() => {
+    const panels = document.querySelectorAll('#siteHeader .hdr-disclosure');
+    if (!panels.length) return;
+
+    document.addEventListener('click', (event) => {
+      panels.forEach((panel) => {
+        if (panel.open && !panel.contains(event.target)) panel.open = false;
+      });
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      panels.forEach((panel) => { panel.open = false; });
+    });
+  })();
+</script>
