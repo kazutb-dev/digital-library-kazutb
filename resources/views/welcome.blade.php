@@ -25,7 +25,7 @@
           'hero_kicker'              => 'Цифровой куратор',
           'hero_h1'                  => 'Открывайте знания,',
           'hero_h1_accent'           => 'управляйте источниками.',
-          'hero_lead'                => 'Единая точка доступа к академическим коллекциям, научным архивам и цифровым ресурсам КазТБУ.',
+          'hero_lead'                => 'Академические коллекции, архивы и цифровые ресурсы КазТБУ в одном месте.',
           'search_placeholder'       => 'Поиск по каталогу, авторам, УДК…',
           'search_cta'               => 'Найти',
           'trending'                 => 'Актуальные темы:',
@@ -44,7 +44,7 @@
           'hero_kicker'              => 'Цифрлық куратор',
           'hero_h1'                  => 'Білімді ашыңыз,',
           'hero_h1_accent'           => 'дереккөздерді басқарыңыз.',
-          'hero_lead'                => 'КазТБУ академиялық жинақтарына, ғылыми мұрағаттар мен цифрлық ресурстарға бірыңғай кіру нүктесі.',
+          'hero_lead'                => 'КазТБУ академиялық жинақтары, мұрағаттары және цифрлық ресурстары бір жерде.',
           'search_placeholder'       => 'Каталог, авторлар, ӘЖЖ бойынша іздеу…',
           'search_cta'               => 'Іздеу',
           'trending'                 => 'Өзекті тақырыптар:',
@@ -63,7 +63,7 @@
           'hero_kicker'              => 'Digital Curator',
           'hero_h1'                  => 'Discover Knowledge,',
           'hero_h1_accent'           => 'Curate Your Sources.',
-          'hero_lead'                => 'A single gateway to KazUTB\'s academic collections, scholarly archives, and digital resources.',
+          'hero_lead'                => 'KazUTB academic collections, archives, and digital resources in one place.',
           'search_placeholder'       => 'Search by title, author, UDC…',
           'search_cta'               => 'Search',
           'trending'                 => 'Trending topics:',
@@ -382,8 +382,8 @@
     margin-top: 0;
 }
 [data-section="homepage-canonical-hero"] {
-    height: 100vh;
-    height: 100svh;
+    min-height: 52vh;
+    min-height: 52svh;
     position: relative;
     isolation: isolate;
     overflow: hidden;
@@ -427,16 +427,17 @@
 .homepage-hero__content {
     width: 100%;
     max-width: 1370px;
-    height: 100%;
     margin: 0 auto;
-    padding: clamp(190px, 22vh, 230px) 32px clamp(58px, 8vh, 84px);
+    min-height: 52vh;
+    min-height: 52svh;
+    padding: clamp(120px, 14vh, 150px) 0 clamp(34px, 5vh, 48px) 32px;
     display: grid;
     grid-template-columns: minmax(0, 1.12fr) minmax(330px, .68fr);
-    align-items: center;
-    gap: clamp(48px, 7vw, 100px);
+    align-items: end;
+    gap: clamp(36px, 5vw, 72px);
 }
 .homepage-hero__copy {
-    max-width: 790px;
+    max-width: 700px;
 }
 .homepage-hero__kicker {
     display: inline-flex;
@@ -461,10 +462,10 @@
     box-shadow: 0 0 14px rgba(232, 160, 32, .9);
 }
 .homepage-hero__title {
-    max-width: 920px;
-    margin-top: 26px;
+    max-width: 760px;
+    margin-top: 18px;
     font-family: "Newsreader", serif;
-    font-size: clamp(52px, 6.2vw, 84px);
+    font-size: clamp(42px, 5vw, 68px);
     font-weight: 700;
     letter-spacing: -.045em;
     line-height: .96;
@@ -476,15 +477,15 @@
     font-weight: 500;
 }
 .homepage-hero__lead {
-    max-width: 650px;
-    margin-top: 28px;
+    max-width: 560px;
+    margin-top: 18px;
     color: rgba(255, 255, 255, .78);
     font-size: clamp(16px, 1.3vw, 19px);
     line-height: 1.72;
 }
 .homepage-hero__search {
     width: min(100%, 650px);
-    margin-top: 34px;
+    margin-top: 24px;
     display: flex;
     align-items: center;
     overflow: hidden;
@@ -521,7 +522,7 @@
     filter: brightness(1.08);
 }
 .homepage-hero__topics {
-    margin-top: 18px;
+    margin-top: 14px;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -542,50 +543,84 @@
     background: rgba(232, 160, 32, .13);
 }
 .homepage-hero__card {
-    max-width: 440px;
-    justify-self: end;
-    padding: clamp(28px, 3vw, 42px);
-    border: 1px solid rgba(255, 255, 255, .24);
-    background: linear-gradient(145deg, rgba(255, 255, 255, .17), rgba(255, 255, 255, .08));
-    box-shadow: 0 32px 80px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .24);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    position: relative;
+    width: 100%;
+    max-width: 388px;
+    min-height: 560px;
+    justify-self: stretch;
+    margin-left: auto;
+    padding: 32px 28px 28px 34px;
+    border: 1px solid rgba(214, 205, 190, .95);
+    background:
+      linear-gradient(90deg, rgba(236, 226, 211, .98) 0 16px, rgba(255, 255, 255, .99) 16px 100%),
+      linear-gradient(180deg, rgba(255, 255, 255, .99), rgba(247, 242, 233, .99));
+    box-shadow:
+      0 30px 74px rgba(0, 0, 0, .26),
+      inset 0 1px 0 rgba(255, 255, 255, .86),
+      inset 16px 0 0 rgba(232, 221, 203, .95),
+      inset -2px 0 0 rgba(255, 255, 255, .72);
+    border-radius: 3px;
+    overflow: hidden;
     animation: homepageHeroCardIn .9s cubic-bezier(.22, 1, .36, 1) .45s both;
 }
+.homepage-hero__card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgba(31, 41, 55, .04), transparent 20%),
+      linear-gradient(180deg, transparent 0 80%, rgba(16, 41, 69, .035) 80% 81%, transparent 81% 100%);
+    pointer-events: none;
+}
+.homepage-hero__card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 12px;
+    width: 10px;
+    height: 100%;
+    background:
+      linear-gradient(90deg, rgba(150, 129, 103, .22), rgba(255, 255, 255, .15) 48%, rgba(150, 129, 103, .12));
+    box-shadow:
+      inset 1px 0 0 rgba(255, 255, 255, .78),
+      inset -1px 0 0 rgba(130, 111, 87, .14);
+    pointer-events: none;
+}
 .homepage-hero__card-icon {
-    width: 50px;
-    height: 50px;
+    width: 54px;
+    height: 54px;
     display: grid;
     place-items: center;
-    color: #102945;
-    background: #e8a020;
-    box-shadow: 0 12px 30px rgba(232, 160, 32, .28);
+    color: #ffffff;
+    background: #11b8b2;
+    box-shadow: 0 12px 30px rgba(17, 184, 178, .22);
 }
 .homepage-hero__stats {
-    margin-top: 30px;
-    padding-top: 26px;
+    margin-top: 24px;
+    padding-top: 24px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    border-top: 1px solid rgba(255, 255, 255, .17);
+    border-top: 1px solid rgba(16, 41, 69, .13);
 }
 .homepage-hero__stat + .homepage-hero__stat {
     padding-left: 24px;
-    border-left: 1px solid rgba(255, 255, 255, .17);
+    border-left: 1px solid rgba(16, 41, 69, .13);
 }
 .homepage-hero__stat strong {
     display: block;
-    color: #fff;
+    color: #3d3f3d;
     font-family: "Newsreader", serif;
-    font-size: 35px;
-    line-height: 1;
+    font-size: 46px;
+    line-height: .84;
+    letter-spacing: -.04em;
 }
 .homepage-hero__stat span {
     display: block;
     margin-top: 8px;
-    color: rgba(255, 255, 255, .58);
+    color: rgba(92, 103, 122, .9);
     font-size: 10px;
-    font-weight: 750;
-    letter-spacing: .12em;
+    font-weight: 800;
+    letter-spacing: .14em;
     line-height: 1.4;
     text-transform: uppercase;
 }
@@ -604,6 +639,92 @@
     letter-spacing: .2em;
     text-transform: uppercase;
     transform: translateX(-50%);
+}
+.homepage-hero__bridge {
+    position: relative;
+    z-index: 3;
+    margin-top: -74px;
+    margin-bottom: 16px;
+    padding: 0 32px 22px;
+}
+.homepage-hero__bridge-inner {
+    width: min(100%, 1370px);
+    margin: 0 auto;
+    padding: 18px 24px 22px;
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid rgba(16, 41, 69, .08);
+    border-top: 0;
+    box-shadow: 0 26px 70px rgba(11, 24, 48, .12);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+.homepage-hero__bridge-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 20px;
+}
+.homepage-hero__bridge-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: #315646;
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+}
+.homepage-hero__bridge-kicker::before {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: #b38b4d;
+}
+.homepage-hero__bridge h2 {
+    margin: 10px 0 0;
+    color: #102945;
+    font-family: "Newsreader", serif;
+    font-size: clamp(28px, 3.4vw, 44px);
+    line-height: 1;
+}
+.homepage-hero__bridge p {
+    max-width: 430px;
+    margin: 0;
+    color: rgba(37, 49, 45, .68);
+    line-height: 1.7;
+}
+.homepage-hero__bridge-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+.homepage-hero__bridge-card {
+    min-height: 148px;
+    padding: 18px 18px 20px;
+    background: #f8f7f2;
+    border: 1px solid rgba(16, 41, 69, .08);
+}
+.homepage-hero__bridge-card strong {
+    display: block;
+    color: #102945;
+    font-family: "Newsreader", serif;
+    font-size: 34px;
+    line-height: 1;
+}
+.homepage-hero__bridge-card b {
+    display: block;
+    margin-top: 10px;
+    color: #102945;
+    font-size: 13px;
+    line-height: 1.25;
+}
+.homepage-hero__bridge-card small {
+    display: block;
+    margin-top: 6px;
+    color: rgba(37, 49, 45, .56);
+    font-size: 11px;
+    line-height: 1.45;
 }
 .homepage-hero__scroll::after {
     content: "";
@@ -734,7 +855,7 @@
 }
 
 [data-section="homepage-canonical-updates"] {
-    padding: 142px 32px 160px !important;
+    padding: 198px 32px 160px !important;
 }
 [data-section="homepage-canonical-updates"] > div:last-child {
     grid-template-columns: 1.12fr .88fr !important;
@@ -839,6 +960,17 @@
     .homepage-hero__scroll {
         display: none;
     }
+    .homepage-hero__bridge {
+        margin-top: -44px;
+        margin-bottom: 14px;
+        padding: 0 24px 12px;
+    }
+    .homepage-hero__bridge-inner {
+        padding: 18px 20px 20px;
+    }
+    .homepage-hero__bridge-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
     [data-section="homepage-canonical-gateway"],
     [data-section="homepage-canonical-hub-slices"],
     [data-section="homepage-canonical-updates"] {
@@ -884,6 +1016,10 @@
     [data-section="homepage-canonical-hub-slices"] > div:last-child,
     [data-section="homepage-canonical-updates"] > div:last-child {
         grid-template-columns: 1fr !important;
+    }
+    .homepage-hero__bridge-head {
+        flex-direction: column;
+        align-items: flex-start;
     }
     .homepage-canonical__gateway-card {
         min-height: 140px;
@@ -2636,7 +2772,7 @@
 
         <div id="hero-quick-links" class="homepage-hero__topics">
           <span class="text-[10px] font-bold uppercase tracking-[0.15em] text-white/50">{{ $copy['trending'] }}</span>
-          @foreach ($topics as $link)
+          @foreach (array_slice($topics, 0, 2) as $link)
             <a href="{{ $link['href'] }}">{{ $link['label'] }}</a>
           @endforeach
         </div>
@@ -2678,6 +2814,28 @@
     <a href="#homepage-navigation" class="homepage-hero__scroll">
       {{ $lang === 'en' ? 'Explore' : ($lang === 'kk' ? 'Төмен' : 'Далее') }}
     </a>
+  </section>
+
+  <section class="homepage-hero__bridge" aria-label="{{ $libraryData['overview_kicker'] }}">
+    <div class="homepage-hero__bridge-inner">
+      <div class="homepage-hero__bridge-head">
+        <div>
+          <span class="homepage-hero__bridge-kicker">{{ $libraryData['overview_kicker'] }}</span>
+          <h2>{{ $libraryData['overview_title'] }}</h2>
+        </div>
+        <p>{{ $libraryData['overview_lead'] }}</p>
+      </div>
+
+      <div class="homepage-hero__bridge-grid">
+        @foreach(array_slice($libraryData['metrics'], 0, 3) as $metric)
+          <article class="homepage-hero__bridge-card">
+            <strong>{{ $metric['value'] }}</strong>
+            <b>{{ $metric['label'] }}</b>
+            <small>{{ $metric['note'] }}</small>
+          </article>
+        @endforeach
+      </div>
+    </div>
   </section>
 
   <div class="library-intelligence">
