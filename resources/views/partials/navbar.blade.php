@@ -157,7 +157,7 @@
   .hdr-brand {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 7px;
     flex: 0 0 auto;
     text-decoration: none;
     min-width: 0;
@@ -180,7 +180,7 @@
   }
 
   .hdr-brand__name {
-    font-family: 'Newsreader', Georgia, serif;
+    font-family: 'Literata', Georgia, serif;
     font-size: 19px;
     font-weight: 600;
     line-height: 1.1;
@@ -217,16 +217,17 @@
     min-width: 0;
     align-items: center;
     justify-content: center;
-    gap: clamp(12px, 1.3vw, 22px);
+    gap: 14px;
   }
 
   .hdr-nav__link {
     position: relative;
     padding: 6px 0;
-    font-size: 14.5px;
-    font-weight: 500;
+    font-family: 'Google Sans', sans-serif;
+    font-size: 15.5px;
+    font-weight: 800;
     line-height: 1.2;
-    letter-spacing: 0.005em;
+    letter-spacing: 0.01em;
     white-space: nowrap;
     color: rgba(255, 255, 255, 0.92);
     text-decoration: none;
@@ -258,7 +259,7 @@
   .hdr-actions {
     display: flex;
     align-items: center;
-    gap: clamp(8px, 1vw, 14px);
+    gap: 7px;
     flex: 0 0 auto;
     margin-left: auto;
     padding-left: 12px;
@@ -324,6 +325,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 16px;
+    font-family: 'Google Sans', sans-serif;
     color: var(--hdr-ink);
     font-size: 13.5px;
     font-weight: 600;
@@ -348,6 +350,7 @@
     background: var(--hdr-accent);
     border: 1px solid var(--hdr-accent);
     color: #ffffff;
+    font-family: 'Google Sans', sans-serif;
     font-size: 13.5px;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -359,6 +362,7 @@
   .hdr-cta:hover { background: #0c3c68; border-color: #0c3c68; }
 
   .hdr-signout {
+    font-family: 'Google Sans', sans-serif;
     font-size: 13px;
     font-weight: 500;
     color: rgba(255, 255, 255, 0.7);
@@ -411,7 +415,7 @@
     border: 1px solid var(--hdr-accent);
     background: var(--hdr-accent);
     color: #fff;
-    font-family: inherit;
+    font-family: 'Google Sans', sans-serif;
     font-size: 13.5px;
     font-weight: 600;
     cursor: pointer;
@@ -422,6 +426,7 @@
   .hdr-menu__link {
     display: block;
     padding: 10px 20px;
+    font-family: 'Google Sans', sans-serif;
     font-size: 14.5px;
     font-weight: 500;
     color: var(--hdr-ink);
@@ -434,6 +439,7 @@
     padding: 14px 20px 6px;
     margin-top: 6px;
     border-top: 1px solid var(--hdr-line);
+    font-family: 'Google Sans', sans-serif;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -493,7 +499,7 @@
 
   /* Tablet: a compact four-item nav; the remainder lives in the menu. */
   @media (min-width: 1024px) and (max-width: 1279px) {
-    .hdr-nav { gap: 13px; }
+    .hdr-nav { gap: 12px; }
     .hdr-nav__link { font-size: 13.5px; }
     .hdr-nav__link:not([data-nav-index='0']):not([data-nav-index='1']):not([data-nav-index='2']):not([data-nav-index='3']) {
       display: none;

@@ -407,8 +407,8 @@
     inset: 0;
     z-index: -3;
     background:
-      linear-gradient(95deg, rgba(11, 24, 48, .97) 0%, rgba(16, 41, 69, .88) 38%, rgba(16, 41, 69, .62) 68%, rgba(0, 82, 88, .4) 100%),
-      linear-gradient(180deg, rgba(11, 24, 48, .58) 0%, transparent 42%, rgba(11, 24, 48, .9) 100%);
+      linear-gradient(95deg, rgba(3, 18, 28, .92) 0%, rgba(7, 41, 55, .72) 25%, rgba(8, 57, 68, .28) 52%, rgba(8, 57, 68, .08) 76%, rgba(8, 57, 68, 0) 100%),
+      linear-gradient(180deg, rgba(6, 13, 20, .64) 0%, rgba(6, 13, 20, .18) 40%, rgba(6, 13, 20, .38) 100%);
 }
 .homepage-hero__ambient {
     position: absolute;
@@ -430,14 +430,21 @@
     margin: 0 auto;
     min-height: 52vh;
     min-height: 52svh;
-    padding: clamp(120px, 14vh, 150px) 0 clamp(34px, 5vh, 48px) 32px;
+    padding: clamp(120px, 14vh, 150px) 32px clamp(34px, 5vh, 48px);
     display: grid;
-    grid-template-columns: minmax(0, 1.12fr) minmax(330px, .68fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: end;
-    gap: clamp(36px, 5vw, 72px);
 }
 .homepage-hero__copy {
-    max-width: 700px;
+    max-width: 820px;
+    position: relative;
+    padding: 28px 24px 24px;
+    margin-left: -24px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(6, 18, 30, .34), rgba(6, 18, 30, .12));
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, .12);
 }
 .homepage-hero__kicker {
     display: inline-flex;
@@ -464,7 +471,7 @@
 .homepage-hero__title {
     max-width: 760px;
     margin-top: 18px;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: clamp(42px, 5vw, 68px);
     font-weight: 700;
     letter-spacing: -.045em;
@@ -485,7 +492,7 @@
 }
 .homepage-hero__search {
     width: min(100%, 650px);
-    margin-top: 24px;
+    margin-top: 22px;
     display: flex;
     align-items: center;
     overflow: hidden;
@@ -522,7 +529,7 @@
     filter: brightness(1.08);
 }
 .homepage-hero__topics {
-    margin-top: 14px;
+    margin-top: 12px;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -541,156 +548,6 @@
     color: #fff;
     border-color: rgba(232, 160, 32, .65);
     background: rgba(232, 160, 32, .13);
-}
-.homepage-hero__card {
-    position: relative;
-    width: 100%;
-    max-width: 396px;
-    min-height: 540px;
-    justify-self: stretch;
-    margin-left: auto;
-    padding: 18px 18px 18px 22px;
-    border: 1px solid rgba(185, 120, 94, .34);
-    background:
-      linear-gradient(90deg, rgba(156, 103, 82, .96) 0 18px, rgba(168, 116, 92, .98) 18px 100%),
-      linear-gradient(180deg, rgba(171, 122, 95, .98), rgba(154, 103, 80, .98));
-    box-shadow:
-      0 28px 70px rgba(0, 0, 0, .22),
-      inset 0 1px 0 rgba(255, 255, 255, .08),
-      inset 18px 0 0 rgba(148, 95, 73, .42),
-      inset -1px 0 0 rgba(255, 255, 255, .1);
-    border-radius: 2px;
-    overflow: hidden;
-    animation: homepageHeroCardIn .9s cubic-bezier(.22, 1, .36, 1) .45s both;
-}
-.homepage-hero__card::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(circle at 86% 84%, rgba(255, 255, 255, .06), transparent 34%),
-      radial-gradient(circle at 82% 82%, rgba(255, 255, 255, .04), transparent 18%),
-      linear-gradient(90deg, rgba(255, 255, 255, .08), transparent 18%);
-    pointer-events: none;
-}
-.homepage-hero__card::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 13px;
-    width: 12px;
-    height: 100%;
-    background:
-      linear-gradient(90deg, rgba(120, 77, 58, .44), rgba(255, 255, 255, .18) 45%, rgba(120, 77, 58, .26));
-    box-shadow:
-      inset 1px 0 0 rgba(255, 255, 255, .14),
-      inset -1px 0 0 rgba(92, 57, 42, .18);
-    pointer-events: none;
-}
-.homepage-hero__card > * {
-    position: relative;
-    z-index: 1;
-}
-.homepage-hero__card-bookmark {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin: 10px 0 0;
-    color: rgba(255, 236, 230, .88);
-    font-size: 11px;
-    font-weight: 850;
-    letter-spacing: .18em;
-    text-transform: uppercase;
-}
-.homepage-hero__card-bookmark::before {
-    content: "";
-    width: 28px;
-    height: 1px;
-    background: rgba(255, 236, 230, .38);
-}
-.homepage-hero__card h2 {
-    max-width: 280px;
-    margin-top: 14px !important;
-    font-size: 28px !important;
-    color: #fff !important;
-}
-.homepage-hero__card > p:nth-of-type(2) {
-    max-width: 300px;
-    margin-top: 14px !important;
-    font-size: 13px !important;
-    line-height: 1.65;
-    color: rgba(255, 245, 240, .74) !important;
-}
-.homepage-hero__card-mid {
-    padding: 20px 20px 0 20px;
-}
-.homepage-hero__stats {
-    margin-top: 16px;
-    padding-top: 16px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    border-top: 1px solid rgba(255, 245, 240, .18);
-}
-.homepage-hero__stat + .homepage-hero__stat {
-    padding-left: 18px;
-    border-left: 1px solid rgba(255, 245, 240, .18);
-}
-.homepage-hero__stat strong {
-    display: block;
-    color: #fff;
-    font-family: "Newsreader", serif;
-    font-size: 40px;
-    line-height: .84;
-    letter-spacing: -.04em;
-}
-.homepage-hero__stat span {
-    display: block;
-    margin-top: 6px;
-    color: rgba(255, 245, 240, .74);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: .12em;
-    line-height: 1.35;
-    text-transform: uppercase;
-}
-.homepage-hero__card-footer {
-    margin-top: auto;
-    padding: 18px 20px 20px;
-    border-top: 1px solid rgba(255, 245, 240, .16);
-    background: linear-gradient(180deg, rgba(154, 103, 80, 0), rgba(118, 72, 56, .18));
-}
-.homepage-hero__card-footer-inner {
-    display: flex;
-    align-items: end;
-    gap: 14px;
-}
-.homepage-hero__card-logo {
-    width: 52px;
-    height: 52px;
-    object-fit: contain;
-    background: transparent;
-    flex: 0 0 auto;
-    filter: brightness(0) invert(1);
-}
-.homepage-hero__card-footer-copy {
-    min-width: 0;
-}
-.homepage-hero__card-footer-copy strong {
-    display: block;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-}
-.homepage-hero__card-footer-copy span {
-    display: block;
-    margin-top: 4px;
-    color: rgba(255, 245, 240, .72);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: .08em;
-    text-transform: uppercase;
 }
 .homepage-hero__scroll {
     position: absolute;
@@ -711,7 +568,7 @@
 .homepage-hero__bridge {
     position: relative;
     z-index: 3;
-    margin-top: 18px;
+    margin-top: -22px;
     margin-bottom: 16px;
     padding: 0 32px 22px;
 }
@@ -751,7 +608,7 @@
 .homepage-hero__bridge h2 {
     margin: 10px 0 0;
     color: #102945;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: clamp(28px, 3.4vw, 44px);
     line-height: 1;
 }
@@ -775,7 +632,7 @@
 .homepage-hero__bridge-card strong {
     display: block;
     color: #102945;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 34px;
     line-height: 1;
 }
@@ -864,7 +721,7 @@
     top: 14px;
     right: 15px;
     color: rgba(16, 41, 69, .25);
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 12px;
 }
 .homepage-canonical__gateway-card:hover {
@@ -1016,19 +873,16 @@
         height: auto;
         min-height: 100svh;
         padding: 154px 24px 80px;
-        grid-template-columns: 1fr;
-        gap: 48px;
     }
-    .homepage-hero__card {
-        width: 100%;
-        max-width: 650px;
-        justify-self: start;
+    .homepage-hero__copy {
+        margin-left: 0;
+        padding: 22px 18px 20px;
     }
     .homepage-hero__scroll {
         display: none;
     }
     .homepage-hero__bridge {
-        margin-top: 14px;
+        margin-top: -18px;
         margin-bottom: 14px;
         padding: 0 24px 12px;
     }
@@ -1068,6 +922,9 @@
     }
     .homepage-hero__topics > span {
         width: 100%;
+    }
+    .homepage-hero__content {
+        padding-right: 24px;
     }
     [data-section="homepage-canonical-gateway"],
     [data-section="homepage-canonical-hub-slices"],
@@ -1217,7 +1074,7 @@
 .library-collection-feature h3 {
     margin-top: 12px;
     color: #fff;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: clamp(36px, 4vw, 56px);
     font-weight: 650;
     letter-spacing: -.035em;
@@ -1289,7 +1146,7 @@
 .library-collection-row__copy strong {
     margin-top: 13px;
     color: #102945;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 25px;
     line-height: 1.06;
 }
@@ -1324,7 +1181,7 @@
 .library-collection-ledger > div:last-child { border-right: 0; }
 .library-collection-ledger strong {
     color: #102945;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 28px;
 }
 .library-collection-ledger span {
@@ -1356,7 +1213,7 @@
 .library-services__intro h2 {
     margin-top: 18px;
     color: #fff !important;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: clamp(44px, 5vw, 66px) !important;
     font-weight: 650;
     letter-spacing: -.04em;
@@ -1407,7 +1264,7 @@
     align-self: start;
     padding-top: 8px;
     color: rgba(255,255,255,.3);
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 13px;
 }
 .library-service__icon {
@@ -1420,7 +1277,7 @@
 }
 .library-service h3 {
     color: #fff !important;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 28px !important;
 }
 .library-service > div {
@@ -1492,7 +1349,7 @@
 }
 .library-directory__number {
     color: rgba(16,41,69,.35);
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 12px;
 }
 .library-directory__item:hover .library-directory__number { color: rgba(255,255,255,.38); }
@@ -1513,7 +1370,7 @@
     display: block;
     margin-top: 6px;
     color: #102945;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 19px;
 }
 .library-directory__item:hover strong { color: #fff; }
@@ -1548,7 +1405,7 @@
 .library-institution__feature h3 {
     margin-top: 13px;
     color: #fff;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: clamp(38px, 4vw, 56px);
     line-height: 1;
 }
@@ -1578,7 +1435,7 @@
 }
 .library-institution__index > a > span:first-child {
     color: rgba(16,41,69,.3);
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 12px;
 }
 .library-institution__index .material-symbols-outlined {
@@ -1595,7 +1452,7 @@
 .library-institution__index h3 {
     margin-top: 7px;
     color: #102945;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: 25px;
     line-height: 1.05;
 }
@@ -1657,7 +1514,7 @@
 .library-journal h3 {
     margin-top: 14px;
     color: #fff;
-    font-family: "Newsreader", serif;
+    font-family: "Literata", serif;
     font-size: clamp(32px, 3.4vw, 48px);
     line-height: 1;
 }
@@ -1787,15 +1644,15 @@
 }
 .homepage-hero__overlay {
     background:
-      linear-gradient(95deg, rgba(3, 47, 45, .62) 0%, rgba(4, 64, 61, .42) 40%, rgba(4, 64, 61, .14) 70%, rgba(4, 64, 61, .04) 100%),
-      linear-gradient(180deg, rgba(20, 28, 25, .22) 0%, transparent 48%, rgba(20, 28, 25, .48) 100%);
+      linear-gradient(95deg, rgba(2, 22, 21, .82) 0%, rgba(4, 56, 53, .56) 34%, rgba(4, 64, 61, .18) 64%, rgba(4, 64, 61, .06) 100%),
+      linear-gradient(180deg, rgba(12, 18, 18, .58) 0%, rgba(12, 18, 18, .18) 40%, rgba(12, 18, 18, .62) 100%);
 }
 .homepage-hero__ambient {
     background:
-      radial-gradient(ellipse 46% 42% at 12% 35%, rgba(9, 186, 178, .1), transparent 72%),
-      radial-gradient(ellipse 38% 58% at 88% 72%, rgba(255, 255, 255, .12), transparent 72%),
-      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      radial-gradient(ellipse 46% 42% at 12% 35%, rgba(9, 186, 178, .08), transparent 72%),
+      radial-gradient(ellipse 38% 58% at 88% 72%, rgba(255, 255, 255, .08), transparent 72%),
+      linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
 }
 .homepage-hero__kicker::before {
     background: #09bab2;
@@ -1811,28 +1668,9 @@
     box-shadow: inset 1px 0 rgba(0, 0, 0, .05);
 }
 .homepage-hero__topics a:hover {
-    border-color: rgba(255, 255, 255, .72);
-    background: rgba(255, 255, 255, .14);
+    border-color: rgba(255, 255, 255, .5);
+    background: rgba(255, 255, 255, .1);
 }
-.homepage-hero__card {
-    color: var(--library-ink);
-    background:
-      linear-gradient(rgba(22, 76, 73, .055) 1px, transparent 1px),
-      #ffffff;
-}
-.homepage-hero__card::before,
-.homepage-hero__card h2,
-.homepage-hero__card p,
-.homepage-hero__stat strong,
-.homepage-hero__card > a {
-    color: var(--library-ink) !important;
-}
-.homepage-hero__card-icon {
-    color: #fff;
-    background: #09bab2;
-    box-shadow: 0 12px 30px rgba(9, 186, 178, .28);
-}
-.homepage-hero__card > p:first-of-type { color: #078d87 !important; }
 .homepage-hero__scroll::after {
     background: linear-gradient(var(--library-beige), transparent);
 }
@@ -2845,273 +2683,10 @@
         </div>
       </div>
 
-      <aside class="homepage-hero__card" data-test-id="homepage-canonical-hero-stats">
-        <div class="homepage-hero__card-mid">
-          <p class="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[rgba(255,245,240,.78)]">
-            {{ $lang === 'en' ? 'Digital holdings' : ($lang === 'kk' ? 'Цифрлық қор' : 'Цифровой фонд') }}
-          </p>
-          <span class="homepage-hero__card-bookmark">{{ $lang === 'en' ? 'UDC 330.3' : ($lang === 'kk' ? 'ӘОЖ 330.3' : 'УДК 330.3') }}</span>
-          <h2 class="mt-3 font-serif text-[30px] font-bold leading-[1.05] text-white">
-            {{ $lang === 'en' ? 'Academic library' : ($lang === 'kk' ? 'Академиялық кітапхана' : 'Академическая библиотека') }}<br>
-            {{ $lang === 'en' ? 'always within reach' : ($lang === 'kk' ? 'әрқашан қолжетімді' : 'всегда рядом') }}
-          </h2>
-          <p class="mt-4 text-sm leading-7 text-white/74">
-            {{ $lang === 'en' ? 'Search the catalog, explore collections, and manage your reading in one place.' : ($lang === 'kk' ? 'Каталогтан іздеңіз, жинақтарды зерттеңіз және оқуыңызды бір жерден басқарыңыз.' : 'Ищите в каталоге, изучайте коллекции и управляйте чтением в одном месте.') }}
-          </p>
-
-          <div class="homepage-hero__stats">
-            <div class="homepage-hero__stat">
-              <strong>{{ $copy['stats_archives_value'] }}</strong>
-              <span>{{ $copy['stats_archives_label'] }}</span>
-            </div>
-            <div class="homepage-hero__stat">
-              <strong>{{ $copy['stats_scholars_value'] }}</strong>
-              <span>{{ $copy['stats_scholars_label'] }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="homepage-hero__card-footer">
-          <div class="homepage-hero__card-footer-inner">
-            <img class="homepage-hero__card-logo" src="{{ asset('logo.png') }}" alt="" width="52" height="52" loading="eager" decoding="async">
-            <div class="homepage-hero__card-footer-copy">
-              <strong>{{ __('ui.brand.title') }}</strong>
-              <span>{{ $copy['identity_brand'] }}</span>
-            </div>
-          </div>
-        </div>
-      </aside>
     </div>
 
     <a href="#homepage-navigation" class="homepage-hero__scroll">
-      {{ $lang === 'en' ? 'Explore' : ($lang === 'kk' ? 'Төмен' : 'Далее') }}
     </a>
   </section>
-
-  <section class="homepage-hero__bridge" aria-label="{{ $libraryData['overview_kicker'] }}">
-    <div class="homepage-hero__bridge-inner">
-      <div class="homepage-hero__bridge-head">
-        <div>
-          <span class="homepage-hero__bridge-kicker">{{ $libraryData['overview_kicker'] }}</span>
-          <h2>{{ $libraryData['overview_title'] }}</h2>
-        </div>
-        <p>{{ $libraryData['overview_lead'] }}</p>
-      </div>
-
-      <div class="homepage-hero__bridge-grid">
-        @foreach(array_slice($libraryData['metrics'], 0, 3) as $metric)
-          <article class="homepage-hero__bridge-card">
-            <strong>{{ $metric['value'] }}</strong>
-            <b>{{ $metric['label'] }}</b>
-            <small>{{ $metric['note'] }}</small>
-          </article>
-        @endforeach
-      </div>
-    </div>
-  </section>
-
-  <div class="library-intelligence">
-    <section id="homepage-navigation" data-section="homepage-canonical-updates" class="library-intelligence__section library-intelligence__section--white">
-      <header class="library-intelligence__head">
-        <div>
-          <span class="library-intelligence__eyebrow">{{ $libraryData['overview_kicker'] }}</span>
-          <h2>{{ $libraryData['overview_title'] }}</h2>
-        </div>
-        <p>{{ $libraryData['overview_lead'] }}</p>
-      </header>
-
-      <div class="library-overview__layout">
-        <div class="library-metrics" aria-label="{{ $libraryData['overview_kicker'] }}">
-          @foreach($libraryData['metrics'] as $index => $metric)
-            <article class="library-metric">
-              <span class="library-metric__index">{{ str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) }} / 04</span>
-              <strong>{{ $metric['value'] }}</strong>
-              <b>{{ $metric['label'] }}</b>
-              <small>{{ $metric['note'] }}</small>
-            </article>
-          @endforeach
-        </div>
-
-        <article class="library-growth">
-          <div class="library-growth__top">
-            <div>
-              <small>{{ $libraryData['growth_period'] }}</small>
-              <h3>{{ $libraryData['growth_title'] }}</h3>
-            </div>
-            <span class="library-growth__badge">{{ $libraryData['growth_note'] }}</span>
-          </div>
-          <div class="library-growth__legend" aria-hidden="true">
-            <span><i style="--series-color:#e0bd79"></i>{{ $libraryData['growth_primary'] }}</span>
-            <span><i style="--series-color:#9ab8aa"></i>{{ $libraryData['growth_secondary'] }}</span>
-          </div>
-          <svg class="library-growth__chart" viewBox="0 0 720 310" role="img" aria-label="{{ $libraryData['growth_title'] }}: {{ $libraryData['growth_latest'] }}, {{ $libraryData['growth_note'] }}">
-            <defs>
-              <linearGradient id="libraryUsageGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#e0bd79" stop-opacity=".3"/>
-                <stop offset="100%" stop-color="#e0bd79" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            @foreach([['1500', 38], ['1000', 104], ['500', 170], ['0', 236]] as $axis)
-              <text class="axis-label" x="3" y="{{ $axis[1] + 4 }}">{{ $axis[0] }}</text>
-              <line class="grid-line" x1="58" y1="{{ $axis[1] }}" x2="690" y2="{{ $axis[1] }}"/>
-            @endforeach
-            @foreach([68, 190, 312, 434, 556, 678] as $x)
-              <line class="vertical-guide" x1="{{ $x }}" y1="38" x2="{{ $x }}" y2="236"/>
-            @endforeach
-            <path class="area-primary" d="M68 188 C116 185,146 174,190 172 S269 183,312 178 S391 153,434 140 S515 116,556 102 S635 76,678 63 L678 236 L68 236 Z"/>
-            <path class="usage-line usage-line--primary" d="M68 188 C116 185,146 174,190 172 S269 183,312 178 S391 153,434 140 S515 116,556 102 S635 76,678 63"/>
-            <path class="usage-line usage-line--secondary" d="M68 220 C116 216,150 207,190 205 S272 194,312 188 S394 181,434 175 S515 162,556 151 S635 137,678 127"/>
-            @foreach([[68,188], [190,172], [312,178], [434,140], [556,102], [678,63]] as $point)
-              <circle class="dot-primary" cx="{{ $point[0] }}" cy="{{ $point[1] }}" r="5"/>
-            @endforeach
-            @foreach([[68,220], [190,205], [312,188], [434,175], [556,151], [678,127]] as $point)
-              <circle class="dot-secondary" cx="{{ $point[0] }}" cy="{{ $point[1] }}" r="4"/>
-            @endforeach
-            <g class="latest-marker">
-              <line x1="678" y1="63" x2="678" y2="31"/>
-              <rect x="632" y="5" width="88" height="28" rx="2"/>
-              <text x="676" y="23">{{ $libraryData['growth_latest'] }}</text>
-            </g>
-            @foreach($libraryData['growth_months'] as $index => $month)
-              <text class="month-label" x="{{ [68,190,312,434,556,678][$index] }}" y="276">{{ $month }}</text>
-            @endforeach
-          </svg>
-        </article>
-      </div>
-    </section>
-
-    <section data-section="homepage-canonical-subjects" class="library-intelligence__section library-intelligence__section--paper">
-      <div class="library-categories__layout">
-        <div class="library-categories__intro">
-          <span class="library-intelligence__eyebrow">{{ $libraryData['categories_kicker'] }}</span>
-          <h2>{{ $libraryData['categories_title'] }}</h2>
-          <p>{{ $libraryData['categories_lead'] }}</p>
-          <a href="{{ $withLang('/catalog') }}" class="library-intelligence__link">
-            {{ $libraryData['all_books'] }} <span aria-hidden="true">→</span>
-          </a>
-        </div>
-
-        <div class="library-category-grid">
-          @foreach($libraryData['categories'] as $category)
-            <a href="{{ $withLang('/catalog', ['q' => $category['query']]) }}"
-               class="library-category"
-               style="--category-share: {{ $category['share'] }}%">
-              <span class="library-category__top">
-                <span class="library-category__icon">
-                  <span class="material-symbols-outlined" aria-hidden="true">{{ $category['icon'] }}</span>
-                </span>
-                <span class="library-category__count">{{ $category['count'] }}</span>
-              </span>
-              <h3>{{ $category['name'] }}</h3>
-              <span class="library-category__scale" aria-hidden="true"><span></span></span>
-            </a>
-          @endforeach
-        </div>
-      </div>
-    </section>
-
-    <section data-section="homepage-canonical-gateway" class="library-intelligence__section library-intelligence__section--white">
-      <header class="library-intelligence__head">
-        <div>
-          <span class="library-intelligence__eyebrow">{{ $libraryData['books_kicker'] }}</span>
-          <h2>{{ $libraryData['books_title'] }}</h2>
-        </div>
-        <div>
-          <p>{{ $libraryData['books_lead'] }}</p>
-          <a href="{{ $withLang('/catalog') }}" class="library-intelligence__link">
-            {{ $libraryData['all_books'] }} <span aria-hidden="true">→</span>
-          </a>
-        </div>
-      </header>
-
-      <div class="library-books__layout">
-        <div class="library-bookshelf">
-          @foreach($libraryData['books'] as $book)
-            <a href="{{ $withLang('/catalog', ['q' => $book['title']]) }}" class="library-book">
-              <article class="library-book__cover library-book__cover--{{ $book['tone'] }}">
-                <span class="library-book__code">UDC {{ $book['code'] }}</span>
-                <span class="library-book__ornament">
-                  <span class="material-symbols-outlined" aria-hidden="true">auto_stories</span>
-                </span>
-                <h3>{{ $book['title'] }}</h3>
-                <small>KazUTB Academic Library</small>
-              </article>
-              <span class="library-book__meta">
-                <span>{{ $book['author'] }}</span>
-                <span>{{ $book['year'] }}</span>
-              </span>
-            </a>
-          @endforeach
-        </div>
-      </div>
-    </section>
-
-    <section data-section="homepage-canonical-hub-slices" class="library-intelligence__section library-intelligence__section--paper">
-      <header class="library-intelligence__head">
-        <div>
-          <span class="library-intelligence__eyebrow">{{ $libraryData['analytics_kicker'] }}</span>
-          <h2>{{ $libraryData['analytics_title'] }}</h2>
-        </div>
-        <p>{{ $libraryData['analytics_lead'] }}</p>
-      </header>
-
-      <div class="library-analytics__grid">
-        <article class="library-analytics__panel">
-          <header>
-            <h3>{{ $libraryData['languages'] }}</h3>
-            <span>UDC<br>Index</span>
-          </header>
-          <div class="library-language-chart">
-            <div class="library-donut" role="img" aria-label="{{ $libraryData['languages'] }}: 52%, 31%, 17%"></div>
-            <ul class="library-language-legend">
-              @foreach($libraryData['language_rows'] as $index => $row)
-                <li style="--legend-color: {{ ['#315646', '#b38b4d', '#d9d7cf'][$index] }}">
-                  <i aria-hidden="true"></i><span>{{ $row[0] }}</span><strong>{{ $row[1] }}</strong>
-                </li>
-              @endforeach
-            </ul>
-          </div>
-        </article>
-
-        <article class="library-analytics__panel">
-          <header>
-            <h3>{{ $libraryData['formats'] }}</h3>
-            <span>Material<br>mix</span>
-          </header>
-          <div class="library-format-bars">
-            @foreach($libraryData['format_rows'] as $row)
-              <div class="library-format-bar">
-                <div class="library-format-bar__label"><span>{{ $row[0] }}</span><strong>{{ $row[1] }}%</strong></div>
-                <div class="library-format-bar__track"><span style="--format-share: {{ $row[1] }}%"></span></div>
-              </div>
-            @endforeach
-          </div>
-        </article>
-
-        <article class="library-analytics__panel">
-          <header>
-            <h3>{{ $libraryData['activity'] }}</h3>
-            <span>{{ $libraryData['month_note'] }}</span>
-          </header>
-          <div class="library-activity__value">18 420 <small>+12.4%</small></div>
-          <svg class="library-activity-chart" viewBox="0 0 520 170" role="img" aria-label="{{ $libraryData['activity'] }}: +12.4%">
-            <line class="guide" x1="0" y1="145" x2="520" y2="145"/>
-            <line class="guide" x1="0" y1="85" x2="520" y2="85"/>
-            <rect class="bar" x="21" y="92" width="42" height="53"/>
-            <rect class="bar" x="105" y="77" width="42" height="68"/>
-            <rect class="bar" x="189" y="89" width="42" height="56"/>
-            <rect class="bar" x="273" y="58" width="42" height="87"/>
-            <rect class="bar" x="357" y="43" width="42" height="102"/>
-            <rect class="bar is-current" x="441" y="22" width="42" height="123"/>
-            <path class="trend" d="M42 88 L126 72 L210 84 L294 53 L378 38 L462 17"/>
-          </svg>
-          <div class="library-activity__months" aria-hidden="true">
-            <span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span>
-          </div>
-        </article>
-      </div>
-    </section>
-  </div>
-
 </div>{{-- /homepage-canonical-page --}}
 @endsection

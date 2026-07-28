@@ -13,7 +13,7 @@
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700;800&family=Literata:opsz,wght@7..72,400..700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
   <script id="tailwind-config">
     tailwind.config = {
@@ -76,9 +76,9 @@
             full: '0.75rem'
           },
           fontFamily: {
-            headline: ['Newsreader', 'serif'],
-            body: ['Manrope', 'sans-serif'],
-            label: ['Manrope', 'sans-serif']
+            headline: ['Literata', 'serif'],
+            body: ['Google Sans', 'sans-serif'],
+            label: ['Google Sans', 'sans-serif']
           }
         }
       }
@@ -86,8 +86,8 @@
   </script>
   <link rel="stylesheet" href="/css/shell.css">
   <style>
-    body { font-family: 'Manrope', sans-serif; }
-    .serif-italic { font-family: 'Newsreader', serif; font-style: italic; }
+    body { font-family: 'Google Sans', sans-serif; }
+    .serif-italic { font-family: 'Literata', serif; font-style: italic; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
   </style>
   @yield('head')

@@ -122,17 +122,21 @@
 
 <style>
   .university-footer {
-    --university-footer-navy: #0b2037;
-    --university-footer-deep: #07192b;
-    --university-footer-gold: #d39a32;
+    --university-footer-ink: #102945;
+    --university-footer-deep: #0b2037;
+    --university-footer-surface: #f5f3ee;
+    --university-footer-paper: #fbfaf6;
+    --university-footer-accent: #09bab2;
+    --university-footer-warm: #b38b4d;
     position: relative;
     width: 100%;
     margin-top: 0;
     padding: clamp(72px, 7vw, 100px) max(5vw, calc((100vw - 1440px) / 2)) 28px;
-    color: rgba(255, 255, 255, .7);
+    color: rgba(16, 41, 69, .72);
     background:
-      radial-gradient(circle at 12% 5%, rgba(31, 72, 111, .23), transparent 29%),
-      linear-gradient(180deg, var(--university-footer-navy), var(--university-footer-deep));
+      radial-gradient(circle at 12% 5%, rgba(9, 186, 178, .08), transparent 29%),
+      radial-gradient(circle at 86% 0%, rgba(179, 139, 77, .08), transparent 26%),
+      linear-gradient(180deg, var(--university-footer-surface), var(--university-footer-paper));
   }
   .university-footer::before {
     position: absolute;
@@ -140,7 +144,7 @@
     right: 0;
     left: 0;
     height: 3px;
-    background: linear-gradient(90deg, transparent, var(--university-footer-gold) 30%, var(--university-footer-gold) 70%, transparent);
+    background: linear-gradient(90deg, transparent, var(--university-footer-accent) 30%, var(--university-footer-warm) 70%, transparent);
     content: "";
   }
   .university-footer__grid {
@@ -163,18 +167,18 @@
   .university-footer__logo {
     display: block;
     flex: 0 0 auto;
-    width: 82px;
-    height: 82px;
+    width: 96px;
+    height: 96px;
     padding: 2px;
     object-fit: contain;
     background: #fff;
     border-radius: 50%;
-    box-shadow: 0 12px 34px rgba(0, 0, 0, .22);
+    box-shadow: 0 12px 34px rgba(16, 41, 69, .12);
   }
   .university-footer__brand-title {
     display: block;
     max-width: 285px;
-    color: #fff;
+    color: var(--university-footer-ink);
     font-size: 15px;
     font-weight: 850;
     letter-spacing: -.025em;
@@ -184,14 +188,14 @@
   .university-footer__tagline {
     display: block;
     margin-top: 6px;
-    color: rgba(255, 255, 255, .48);
+    color: rgba(16, 41, 69, .56);
     font-size: 9px;
     font-weight: 700;
     letter-spacing: .04em;
   }
   .university-footer__address {
     margin: 0;
-    color: rgba(255, 255, 255, .64);
+    color: rgba(16, 41, 69, .72);
     font-size: 13px;
     line-height: 1.75;
   }
@@ -199,31 +203,31 @@
     display: block;
     width: fit-content;
     margin: 12px 0 0;
-    color: rgba(255, 255, 255, .68);
+    color: rgba(16, 41, 69, .68);
     font-size: 13px;
   }
   .university-footer__contact--email {
     margin-top: 24px;
-    color: var(--university-footer-gold);
+    color: var(--university-footer-accent);
   }
   .university-footer__contact:hover {
-    color: #fff;
+    color: var(--university-footer-ink);
   }
   .university-footer__accreditation {
     width: fit-content;
     margin-top: 25px;
     padding: 9px 12px;
-    color: rgba(255, 255, 255, .38);
-    border: 1px solid rgba(255, 255, 255, .13);
+    color: rgba(16, 41, 69, .48);
+    border: 1px solid rgba(16, 41, 69, .08);
     font-size: 9px;
     line-height: 1.55;
   }
   .university-footer__column h2 {
     margin: 0 0 22px;
     padding-bottom: 14px;
-    color: #fff;
-    border-bottom: 1px solid rgba(255, 255, 255, .11);
-    font-family: "Newsreader", Georgia, serif;
+    color: var(--university-footer-ink);
+    border-bottom: 1px solid rgba(16, 41, 69, .1);
+    font-family: "Literata", serif;
     font-size: 14px;
     font-weight: 700;
     letter-spacing: .12em;
@@ -233,13 +237,13 @@
     display: block;
     width: fit-content;
     margin: 12px 0;
-    color: rgba(255, 255, 255, .58);
+    color: rgba(16, 41, 69, .64);
     font-size: 13px;
     line-height: 1.5;
     transition: color .25s ease, transform .25s ease;
   }
   .university-footer__column a:hover {
-    color: var(--university-footer-gold);
+    color: var(--university-footer-accent);
     transform: translateX(5px);
   }
   .university-footer__bottom {
@@ -251,8 +255,8 @@
     max-width: 1440px;
     margin: clamp(48px, 5vw, 72px) auto 0;
     padding-top: 25px;
-    color: rgba(255, 255, 255, .36);
-    border-top: 1px solid rgba(255, 255, 255, .11);
+    color: rgba(16, 41, 69, .48);
+    border-top: 1px solid rgba(16, 41, 69, .1);
     font-size: 11px;
     line-height: 1.6;
   }
@@ -279,8 +283,8 @@
       align-items: flex-start;
     }
     .university-footer__logo {
-      width: 68px;
-      height: 68px;
+      width: 84px;
+      height: 84px;
     }
     .university-footer__brand-title {
       font-size: 13px;
