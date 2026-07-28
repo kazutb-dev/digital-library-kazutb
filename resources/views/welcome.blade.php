@@ -545,21 +545,21 @@
 .homepage-hero__card {
     position: relative;
     width: 100%;
-    max-width: 388px;
-    min-height: 560px;
+    max-width: 396px;
+    min-height: 540px;
     justify-self: stretch;
     margin-left: auto;
-    padding: 32px 28px 28px 34px;
-    border: 1px solid rgba(214, 205, 190, .95);
+    padding: 18px 18px 18px 22px;
+    border: 1px solid rgba(185, 120, 94, .34);
     background:
-      linear-gradient(90deg, rgba(236, 226, 211, .98) 0 16px, rgba(255, 255, 255, .99) 16px 100%),
-      linear-gradient(180deg, rgba(255, 255, 255, .99), rgba(247, 242, 233, .99));
+      linear-gradient(90deg, rgba(156, 103, 82, .96) 0 18px, rgba(168, 116, 92, .98) 18px 100%),
+      linear-gradient(180deg, rgba(171, 122, 95, .98), rgba(154, 103, 80, .98));
     box-shadow:
-      0 30px 74px rgba(0, 0, 0, .26),
-      inset 0 1px 0 rgba(255, 255, 255, .86),
-      inset 16px 0 0 rgba(232, 221, 203, .95),
-      inset -2px 0 0 rgba(255, 255, 255, .72);
-    border-radius: 3px;
+      0 28px 70px rgba(0, 0, 0, .22),
+      inset 0 1px 0 rgba(255, 255, 255, .08),
+      inset 18px 0 0 rgba(148, 95, 73, .42),
+      inset -1px 0 0 rgba(255, 255, 255, .1);
+    border-radius: 2px;
     overflow: hidden;
     animation: homepageHeroCardIn .9s cubic-bezier(.22, 1, .36, 1) .45s both;
 }
@@ -568,60 +568,128 @@
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(90deg, rgba(31, 41, 55, .04), transparent 20%),
-      linear-gradient(180deg, transparent 0 80%, rgba(16, 41, 69, .035) 80% 81%, transparent 81% 100%);
+      radial-gradient(circle at 86% 84%, rgba(255, 255, 255, .06), transparent 34%),
+      radial-gradient(circle at 82% 82%, rgba(255, 255, 255, .04), transparent 18%),
+      linear-gradient(90deg, rgba(255, 255, 255, .08), transparent 18%);
     pointer-events: none;
 }
 .homepage-hero__card::after {
     content: "";
     position: absolute;
     top: 0;
-    left: 12px;
-    width: 10px;
+    left: 13px;
+    width: 12px;
     height: 100%;
     background:
-      linear-gradient(90deg, rgba(150, 129, 103, .22), rgba(255, 255, 255, .15) 48%, rgba(150, 129, 103, .12));
+      linear-gradient(90deg, rgba(120, 77, 58, .44), rgba(255, 255, 255, .18) 45%, rgba(120, 77, 58, .26));
     box-shadow:
-      inset 1px 0 0 rgba(255, 255, 255, .78),
-      inset -1px 0 0 rgba(130, 111, 87, .14);
+      inset 1px 0 0 rgba(255, 255, 255, .14),
+      inset -1px 0 0 rgba(92, 57, 42, .18);
     pointer-events: none;
 }
-.homepage-hero__card-icon {
-    width: 54px;
-    height: 54px;
-    display: grid;
-    place-items: center;
-    color: #ffffff;
-    background: #11b8b2;
-    box-shadow: 0 12px 30px rgba(17, 184, 178, .22);
+.homepage-hero__card > * {
+    position: relative;
+    z-index: 1;
+}
+.homepage-hero__card-bookmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 0;
+    color: rgba(255, 236, 230, .88);
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+}
+.homepage-hero__card-bookmark::before {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: rgba(255, 236, 230, .38);
+}
+.homepage-hero__card h2 {
+    max-width: 280px;
+    margin-top: 14px !important;
+    font-size: 28px !important;
+    color: #fff !important;
+}
+.homepage-hero__card > p:nth-of-type(2) {
+    max-width: 300px;
+    margin-top: 14px !important;
+    font-size: 13px !important;
+    line-height: 1.65;
+    color: rgba(255, 245, 240, .74) !important;
+}
+.homepage-hero__card-mid {
+    padding: 20px 20px 0 20px;
 }
 .homepage-hero__stats {
-    margin-top: 24px;
-    padding-top: 24px;
+    margin-top: 16px;
+    padding-top: 16px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    border-top: 1px solid rgba(16, 41, 69, .13);
+    border-top: 1px solid rgba(255, 245, 240, .18);
 }
 .homepage-hero__stat + .homepage-hero__stat {
-    padding-left: 24px;
-    border-left: 1px solid rgba(16, 41, 69, .13);
+    padding-left: 18px;
+    border-left: 1px solid rgba(255, 245, 240, .18);
 }
 .homepage-hero__stat strong {
     display: block;
-    color: #3d3f3d;
+    color: #fff;
     font-family: "Newsreader", serif;
-    font-size: 46px;
+    font-size: 40px;
     line-height: .84;
     letter-spacing: -.04em;
 }
 .homepage-hero__stat span {
     display: block;
-    margin-top: 8px;
-    color: rgba(92, 103, 122, .9);
+    margin-top: 6px;
+    color: rgba(255, 245, 240, .74);
     font-size: 10px;
     font-weight: 800;
-    letter-spacing: .14em;
-    line-height: 1.4;
+    letter-spacing: .12em;
+    line-height: 1.35;
+    text-transform: uppercase;
+}
+.homepage-hero__card-footer {
+    margin-top: auto;
+    padding: 18px 20px 20px;
+    border-top: 1px solid rgba(255, 245, 240, .16);
+    background: linear-gradient(180deg, rgba(154, 103, 80, 0), rgba(118, 72, 56, .18));
+}
+.homepage-hero__card-footer-inner {
+    display: flex;
+    align-items: end;
+    gap: 14px;
+}
+.homepage-hero__card-logo {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+    background: transparent;
+    flex: 0 0 auto;
+    filter: brightness(0) invert(1);
+}
+.homepage-hero__card-footer-copy {
+    min-width: 0;
+}
+.homepage-hero__card-footer-copy strong {
+    display: block;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+.homepage-hero__card-footer-copy span {
+    display: block;
+    margin-top: 4px;
+    color: rgba(255, 245, 240, .72);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
     text-transform: uppercase;
 }
 .homepage-hero__scroll {
@@ -643,17 +711,16 @@
 .homepage-hero__bridge {
     position: relative;
     z-index: 3;
-    margin-top: -74px;
+    margin-top: 18px;
     margin-bottom: 16px;
     padding: 0 32px 22px;
 }
 .homepage-hero__bridge-inner {
     width: min(100%, 1370px);
     margin: 0 auto;
-    padding: 18px 24px 22px;
+    padding: 26px 24px 26px;
     background: rgba(255, 255, 255, .92);
     border: 1px solid rgba(16, 41, 69, .08);
-    border-top: 0;
     box-shadow: 0 26px 70px rgba(11, 24, 48, .12);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -961,7 +1028,7 @@
         display: none;
     }
     .homepage-hero__bridge {
-        margin-top: -44px;
+        margin-top: 14px;
         margin-bottom: 14px;
         padding: 0 24px 12px;
     }
@@ -2779,35 +2846,40 @@
       </div>
 
       <aside class="homepage-hero__card" data-test-id="homepage-canonical-hero-stats">
-        <div class="homepage-hero__card-icon">
-          <span class="material-symbols-outlined text-[26px]" aria-hidden="true">local_library</span>
-        </div>
-        <p class="mt-7 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#f3bd46]">
-          {{ $lang === 'en' ? 'KazUTB knowledge gateway' : ($lang === 'kk' ? 'КазТБУ білім порталы' : 'Портал знаний КазТБУ') }}
-        </p>
-        <h2 class="mt-3 font-serif text-[30px] font-bold leading-[1.08] text-white">
-          {{ $lang === 'en' ? 'Your academic library, always within reach' : ($lang === 'kk' ? 'Академиялық кітапхана әрқашан қолжетімді' : 'Академическая библиотека всегда рядом') }}
-        </h2>
-        <p class="mt-4 text-sm leading-7 text-white/65">
-          {{ $lang === 'en' ? 'Search the catalog, explore curated collections, and manage your reading from one place.' : ($lang === 'kk' ? 'Каталогтан іздеңіз, жинақтарды зерттеңіз және оқуды бір жерден басқарыңыз.' : 'Ищите в каталоге, изучайте коллекции и управляйте чтением в одном месте.') }}
-        </p>
+        <div class="homepage-hero__card-mid">
+          <p class="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[rgba(255,245,240,.78)]">
+            {{ $lang === 'en' ? 'Digital holdings' : ($lang === 'kk' ? 'Цифрлық қор' : 'Цифровой фонд') }}
+          </p>
+          <span class="homepage-hero__card-bookmark">{{ $lang === 'en' ? 'UDC 330.3' : ($lang === 'kk' ? 'ӘОЖ 330.3' : 'УДК 330.3') }}</span>
+          <h2 class="mt-3 font-serif text-[30px] font-bold leading-[1.05] text-white">
+            {{ $lang === 'en' ? 'Academic library' : ($lang === 'kk' ? 'Академиялық кітапхана' : 'Академическая библиотека') }}<br>
+            {{ $lang === 'en' ? 'always within reach' : ($lang === 'kk' ? 'әрқашан қолжетімді' : 'всегда рядом') }}
+          </h2>
+          <p class="mt-4 text-sm leading-7 text-white/74">
+            {{ $lang === 'en' ? 'Search the catalog, explore collections, and manage your reading in one place.' : ($lang === 'kk' ? 'Каталогтан іздеңіз, жинақтарды зерттеңіз және оқуыңызды бір жерден басқарыңыз.' : 'Ищите в каталоге, изучайте коллекции и управляйте чтением в одном месте.') }}
+          </p>
 
-        <div class="homepage-hero__stats">
-          <div class="homepage-hero__stat">
-            <strong>{{ $copy['stats_archives_value'] }}</strong>
-            <span>{{ $copy['stats_archives_label'] }}</span>
-          </div>
-          <div class="homepage-hero__stat">
-            <strong>{{ $copy['stats_scholars_value'] }}</strong>
-            <span>{{ $copy['stats_scholars_label'] }}</span>
+          <div class="homepage-hero__stats">
+            <div class="homepage-hero__stat">
+              <strong>{{ $copy['stats_archives_value'] }}</strong>
+              <span>{{ $copy['stats_archives_label'] }}</span>
+            </div>
+            <div class="homepage-hero__stat">
+              <strong>{{ $copy['stats_scholars_value'] }}</strong>
+              <span>{{ $copy['stats_scholars_label'] }}</span>
+            </div>
           </div>
         </div>
 
-        <a href="{{ $withLang('/catalog') }}"
-           class="mt-8 inline-flex items-center gap-2 border-b border-[#e8a020] pb-1 text-xs font-extrabold uppercase tracking-[0.12em] text-white transition hover:text-[#f3bd46]">
-          {{ $lang === 'en' ? 'Open Catalog' : ($lang === 'kk' ? 'Каталогты ашу' : 'Открыть каталог') }}
-          <span aria-hidden="true">→</span>
-        </a>
+        <div class="homepage-hero__card-footer">
+          <div class="homepage-hero__card-footer-inner">
+            <img class="homepage-hero__card-logo" src="{{ asset('logo.png') }}" alt="" width="52" height="52" loading="eager" decoding="async">
+            <div class="homepage-hero__card-footer-copy">
+              <strong>{{ __('ui.brand.title') }}</strong>
+              <span>{{ $copy['identity_brand'] }}</span>
+            </div>
+          </div>
+        </div>
       </aside>
     </div>
 
