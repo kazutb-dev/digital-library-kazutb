@@ -1,0 +1,137 @@
+# ──────────────────────────────────────────────────────────────
+#  Digital Library — Docker Compose (live-sync dev runtime)
+# ──────────────────────────────────────────────────────────────
+#
+#  Services
+#  --------
+#  postgres      — PostgreSQL 18 with existing data
+#  app           — Laravel 13 (nginx + php-fpm) on port 80
+#  frontend-dev  — Vite dev server on port 5173 for live JS/CSS updates
+#
+#  Quick start
+#  -----------
+#  1. Ensure .env is configured
+#  2. docker compose up --build -d app frontend-dev
+#  3. Open http://localhost
+# ──────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - max_connections=120
+      - -c
+      - random_page_cost=1.1
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-library_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-digital_library}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    ports:
+      - "0.0.0.0:${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-library_user} -d ${POSTGRES_DB:-digital_library}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 768M
+        reservations:
+          cpus: '0.50'
+          memory: 256M
+
+  # ── Laravel App (nginx + php-fpm) ──────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_NAME: "${APP_NAME:-Digital Library}"
+      APP_ENV: "${APP_ENV:-production}"
+      APP_KEY: "${APP_KEY}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      APP_URL: "${APP_URL:-http://localhost}"
+      APP_LIVE_SYNC: "${APP_LIVE_SYNC:-true}"
+      LOG_CHANNEL: "${LOG_CHANNEL:-stack}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: "${POSTGRES_DB:-digital_library}"
+      DB_USERNAME: "${POSTGRES_USER:-library_user}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      SESSION_DRIVER: "${SESSION_DRIVER:-database}"
+      SESSION_LIFETIME: "${SESSION_LIFETIME:-120}"
+      CACHE_STORE: "${CACHE_STORE:-database}"
+      EXTERNAL_AUTH_LOGIN_URL: "${EXTERNAL_AUTH_LOGIN_URL:-http://crm.local/api/login}"
+      EXTERNAL_AUTH_DEVICE_NAME: "${EXTERNAL_AUTH_DEVICE_NAME:-web}"
+    ports:
+      - "0.0.0.0:80:80"
+    volumes:
+      - ./:/app:cached
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fs http://localhost/api/v1/catalog-db?limit=1 || exit 1" ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 1024M
+        reservations:
+          cpus: '0.75'
+          memory: 384M
+
+  frontend-dev:
+    image: node:22
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      APP_URL: "${APP_URL:-http://localhost}"
+      VITE_HMR_HOST: "${VITE_HMR_HOST:-}"
+      CHOKIDAR_USEPOLLING: "${CHOKIDAR_USEPOLLING:-false}"
+      CHOKIDAR_INTERVAL: "${CHOKIDAR_INTERVAL:-250}"
+    command: >
+      sh -lc "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then npm install; fi && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "0.0.0.0:5173:5173"
+    volumes:
+      - ./:/app:cached
+      - frontend_node_modules:/app/node_modules
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.50'
+          memory: 256M
+
+volumes:
+  postgres_data:
+  frontend_node_modules:

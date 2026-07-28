@@ -1,0 +1,437 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Digital Library — CRM Integration API",
+    "description": "Integration API for a CRM system to interact with the library platform. All endpoints require integration boundary authentication via bearer token and standard headers.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Digital Library Platform Team"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/integration/v1",
+      "description": "Integration API v1"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": [],
+      "IntegrationHeaders": []
+    }
+  ],
+  "paths": {
+    "/_boundary/ping": {
+      "get": {
+        "summary": "Infrastructure health check",
+        "description": "Verifies integration boundary authentication and header processing. Returns parsed context from middleware.",
+        "tags": ["Infrastructure"],
+        "responses": {
+          "200": {
+            "description": "Boundary authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "context": {
+                      "type": "object",
+                      "properties": {
+                        "authenticated_client_ref": { "type": "string" },
+                        "source_system": { "type": "string", "example": "crm" },
+                        "request_id": { "type": "string" },
+                        "correlation_id": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/reservations": {
+      "get": {
+        "summary": "List reservations",
+        "description": "List reservations with filtering and pagination. Scoped by operator's org context (branch).",
+        "tags": ["Reservations"],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["PENDING", "READY", "FULFILLED", "CANCELLED", "EXPIRED"] } },
+          { "name": "user_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "reserved_after", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "reserved_before", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of reservations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Reservation" } },
+                    "meta": { "$ref": "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/reservations/{id}": {
+      "get": {
+        "summary": "Get reservation detail",
+        "tags": ["Reservations"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reservation details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Reservation" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/reservations/{id}/approve": {
+      "post": {
+        "summary": "Approve a PENDING reservation",
+        "description": "Transitions reservation from PENDING to READY. Requires 'reservations.approve' operator role. Idempotent via Idempotency-Key header.",
+        "tags": ["Reservations"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "x-rate-limit": "30 mutations per minute per client",
+        "x-required-role": "reservations.approve",
+        "responses": {
+          "200": { "description": "Reservation approved" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/reservations/{id}/reject": {
+      "post": {
+        "summary": "Reject a PENDING reservation",
+        "description": "Transitions reservation from PENDING to CANCELLED. Requires 'reservations.reject' operator role.",
+        "tags": ["Reservations"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["cancel_origin", "cancel_reason_code"],
+                "properties": {
+                  "cancel_origin": { "type": "string", "description": "System that initiated the rejection" },
+                  "cancel_reason_code": { "type": "string", "description": "Machine-readable reason code" }
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": "30 mutations per minute per client",
+        "x-required-role": "reservations.reject",
+        "responses": {
+          "200": { "description": "Reservation rejected" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/documents": {
+      "get": {
+        "summary": "List documents",
+        "description": "Search and list library documents with pagination.",
+        "tags": ["Documents"],
+        "parameters": [
+          { "name": "query", "in": "query", "schema": { "type": "string" }, "description": "Full-text search on title and ISBN" },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of documents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Document" } },
+                    "meta": { "$ref": "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a document",
+        "tags": ["Documents"],
+        "x-rate-limit": "30 mutations per minute per client",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title"],
+                "properties": {
+                  "title": { "type": "string", "maxLength": 1000 },
+                  "isbn": { "type": "string", "maxLength": 30 },
+                  "publisher_id": { "type": "string", "format": "uuid" },
+                  "publication_year": { "type": "integer", "minimum": 1000, "maximum": 2100 },
+                  "language": { "type": "string", "maxLength": 10 },
+                  "description": { "type": "string", "maxLength": 5000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Document created" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/documents/{id}": {
+      "get": {
+        "summary": "Get document detail",
+        "tags": ["Documents"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Document details" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "summary": "Update document metadata",
+        "tags": ["Documents"],
+        "x-rate-limit": "30 mutations per minute per client",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "isbn": { "type": "string" },
+                  "publication_year": { "type": "integer" },
+                  "language": { "type": "string" },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Document updated" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/documents/{id}/archive": {
+      "post": {
+        "summary": "Archive a document",
+        "tags": ["Documents"],
+        "x-rate-limit": "30 mutations per minute per client",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Document archived" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "CRM-issued bearer token"
+      },
+      "IntegrationHeaders": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Source-System",
+        "description": "Required headers: X-Source-System (must be 'crm'), X-Request-Id, X-Correlation-Id, X-Operator-Id, X-Operator-Roles, X-Operator-Org-Context (JSON)"
+      }
+    },
+    "schemas": {
+      "Reservation": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["PENDING", "READY", "FULFILLED", "CANCELLED", "EXPIRED"] },
+          "user_id": { "type": "string", "format": "uuid" },
+          "reserved_at": { "type": "string", "format": "date-time" },
+          "expires_at": { "type": "string", "format": "date-time" },
+          "book": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "isbn": { "type": "string" }
+            }
+          }
+        }
+      },
+      "Document": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "isbn": { "type": "string" },
+          "publication_year": { "type": "integer" },
+          "language": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer" },
+          "per_page": { "type": "integer" },
+          "total": { "type": "integer" },
+          "total_pages": { "type": "integer" }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "error_code": { "type": "string" },
+              "reason_code": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          },
+          "request_id": { "type": "string" },
+          "correlation_id": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Authentication failed",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Insufficient operator role",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "State conflict (invalid transition, idempotency key reuse with different payload)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      }
+    }
+  },
+  "x-governance": {
+    "api-scope": "FROZEN — no expansion beyond v1 without explicit approval",
+    "rate-limits": {
+      "global": "120 requests/minute per client (bearer token hash)",
+      "mutations": "30 write operations/minute per client",
+      "reads": "120 read operations/minute per client"
+    },
+    "authentication": {
+      "method": "Bearer token in Authorization header",
+      "client-identification": "SHA256 hash of first 16 chars of bearer token",
+      "required-headers": [
+        "Authorization: Bearer <token>",
+        "X-Request-Id: <uuid>",
+        "X-Correlation-Id: <uuid>",
+        "X-Source-System: crm",
+        "X-Operator-Id: <operator-uuid>",
+        "X-Operator-Roles: <comma-separated-roles>"
+      ],
+      "optional-headers": [
+        "X-Operator-Org-Context: {\"branch_id\": \"<uuid>\"} (required for mutations)"
+      ]
+    },
+    "audit": {
+      "all-mutations": "Logged to app.circulation_audit_events with previous_state/new_state snapshots",
+      "idempotency": "Mutation endpoints require Idempotency-Key header; replays identical responses for same key+payload",
+      "request-logging": "All requests logged with timing, status, client ref via LogIntegrationRequest middleware"
+    },
+    "scope-restrictions": [
+      "CRM must not connect directly to the library database",
+      "Library APIs are the integration boundary for CRM-side functionality",
+      "CRM-facing API expansion must be conservative and explicit",
+      "Do not casually expose risky mutation surfaces to CRM"
+    ]
+  }
+}

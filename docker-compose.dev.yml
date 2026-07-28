@@ -1,0 +1,86 @@
+# ──────────────────────────────────────────────────────────────
+#  Digital Library — Docker Compose DEV (live-sync, hot reload)
+#  Usage: docker compose -f docker-compose.dev.yml up --build -d
+# ──────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-library_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-digital_library_dev}
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-library_user} -d ${POSTGRES_DB:-digital_library_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Laravel App (nginx + php-fpm) — DEV mode ────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_NAME: "${APP_NAME:-Digital Library [DEV]}"
+      APP_ENV: local
+      APP_KEY: "${APP_KEY}"
+      APP_DEBUG: "true"
+      APP_URL: "${APP_URL:-http://localhost}"
+      APP_LIVE_SYNC: "true"
+      LOG_CHANNEL: stack
+      LOG_LEVEL: debug
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: "${POSTGRES_DB:-digital_library_dev}"
+      DB_USERNAME: "${POSTGRES_USER:-library_user}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      SESSION_DRIVER: database
+      SESSION_LIFETIME: "120"
+      CACHE_STORE: database
+      EXTERNAL_AUTH_LOGIN_URL: "${EXTERNAL_AUTH_LOGIN_URL:-http://crm.local/api/login}"
+      EXTERNAL_AUTH_DEVICE_NAME: "${EXTERNAL_AUTH_DEVICE_NAME:-web}"
+    ports:
+      - "0.0.0.0:${APP_PORT:-8080}:80"
+    volumes:
+      - ./:/app
+      - /app/vendor
+      - /app/node_modules
+
+  # ── Vite Dev Server (hot module reload) ─────────────────────
+  frontend-dev:
+    image: node:22
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      APP_URL: "${APP_URL:-http://localhost}"
+      VITE_HMR_HOST: "${VITE_HMR_HOST:-localhost}"
+      CHOKIDAR_USEPOLLING: "true"
+    command: >
+      sh -lc "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then npm install; fi && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "0.0.0.0:5173:5173"
+    volumes:
+      - ./:/app
+      - frontend_node_modules:/app/node_modules
+
+volumes:
+  postgres_dev_data:
+    name: library_dev_postgres_data
+  frontend_node_modules:
+    name: library_dev_node_modules

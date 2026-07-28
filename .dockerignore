@@ -1,0 +1,29 @@
+# Database dumps (large files, not needed in image)
+*.dump
+*.sql
+
+# Node modules
+node_modules/
+
+# PHP vendor (installed during build inside container)
+vendor/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Development files
+*.log
+.env.example
+README.md
+
+# Tests
+tests/
+
+# Storage runtime data (mounted as volume in production)
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/views/
+storage/logs/
+
