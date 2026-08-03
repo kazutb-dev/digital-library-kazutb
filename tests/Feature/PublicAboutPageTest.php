@@ -26,20 +26,18 @@ class PublicAboutPageTest extends TestCase
         parent::setUp();
 
         config()->set('demo_auth.enabled', true);
+        config()->set('demo_users.enabled', true);
         $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
+        $this->withSession(['locale' => 'ru']);
     }
 
     private function loginAs(string $identitySlug): void
     {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
+        session()->put('library.user', [
+            'role' => in_array($identitySlug, ['student', 'teacher'], true) ? 'reader' : $identitySlug,
+            'profile_type' => $identitySlug,
         ]);
+        $this->post('/locale', ['locale' => 'en', 'return_to' => '/about']);
     }
 
     public function test_guest_can_view_about_page(): void
@@ -47,7 +45,7 @@ class PublicAboutPageTest extends TestCase
         $response = $this->get('/about?lang=en');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('Scientific Library', false);
         $response->assertSee('data-section="about-canonical-hero"', false);
         $response->assertSee('data-section="about-canonical-mission-stats"', false);
         $response->assertSee('data-section="about-canonical-collection"', false);
@@ -158,7 +156,7 @@ class PublicAboutPageTest extends TestCase
     public function test_guest_can_view_about_page_with_canonical_brand(): void
     {
         $response = $this->get('/about?lang=en');
-        $response->assertOk()->assertSee('KazUTB Smart Library', false);
+        $response->assertOk()->assertSee('Scientific Library', false);
     }
 
     public function test_authenticated_reader_can_view_about_page(): void
@@ -168,7 +166,7 @@ class PublicAboutPageTest extends TestCase
         $response = $this->get('/about?lang=en');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('Scientific Library', false);
         $response->assertSee('Sign out', false);
         $response->assertSee('data-test-id="about-canonical-mission-cta"', false);
         $response->assertSee('href="/catalog?lang=en"', false);
@@ -178,15 +176,15 @@ class PublicAboutPageTest extends TestCase
     {
         $this->loginAs('librarian');
 
-        $this->get('/about?lang=en')->assertOk()->assertSee('KazUTB Smart Library', false);
-        $this->get('/contacts?lang=en')->assertOk()->assertSee('KazUTB Smart Library', false);
+        $this->get('/about?lang=en')->assertOk()->assertSee('Scientific Library', false);
+        $this->get('/contacts?lang=en')->assertOk()->assertSee('Scientific Library', false);
     }
 
     public function test_admin_can_view_public_about_and_contacts(): void
     {
         $this->loginAs('admin');
 
-        $this->get('/about?lang=en')->assertOk()->assertSee('KazUTB Smart Library', false);
-        $this->get('/contacts?lang=en')->assertOk()->assertSee('KazUTB Smart Library', false);
+        $this->get('/about?lang=en')->assertOk()->assertSee('Scientific Library', false);
+        $this->get('/contacts?lang=en')->assertOk()->assertSee('Scientific Library', false);
     }
 }

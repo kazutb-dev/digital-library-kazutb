@@ -1,204 +1,204 @@
-@extends('layouts.member', ['title' => 'Notifications — KazUTB Smart Library'])
+@extends('layouts.member', ['title' => __('librarian.member.notifications.title').' — '.__('common.app_name')])
 
 @php
-  // Representative placeholder data — real notifications arrive when
-  // the notification backend for the member module is wired up.
-  //
-  // Event vocabulary (see PROJECT_CONTEXT §Notifications):
-  //   reservation.created · reservation.confirmed · reservation.ready_for_pickup
-  //   reservation.expired · loan.due_soon · loan.overdue
-  //   digital_access.granted · message.status_changed · system.announcement
-  $notificationGroups = [
-      [
-          'label' => 'Today, April 21',
-          'items' => [
-              [
-                  'event' => 'reservation.ready_for_pickup',
-                  'icon' => 'book_online',
-                  'title' => 'Reservation ready for pickup',
-                  'body' => 'Your requested volume, <span class="italic font-headline">Introduction to Algorithms</span>, has been retrieved from the depository and is waiting at the main circulation desk.',
-                  'time' => '10:42',
-                  'unread' => true,
-                  'tone' => 'primary',
-                  'primary_cta' => ['label' => 'Pickup instructions', 'href' => route('member.reservations')],
-                  'secondary_cta' => ['label' => 'Release hold', 'href' => '#'],
-              ],
-              [
-                  'event' => 'digital_access.granted',
-                  'icon' => 'lock_open',
-                  'title' => 'Digital access granted',
-                  'body' => 'You now have full access to the <span class="italic font-headline">IEEE Xplore</span> collection for the Spring 2026 term.',
-                  'time' => '08:15',
-                  'unread' => true,
-                  'tone' => 'secondary',
-                  'primary_cta' => null,
-                  'secondary_cta' => ['label' => 'Open resource', 'href' => '/resources'],
-              ],
-          ],
-      ],
-      [
-          'label' => 'Yesterday, April 20',
-          'items' => [
-              [
-                  'event' => 'loan.overdue',
-                  'icon' => 'warning',
-                  'title' => 'Overdue notice',
-                  'body' => 'The loan period for <span class="italic font-headline">Clean Architecture</span> expired yesterday. Please return the copy or request an extension.',
-                  'time' => '14:30',
-                  'unread' => false,
-                  'tone' => 'error',
-                  'primary_cta' => null,
-                  'secondary_cta' => ['label' => 'Renew loan', 'href' => route('member.history')],
-              ],
-              [
-                  'event' => 'message.status_changed',
-                  'icon' => 'forum',
-                  'title' => 'Reply from the library',
-                  'body' => 'Your inquiry <span class="italic font-headline">«Доступ к архиву журналов по экономике»</span> has been marked as <strong>in review</strong> by the curation team.',
-                  'time' => '11:05',
-                  'unread' => false,
-                  'tone' => 'neutral',
-                  'primary_cta' => null,
-                  'secondary_cta' => ['label' => 'Open conversation', 'href' => route('member.messages')],
-              ],
-          ],
-      ],
-      [
-          'label' => 'April 18',
-          'items' => [
-              [
-                  'event' => 'reservation.confirmed',
-                  'icon' => 'how_to_reg',
-                  'title' => 'Reservation confirmed',
-                  'body' => 'A librarian confirmed your request for <span class="italic font-headline">Database System Concepts</span>. You will be notified when the copy is ready for pickup.',
-                  'time' => '09:00',
-                  'unread' => false,
-                  'tone' => 'neutral',
-                  'primary_cta' => null,
-                  'secondary_cta' => null,
-              ],
-              [
-                  'event' => 'system.announcement',
-                  'icon' => 'system_update',
-                  'title' => 'Scheduled maintenance',
-                  'body' => 'The digital viewer will undergo scheduled maintenance on April 25 from 02:00 to 04:00 UTC. Offline access remains available.',
-                  'time' => '08:00',
-                  'unread' => false,
-                  'tone' => 'neutral',
-                  'primary_cta' => null,
-                  'secondary_cta' => null,
-              ],
-          ],
-      ],
+  use App\Http\Controllers\Member\NotificationController;
+
+  $eventIcons = [
+      'reservation_created' => 'book_online',
+      'reservation_confirmed' => 'how_to_reg',
+      'reservation_ready' => 'check_circle',
+      'reservation_expired' => 'timer_off',
+      'reservation_cancelled' => 'cancel',
+      'loan_due_soon' => 'schedule',
+      'loan_overdue' => 'warning',
+      'loan_renewed' => 'event_repeat',
+      'digital_access_granted' => 'lock_open',
+      'news_published' => 'campaign',
+      'message_received' => 'forum',
+      'message_status_changed' => 'mark_email_read',
   ];
 
-  $unreadCount = collect($notificationGroups)
-      ->flatMap(fn ($g) => $g['items'])
-      ->where('unread', true)
-      ->count();
+  $eventTones = [
+      'reservation_ready' => 'secondary',
+      'digital_access_granted' => 'secondary',
+      'loan_renewed' => 'secondary',
+      'reservation_expired' => 'error',
+      'reservation_cancelled' => 'error',
+      'loan_overdue' => 'error',
+      'reservation_created' => 'primary',
+      'reservation_confirmed' => 'primary',
+      'loan_due_soon' => 'primary',
+  ];
 
-  $tabs = [
-      ['key' => 'all', 'label' => 'All alerts', 'active' => true],
-      ['key' => 'reservations', 'label' => 'Reservations', 'active' => false],
-      ['key' => 'access', 'label' => 'Access notices', 'active' => false],
-      ['key' => 'system', 'label' => 'System', 'active' => false],
+  // Family → the reader page that actually resolves the event. Real routes only.
+  $familyOf = static function (string $eventType): ?string {
+      foreach (NotificationController::FAMILIES as $family => $events) {
+          if (in_array($eventType, $events, true)) {
+              return $family;
+          }
+      }
+
+      return null;
+  };
+
+  $filterTabs = [
+      ['key' => '', 'label' => __('librarian.member.notifications.filters.all'), 'count' => $totalCount],
+      ['key' => 'reservations', 'label' => __('librarian.member.notifications.filters.reservations'), 'count' => $familyCounts['reservations'] ?? 0],
+      ['key' => 'loans', 'label' => __('librarian.member.notifications.filters.loans'), 'count' => $familyCounts['loans'] ?? 0],
+      ['key' => 'digital', 'label' => __('librarian.member.notifications.filters.digital'), 'count' => $familyCounts['digital'] ?? 0],
+      ['key' => 'library', 'label' => __('librarian.member.notifications.filters.library'), 'count' => $familyCounts['library'] ?? 0],
   ];
 @endphp
 
 @section('content')
-  <!-- Header -->
-  <header class="mb-12 md:mb-16 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+  <header class="mb-10 flex flex-col gap-6 md:mb-14 md:flex-row md:items-end md:justify-between">
     <div>
-      <div class="inline-flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full mb-6">
-        <span class="w-2 h-2 rounded-full bg-secondary"></span>
-        <span class="font-label text-xs text-on-surface-variant tracking-widest uppercase">{{ $unreadCount }} unread</span>
+      <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-1">
+        <span class="h-2 w-2 rounded-full {{ $unreadCount > 0 ? 'bg-secondary' : 'bg-outline-variant' }}"></span>
+        <span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">
+          {{ $unreadCount > 0
+              ? __('librarian.member.notifications.unread_count', ['count' => $unreadCount])
+              : __('librarian.member.notifications.all_read') }}
+        </span>
       </div>
-      <h1 class="font-headline text-4xl md:text-[3.5rem] text-primary tracking-tight leading-none mb-6">Notifications</h1>
-      <p class="font-body text-base md:text-lg text-on-surface-variant max-w-2xl leading-relaxed">
-        Updates, alerts, and access notices from the KazUTB Smart Library. Reservation status, circulation reminders, digital access grants, and replies from the library team appear here.
-      </p>
+      <h1 class="mb-6 font-headline text-4xl leading-none tracking-tight text-primary md:text-[3.5rem]">{{ __('librarian.member.notifications.title') }}</h1>
+      <p class="max-w-2xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">{{ __('librarian.member.notifications.subtitle') }}</p>
     </div>
-    <div class="hidden md:flex gap-4">
-      <span class="font-label text-sm text-secondary uppercase tracking-widest flex items-center gap-2">
-        <span class="material-symbols-outlined text-sm">done_all</span>
-        Mark all as read
-      </span>
-    </div>
+
+    @if ($unreadCount > 0)
+      <form method="POST" action="{{ route('member.notifications.read-all') }}" class="shrink-0">
+        @csrf
+        <button type="submit" class="inline-flex items-center gap-2 rounded-md px-5 py-2.5 font-label text-sm uppercase tracking-widest text-secondary ring-1 ring-outline-variant/30 transition-colors hover:bg-surface-variant">
+          <span class="material-symbols-outlined text-[18px]">done_all</span>
+          <span>{{ __('librarian.member.notifications.mark_all_read') }}</span>
+        </button>
+      </form>
+    @endif
   </header>
 
-  <!-- Placeholder disclosure -->
-  <p class="font-body italic text-sm text-on-surface-variant mb-8 max-w-3xl">
-    The alerts shown below are representative placeholders. Real notifications will appear once the member notification backend is wired up.
-  </p>
+  @include('member.partials.flash')
 
-  <!-- Tabs -->
-  <div class="flex gap-6 md:gap-8 mb-10 md:mb-12 border-b border-outline-variant/20 pb-4 overflow-x-auto">
-    @foreach ($tabs as $tab)
-      @if ($tab['active'])
-        <span class="text-primary font-bold text-sm tracking-wider uppercase whitespace-nowrap relative">
-          {{ $tab['label'] }}
-          <span class="absolute -bottom-4 left-0 w-full h-[2px] bg-secondary"></span>
-        </span>
-      @else
-        <span class="text-on-surface-variant text-sm font-medium tracking-wider uppercase whitespace-nowrap">
-          {{ $tab['label'] }}
-        </span>
-      @endif
+  <nav class="mb-10 flex gap-2 overflow-x-auto border-b border-outline-variant/20 pb-4 md:mb-12" aria-label="{{ __('librarian.member.notifications.filters.aria') }}">
+    @foreach ($filterTabs as $tab)
+      @php $isActive = $activeType === $tab['key']; @endphp
+      <a href="{{ $tab['key'] === '' ? route('member.notifications') : route('member.notifications', ['type' => $tab['key']]) }}"
+         @if ($isActive) aria-current="page" @endif
+         class="inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 font-label text-xs uppercase tracking-widest transition-colors {{ $isActive ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-high hover:text-primary' }}">
+        <span>{{ $tab['label'] }}</span>
+        <span class="rounded-full px-2 py-0.5 text-[11px] font-bold {{ $isActive ? 'bg-white/20 text-on-primary' : 'bg-surface-container-highest text-on-surface-variant' }}">{{ $tab['count'] }}</span>
+      </a>
     @endforeach
-  </div>
+  </nav>
 
-  <!-- Feed -->
-  <div class="space-y-12">
-    @foreach ($notificationGroups as $group)
-      <section>
-        <h2 class="text-sm font-label uppercase tracking-widest text-on-surface-variant mb-6">{{ $group['label'] }}</h2>
-        <div class="space-y-5">
-          @foreach ($group['items'] as $item)
-            @php
-              $iconWrap = match ($item['tone']) {
-                  'primary' => 'bg-primary-container/10 text-primary-container',
-                  'secondary' => 'bg-secondary/10 text-secondary',
-                  'error' => 'bg-error-container/30 text-error',
-                  default => 'bg-surface-container-highest text-on-surface-variant',
-              };
-              $wrapperClass = $item['unread']
-                  ? 'bg-surface-container-lowest shadow-[0_24px_48px_rgba(0,6,19,0.02)]'
-                  : 'bg-surface border-b border-outline-variant/20';
-            @endphp
-            <div class="{{ $wrapperClass }} p-6 rounded-xl flex gap-5 md:gap-6 relative overflow-hidden">
-              @if ($item['unread'])
-                <div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary"></div>
-              @endif
-              <div class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center {{ $iconWrap }}">
-                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">{{ $item['icon'] }}</span>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex justify-between items-start mb-1 gap-4">
-                  <h3 class="text-base md:text-lg font-headline font-medium {{ $item['unread'] ? 'text-primary' : 'text-on-surface' }}">{{ $item['title'] }}</h3>
-                  <span class="text-xs text-on-surface-variant font-label whitespace-nowrap">{{ $item['time'] }}</span>
+  @if ($notificationGroups->isEmpty())
+    <div class="rounded-xl bg-surface-container-lowest p-10 text-center md:p-16">
+      <span class="material-symbols-outlined mb-4 text-5xl text-outline">notifications_off</span>
+      <h2 class="mb-3 font-headline text-2xl text-primary">
+        {{ $activeType === '' ? __('librarian.member.notifications.empty_title') : __('librarian.member.notifications.empty_filtered_title') }}
+      </h2>
+      <p class="mx-auto max-w-xl font-body text-sm leading-relaxed text-on-surface-variant">
+        {{ $activeType === '' ? __('librarian.member.notifications.empty_body') : __('librarian.member.notifications.empty_filtered_body') }}
+      </p>
+      @if ($activeType !== '')
+        <a href="{{ route('member.notifications') }}" class="mt-6 inline-flex items-center gap-2 font-body text-sm font-medium text-secondary hover:underline">
+          <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+          <span>{{ __('librarian.member.notifications.filters.all') }}</span>
+        </a>
+      @endif
+    </div>
+  @else
+    <div class="space-y-12">
+      @foreach ($notificationGroups as $day => $items)
+        <section>
+          <h2 class="mb-6 font-label text-sm uppercase tracking-widest text-on-surface-variant">
+            @if ($day === $today)
+              {{ __('librarian.member.notifications.today') }} · {{ $day }}
+            @elseif ($day === $yesterday)
+              {{ __('librarian.member.notifications.yesterday') }} · {{ $day }}
+            @else
+              {{ $day }}
+            @endif
+          </h2>
+
+          <div class="space-y-5">
+            @foreach ($items as $item)
+              @php
+                $isUnread = $item->read_at === null;
+                $tone = $eventTones[$item->event_type] ?? 'neutral';
+                $iconWrap = match ($tone) {
+                    'primary' => 'bg-primary-container/10 text-primary-container',
+                    'secondary' => 'bg-secondary/10 text-secondary',
+                    'error' => 'bg-error-container/30 text-error',
+                    default => 'bg-surface-container-highest text-on-surface-variant',
+                };
+                $eventKey = 'librarian.member.notifications.events.'.$item->event_type;
+                $eventLabel = \Illuminate\Support\Facades\Lang::has($eventKey)
+                    ? __($eventKey)
+                    : __('librarian.member.notifications.events.other');
+                $family = $familyOf($item->event_type);
+                $contextLink = match (true) {
+                    $family === 'reservations' => ['href' => route('member.reservations'), 'label' => __('librarian.member.notifications.links.reservations'), 'icon' => 'book_online'],
+                    $family === 'loans' => ['href' => route('member.history'), 'label' => __('librarian.member.notifications.links.history'), 'icon' => 'history'],
+                    in_array($item->event_type, ['message_received', 'message_status_changed'], true) => ['href' => route('member.messages'), 'label' => __('librarian.member.notifications.links.messages'), 'icon' => 'chat_bubble'],
+                    default => null,
+                };
+              @endphp
+
+              <article class="relative flex gap-5 overflow-hidden rounded-xl p-6 md:gap-6 {{ $isUnread ? 'bg-surface-container-lowest shadow-[0_24px_48px_rgba(0,6,19,0.04)]' : 'border-b border-outline-variant/20 bg-surface' }}">
+                @if ($isUnread)
+                  <div class="absolute bottom-0 left-0 top-0 w-1 bg-secondary"></div>
+                @endif
+
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full {{ $iconWrap }}">
+                  <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">{{ $eventIcons[$item->event_type] ?? 'notifications' }}</span>
                 </div>
-                <p class="{{ $item['unread'] ? 'text-on-surface' : 'text-on-surface-variant' }} text-sm md:text-base mb-3">
-                  {!! $item['body'] !!}
-                </p>
-                @if (! empty($item['primary_cta']) || ! empty($item['secondary_cta']))
-                  <div class="flex flex-wrap gap-3 mt-3">
-                    @if (! empty($item['primary_cta']))
-                      <a href="{{ $item['primary_cta']['href'] }}" class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2 rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
-                        {{ $item['primary_cta']['label'] }}
-                      </a>
-                    @endif
-                    @if (! empty($item['secondary_cta']))
-                      <a href="{{ $item['secondary_cta']['href'] }}" class="text-on-surface-variant border-b border-outline-variant/30 hover:text-primary hover:border-primary transition-colors px-1 pb-1 text-sm font-medium">
-                        {{ $item['secondary_cta']['label'] }}
-                      </a>
+
+                <div class="min-w-0 flex-1">
+                  <div class="mb-2 flex flex-wrap items-center gap-2">
+                    <span class="rounded-full bg-surface-container-high px-2.5 py-1 font-label text-[11px] uppercase tracking-wider text-on-surface-variant">{{ $eventLabel }}</span>
+                    @if ($isUnread)
+                      <span class="rounded-full bg-secondary/10 px-2.5 py-1 font-label text-[11px] font-bold uppercase tracking-wider text-secondary">{{ __('librarian.member.notifications.unread') }}</span>
                     @endif
                   </div>
-                @endif
-              </div>
-            </div>
-          @endforeach
-        </div>
-      </section>
-    @endforeach
-  </div>
+
+                  <div class="mb-1 flex items-start justify-between gap-4">
+                    <h3 class="font-headline text-base font-medium md:text-lg {{ $isUnread ? 'text-primary' : 'text-on-surface' }}">{{ $item->localizedTitle() }}</h3>
+                    <time class="whitespace-nowrap font-label text-xs text-on-surface-variant" datetime="{{ $item->created_at?->toIso8601String() }}">
+                      {{ $item->created_at?->format('H:i') ?? '—' }}
+                    </time>
+                  </div>
+
+                  <p class="text-sm md:text-base {{ $isUnread ? 'text-on-surface' : 'text-on-surface-variant' }}">{{ $item->localizedBody() ?: '—' }}</p>
+
+                  <div class="mt-4 flex flex-wrap items-center gap-3">
+                    @if ($contextLink !== null)
+                      <a href="{{ $contextLink['href'] }}" class="inline-flex items-center gap-2 rounded-md px-4 py-2 font-body text-sm font-medium text-primary ring-1 ring-outline-variant/20 transition-colors hover:bg-surface-variant">
+                        <span class="material-symbols-outlined text-[18px]">{{ $contextLink['icon'] }}</span>
+                        <span>{{ $contextLink['label'] }}</span>
+                      </a>
+                    @endif
+
+                    @if ($isUnread)
+                      <form method="POST" action="{{ route('member.notifications.read', $item) }}">
+                        @csrf
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-md px-4 py-2 font-body text-sm font-medium text-secondary transition-colors hover:bg-surface-variant">
+                          <span class="material-symbols-outlined text-[18px]">done</span>
+                          <span>{{ __('librarian.member.notifications.mark_read') }}</span>
+                        </button>
+                      </form>
+                    @endif
+                  </div>
+                </div>
+              </article>
+            @endforeach
+          </div>
+        </section>
+      @endforeach
+    </div>
+
+    <div class="mt-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <p class="font-body text-xs text-on-surface-variant">{{ __('librarian.member.notifications.total', ['count' => $notifications->total()]) }}</p>
+      <div>{{ $notifications->links() }}</div>
+    </div>
+  @endif
 @endsection

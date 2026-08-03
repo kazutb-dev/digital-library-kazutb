@@ -1,0 +1,5 @@
+"observation_id","module","category","description","predicted_in_phase1","evidence","impact"
+"UB-001","Catalog/Public","unexpected runtime failure","Public /news route returned HTTP 500 in smoke run","no","qa/phase2/metrics/phase2-test-execution-log.csv","High user-facing disruption"
+"UB-002","Integration API","new failure pattern","Integration endpoints expected policy codes but returned 404","partial","qa/phase2/metrics/phase2-test-execution-log.csv","High external-system contract risk"
+"UB-003","Coverage pipeline","tooling anomaly","Coverage driver unavailable in local measured environment","yes","qa/phase2/evidence/logs/phase2-coverage.log","Reduced detectability and delayed risk closure"
+"UB-004","Targeted backend regression suite","environment anomaly","SQLite table/view mismatch noted in failing subset","no","qa/phase2/metrics/phase2-test-execution-log.csv","Medium reliability and reproducibility risk"

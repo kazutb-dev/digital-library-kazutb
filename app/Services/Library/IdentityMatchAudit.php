@@ -10,9 +10,9 @@ class IdentityMatchAudit
     /**
      * Validate and audit identity matching decision.
      *
-     * @param array<string, string> $sessionProfile Normalized CRM user profile
-     * @param ?object $matchedReader First matched reader (or null)
-     * @param array<int, string> $candidates Identifiers used for matching
+     * @param  array<string, string>  $sessionProfile  Normalized CRM user profile
+     * @param  ?object  $matchedReader  First matched reader (or null)
+     * @param  array<int, string>  $candidates  Identifiers used for matching
      * @return array<string, mixed> Audit result with visibility fields
      */
     public function validate(array $sessionProfile, ?object $matchedReader, array $candidates): array
@@ -40,8 +40,7 @@ class IdentityMatchAudit
     /**
      * Detect which identifier was used for successful match.
      *
-     * @param array<string, string> $sessionProfile
-     * @param ?object $matchedReader
+     * @param  array<string, string>  $sessionProfile
      * @return string One of: 'email', 'ad_login', 'no_match'
      */
     private function detectMatchType(array $sessionProfile, ?object $matchedReader): string
@@ -69,8 +68,7 @@ class IdentityMatchAudit
     /**
      * Check if multiple readers share the same email (ambiguity).
      *
-     * @param array<int, string> $candidates
-     * @param ?object $firstMatch
+     * @param  array<int, string>  $candidates
      * @return array<string, mixed> {ambiguous: bool, details: string, count: int}
      */
     private function checkAmbiguity(array $candidates, ?object $firstMatch): array
@@ -118,10 +116,8 @@ class IdentityMatchAudit
     /**
      * Log matching decision for audit trail and debugging.
      *
-     * @param array<string, string> $sessionProfile
-     * @param array<string, mixed> $audit
-     * @param ?object $matchedReader
-     * @return void
+     * @param  array<string, string>  $sessionProfile
+     * @param  array<string, mixed>  $audit
      */
     private function logMatchingDecision(array $sessionProfile, array $audit, ?object $matchedReader): void
     {
@@ -175,8 +171,8 @@ class IdentityMatchAudit
     /**
      * Check if email has changed since match (stale detection).
      *
-     * @param string $currentEmail Email from current session
-     * @param ?string $recordedEmail Email recorded at match time (from primary_email field)
+     * @param  string  $currentEmail  Email from current session
+     * @param  ?string  $recordedEmail  Email recorded at match time (from primary_email field)
      * @return array<string, mixed> {stale: bool, reason: string}
      */
     public function checkIfStale(string $currentEmail, ?string $recordedEmail): array

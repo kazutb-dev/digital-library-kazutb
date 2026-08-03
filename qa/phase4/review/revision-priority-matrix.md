@@ -1,0 +1,20 @@
+# Revision Priority Matrix
+
+Date: 2026-05-13
+
+| Issue ID | Issue Description                                                       | Severity | Source                       | Affected Section                                                                    | Recommended Fix                                                             | Effort      | Priority Order |
+| -------- | ----------------------------------------------------------------------- | -------- | ---------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------- | -------------- |
+| R-01     | Literature section has unresolved citation placeholders                 | High     | peer review / writing review | literature-review-draft.md                                                          | Insert real references and replace placeholders systematically              | Medium-High | 1              |
+| R-02     | Methodology and discussion need formal validity-framework anchoring     | High     | methodology review           | methodology-draft.md; discussion-draft.md                                           | Add structured threats-to-validity framework with mitigation mapping        | Medium      | 2              |
+| R-03     | Contribution novelty needs sharper differentiation                      | High     | internal peer review         | abstract-draft.md; final-insight-draft.md; final-conclusion-draft.md                | Add explicit "what is new" boundary statement                               | Medium      | 3              |
+| R-04     | Figure placeholders lack final claim-linked caption language            | Medium   | visuals review               | full-paper-draft.md; figures-and-tables-map.md                                      | Write final caption set with takeaway statements and caveats                | Medium      | 4              |
+| R-05     | Conclusion-layer role overlap                                           | Medium   | major/minor review           | preliminary-conclusions-draft.md; final-insight-draft.md; final-conclusion-draft.md | Enforce strict semantic boundaries and reduce repeated claims               | Low-Medium  | 5              |
+| R-06     | Transition flow between sections can improve                            | Medium   | writing review               | full-paper-draft.md                                                                 | Add bridge paragraphs between literature-methodology and results-discussion | Low         | 6              |
+| R-07     | Terminology consistency (maturity/governance/confidence)                | Low      | writing review               | abstract-draft.md; discussion-draft.md; full-paper-draft.md                         | Define preferred terms and enforce consistent usage                         | Low         | 7              |
+| R-08     | Composite indicator interpretation needs explicit caution               | Medium   | evidence review              | results-draft.md; discussion-draft.md                                               | Add explicit non-universal index disclaimer near figure discussion          | Low         | 8              |
+| R-09     | Defense Q&A readiness is good but should include concise metric scripts | Low      | defense prep review          | defense-answer-guidance.md                                                          | Add one-line metric recall script appendix                                  | Low         | 9              |
+| R-10     | Publication-style readiness remains below defense readiness             | Medium   | internal peer review         | phase4-part3-summary.md; final-readiness-checklist.md                               | Add dual-readiness summary table (program vs publication)                    | Low         | 10             |
+
+---
+
+KazUTB Digital Library - research synthesis layer (Phase 4) Part 3

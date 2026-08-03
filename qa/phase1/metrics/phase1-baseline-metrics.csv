@@ -1,0 +1,18 @@
+Metric,Status,Value,Notes
+Phase 1 manual test case files (total),Measured,25,Count of Markdown files under qa/phase1/test-cases
+Phase 1 manual test cases (auth),Measured,5,Count in qa/phase1/test-cases/auth
+Phase 1 manual test cases (catalog),Measured,5,Count in qa/phase1/test-cases/catalog
+Phase 1 manual test cases (circulation),Measured,5,Count in qa/phase1/test-cases/circulation
+Phase 1 manual test cases (api),Measured,5,Count in qa/phase1/test-cases/api
+Phase 1 manual test cases (admin),Measured,5,Count in qa/phase1/test-cases/admin
+Repository tests (unit),Measured,2,Count of PHP test files under tests/Unit
+Repository tests (feature),Measured,97,Count of PHP test files under tests/Feature
+Repository tests (api identifiable),Measured,55,Count of PHP test files under tests/Feature/Api
+Repository tests (e2e),Measured,1,Count of JS/TS test files under tests/e2e
+Risk register high-risk items (P0),Measured,5,Count of P0 rows in qa/phase1/docs/phase1-risk-register.md
+Phase 1 manual design modules covered,Measured,5,auth catalog circulation api admin
+Current CI workflow files found,Measured,2,.github/workflows contains ci.yml and release-package.yml
+Currently validated toolchain items,Measured,3,Validated now via commands: PHP 8.4.19 PHPUnit 12.5.14 Playwright 1.59.1
+Unit line coverage metric,Blocked,blocked,Coverage driver pcov/xdebug not detected
+Feature line coverage metric,Blocked,blocked,Coverage driver pcov/xdebug not detected
+E2E coverage metric,Blocked,not measured yet,No coverage instrumentation captured in current allowed command scope

@@ -49,7 +49,7 @@ class RulesPageTest extends TestCase
         $response = $this->get('/rules');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('KazUTB Library', false);
     }
 
     public function test_rules_page_renders_all_frozen_section_markers(): void

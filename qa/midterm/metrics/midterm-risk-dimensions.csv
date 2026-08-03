@@ -1,0 +1,6 @@
+"module","likelihood_before","likelihood_after","impact_before","impact_after","detectability_before","detectability_after","evidence","explanation"
+"Catalog/Public (R2)","4","5","4","5","3","2","P2-UI-CAT-004 fail, P2-QG-004 fail","5xx on public route increases likelihood and impact; detectability drops due unresolved recurring issue"
+"Integration API (R4,R6)","2","5","5","5","3","2","P2-API-INT-001/002 failures and low module coverage","Multiple integration failures undercut confidence in external contract compliance"
+"Circulation/Operations (R3)","3","4","5","5","3","2","Ops mismatch defect and 66.7 percent coverage","Critical operations remain high impact while coverage gap lowers early detection"
+"Admin operations (R5)","2","4","4","4","3","2","Admin ops failure and 50 percent coverage","Low coverage and observed failure indicate higher likelihood than initial estimate"
+"Coverage readiness (R13)","4","4","4","5","2","1","Coverage blocked warning in phase2 gate results","Risk impact grows when observability cannot support confident release decisions"

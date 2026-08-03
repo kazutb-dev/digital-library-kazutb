@@ -1,0 +1,5 @@
+"module","mutation_score_pct","mutants_created","mutants_killed","mutants_survived","inconclusive","equivalent"
+"Integration Boundary Middleware","100","3","3","0","0","0"
+"Integration Document Management API","75","4","3","1","0","0"
+"Integration Reservations Mutate API","75","4","3","1","0","0"
+"Integration Reservations Read API","100","3","3","0","0","0"

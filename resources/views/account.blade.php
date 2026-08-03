@@ -4,7 +4,7 @@
 
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
       $normalizedPath = '/' . ltrim($path, '/');
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
       $query = array_filter($query, static fn ($value) => $value !== null && $value !== '');
@@ -74,9 +74,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>{{ $accountTitle }}</title>
+  @include('partials.favicons')
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/fonts/fonts.css"/>
   <script id="tailwind-config">
       tailwind.config = {
           darkMode: 'class',
@@ -238,7 +238,7 @@
     <div class="flex items-start md:items-center gap-3 bg-secondary/10 text-on-surface border border-secondary/20 rounded-md px-4 py-3">
       <span class="material-symbols-outlined text-secondary text-xl" aria-hidden="true">auto_awesome</span>
       <p class="text-sm md:text-base leading-snug flex-1">
-        This legacy reader workspace is being retired. The canonical KazUTB Smart Library experience now lives at <strong>My Library → /dashboard</strong>.
+        {!! __('shell.legacy_account_notice') !!}
       </p>
       <a href="/dashboard" class="inline-flex items-center gap-1 text-sm font-medium text-secondary hover:text-primary transition-colors whitespace-nowrap">
         Try the new dashboard
@@ -253,7 +253,7 @@
         <nav class="hidden md:flex items-center gap-6 lg:gap-8">
           <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/catalog') }}">Catalog</a>
           <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/resources') }}">Resources</a>
-          <a id="archive-nav-link" class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/discover') }}"><span aria-hidden="true"></span></a>
+          <a id="archive-nav-link" class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/catalog') }}"><span aria-hidden="true"></span></a>
           <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/shortlist') }}">Shortlist</a>
         </nav>
       </div>

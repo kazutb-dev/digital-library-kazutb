@@ -1,0 +1,6 @@
+Test Stage,Execution Time (Automated),Notes
+AdminPrivilegeNegativePathTest,00:05.413,"28 tests; average 0.19s per test"
+ReservationMutateTest,00:04.520,"15 tests; average 0.30s per test"
+Feature Tests (All),~180s,"887 tests; average 0.20s per test"
+Unit Tests,00:00.019,"17 tests; average 0.001s per test"
+TOTAL SUITE,~190s,"947 total tests; effective throughput: 5 tests/second"

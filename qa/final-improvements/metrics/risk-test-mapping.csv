@@ -1,0 +1,13 @@
+Risk ID,Test Type,Test Description,Automation Layer,Metric / Evidence Output
+R-PRIV-001,Feature,AdminPrivilegeNegativePathTest - 7 routes × 4 roles,API/Feature,28 tests pass - 100% coverage of privilege boundaries
+R-PRIV-002,Feature,Admin access validation for all 4 user roles,API/Feature,28 tests pass - guest/reader/librarian/admin coverage
+R-API-001,Integration,ReservationMutateTest - operator role enforcement,API/Integration,2 tests pass - approve/reject role validation
+R-API-002,Integration,ReservationMutateTest - context field propagation,API/Integration,2 tests pass - request_id/correlation_id/timestamp in response
+R-API-003,Integration,ReservationMutateTest - idempotency key handling,API/Integration,3 tests pass - idempotency-key validation and conflict detection
+R-RESV-001,Feature,ReaderReservationTest - auth validation (4/14 executable),Feature,4 tests pass - auth layer validated; API contract blocked by schema
+R-RESV-002,Feature,AccountReservationsTest - filter validation (2/6 executable),Feature,2 tests pass - auth layer validated; filtering blocked by schema
+R-AUTH-001,Feature,AdminPrivilegeNegativePathTest - guest redirect,API/Feature,7 tests pass - unauthenticated access redirected
+R-DATA-001,Feature,ReaderReservationTest - validation (blocked by schema),Feature,Structured but blocked - parameter validation patterns established
+R-DATA-002,Integration,ReservationMutateTest - response contracts,API/Integration,2 tests pass - context field presence validated
+R-PERF-001,Suite,Full Feature/Unit suite execution,Suite,887 Feature + 17 Unit = 904 tests in ~190s (~0.2s per test)
+R-DB-001,Feature,ReaderReservationTest + AccountReservationsTest blocked,Feature,20 tests remain in codebase; PostgreSQL schema issue documented

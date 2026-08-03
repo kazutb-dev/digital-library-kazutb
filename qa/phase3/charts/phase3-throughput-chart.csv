@@ -1,0 +1,11 @@
+scenario_id,module,endpoint,throughput_rps,total_requests,total_elapsed_sec,load_type
+S01-NL-CATALOG,Catalog/Public API,GET /api/v1/landing,0.290,20,68.946,normal_load
+S02-PL-CATALOG,Catalog/Public API,GET /api/v1/catalog-db,0.286,30,104.958,peak_load
+S03-NL-SUBJECTS,Catalog/Public API,GET /api/v1/subjects,0.298,20,67.211,normal_load
+S04-SL-MIXED,Catalog/Public API,GET /api/v1/landing+subjects,0.289,20,69.319,spike_load
+S05-NL-EXTRES,External Resources,GET /api/v1/external-resources,0.325,20,61.613,normal_load
+S06-NL-WEBCATALOG,Web Catalog UI,GET /catalog,0.264,10,37.861,normal_load
+S07-PL-WEBCATALOG,Web Catalog UI,GET /catalog (peak),0.275,20,72.819,peak_load
+S08A-NO-AUTH,Integration API,GET /api/integration (no-auth),0.300,10,33.317,boundary_auth
+S08B-BAD-TOKEN,Integration API,GET /api/integration (bad-token),0.318,10,31.426,boundary_auth
+S09-END-CATALOG,Catalog/Public API,GET /api/v1/landing (endurance),0.289,40,138.209,endurance

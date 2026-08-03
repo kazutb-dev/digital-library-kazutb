@@ -85,17 +85,12 @@ class DigitalMaterialTest extends TestCase
 
     public function test_viewer_page_renders(): void
     {
+        // An id that resolves to nothing still renders the viewer shell, now with
+        // the not-found state decided server-side rather than probed in the browser.
         $response = $this->get('/digital-viewer/some-fake-id');
         $response->assertOk();
         $response->assertSee('viewer-root', false);
-        $response->assertSee('initViewer', false);
-    }
-
-    public function test_viewer_page_passes_material_id(): void
-    {
-        $response = $this->get('/digital-viewer/test-uuid-123');
-        $response->assertOk();
-        $response->assertSee('test-uuid-123', false);
+        $response->assertSee(__('ui.digital.not_found_title'), false);
     }
 
     // ═══════════════════════════════════════════════════════════

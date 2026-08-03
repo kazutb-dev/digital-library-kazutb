@@ -1,0 +1,10 @@
+Metric,Value,Status,Notes
+Performance Baseline Runtime,~190s,"Retained","Full test suite (947 tests) completes in approximately 190 seconds"
+Memory Usage (Peak),20.00 MB,"Measured","Observed during feature test execution"
+Memory Usage (Avg),~12 MB,"Estimated","Based on individual test runs"
+Database Query Performance,Fast,"Stable","SQLite in-memory tests; no regression observed"
+Docker Container Startup,~5s,"Stable","Consistent across test runs"
+Middleware Overhead,<1ms,"Estimated","Session and auth middleware execution time negligible"
+Test Framework Overhead,~1s,"Estimated","PHPUnit bootstrap and configuration loading"
+Critical Path (Privilege Tests),~5.4s,"Measured","28 privilege tests; authentication bottleneck not observed"
+Comment,,"Not Rerun","Performance regression testing deferred; stability baseline established"

@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,11 +14,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        // RBAC must be seeded before any account, so role assignment has
+        // something to attach to.
+        $this->call([
+            PermissionSeeder::class,
+            RoleSeeder::class,
+            DemoUserSeeder::class,
+            SettingsSeeder::class,
+            LibraryStructureSeeder::class,
+            ExternalResourceSeeder::class,
+            UdcCodeSeeder::class,
+            LibraryCatalogSeeder::class,
         ]);
     }
 }

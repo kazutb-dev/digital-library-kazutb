@@ -1,0 +1,29 @@
+{
+    "execution_time_comparison": [
+        {
+            "test_stage": "AdminPrivilegeNegativePathTest",
+            "execution_time": "00:05.413",
+            "notes": "28 tests; average 0.19s per test"
+        },
+        {
+            "test_stage": "ReservationMutateTest",
+            "execution_time": "00:04.520",
+            "notes": "15 tests; average 0.30s per test"
+        },
+        {
+            "test_stage": "Feature Tests (All)",
+            "execution_time": "~180s",
+            "notes": "887 tests; average 0.20s per test"
+        },
+        {
+            "test_stage": "Unit Tests",
+            "execution_time": "00:00.019",
+            "notes": "17 tests; average 0.001s per test"
+        },
+        {
+            "test_stage": "TOTAL SUITE",
+            "execution_time": "~190s",
+            "notes": "947 total tests; effective throughput: 5 tests/second"
+        }
+    ]
+}

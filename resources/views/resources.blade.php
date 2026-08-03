@@ -1,34 +1,17 @@
 @extends('layouts.public')
 
 @php
-  // Phase 3 Cluster D — /resources canonical-exact rebuild per
-  // docs/design-exports/institutional_resources_canonical/code.html.
-  //
-  // Retired the previous pathways + filter-bar + featured/small-grid + support-section
-  // shell; legacy markers (pathways id, filter-bar id, resource-grid data attr, support
-  // section id, featured and small card modifiers, pathway panels, core-databases
-  // label) are no longer emitted. The new layout mirrors the canonical export:
-  //
-  //   1. Hero (8/12 + 4/12 off-campus access card)
-  //   2. Main two-column layout
-  //      2a. Sidebar — "Refine Search" (Discipline + Resource Type, UI-only)
-  //      2b. Content stack
-  //          • "Premium Databases" — 2-col card grid (subscription databases,
-  //            remote_auth + campus access types)
-  //          • "Open Access Tools"  — list rows (open access type)
-  //
-  // Data source unchanged: App\Services\ExternalResourceService, fed by
-  // config/external_resources.php — resource title, provider, url, description,
-  // access_type are preserved verbatim. Tri-lingual support covers UI chrome
-  // (hero, sidebar labels, section headings, access-type labels, chrome copy);
-  // resource descriptions stay in their canonical language as supplied by config.
+  // /resources now follows the same public-v2 editorial rhythm as /repository:
+  // compact page hero, search, chips, count summary, resource records, and aside.
+  // Data source remains App\Services\ExternalResourceService, fed by
+  // config/external_resources.php.
 
-  $lang = request()->query('lang', 'ru');
+  $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $activePage = $activePage ?? 'resources';
 
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
       $queryString = http_build_query(array_filter($query, static fn ($v) => $v !== null && $v !== ''));
@@ -44,6 +27,16 @@
       fn ($r) => ($r['access_type'] ?? null) === 'open'
           && ($r['status'] ?? 'active') !== 'inactive'
   )->values();
+  $allResources = $premiumResources
+      ->map(static function ($resource) {
+          $resource['resource_group'] = 'premium';
+          return $resource;
+      })
+      ->concat($openResources->map(static function ($resource) {
+          $resource['resource_group'] = 'open';
+          return $resource;
+      }))
+      ->values();
 
   $openIconFor = static function (array $resource): string {
       $category = $resource['category'] ?? null;
@@ -67,7 +60,7 @@
 
   $copy = [
       'ru' => [
-          'title' => 'Институциональные ресурсы — KazUTB Smart Library',
+          'title' => 'Институциональные ресурсы — KazUTB',
           'hero_eyebrow' => 'Справочник',
           'hero_title_a' => 'Институциональные',
           'hero_title_b' => 'ресурсы',
@@ -93,9 +86,18 @@
           'open_title' => 'Инструменты открытого доступа',
           'open_count_label' => 'Открытый доступ',
           'open_cta' => 'Открыть инструмент',
+          'filter_all' => 'Все ресурсы',
+          'search_placeholder' => 'Поиск по ресурсам, базам данных и поставщикам',
+          'resources_one' => 'ресурс',
+          'resources_few' => 'ресурса',
+          'resources_many' => 'ресурсов',
+          'access_remote_auth' => 'Удалённый доступ',
+          'access_campus' => 'Доступ в кампусе',
+          'access_open' => 'Открытый доступ',
+          'provider_label' => 'Поставщик',
       ],
       'kk' => [
-          'title' => 'Институционалдық ресурстар — KazUTB Smart Library',
+          'title' => 'Институционалдық ресурстар — KazUTB',
           'hero_eyebrow' => 'Анықтамалық',
           'hero_title_a' => 'Институционалдық',
           'hero_title_b' => 'ресурстар',
@@ -121,9 +123,18 @@
           'open_title' => 'Ашық қол жеткізу құралдары',
           'open_count_label' => 'Ашық қол жеткізу',
           'open_cta' => 'Құралды ашу',
+          'filter_all' => 'Барлық ресурстар',
+          'search_placeholder' => 'Ресурстар, дерекқорлар және провайдерлер бойынша іздеу',
+          'resources_one' => 'ресурс',
+          'resources_few' => 'ресурс',
+          'resources_many' => 'ресурс',
+          'access_remote_auth' => 'Қашықтан қол жеткізу',
+          'access_campus' => 'Кампус ішіндегі қолжетімділік',
+          'access_open' => 'Ашық қол жеткізу',
+          'provider_label' => 'Провайдер',
       ],
       'en' => [
-          'title' => 'Institutional Resources — KazUTB Smart Library',
+          'title' => 'Institutional Resources — KazUTB',
           'hero_eyebrow' => 'Directory',
           'hero_title_a' => 'Institutional',
           'hero_title_b' => 'Resources',
@@ -149,6 +160,15 @@
           'open_title' => 'Open Access Tools',
           'open_count_label' => 'Public',
           'open_cta' => 'Open Tool',
+          'filter_all' => 'All resources',
+          'search_placeholder' => 'Search resources, databases, and providers',
+          'resources_one' => 'resource',
+          'resources_few' => 'resources',
+          'resources_many' => 'resources',
+          'access_remote_auth' => 'Remote access',
+          'access_campus' => 'Campus access',
+          'access_open' => 'Open access',
+          'provider_label' => 'Provider',
       ],
   ][$lang];
 
@@ -165,178 +185,156 @@
       return str_replace(':count', (string) $n, $copy[$key]);
   };
   $premiumCountLabel = $pluralizePremium($premiumResources->count());
+  $resourceCount = $allResources->count();
+  $countWord = static function (int $n) use ($copy, $lang): string {
+      if ($lang !== 'kk') {
+          return $n === 1 ? $copy['resources_one'] : $copy['resources_many'];
+      }
+      $mod10 = $n % 10;
+      $mod100 = $n % 100;
+      if ($mod10 === 1 && $mod100 !== 11) return $copy['resources_one'];
+      if ($mod10 >= 2 && $mod10 <= 4 && ($mod100 < 12 || $mod100 > 14)) return $copy['resources_few'];
+      return $copy['resources_many'];
+  };
+  $accessLabels = [
+      'remote_auth' => $copy['access_remote_auth'],
+      'campus' => $copy['access_campus'],
+      'open' => $copy['access_open'],
+  ];
+  $resourceWords = [
+      'lang' => $lang,
+      'one' => $copy['resources_one'],
+      'few' => $copy['resources_few'],
+      'many' => $copy['resources_many'],
+  ];
 @endphp
 
 @section('title', $copy['title'])
 
 @section('content')
-  {{-- Cluster D — canonical-exact rebuild of /resources per institutional_resources_canonical.
-       Section markers (canonical order): resources-canonical-hero, resources-canonical-main,
-       resources-canonical-sidebar, resources-canonical-premium, resources-canonical-open-access. --}}
-  <div class="resources-canonical">
-
-    {{-- Hero: 8/12 copy + 4/12 off-campus access card. --}}
-    <header class="resources-canonical__hero" data-section="resources-canonical-hero">
-      <div class="resources-canonical__hero-copy">
-        <span class="resources-canonical__eyebrow">{{ $copy['hero_eyebrow'] }}</span>
-        <h1 class="resources-canonical__display">
-          {{ $copy['hero_title_a'] }}<br>
-          <span class="resources-canonical__display-italic">{{ $copy['hero_title_b'] }}</span>
-        </h1>
-        <p class="resources-canonical__lead">{{ $copy['hero_body'] }}</p>
+  <div class="resources-canonical public-v2 resources-v2">
+    <header class="public-v2__hero resources-canonical__hero" data-section="resources-canonical-hero">
+      <div class="public-v2__inset public-v2__hero-grid">
+        <div>
+          <p class="public-v2__kicker">{{ $copy['hero_eyebrow'] }}</p>
+          <h1 class="public-v2__title">
+            {{ $copy['hero_title_a'] }} {{ $copy['hero_title_b'] }}
+          </h1>
+          <p class="public-v2__lead">{{ $copy['hero_body'] }}</p>
+        </div>
+        <aside class="public-v2__hero-note">
+          <strong>{{ $resourceCount }}</strong>
+          <span>{{ $copy['filter_all'] }}</span>
+        </aside>
       </div>
-      <aside class="resources-canonical__hero-aside">
-        <div class="resources-canonical__off-campus" data-test-id="resources-canonical-off-campus">
-          <div class="resources-canonical__off-campus-icon" aria-hidden="true">
-            <span class="material-symbols-outlined">vpn_key</span>
-          </div>
-          <div class="resources-canonical__off-campus-copy">
-            <h3 class="resources-canonical__off-campus-title">{{ $copy['off_campus_title'] }}</h3>
+    </header>
+
+    <div class="public-v2__body resources-canonical__main" data-section="resources-canonical-main">
+      <div class="public-v2__inset">
+        <label class="public-v2__search">
+          <span class="material-symbols-outlined" aria-hidden="true">search</span>
+          <input type="search" data-resource-search placeholder="{{ $copy['search_placeholder'] }}">
+          <button type="button">{{ $copy['premium_cta'] }}</button>
+        </label>
+
+        <nav class="repository-canonical__filters resources-v2__filters" data-section="resources-canonical-filters" aria-label="{{ $copy['filter_all'] }}">
+          <button class="repository-canonical__chip repository-canonical__chip--active is-active" type="button" data-resource-category="all">
+            {{ $copy['filter_all'] }}
+            <span class="repository-canonical__chip-count">{{ $resourceCount }}</span>
+          </button>
+          <button class="repository-canonical__chip" type="button" data-resource-category="premium">
+            {{ $copy['premium_title'] }}
+            <span class="repository-canonical__chip-count">{{ $premiumResources->count() }}</span>
+          </button>
+          <button class="repository-canonical__chip" type="button" data-resource-category="open">
+            {{ $copy['open_title'] }}
+            <span class="repository-canonical__chip-count">{{ $openResources->count() }}</span>
+          </button>
+        </nav>
+
+        <p class="repository-canonical__summary resources-v2__summary" data-resource-count>
+          {{ $resourceCount }} {{ $countWord($resourceCount) }}
+        </p>
+
+        <div class="repository-v2__layout resources-v2__layout">
+          <section class="repository-canonical__list resources-canonical__list" data-section="resources-canonical-list">
+            @forelse($allResources as $resource)
+              @php
+                $isPremium = ($resource['resource_group'] ?? null) === 'premium';
+                $resourceIcon = $isPremium ? 'lock' : $openIconFor($resource);
+                $resourceCta = $isPremium ? $copy['premium_cta'] : $copy['open_cta'];
+                $accessLabel = $accessLabels[$resource['access_type'] ?? 'open'] ?? $copy['open_count_label'];
+                $logoSrc = ! empty($resource['logo_path'])
+                    ? asset('storage/' . ltrim($resource['logo_path'], '/'))
+                    : ($resource['logo'] ?? null);
+              @endphp
+              <article
+                class="resources-canonical__card"
+                data-resource-card
+                data-resource-category="{{ $resource['resource_group'] }}"
+                data-resource-slug="{{ $resource['slug'] }}"
+                data-resource-access="{{ $resource['access_type'] }}"
+                data-test-id="resources-canonical-card-{{ $resource['slug'] }}"
+              >
+                <aside class="resources-canonical__rail">
+                  @if($isPremium)
+                    <span class="resources-canonical__type">{{ $copy['premium_title'] }}</span>
+                  @endif
+                  <span class="resources-canonical__emblem" aria-hidden="true">
+                    @if($logoSrc)
+                      <img src="{{ $logoSrc }}" alt="" loading="lazy" decoding="async">
+                    @else
+                      {{ $emblemFor($resource) }}
+                    @endif
+                  </span>
+                  <span class="resources-canonical__access">
+                    <span class="material-symbols-outlined" aria-hidden="true">{{ $resourceIcon }}</span>
+                    {{ $accessLabel }}
+                  </span>
+                </aside>
+                <div class="resources-canonical__body">
+                  <h2 class="resources-canonical__card-title">
+                    <a href="{{ $resource['url'] }}" target="_blank" rel="noopener noreferrer">
+                      {{ $resource['title'] }}
+                    </a>
+                  </h2>
+                  <p class="resources-canonical__provider">
+                    {{ $copy['provider_label'] }}: {{ $resource['provider'] }}
+                  </p>
+                  <p class="resources-canonical__card-desc">{{ $resource['description'] }}</p>
+                  <div class="resources-canonical__meta-row">
+                    <span class="resources-canonical__card-badge">
+                      <span class="material-symbols-outlined" aria-hidden="true">{{ $isPremium ? 'vpn_key' : 'public' }}</span>
+                      <span>{{ $accessLabel }}</span>
+                    </span>
+                    <a class="repository-canonical__details-link resources-canonical__card-link"
+                       href="{{ $resource['url'] }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       data-test-id="resources-canonical-link-{{ $resource['slug'] }}">
+                      <span>{{ $resourceCta }}</span>
+                      <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+                    </a>
+                  </div>
+                </div>
+              </article>
+            @empty
+              <div class="public-v2__empty">
+                <span class="material-symbols-outlined" aria-hidden="true">database_off</span>
+                <h3>{{ $copy['filter_all'] }}</h3>
+              </div>
+            @endforelse
+          </section>
+          <aside class="repository-v2__aside resources-v2__aside">
+            <strong>{{ $copy['off_campus_title'] }}</strong>
+            <p>{{ $copy['hero_body'] }}</p>
             <a class="resources-canonical__off-campus-cta"
                href="{{ $routeWithLang('/contacts') }}"
                data-test-id="resources-canonical-off-campus-cta">
               {{ $copy['off_campus_cta'] }} →
             </a>
-          </div>
+          </aside>
         </div>
-      </aside>
-    </header>
-
-    {{-- Main two-column layout: 1/4 sidebar + 3/4 categorized content. --}}
-    <div class="resources-canonical__main" data-section="resources-canonical-main">
-
-      {{-- Refine Search sidebar. Checkboxes are UI-only per canonical export. --}}
-      <aside class="resources-canonical__sidebar" data-section="resources-canonical-sidebar">
-        <div class="resources-canonical__sidebar-card">
-          <h3 class="resources-canonical__sidebar-title">{{ $copy['sidebar_title'] }}</h3>
-
-          <div class="resources-canonical__facet">
-            <h4 class="resources-canonical__facet-heading">{{ $copy['sidebar_discipline'] }}</h4>
-            <ul class="resources-canonical__facet-list">
-              @foreach([
-                  'engineering' => $copy['discipline_engineering'],
-                  'sciences'    => $copy['discipline_sciences'],
-                  'business'    => $copy['discipline_business'],
-                  'humanities'  => $copy['discipline_humanities'],
-              ] as $slug => $label)
-                <li>
-                  <label class="resources-canonical__facet-option" data-facet-slot data-facet-type="discipline" data-facet-slug="{{ $slug }}">
-                    <input type="checkbox" name="discipline[]" value="{{ $slug }}">
-                    <span>{{ $label }}</span>
-                  </label>
-                </li>
-              @endforeach
-            </ul>
-          </div>
-
-          <hr class="resources-canonical__facet-divider">
-
-          <div class="resources-canonical__facet">
-            <h4 class="resources-canonical__facet-heading">{{ $copy['sidebar_resource_type'] }}</h4>
-            <ul class="resources-canonical__facet-list">
-              @foreach([
-                  'journals'    => $copy['type_journals'],
-                  'proceedings' => $copy['type_proceedings'],
-                  'datasets'    => $copy['type_datasets'],
-              ] as $slug => $label)
-                <li>
-                  <label class="resources-canonical__facet-option" data-facet-slot data-facet-type="resource-type" data-facet-slug="{{ $slug }}">
-                    <input type="checkbox" name="resource_type[]" value="{{ $slug }}">
-                    <span>{{ $label }}</span>
-                  </label>
-                </li>
-              @endforeach
-            </ul>
-          </div>
-        </div>
-      </aside>
-
-      {{-- Categorized directory: Premium → card grid, Open Access → list rows. --}}
-      <div class="resources-canonical__directory">
-
-        <section class="resources-canonical__section" data-section="resources-canonical-premium">
-          <div class="resources-canonical__section-head">
-            <h2 class="resources-canonical__section-title">{{ $copy['premium_title'] }}</h2>
-            <span class="resources-canonical__section-count" data-test-id="resources-canonical-premium-count">
-              {{ $premiumCountLabel }}
-            </span>
-          </div>
-          <div class="resources-canonical__card-grid">
-            @foreach($premiumResources as $resource)
-              <article
-                class="resources-canonical__card"
-                data-premium-resource
-                data-resource-slug="{{ $resource['slug'] }}"
-                data-resource-access="{{ $resource['access_type'] }}"
-                data-test-id="resources-canonical-premium-card-{{ $resource['slug'] }}"
-              >
-                <div class="resources-canonical__card-body">
-                  <div class="resources-canonical__card-head">
-                    <div class="resources-canonical__card-emblem" aria-hidden="true">
-                      <span>{{ $emblemFor($resource) }}</span>
-                    </div>
-                    <span class="resources-canonical__card-badge">
-                      <span class="material-symbols-outlined" aria-hidden="true">lock</span>
-                      <span>{{ $copy['premium_badge'] }}</span>
-                    </span>
-                  </div>
-                  <h3 class="resources-canonical__card-title">{{ $resource['title'] }}</h3>
-                  <p class="resources-canonical__card-desc">{{ $resource['description'] }}</p>
-                </div>
-                <div class="resources-canonical__card-foot">
-                  <span class="resources-canonical__card-provider">{{ $resource['provider'] }}</span>
-                  <a class="resources-canonical__card-link"
-                     href="{{ $resource['url'] }}"
-                     target="_blank"
-                     rel="noopener noreferrer"
-                     data-test-id="resources-canonical-premium-link-{{ $resource['slug'] }}">
-                    <span>{{ $copy['premium_cta'] }}</span>
-                    <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-                  </a>
-                </div>
-              </article>
-            @endforeach
-          </div>
-        </section>
-
-        <div class="resources-canonical__section-spacer" aria-hidden="true"></div>
-
-        <section class="resources-canonical__section" data-section="resources-canonical-open-access">
-          <div class="resources-canonical__section-head">
-            <h2 class="resources-canonical__section-title">{{ $copy['open_title'] }}</h2>
-            <span class="resources-canonical__section-count" data-test-id="resources-canonical-open-count">
-              {{ $copy['open_count_label'] }}
-            </span>
-          </div>
-          <div class="resources-canonical__list">
-            @foreach($openResources as $resource)
-              <div
-                class="resources-canonical__row"
-                data-open-resource
-                data-resource-slug="{{ $resource['slug'] }}"
-                data-test-id="resources-canonical-open-row-{{ $resource['slug'] }}"
-              >
-                <div class="resources-canonical__row-main">
-                  <div class="resources-canonical__row-icon" aria-hidden="true">
-                    <span class="material-symbols-outlined">{{ $openIconFor($resource) }}</span>
-                  </div>
-                  <div class="resources-canonical__row-copy">
-                    <h3 class="resources-canonical__row-title">{{ $resource['title'] }}</h3>
-                    <p class="resources-canonical__row-desc">{{ $resource['description'] }}</p>
-                  </div>
-                </div>
-                <a class="resources-canonical__row-link"
-                   href="{{ $resource['url'] }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   data-test-id="resources-canonical-open-link-{{ $resource['slug'] }}">
-                  {{ $copy['open_cta'] }}
-                </a>
-              </div>
-            @endforeach
-          </div>
-        </section>
-
       </div>
     </div>
   </div>
@@ -348,15 +346,16 @@
      Scoped to .resources-canonical; mirrors institutional_resources_canonical/code.html. */
 
   .resources-canonical {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 96px 16px 96px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
     color: #191c1d;
     font-family: 'Manrope', sans-serif;
   }
 
   @media (min-width: 768px) {
-    .resources-canonical { padding: 128px 32px 96px; }
+    .resources-canonical { padding: 0; }
   }
 
   /* --- Hero --------------------------------------------------------------- */
@@ -797,4 +796,49 @@
     border-color: rgba(0, 106, 106, 0.5);
   }
 </style>
+@endsection
+
+@section('scripts')
+<script>
+  const resourceSearch = document.querySelector('[data-resource-search]');
+  const resourceCategories = document.querySelectorAll('[data-resource-category]');
+  const resourceCount = document.querySelector('[data-resource-count]');
+  const resourceWords = @json($resourceWords);
+
+  function resourceCountWord(count) {
+    if (resourceWords.lang !== 'kk') {
+      return count === 1 ? resourceWords.one : resourceWords.many;
+    }
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 === 1 && mod100 !== 11) return resourceWords.one;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return resourceWords.few;
+    return resourceWords.many;
+  }
+
+  function filterResources(category = document.querySelector('[data-resource-category].is-active')?.dataset.resourceCategory || 'all') {
+    const query = resourceSearch?.value.trim().toLocaleLowerCase() || '';
+    let visibleCount = 0;
+    document.querySelectorAll('[data-resource-card]').forEach((card) => {
+      const cardCategory = card.dataset.resourceCategory || 'open';
+      const categoryMatches = category === 'all' || category === cardCategory;
+      const searchMatches = query === '' || card.textContent.toLocaleLowerCase().includes(query);
+      const isVisible = categoryMatches && searchMatches;
+      card.hidden = !isVisible;
+      if (isVisible) visibleCount += 1;
+    });
+    if (resourceCount) {
+      resourceCount.textContent = `${visibleCount} ${resourceCountWord(visibleCount)}`;
+    }
+  }
+
+  resourceSearch?.addEventListener('input', () => filterResources());
+  resourceCategories.forEach((button) => button.addEventListener('click', () => {
+    resourceCategories.forEach((item) => {
+      item.classList.toggle('repository-canonical__chip--active', item === button);
+      item.classList.toggle('is-active', item === button);
+    });
+    filterResources(button.dataset.resourceCategory);
+  }));
+</script>
 @endsection

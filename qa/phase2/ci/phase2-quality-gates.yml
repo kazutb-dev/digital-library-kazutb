@@ -1,0 +1,85 @@
+quality_gates:
+  - id: P2-QG-001
+    tier: current_enforced
+    metric: API smoke critical endpoint success
+    threshold: ">=90 percent pass-rate"
+    importance: high
+    enforcement: fail
+    implementedInCi: true
+  - id: P2-QG-002
+    tier: current_enforced
+    metric: Critical UI public regression success
+    threshold: ">=90 percent pass-rate"
+    importance: high
+    enforcement: fail
+    implementedInCi: true
+  - id: P2-QG-003
+    tier: current_enforced
+    metric: Critical workflow regression subset PHPUnit
+    threshold: ">=90 percent pass-rate excluding skips"
+    importance: high
+    enforcement: fail
+    implementedInCi: true
+  - id: P2-QG-004
+    tier: current_enforced
+    metric: Fatal error crash detection on public routes
+    threshold: "0 unexpected HTTP 5xx in critical public smoke"
+    importance: high
+    enforcement: fail
+    implementedInCi: true
+  - id: P2-QG-005
+    tier: current_enforced
+    metric: Role access protection validation
+    threshold: ">=85 percent pass-rate across role-boundary smoke checks"
+    importance: high
+    enforcement: fail
+    implementedInCi: true
+  - id: P2-QG-006
+    tier: current_enforced
+    metric: Coverage availability status in measured environment
+    threshold: "Coverage driver available pcov or xdebug"
+    importance: medium
+    enforcement: warn
+    implementedInCi: true
+  - id: P2-QG-007
+    tier: current_enforced
+    metric: Test execution time thresholds
+    threshold: "API <=60s; UI <=90s; PHPUnit <=90s"
+    importance: medium
+    enforcement: warn
+    implementedInCi: true
+  - id: P2-QG-008
+    tier: current_enforced
+    metric: CI artifact generation completeness
+    threshold: "Required Phase 2 docs and gate result logs present"
+    importance: medium
+    enforcement: fail
+    implementedInCi: true
+  - id: P2-QG-009
+    tier: proposed_next_stage
+    metric: Critical module line coverage
+    threshold: ">=80 percent"
+    importance: high
+    enforcement: informational
+    implementedInCi: false
+  - id: P2-QG-010
+    tier: proposed_next_stage
+    metric: Regression success for critical workflows
+    threshold: "100 percent pass-rate"
+    importance: high
+    enforcement: informational
+    implementedInCi: false
+  - id: P2-QG-011
+    tier: proposed_next_stage
+    metric: Static analysis major violations
+    threshold: "0 major violations"
+    importance: medium
+    enforcement: informational
+    implementedInCi: false
+  - id: P2-QG-012
+    tier: proposed_next_stage
+    metric: Flaky-test control
+    threshold: "<=2 percent flaky rerun rate over rolling 10 CI runs"
+    importance: medium
+    enforcement: informational
+    implementedInCi: false

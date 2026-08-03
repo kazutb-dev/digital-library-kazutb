@@ -1,0 +1,86 @@
+{
+    "qa_rerun_summary": {
+        "execution_date": "2026-05-13",
+        "phase": "Phase B - Full Enhanced QA Rerun",
+        "repository": "kazutb-dev/digital-library-kazutb",
+        "branch": "main",
+        "test_suites": [
+            {
+                "name": "AdminPrivilegeNegativePathTest (Enhanced)",
+                "category": "Validated Enhanced",
+                "total_tests": 28,
+                "passed": 28,
+                "failed": 0,
+                "errors": 0,
+                "risky": 0,
+                "skipped": 0,
+                "assertions": 35,
+                "execution_time": "00:05.413",
+                "status": "PASS",
+                "notes": "Round 2 enhancement - comprehensive privilege enforcement validation"
+            },
+            {
+                "name": "ReservationMutateTest (Enhanced Integration)",
+                "category": "Validated Enhanced",
+                "total_tests": 15,
+                "passed": 15,
+                "failed": 0,
+                "errors": 0,
+                "risky": 0,
+                "skipped": 0,
+                "assertions": 67,
+                "execution_time": "00:04.520",
+                "status": "PASS",
+                "notes": "Round 2 fix & enhancement - integration endpoint context propagation"
+            },
+            {
+                "name": "Feature Tests (Full Suite)",
+                "category": "Existing",
+                "total_tests": 887,
+                "passed": 733,
+                "failed": 112,
+                "errors": 36,
+                "risky": 5,
+                "skipped": 1,
+                "assertions": 5151,
+                "execution_time": "~180s",
+                "status": "PARTIAL",
+                "pass_rate": "82.6%",
+                "notes": "Includes blocked API contract tests (PostgreSQL schema issue)"
+            },
+            {
+                "name": "Unit Tests (Full Suite)",
+                "category": "Existing",
+                "total_tests": 17,
+                "passed": 17,
+                "failed": 0,
+                "errors": 0,
+                "risky": 0,
+                "skipped": 0,
+                "assertions": 56,
+                "execution_time": "00:00.019",
+                "status": "PASS",
+                "pass_rate": "100%",
+                "notes": "Bibliography formatter and service unit tests"
+            }
+        ],
+        "aggregate_metrics": {
+            "total_tests_executed": 947,
+            "total_passed": 793,
+            "total_failed": 112,
+            "total_errors": 36,
+            "total_risky": 5,
+            "total_skipped": 1,
+            "total_assertions": 5309,
+            "overall_pass_rate": "83.7%",
+            "total_execution_time": "~190s"
+        },
+        "enhanced_tests_breakdown": {
+            "total_new_enhanced": 43,
+            "passed": 43,
+            "blocked": 20,
+            "blocked_reason": "PostgreSQL schema incomplete (ReaderReservationTest + AccountReservationsTest)",
+            "notes": "43 new enhanced tests are production-ready; 20 blocked tests documented separately"
+        }
+    }
+}

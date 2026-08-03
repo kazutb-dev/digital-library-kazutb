@@ -1,12 +1,17 @@
+{{-- Public scholarly repository record — Master.md §20.3.
+     Data source: App\Models\Catalog\RepositoryItem (repository_items table),
+     served by App\Http\Controllers\RepositoryController::show().
+     $canReadFull is decided in the controller; /repository/{id}/download
+     repeats the same check, so the button is a hint, not the gate. --}}
 @extends('layouts.public')
 
 @php
-  $lang = request()->query('lang', 'ru');
+  $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $activePage = $activePage ?? 'repository';
 
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
       $qs = http_build_query(array_filter($query, static fn ($v) => $v !== null && $v !== ''));
@@ -17,83 +22,68 @@
     'ru' => [
       'back' => 'К репозиторию',
       'abstract_heading' => 'Аннотация',
+      'abstract_missing' => 'Аннотация к этой работе не указана.',
       'meta_heading' => 'Метаданные работы',
-      'meta_faculty' => 'Факультет',
-      'meta_department' => 'Кафедра',
+      'meta_department' => 'Кафедра / факультет',
       'meta_udc' => 'Индекс УДК',
       'meta_language' => 'Язык работы',
-      'meta_pages' => 'Объём',
-      'meta_pages_unit' => 'с.',
+      'meta_type' => 'Вид работы',
+      'meta_year' => 'Год',
       'meta_published' => 'Опубликовано',
       'meta_keywords' => 'Ключевые слова',
+      'meta_file' => 'Файл работы',
       'access_heading' => 'Доступ к полному тексту',
-      'access_body' => 'Полный текст открывается авторизованным читателям университета в контролируемом просмотре. Скачивание и копирование файлов не предусмотрены — это условие публикации работ в репозитории.',
+      'access_body_open' => 'Метаданные работы открыты всем. Полный текст доступен вам как авторизованному читателю университета.',
+      'access_body_guest' => 'Метаданные работы открыты всем. Полный текст открывается после входа под университетской учётной записью.',
+      'access_body_denied' => 'Метаданные работы открыты всем. Полный текст этой работы недоступен для вашей учётной записи — обратитесь в библиотеку.',
+      'access_no_file' => 'Файл полного текста для этой работы не загружен.',
+      'access_download' => 'Открыть полный текст',
       'access_signin' => 'Войти для чтения',
-      'access_dashboard' => 'Открыть кабинет',
       'related_heading' => 'Похожие работы',
     ],
     'kk' => [
       'back' => 'Репозиторийге оралу',
       'abstract_heading' => 'Аңдатпа',
+      'abstract_missing' => 'Бұл жұмыстың аңдатпасы көрсетілмеген.',
       'meta_heading' => 'Жұмыс метадеректері',
-      'meta_faculty' => 'Факультет',
-      'meta_department' => 'Кафедра',
+      'meta_department' => 'Кафедра / факультет',
       'meta_udc' => 'ӘОЖ индексі',
       'meta_language' => 'Жұмыс тілі',
-      'meta_pages' => 'Көлемі',
-      'meta_pages_unit' => 'б.',
+      'meta_type' => 'Жұмыс түрі',
+      'meta_year' => 'Жылы',
       'meta_published' => 'Жарияланды',
       'meta_keywords' => 'Кілт сөздер',
+      'meta_file' => 'Жұмыс файлы',
       'access_heading' => 'Толық мәтінге қолжетімділік',
-      'access_body' => 'Толық мәтін университеттің авторизацияланған оқырмандарына бақыланатын қарау режимінде ашылады. Файлдарды жүктеп алу мен көшіру қарастырылмаған — бұл жұмыстарды репозиторийде жариялау шарты.',
+      'access_body_open' => 'Жұмыстың метадеректері барлығына ашық. Толық мәтін сізге университеттің авторизацияланған оқырманы ретінде қолжетімді.',
+      'access_body_guest' => 'Жұмыстың метадеректері барлығына ашық. Толық мәтін университеттік тіркелгімен кіргеннен кейін ашылады.',
+      'access_body_denied' => 'Жұмыстың метадеректері барлығына ашық. Бұл жұмыстың толық мәтіні сіздің тіркелгіңізге қолжетімсіз — кітапханаға хабарласыңыз.',
+      'access_no_file' => 'Бұл жұмыстың толық мәтін файлы жүктелмеген.',
+      'access_download' => 'Толық мәтінді ашу',
       'access_signin' => 'Оқу үшін кіру',
-      'access_dashboard' => 'Кабинетті ашу',
       'related_heading' => 'Ұқсас жұмыстар',
     ],
     'en' => [
       'back' => 'Back to Repository',
       'abstract_heading' => 'Abstract',
+      'abstract_missing' => 'No abstract has been recorded for this work.',
       'meta_heading' => 'Work metadata',
-      'meta_faculty' => 'Faculty',
-      'meta_department' => 'Department',
+      'meta_department' => 'Department / faculty',
       'meta_udc' => 'UDC index',
       'meta_language' => 'Work language',
-      'meta_pages' => 'Extent',
-      'meta_pages_unit' => 'pp.',
+      'meta_type' => 'Work type',
+      'meta_year' => 'Year',
       'meta_published' => 'Published',
       'meta_keywords' => 'Keywords',
+      'meta_file' => 'Work file',
       'access_heading' => 'Full-text access',
-      'access_body' => 'The full text opens for signed-in university readers in the controlled viewer. File downloads and copying are not provided — this is a condition of publishing works in the repository.',
+      'access_body_open' => 'Metadata is open to everyone. The full text is available to you as an authorised university reader.',
+      'access_body_guest' => 'Metadata is open to everyone. The full text opens after signing in with a university account.',
+      'access_body_denied' => 'Metadata is open to everyone. The full text of this work is not available to your account — please contact the library.',
+      'access_no_file' => 'No full-text file has been uploaded for this work.',
+      'access_download' => 'Open full text',
       'access_signin' => 'Sign in to read',
-      'access_dashboard' => 'Open dashboard',
       'related_heading' => 'Related works',
-    ],
-  ][$lang];
-
-  $typeLabels = [
-    'ru' => [
-      'bachelor_thesis' => 'Дипломная работа',
-      'master_dissertation' => 'Магистерская диссертация',
-      'phd_dissertation' => 'Докторская диссертация',
-      'article' => 'Научная статья',
-      'report' => 'Научный отчёт',
-      'journal' => 'Журнальная публикация',
-    ],
-    'kk' => [
-      'bachelor_thesis' => 'Дипломдық жұмыс',
-      'master_dissertation' => 'Магистрлік диссертация',
-      'phd_dissertation' => 'Докторлық диссертация',
-      'article' => 'Ғылыми мақала',
-      'report' => 'Ғылыми есеп',
-      'journal' => 'Журналдық жарияланым',
-    ],
-    'en' => [
-      'bachelor_thesis' => 'Bachelor Thesis',
-      'master_dissertation' => 'Master Dissertation',
-      'phd_dissertation' => 'PhD Dissertation',
-      'article' => 'Research Article',
-      'report' => 'Research Report',
-      'journal' => 'Journal Publication',
     ],
   ][$lang];
 
@@ -103,44 +93,64 @@
     'en' => ['ru' => 'Russian', 'kk' => 'Kazakh', 'en' => 'English'],
   ][$lang];
 
-  $w = $work['i18n'][$lang];
-  $isAuthenticated = (bool) session('library.user');
-  $publishedDisplay = \Carbon\Carbon::parse($work['published_at'])->format('d.m.Y');
+  $authors = collect($item->authors ?? [])->filter()->values();
+  $keywords = collect($item->keywords ?? [])->filter()->values();
+  $publishedDisplay = $item->published_at?->format('d.m.Y') ?? '—';
+
+  $fileSizeDisplay = null;
+  if ($hasFile && $item->file_size) {
+      $megabytes = $item->file_size / 1048576;
+      $fileSizeDisplay = $megabytes >= 1
+          ? number_format($megabytes, 1, ',', ' ') . ' MB'
+          : number_format(max(1, (int) round($item->file_size / 1024)), 0, ',', ' ') . ' KB';
+  }
 @endphp
 
-@section('title', $w['title'])
+@section('title', $item->title)
 
 @section('content')
-  <div class="repository-detail" data-section="repository-detail-page" data-work-slug="{{ $work['slug'] }}">
+  <div class="repository-detail" data-section="repository-detail-page" data-work-id="{{ $item->getKey() }}">
     <a class="repository-detail__back" href="{{ $routeWithLang('/repository') }}" data-test-id="repository-detail-back">
       <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
       <span>{{ $copy['back'] }}</span>
     </a>
 
     <header class="repository-detail__header" data-section="repository-detail-header">
-      <p class="repository-detail__eyebrow">{{ $typeLabels[$work['type']] }} · {{ $work['year'] }}</p>
-      <h1 class="repository-detail__display">{{ $w['title'] }}</h1>
-      <p class="repository-detail__authors">{{ implode(' · ', $w['authors']) }}</p>
+      <p class="repository-detail__eyebrow">
+        {{ __('librarian.repository.work_types.'.$item->work_type) }}@if($item->year) · {{ $item->year }}@endif
+      </p>
+      <h1 class="repository-detail__display">{{ $item->title }}</h1>
+      <p class="repository-detail__authors">{{ $authors->isNotEmpty() ? $authors->implode(' · ') : '—' }}</p>
     </header>
 
     <div class="repository-detail__columns">
       <div class="repository-detail__main">
         <section class="repository-detail__section" data-section="repository-detail-abstract">
           <h2 class="repository-detail__section-heading">{{ $copy['abstract_heading'] }}</h2>
-          <p class="repository-detail__abstract">{{ $w['abstract'] }}</p>
+          <p class="repository-detail__abstract">{{ filled($item->abstract) ? $item->abstract : $copy['abstract_missing'] }}</p>
         </section>
 
         <section class="repository-detail__section repository-detail__access" data-section="repository-detail-access">
           <h2 class="repository-detail__section-heading">
-            <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+            <span class="material-symbols-outlined" aria-hidden="true">{{ $canReadFull && $hasFile ? 'lock_open' : 'lock' }}</span>
             {{ $copy['access_heading'] }}
           </h2>
-          <p class="repository-detail__access-body">{{ $copy['access_body'] }}</p>
-          @if($isAuthenticated)
-            <a class="repository-detail__access-cta" href="{{ $routeWithLang('/dashboard') }}" data-test-id="repository-detail-access-cta">
-              {{ $copy['access_dashboard'] }}
-            </a>
+          @if($canReadFull)
+            <p class="repository-detail__access-body">{{ $copy['access_body_open'] }}</p>
+            @if($hasFile)
+              <a class="repository-detail__access-cta"
+                 href="{{ $routeWithLang('/repository/' . $item->getKey() . '/download') }}"
+                 data-test-id="repository-detail-download">
+                <span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
+                {{ $copy['access_download'] }}
+              </a>
+            @else
+              <p class="repository-detail__access-note" data-test-id="repository-detail-no-file">{{ $copy['access_no_file'] }}</p>
+            @endif
+          @elseif($isAuthenticated)
+            <p class="repository-detail__access-body">{{ $copy['access_body_denied'] }}</p>
           @else
+            <p class="repository-detail__access-body">{{ $copy['access_body_guest'] }}</p>
             <a class="repository-detail__access-cta" href="{{ $routeWithLang('/login') }}" data-test-id="repository-detail-access-cta">
               {{ $copy['access_signin'] }}
             </a>
@@ -151,14 +161,16 @@
           <section class="repository-detail__section" data-section="repository-detail-related">
             <h2 class="repository-detail__section-heading">{{ $copy['related_heading'] }}</h2>
             <div class="repository-detail__related-grid">
-              @foreach($related as $relatedWork)
-                @php $rw = $relatedWork['i18n'][$lang]; @endphp
+              @foreach($related as $relatedItem)
+                @php $relatedAuthors = collect($relatedItem->authors ?? [])->filter()->values(); @endphp
                 <a class="repository-detail__related-card"
-                   href="{{ $routeWithLang('/repository/' . $relatedWork['slug']) }}"
-                   data-test-id="repository-detail-related-{{ $relatedWork['slug'] }}">
-                  <span class="repository-detail__related-eyebrow">{{ $typeLabels[$relatedWork['type']] }} · {{ $relatedWork['year'] }}</span>
-                  <span class="repository-detail__related-title">{{ $rw['title'] }}</span>
-                  <span class="repository-detail__related-authors">{{ implode(' · ', $rw['authors']) }}</span>
+                   href="{{ $routeWithLang('/repository/' . $relatedItem->getKey()) }}"
+                   data-test-id="repository-detail-related-{{ $relatedItem->getKey() }}">
+                  <span class="repository-detail__related-eyebrow">
+                    {{ __('librarian.repository.work_types.'.$relatedItem->work_type) }}@if($relatedItem->year) · {{ $relatedItem->year }}@endif
+                  </span>
+                  <span class="repository-detail__related-title">{{ $relatedItem->title }}</span>
+                  <span class="repository-detail__related-authors">{{ $relatedAuthors->isNotEmpty() ? $relatedAuthors->implode(' · ') : '—' }}</span>
                 </a>
               @endforeach
             </div>
@@ -170,39 +182,61 @@
         <h2 class="repository-detail__aside-heading">{{ $copy['meta_heading'] }}</h2>
         <dl class="repository-detail__meta">
           <div>
-            <dt>{{ $copy['meta_faculty'] }}</dt>
-            <dd>{{ $w['faculty'] }}</dd>
+            <dt>{{ $copy['meta_type'] }}</dt>
+            <dd>{{ __('librarian.repository.work_types.'.$item->work_type) }}</dd>
+          </div>
+          <div>
+            <dt>{{ $copy['meta_year'] }}</dt>
+            <dd>{{ $item->year ?? '—' }}</dd>
           </div>
           <div>
             <dt>{{ $copy['meta_department'] }}</dt>
-            <dd>{{ $w['department'] }}</dd>
+            <dd>{{ $item->department ?: '—' }}</dd>
           </div>
           <div>
             <dt>{{ $copy['meta_udc'] }}</dt>
-            <dd><span class="repository-detail__udc">{{ $work['udc'] }}</span></dd>
+            <dd>
+              @if(filled($item->udc_code))
+                <span class="repository-detail__udc">{{ $item->udc_code }}</span>
+              @else
+                —
+              @endif
+            </dd>
           </div>
           <div>
             <dt>{{ $copy['meta_language'] }}</dt>
-            <dd>{{ $langNames[$work['work_language']] }}</dd>
-          </div>
-          <div>
-            <dt>{{ $copy['meta_pages'] }}</dt>
-            <dd>{{ $work['pages'] }} {{ $copy['meta_pages_unit'] }}</dd>
+            <dd>{{ $langNames[$item->language] ?? ($item->language ?: '—') }}</dd>
           </div>
           <div>
             <dt>{{ $copy['meta_published'] }}</dt>
-            <dd><time datetime="{{ $work['published_at'] }}">{{ $publishedDisplay }}</time></dd>
-          </div>
-          <div>
-            <dt>{{ $copy['meta_keywords'] }}</dt>
             <dd>
-              <ul class="repository-detail__keywords" role="list">
-                @foreach($w['keywords'] as $keyword)
-                  <li>{{ $keyword }}</li>
-                @endforeach
-              </ul>
+              @if($item->published_at)
+                <time datetime="{{ $item->published_at->toDateString() }}">{{ $publishedDisplay }}</time>
+              @else
+                —
+              @endif
             </dd>
           </div>
+          @if($canReadFull && $hasFile)
+            <div>
+              <dt>{{ $copy['meta_file'] }}</dt>
+              <dd>
+                {{ $item->file_name ?: '—' }}@if($fileSizeDisplay) <span class="repository-detail__file-size">({{ $fileSizeDisplay }})</span>@endif
+              </dd>
+            </div>
+          @endif
+          @if($keywords->isNotEmpty())
+            <div>
+              <dt>{{ $copy['meta_keywords'] }}</dt>
+              <dd>
+                <ul class="repository-detail__keywords" role="list">
+                  @foreach($keywords as $keyword)
+                    <li>{{ $keyword }}</li>
+                  @endforeach
+                </ul>
+              </dd>
+            </div>
+          @endif
         </dl>
       </aside>
     </div>
@@ -212,16 +246,17 @@
 @section('head')
 <style>
   .repository-detail {
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: 80px 16px 96px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 80px var(--page-inset) 96px;
     color: #191c1d;
     font-family: 'Manrope', sans-serif;
   }
 
   @media (min-width: 768px) {
     .repository-detail {
-      padding: 96px 32px;
+      padding: 96px var(--page-inset);
     }
   }
 
@@ -248,7 +283,7 @@
   }
 
   .repository-detail__header {
-    max-width: 820px;
+    max-width: 940px;
     margin-bottom: 56px;
   }
 
@@ -344,10 +379,18 @@
     max-width: 620px;
   }
 
+  .repository-detail__access-note {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #43474e;
+    margin: 0;
+  }
+
   .repository-detail__access-cta {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     padding: 12px 28px;
     background: #006a6a;
     color: #ffffff;
@@ -360,6 +403,10 @@
 
   .repository-detail__access-cta:hover {
     background: #00524f;
+  }
+
+  .repository-detail__access-cta .material-symbols-outlined {
+    font-size: 18px;
   }
 
   .repository-detail__related-grid {
@@ -446,6 +493,12 @@
     line-height: 1.5;
     color: #191c1d;
     margin: 0;
+    word-break: break-word;
+  }
+
+  .repository-detail__file-size {
+    color: #43474e;
+    font-size: 13px;
   }
 
   .repository-detail__udc {

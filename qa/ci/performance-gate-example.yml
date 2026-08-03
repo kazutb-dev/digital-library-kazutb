@@ -1,0 +1,35 @@
+name: performance-gate-example
+
+on:
+  workflow_dispatch:
+
+jobs:
+  perf-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Docker stack
+        run: docker compose up -d --build app frontend-dev postgres
+
+      - name: Collect candidate metrics
+        shell: pwsh
+        run: |
+          pwsh -File qa/performance/scripts/collect-performance-baseline.ps1 `
+            -Phase after `
+            -OutputCsv qa/metrics/performance-candidate.csv `
+            -OutputMarkdown qa/performance/results/performance-candidate.md
+
+      - name: Compare with baseline (placeholder)
+        shell: pwsh
+        run: |
+          Write-Host "Implement CSV comparison logic against main-branch baseline artifact"
+          Write-Host "Fail if thresholds in qa/ci/performance-gate-proposal.md are exceeded"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-artifacts
+          path: |
+            qa/metrics/performance-candidate.csv
+            qa/performance/results/performance-candidate.md

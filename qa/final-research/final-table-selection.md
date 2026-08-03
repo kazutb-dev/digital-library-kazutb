@@ -1,0 +1,21 @@
+# Final Table Selection
+
+This document maps the canonical final-improvements tables to the paper table roles used in the manuscript.
+
+| Table # | Paper Table Title         | Source File                                                                                                                        | Manuscript Section   | Short Purpose                                                                | Caveat                                                               |
+| ------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Table 1 | Risk Inventory            | [qa/final-improvements/tables/risk-table.md](../final-improvements/tables/risk-table.md)                                           | Methodology          | Defines the risk universe and priority classes used to drive testing.        | None                                                                 |
+| Table 2 | Risk-to-Test Mapping      | [qa/final-improvements/tables/risk-test-mapping-table.md](../final-improvements/tables/risk-test-mapping-table.md)                 | Methodology          | Shows which tests support which risks and where evidence comes from.         | None                                                                 |
+| Table 3 | Quality Gates             | [qa/final-improvements/tables/quality-gates-table.md](../final-improvements/tables/quality-gates-table.md)                         | Methodology          | Documents the detailed gate definitions, thresholds, and enforcement stages. | Keep detailed definitions here; Figure 8 is summary-only.            |
+| Table 4 | Experimental Environment  | [qa/final-improvements/tables/environment-table.md](../final-improvements/tables/environment-table.md)                             | Methodology          | Summarizes runtime, database, tooling, and orchestration assumptions.        | PostgreSQL schema remains partially constrained in local validation. |
+| Table 5 | Coverage vs Risk          | [qa/final-improvements/tables/coverage-vs-risk-table.md](../final-improvements/tables/coverage-vs-risk-table.md)                   | Results              | Shows coverage changes and mitigation status per risk.                       | Local-only values are marked with an asterisk where applicable.      |
+| Table 6 | Defect Detection          | [qa/final-improvements/tables/defect-detection-table.md](../final-improvements/tables/defect-detection-table.md)                   | Results              | Records manual/automated defect evidence and environment findings.           | Keep detailed counts here; Figure 7 is summary-only.                 |
+| Table 7 | Execution Time Comparison | [qa/final-improvements/tables/execution-time-comparison-table.md](../final-improvements/tables/execution-time-comparison-table.md) | Results              | Compares runtime across the major test categories and suite totals.          | Full-suite timing is retained baseline evidence.                     |
+| Table 8 | Performance Summary       | [qa/final-improvements/tables/performance-summary-table.md](../final-improvements/tables/performance-summary-table.md)             | Results / Discussion | Captures the retained baseline performance snapshot and resource usage.      | Not newly rerun in the current campaign.                             |
+| Table 9 | Mutation Summary          | [qa/final-improvements/tables/mutation-summary-table.md](../final-improvements/tables/mutation-summary-table.md)                   | Results / Discussion | Summarizes mutation-related evidence and assertion-density inference.        | Mutation tooling was not rerun; evidence is proxy-based.             |
+
+## Table Set Notes
+
+1. The detailed quality-gate and defect-detection tables remain the authoritative sources.
+2. The new figures are summary visualizations only and do not replace the paper tables.
+3. Performance and mutation tables should retain their caveats in the manuscript body.

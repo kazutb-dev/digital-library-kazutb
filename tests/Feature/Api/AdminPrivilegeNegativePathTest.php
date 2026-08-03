@@ -2,233 +2,139 @@
 
 namespace Tests\Feature\Api;
 
+use App\Services\AuditLogger;
+use Spatie\Permission\Models\Role;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class AdminPrivilegeNegativePathTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpAdminControlPlane();
+    }
+
+    public function test_guests_are_redirected_from_every_control_plane_section(): void
+    {
+        foreach ($this->protectedPages() as $uri) {
+            $this->get($uri)->assertRedirect(route('login'));
+        }
+    }
+
+    public function test_member_is_forbidden_from_every_control_plane_section(): void
+    {
+        $member = $this->makeControlPlaneUser('member');
+
+        foreach ($this->protectedPages() as $uri) {
+            $this->signInToLibraryAs($member)->get($uri)->assertForbidden();
+        }
+    }
+
+    public function test_librarian_only_reaches_the_sections_granted_by_exact_permissions(): void
+    {
+        $librarian = $this->makeControlPlaneUser('librarian');
+
+        $this->signInToLibraryAs($librarian)->get('/admin')->assertOk();
+        $this->signInToLibraryAs($librarian)->get('/admin/feedback')->assertOk();
+
+        foreach ([
+            '/admin/users',
+            '/admin/roles',
+            '/admin/logs',
+            '/admin/reports',
+            '/admin/settings',
+            '/admin/integrations',
+            '/admin/branches',
+            '/admin/external-resources',
+        ] as $uri) {
+            $this->signInToLibraryAs($librarian)->get($uri)->assertForbidden();
+        }
+
+        $this->signInToLibraryAs($librarian)->get('/admin/news')->assertOk();
+    }
+
+    public function test_custom_role_can_enter_only_its_delegated_control_plane_scope(): void
+    {
+        $audit = app(AuditLogger::class);
+        $audit->logRequired(
+            actionType: 'security.secret',
+            entityType: 'security_probe',
+            entityId: 'hidden-security-event',
+            scope: 'security',
+            actor: $this->adminUser,
+        );
+        $audit->logRequired(
+            actionType: 'operational.visible',
+            entityType: 'operational_probe',
+            entityId: 'visible-operational-event',
+            scope: 'operational',
+            actor: $this->adminUser,
+        );
+
+        $role = Role::query()->create([
+            'name' => 'audit-reviewer',
+            'guard_name' => 'web',
+        ]);
+        $role->syncPermissions(['system.logs']);
+        $reviewer = $this->makeControlPlaneUser('member');
+        $reviewer->syncRoles([$role]);
+
+        $this->signInToLibraryAs($reviewer)
+            ->get('/admin')
+            ->assertOk()
+            ->assertSee('Управление, журналы и мониторинг', false)
+            ->assertDontSee('Управление пользователями', false)
+            ->assertSee('visible-operational-event', false)
+            ->assertDontSee('hidden-security-event', false);
+
+        $this->signInToLibraryAs($reviewer)
+            ->get('/admin/logs')
+            ->assertOk()
+            ->assertSee('visible-operational-event', false)
+            ->assertDontSee('hidden-security-event', false)
+            ->assertDontSee('security.secret', false);
+        $this->signInToLibraryAs($reviewer)->get('/admin/users')->assertForbidden();
+        $this->signInToLibraryAs($reviewer)->get('/admin/settings')->assertForbidden();
+    }
+
+    public function test_admin_can_access_every_control_plane_section(): void
+    {
+        foreach ($this->protectedPages() as $uri) {
+            $this->signInToLibraryAs($this->adminUser)->get($uri)->assertOk();
+        }
+    }
+
+    public function test_deactivated_staff_session_is_rejected_by_internal_api(): void
+    {
+        $librarian = $this->makeControlPlaneUser('librarian');
+        $this->signInToLibraryAs($librarian);
+        $librarian->update(['is_active' => false]);
+
+        $this->getJson('/api/v1/internal/circulation/loans/1')
+            ->assertForbidden()
+            ->assertJsonPath('error', 'staff_authorization_required');
+    }
+
     /**
-     * Helper to create authenticated session with a specific role
+     * @return list<string>
      */
-    private function staffSession(string $role = 'admin'): array
+    private function protectedPages(): array
     {
         return [
-            'library.user' => [
-                'id' => 'staff-' . $role,
-                'name' => ucfirst($role) . ' User',
-                'email' => $role . '@example.com',
-                'role' => $role,
-            ],
+            '/admin',
+            '/admin/users',
+            '/admin/roles',
+            '/admin/logs',
+            '/admin/news',
+            '/admin/feedback',
+            '/admin/reports',
+            '/admin/settings',
+            '/admin/integrations',
+            '/admin/branches',
+            '/admin/external-resources',
         ];
-    }
-
-    // --- Guest Access Tests ---
-
-    public function test_guest_cannot_access_admin_overview(): void
-    {
-        $response = $this->get('/admin');
-
-        $response->assertRedirect();
-        $this->assertStringContainsString('/login', $response->headers->get('Location'));
-    }
-
-    public function test_guest_cannot_access_admin_users(): void
-    {
-        $response = $this->get('/admin/users');
-
-        $response->assertRedirect();
-        $this->assertStringContainsString('/login', $response->headers->get('Location'));
-    }
-
-    public function test_guest_cannot_access_admin_logs(): void
-    {
-        $response = $this->get('/admin/logs');
-
-        $response->assertRedirect();
-        $this->assertStringContainsString('/login', $response->headers->get('Location'));
-    }
-
-    public function test_guest_cannot_access_admin_news(): void
-    {
-        $response = $this->get('/admin/news');
-
-        $response->assertRedirect();
-        $this->assertStringContainsString('/login', $response->headers->get('Location'));
-    }
-
-    public function test_guest_cannot_access_admin_settings(): void
-    {
-        $response = $this->get('/admin/settings');
-
-        $response->assertRedirect();
-        $this->assertStringContainsString('/login', $response->headers->get('Location'));
-    }
-
-    public function test_guest_cannot_access_admin_reports(): void
-    {
-        $response = $this->get('/admin/reports');
-
-        $response->assertRedirect();
-        $this->assertStringContainsString('/login', $response->headers->get('Location'));
-    }
-
-    public function test_guest_cannot_access_admin_feedback(): void
-    {
-        $response = $this->get('/admin/feedback');
-
-        $response->assertRedirect();
-        $this->assertStringContainsString('/login', $response->headers->get('Location'));
-    }
-
-    // --- Non-Admin Authenticated Users Tests ---
-
-    public function test_reader_cannot_access_admin_overview(): void
-    {
-        $response = $this->withSession($this->staffSession('reader'))->get('/admin');
-
-        $response->assertForbidden();
-    }
-
-    public function test_reader_cannot_access_admin_users(): void
-    {
-        $response = $this->withSession($this->staffSession('reader'))->get('/admin/users');
-
-        $response->assertForbidden();
-    }
-
-    public function test_reader_cannot_access_admin_logs(): void
-    {
-        $response = $this->withSession($this->staffSession('reader'))->get('/admin/logs');
-
-        $response->assertForbidden();
-    }
-
-    public function test_reader_cannot_access_admin_news(): void
-    {
-        $response = $this->withSession($this->staffSession('reader'))->get('/admin/news');
-
-        $response->assertForbidden();
-    }
-
-    public function test_reader_cannot_access_admin_settings(): void
-    {
-        $response = $this->withSession($this->staffSession('reader'))->get('/admin/settings');
-
-        $response->assertForbidden();
-    }
-
-    public function test_reader_cannot_access_admin_reports(): void
-    {
-        $response = $this->withSession($this->staffSession('reader'))->get('/admin/reports');
-
-        $response->assertForbidden();
-    }
-
-    public function test_reader_cannot_access_admin_feedback(): void
-    {
-        $response = $this->withSession($this->staffSession('reader'))->get('/admin/feedback');
-
-        $response->assertForbidden();
-    }
-
-    // --- Librarian (non-admin staff) Privilege Escalation Tests ---
-
-    public function test_librarian_cannot_access_admin_overview(): void
-    {
-        $response = $this->withSession($this->staffSession('librarian'))->get('/admin');
-
-        $response->assertForbidden();
-    }
-
-    public function test_librarian_cannot_access_admin_users(): void
-    {
-        $response = $this->withSession($this->staffSession('librarian'))->get('/admin/users');
-
-        $response->assertForbidden();
-    }
-
-    public function test_librarian_cannot_access_admin_logs(): void
-    {
-        $response = $this->withSession($this->staffSession('librarian'))->get('/admin/logs');
-
-        $response->assertForbidden();
-    }
-
-    public function test_librarian_cannot_access_admin_news(): void
-    {
-        $response = $this->withSession($this->staffSession('librarian'))->get('/admin/news');
-
-        $response->assertForbidden();
-    }
-
-    public function test_librarian_cannot_access_admin_settings(): void
-    {
-        $response = $this->withSession($this->staffSession('librarian'))->get('/admin/settings');
-
-        $response->assertForbidden();
-    }
-
-    public function test_librarian_cannot_access_admin_reports(): void
-    {
-        $response = $this->withSession($this->staffSession('librarian'))->get('/admin/reports');
-
-        $response->assertForbidden();
-    }
-
-    public function test_librarian_cannot_access_admin_feedback(): void
-    {
-        $response = $this->withSession($this->staffSession('librarian'))->get('/admin/feedback');
-
-        $response->assertForbidden();
-    }
-
-    // --- Privilege Verification Tests ---
-
-    public function test_admin_can_access_admin_overview(): void
-    {
-        $response = $this->withSession($this->staffSession('admin'))->get('/admin');
-
-        $response->assertOk();
-    }
-
-    public function test_admin_can_access_admin_users(): void
-    {
-        $response = $this->withSession($this->staffSession('admin'))->get('/admin/users');
-
-        $response->assertOk();
-    }
-
-    public function test_admin_can_access_admin_logs(): void
-    {
-        $response = $this->withSession($this->staffSession('admin'))->get('/admin/logs');
-
-        $response->assertOk();
-    }
-
-    public function test_admin_can_access_admin_news(): void
-    {
-        $response = $this->withSession($this->staffSession('admin'))->get('/admin/news');
-
-        $response->assertOk();
-    }
-
-    public function test_admin_can_access_admin_settings(): void
-    {
-        $response = $this->withSession($this->staffSession('admin'))->get('/admin/settings');
-
-        $response->assertOk();
-    }
-
-    public function test_admin_can_access_admin_reports(): void
-    {
-        $response = $this->withSession($this->staffSession('admin'))->get('/admin/reports');
-
-        $response->assertOk();
-    }
-
-    public function test_admin_can_access_admin_feedback(): void
-    {
-        $response = $this->withSession($this->staffSession('admin'))->get('/admin/feedback');
-
-        $response->assertOk();
     }
 }

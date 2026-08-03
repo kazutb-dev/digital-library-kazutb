@@ -78,9 +78,9 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'ru'),
+    'locale' => env('APP_LOCALE', 'kk'),
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'ru'),
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'kk'),
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 

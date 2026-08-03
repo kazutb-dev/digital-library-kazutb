@@ -1,0 +1,59 @@
+{
+  "riskDimensions": [
+    {
+      "module": "Catalog/Public (R2)",
+      "likelihood_before": 4,
+      "likelihood_after": 5,
+      "impact_before": 4,
+      "impact_after": 5,
+      "detectability_before": 3,
+      "detectability_after": 2,
+      "evidence": "P2-UI-CAT-004 fail, P2-QG-004 fail",
+      "explanation": "5xx on public route increases likelihood and impact; detectability drops due unresolved recurring issue"
+    },
+    {
+      "module": "Integration API (R4,R6)",
+      "likelihood_before": 2,
+      "likelihood_after": 5,
+      "impact_before": 5,
+      "impact_after": 5,
+      "detectability_before": 3,
+      "detectability_after": 2,
+      "evidence": "P2-API-INT-001/002 failures and low module coverage",
+      "explanation": "Multiple integration failures undercut confidence in external contract compliance"
+    },
+    {
+      "module": "Circulation/Operations (R3)",
+      "likelihood_before": 3,
+      "likelihood_after": 4,
+      "impact_before": 5,
+      "impact_after": 5,
+      "detectability_before": 3,
+      "detectability_after": 2,
+      "evidence": "Ops mismatch defect and 66.7 percent coverage",
+      "explanation": "Critical operations remain high impact while coverage gap lowers early detection"
+    },
+    {
+      "module": "Admin operations (R5)",
+      "likelihood_before": 2,
+      "likelihood_after": 4,
+      "impact_before": 4,
+      "impact_after": 4,
+      "detectability_before": 3,
+      "detectability_after": 2,
+      "evidence": "Admin ops failure and 50 percent coverage",
+      "explanation": "Low coverage and observed failure indicate higher likelihood than initial estimate"
+    },
+    {
+      "module": "Coverage readiness (R13)",
+      "likelihood_before": 4,
+      "likelihood_after": 4,
+      "impact_before": 4,
+      "impact_after": 5,
+      "detectability_before": 2,
+      "detectability_after": 1,
+      "evidence": "Coverage blocked warning in phase2 gate results",
+      "explanation": "Risk impact grows when observability cannot support confident release decisions"
+    }
+  ]
+}

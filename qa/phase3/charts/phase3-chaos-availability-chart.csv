@@ -1,0 +1,5 @@
+"scenario_id","target_module","fault_availability_pct","recovery_availability_pct"
+"CHS-001-API-DOWN","Catalog/Public API","0","100"
+"CHS-002-DB-SLOWDOWN","Catalog DB API","0","100"
+"CHS-003-NET-LATENCY","External API Path","100","100"
+"CHS-004-CPU-PRESSURE","Web/API runtime","100","100"

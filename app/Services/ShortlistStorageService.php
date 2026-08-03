@@ -52,7 +52,7 @@ class ShortlistStorageService
     /**
      * Add an item to the shortlist. Returns [item, isNew].
      *
-     * @param array<string, mixed> $data Validated item data (without addedAt)
+     * @param  array<string, mixed>  $data  Validated item data (without addedAt)
      * @return array{0: array<string, mixed>, 1: bool}
      */
     public function addItem(Request $request, array $data): array
@@ -106,7 +106,7 @@ class ShortlistStorageService
 
         $this->migrateSessionToDb($request, $userId);
 
-        $draft = LiteratureDraft::where('user_id', $userId)->first();
+        $draft = $this->defaultDraft($userId);
 
         if (! $draft) {
             return false;
@@ -132,7 +132,7 @@ class ShortlistStorageService
 
         $this->migrateSessionToDb($request, $userId);
 
-        $draft = LiteratureDraft::where('user_id', $userId)->first();
+        $draft = $this->defaultDraft($userId);
 
         if ($draft) {
             $draft->items()->delete();
@@ -161,7 +161,7 @@ class ShortlistStorageService
 
         $this->migrateSessionToDb($request, $userId);
 
-        $draft = LiteratureDraft::where('user_id', $userId)->first();
+        $draft = $this->defaultDraft($userId);
 
         return [
             'title' => $draft?->title,
@@ -217,7 +217,7 @@ class ShortlistStorageService
     /**
      * Check which identifiers exist in the shortlist.
      *
-     * @param string[] $identifiers
+     * @param  string[]  $identifiers
      * @return array<string, bool>
      */
     public function checkIdentifiers(Request $request, array $identifiers): array
@@ -308,7 +308,7 @@ class ShortlistStorageService
      */
     private function getDbItems(string $userId): array
     {
-        $draft = LiteratureDraft::where('user_id', $userId)->first();
+        $draft = $this->defaultDraft($userId);
 
         if (! $draft) {
             return [];
@@ -326,9 +326,16 @@ class ShortlistStorageService
     private function getOrCreateDraft(string $userId): LiteratureDraft
     {
         return LiteratureDraft::firstOrCreate(
-            ['user_id' => $userId],
-            ['title' => null, 'notes' => null],
+            ['user_id' => $userId, 'collection_type' => 'favourites'],
+            ['title' => 'Избранное', 'notes' => null, 'slug' => 'favourites-'.str()->lower(str()->random(12)), 'visibility' => 'private', 'status' => 'published', 'owner_type' => 'reader'],
         );
+    }
+
+    private function defaultDraft(string $userId): ?LiteratureDraft
+    {
+        return LiteratureDraft::query()->where('user_id', $userId)
+            ->orderByRaw("CASE WHEN collection_type = 'favourites' THEN 0 ELSE 1 END")
+            ->orderBy('id')->first();
     }
 
     // ── Session → DB migration ────────────────────────────────────

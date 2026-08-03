@@ -2,8 +2,27 @@
 
 namespace App\Providers;
 
+use App\Models\Branch;
+use App\Models\ContactMessage;
+use App\Models\ExternalResource;
+use App\Models\Fund;
+use App\Models\Library\CirculationLoan;
+use App\Models\Library\DigitalMaterial;
+use App\Models\Library\Document;
+use App\Models\LiteratureDraft;
+use App\Models\News;
+use App\Models\Setting;
+use App\Models\User;
+use App\Policies\CatalogPolicy;
+use App\Policies\CirculationPolicy;
+use App\Policies\DigitalMaterialPolicy;
+use App\Policies\RepositoryPolicy;
+use App\Policies\ReservationPolicy;
+use App\Services\AuditLogger;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -17,22 +36,55 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $locale = in_array(app()->getLocale(), ['ru', 'kk', 'en'], true) ? app()->getLocale() : 'ru';
+        $locale = in_array(app()->getLocale(), ['ru', 'kk', 'en'], true) ? app()->getLocale() : 'kk';
 
         app()->setLocale($locale);
         View::share('pageLang', $locale);
 
+        Relation::morphMap([
+            'user' => User::class,
+            'news' => News::class,
+            'contact_message' => ContactMessage::class,
+            'setting' => Setting::class,
+            'branch' => Branch::class,
+            'fund' => Fund::class,
+            'external_resource' => ExternalResource::class,
+        ]);
+
+        $this->registerAuthorization();
+
         // Login rate limiter — prevents brute force on /api/login
         $loginLimit = (int) env('LOGIN_RATE_LIMIT', 5);
         RateLimiter::for('login', function (Request $request) use ($loginLimit) {
-            $key = 'login:'.($request->input('login') ?? $request->input('email') ?? '').'|'.$request->ip();
+            $rawIdentifier = $request->input('login') ?? $request->input('email');
+            if ($rawIdentifier === null || trim((string) $rawIdentifier) === '') {
+                $demoRole = (string) ($request->input('role') ?? $request->route('role') ?? '');
+                $rawIdentifier = array_key_exists($demoRole, (array) config('demo_users.identities'))
+                    ? 'demo:'.$demoRole
+                    : 'anonymous';
+            }
+            $identifier = mb_strtolower(trim((string) $rawIdentifier));
+            $key = 'login:'.hash('sha256', $identifier).'|'.$request->ip();
 
             return Limit::perMinute($loginLimit)
                 ->by($key)
-                ->response(function () {
+                ->response(function (Request $request, array $headers) use ($identifier) {
+                    app(AuditLogger::class)->logRequired(
+                        actionType: 'login.throttled',
+                        entityType: 'authentication',
+                        entityId: $identifier !== '' ? $identifier : 'anonymous',
+                        newValues: ['reason' => 'rate_limited'],
+                        scope: 'security',
+                        metadata: ['limiter' => 'login'],
+                        actor: ['name' => $identifier !== '' ? $identifier : 'anonymous', 'role' => 'guest'],
+                        request: $request,
+                    );
+
                     return response()->json([
-                        'message' => 'Слишком много попыток входа. Попробуйте через минуту.',
-                    ], 429);
+                        'message' => __('auth.messages.too_many_attempts', [
+                            'seconds' => (int) ($headers['Retry-After'] ?? 60),
+                        ]),
+                    ], 429, $headers);
                 });
         });
 
@@ -48,6 +100,34 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute($globalLimit)->by('integration:'.$clientRef);
         });
 
+        $this->registerIntegrationLimiters($mutateLimit);
+    }
+
+    /**
+     * Wires the RBAC policies.
+     *
+     * Model-backed domains are registered the usual way. Reservations have no
+     * Eloquent model — the reservation service returns arrays from the CRM — so
+     * ReservationPolicy is exposed as explicit gates instead. Those gate names
+     * use a `reservation:` prefix rather than the `reservation.` permission
+     * prefix: Spatie resolves permissions through a Gate::before callback, and
+     * identical names would make a permission silently shadow the policy.
+     */
+    private function registerAuthorization(): void
+    {
+        Gate::policy(Document::class, CatalogPolicy::class);
+        Gate::policy(CirculationLoan::class, CirculationPolicy::class);
+        Gate::policy(DigitalMaterial::class, DigitalMaterialPolicy::class);
+        Gate::policy(LiteratureDraft::class, RepositoryPolicy::class);
+
+        Gate::define('reservation:create', [ReservationPolicy::class, 'create']);
+        Gate::define('reservation:cancel', [ReservationPolicy::class, 'cancel']);
+        Gate::define('reservation:confirm', [ReservationPolicy::class, 'confirm']);
+        Gate::define('reservation:override-limits', [ReservationPolicy::class, 'overrideLimits']);
+    }
+
+    private function registerIntegrationLimiters(int $mutateLimit): void
+    {
         // Stricter limiter for mutation (write) endpoints
         RateLimiter::for('integration-mutate', function (Request $request) use ($mutateLimit) {
             $clientRef = $request->attributes->get('integration.authenticated_client_ref', 'unknown');

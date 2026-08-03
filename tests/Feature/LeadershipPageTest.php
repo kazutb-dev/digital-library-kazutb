@@ -44,7 +44,7 @@ class LeadershipPageTest extends TestCase
         $response = $this->get('/leadership');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('KazUTB Library', false);
     }
 
     public function test_leadership_page_renders_all_core_section_markers(): void
@@ -83,7 +83,7 @@ class LeadershipPageTest extends TestCase
         $response = $this->get('/leadership');
 
         $response->assertOk();
-        $response->assertSee('Руководство KazUTB Smart Library', false);
+        $response->assertSee('Руководство KazUTB', false);
         $response->assertSee('Ответственность библиотеки', false);
         $response->assertSee('Администрация КазУТБ', false);
         $response->assertSee('Общие обращения и академические запросы', false);
@@ -94,7 +94,7 @@ class LeadershipPageTest extends TestCase
         $response = $this->get('/leadership?lang=kk');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library басшылығы', false);
+        $response->assertSee('KazUTB басшылығы', false);
         $response->assertSee('Кітапхана директоры', false);
         $response->assertSee('КазУТБ әкімшілігі', false);
         $response->assertSee('Байланыс бетіне өту', false);
@@ -105,7 +105,7 @@ class LeadershipPageTest extends TestCase
         $response = $this->get('/leadership?lang=en');
 
         $response->assertOk();
-        $response->assertSee('Leadership of KazUTB Smart Library', false);
+        $response->assertSee('Leadership of KazUTB', false);
         $response->assertSee('Library Director', false);
         $response->assertSee('Head of Digital Collections', false);
         $response->assertSee('Reader Services Coordinator', false);
@@ -177,7 +177,7 @@ class LeadershipPageTest extends TestCase
         $response = $this->get('/leadership?lang=en');
 
         $response->assertOk();
-        $response->assertSee('Leadership of KazUTB Smart Library', false);
+        $response->assertSee('Leadership of KazUTB', false);
         $response->assertSee('Sign out', false);
     }
 
@@ -187,7 +187,7 @@ class LeadershipPageTest extends TestCase
 
         $this->get('/leadership?lang=en')
             ->assertOk()
-            ->assertSee('Leadership of KazUTB Smart Library', false);
+            ->assertSee('Leadership of KazUTB', false);
     }
 
     public function test_admin_can_view_leadership_page(): void
@@ -196,6 +196,6 @@ class LeadershipPageTest extends TestCase
 
         $this->get('/leadership?lang=en')
             ->assertOk()
-            ->assertSee('Leadership of KazUTB Smart Library', false);
+            ->assertSee('Leadership of KazUTB', false);
     }
 }

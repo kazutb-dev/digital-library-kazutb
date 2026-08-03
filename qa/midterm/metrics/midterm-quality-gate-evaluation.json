@@ -1,0 +1,54 @@
+{
+  "qualityGateEvaluation": [
+    {
+      "gate_id": "MT-QG-001",
+      "metric": "Critical regression pass rate (phase2 current_enforced fail-level)",
+      "threshold": ">=90 percent",
+      "observed_result": "API 70.00 percent, UI 90.91 percent, PHPUnit 83.78 percent",
+      "status": "Fail",
+      "strictness_assessment": "Appropriate",
+      "root_cause": "Observed product and contract defects in high-risk modules",
+      "evidence": "qa/phase2/metrics/phase2-quality-gate-results.csv"
+    },
+    {
+      "gate_id": "MT-QG-002",
+      "metric": "Critical public 5xx errors",
+      "threshold": "0 unexpected HTTP 5xx",
+      "observed_result": "1 (news route)",
+      "status": "Fail",
+      "strictness_assessment": "Appropriate",
+      "root_cause": "Public route runtime failure indicates real production risk",
+      "evidence": "qa/phase2/metrics/phase2-test-execution-log.csv"
+    },
+    {
+      "gate_id": "MT-QG-003",
+      "metric": "High-risk module weighted coverage",
+      "threshold": ">=70 percent weighted checks",
+      "observed_result": "75.0 percent (27/36)",
+      "status": "Pass",
+      "strictness_assessment": "Slightly lenient",
+      "root_cause": "Pass achieved despite weak depth in some modules; module-level weak spots remain",
+      "evidence": "qa/phase2/metrics/phase2-automation-coverage.csv"
+    },
+    {
+      "gate_id": "MT-QG-004",
+      "metric": "Runtime threshold",
+      "threshold": "API<=60s, UI<=90s, PHPUnit<=90s",
+      "observed_result": "API 38.435s, UI 54.885s, PHPUnit 61.258s",
+      "status": "Pass",
+      "strictness_assessment": "Appropriate",
+      "root_cause": "No runtime bottleneck observed in measured suite",
+      "evidence": "qa/phase2/metrics/phase2-execution-time.csv"
+    },
+    {
+      "gate_id": "MT-QG-005",
+      "metric": "Coverage observability",
+      "threshold": "Coverage tooling available in measured environment",
+      "observed_result": "blocked locally",
+      "status": "Warn",
+      "strictness_assessment": "Appropriate",
+      "root_cause": "Environment/tooling gap, not necessarily code logic defect",
+      "evidence": "qa/phase2/evidence/logs/phase2-coverage.log"
+    }
+  ]
+}

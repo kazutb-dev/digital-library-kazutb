@@ -1,0 +1,88 @@
+{
+    "risk_test_mapping": [
+        {
+            "risk_id": "R-PRIV-001",
+            "test_type": "Feature",
+            "test_description": "AdminPrivilegeNegativePathTest - 7 routes × 4 roles",
+            "automation_layer": "API/Feature",
+            "metric": "28 tests pass - 100% coverage of privilege boundaries"
+        },
+        {
+            "risk_id": "R-PRIV-002",
+            "test_type": "Feature",
+            "test_description": "Admin access validation for all 4 user roles",
+            "automation_layer": "API/Feature",
+            "metric": "28 tests pass - guest/reader/librarian/admin coverage"
+        },
+        {
+            "risk_id": "R-API-001",
+            "test_type": "Integration",
+            "test_description": "ReservationMutateTest - operator role enforcement",
+            "automation_layer": "API/Integration",
+            "metric": "2 tests pass - approve/reject role validation"
+        },
+        {
+            "risk_id": "R-API-002",
+            "test_type": "Integration",
+            "test_description": "ReservationMutateTest - context field propagation",
+            "automation_layer": "API/Integration",
+            "metric": "2 tests pass - request_id/correlation_id/timestamp in response"
+        },
+        {
+            "risk_id": "R-API-003",
+            "test_type": "Integration",
+            "test_description": "ReservationMutateTest - idempotency key handling",
+            "automation_layer": "API/Integration",
+            "metric": "3 tests pass - idempotency-key validation and conflict detection"
+        },
+        {
+            "risk_id": "R-RESV-001",
+            "test_type": "Feature",
+            "test_description": "ReaderReservationTest - auth validation (4/14 executable)",
+            "automation_layer": "Feature",
+            "metric": "4 tests pass - auth layer validated; API contract blocked by schema"
+        },
+        {
+            "risk_id": "R-RESV-002",
+            "test_type": "Feature",
+            "test_description": "AccountReservationsTest - filter validation (2/6 executable)",
+            "automation_layer": "Feature",
+            "metric": "2 tests pass - auth layer validated; filtering blocked by schema"
+        },
+        {
+            "risk_id": "R-AUTH-001",
+            "test_type": "Feature",
+            "test_description": "AdminPrivilegeNegativePathTest - guest redirect",
+            "automation_layer": "API/Feature",
+            "metric": "7 tests pass - unauthenticated access redirected"
+        },
+        {
+            "risk_id": "R-DATA-001",
+            "test_type": "Feature",
+            "test_description": "ReaderReservationTest - validation (blocked by schema)",
+            "automation_layer": "Feature",
+            "metric": "Structured but blocked - parameter validation patterns established"
+        },
+        {
+            "risk_id": "R-DATA-002",
+            "test_type": "Integration",
+            "test_description": "ReservationMutateTest - response contracts",
+            "automation_layer": "API/Integration",
+            "metric": "2 tests pass - context field presence validated"
+        },
+        {
+            "risk_id": "R-PERF-001",
+            "test_type": "Suite",
+            "test_description": "Full Feature/Unit suite execution",
+            "automation_layer": "Suite",
+            "metric": "887 Feature + 17 Unit = 904 tests in ~190s (~0.2s per test)"
+        },
+        {
+            "risk_id": "R-DB-001",
+            "test_type": "Feature",
+            "test_description": "ReaderReservationTest + AccountReservationsTest blocked",
+            "automation_layer": "Feature",
+            "metric": "20 tests remain in codebase; PostgreSQL schema issue documented"
+        }
+    ]
+}

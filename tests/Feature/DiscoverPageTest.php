@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use Database\Seeders\UdcCodeSeeder;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 /**
@@ -18,6 +20,15 @@ use Tests\TestCase;
  */
 class DiscoverPageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpAdminControlPlane();
+        $this->seed(UdcCodeSeeder::class);
+    }
+
     public function test_discover_page_renders_ok(): void
     {
         $this->get('/discover')
@@ -40,9 +51,9 @@ class DiscoverPageTest extends TestCase
     {
         $html = $this->get('/discover')->assertOk()->getContent();
 
-        $hero     = strpos($html, 'data-section="discover-canonical-hero"');
-        $fac      = strpos($html, 'data-section="discover-canonical-faculties"');
-        $udc      = strpos($html, 'data-section="discover-canonical-udc"');
+        $hero = strpos($html, 'data-section="discover-canonical-hero"');
+        $fac = strpos($html, 'data-section="discover-canonical-faculties"');
+        $udc = strpos($html, 'data-section="discover-canonical-udc"');
 
         $this->assertNotFalse($hero);
         $this->assertNotFalse($fac);
@@ -84,16 +95,19 @@ class DiscoverPageTest extends TestCase
     {
         $html = $this->get('/discover')->assertOk()->getContent();
 
-        // Primary KazUTB UDC coverage axes.
-        foreach (['004', '33', '62', '50'] as $code) {
-            $this->assertStringContainsString('UDC ' . $code, $html);
-            $this->assertStringContainsString('/catalog?udc=' . $code, $html);
-            $this->assertStringContainsString('data-test-id="discover-canonical-udc-' . $code . '"', $html);
+        // The complete top-level classifier is rendered as a real tree.
+        foreach (range(0, 9) as $code) {
+            $this->assertStringContainsString('УДК '.$code, $html);
+            $this->assertStringContainsString('/catalog?udc='.$code, $html);
+            $this->assertStringContainsString('data-test-id="discover-canonical-udc-'.$code.'"', $html);
         }
 
-        // View-all CTA must exist and point at the catalog (no "#" placeholder).
+        $this->assertStringContainsString('data-test-id="discover-canonical-udc-004"', $html);
+        $this->assertStringContainsString('data-udc-node="004"', $html);
+
+        // View-all CTA opens the tree itself.
         $this->assertStringContainsString('data-test-id="discover-canonical-udc-view-all"', $html);
-        $this->assertStringContainsString('/catalog?sort=udc', $html);
+        $this->assertStringContainsString('href="#udc-tree"', $html);
     }
 
     public function test_discover_page_udc_is_the_primary_axis_and_faculties_carry_udc_chip(): void
@@ -238,7 +252,7 @@ class DiscoverPageTest extends TestCase
             ->assertSee('View Full UDC Tree');
 
         $html = $response->getContent();
-        $this->assertStringContainsString('/catalog?udc=50&amp;lang=en', $html);
+        $this->assertStringContainsString('/catalog?udc=5&amp;lang=en', $html);
     }
 
     public function test_discover_page_falls_back_to_russian_for_unknown_lang(): void

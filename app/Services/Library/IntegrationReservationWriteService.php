@@ -13,7 +13,7 @@ class IntegrationReservationWriteService
     /**
      * Approve command: PENDING -> READY.
      *
-    * @param array{authenticatedClientRef:string, operatorId:string, operatorBranchId:string, requestId:string, correlationId:string} $context
+     * @param  array{authenticatedClientRef:string, operatorId:string, operatorBranchId:string, requestId:string, correlationId:string}  $context
      * @return array{status:int, body:array<string,mixed>, replayed:bool}
      */
     public function approve(string $reservationId, string $idempotencyKey, array $context): array
@@ -89,7 +89,7 @@ class IntegrationReservationWriteService
     /**
      * Reject command: PENDING -> CANCELLED.
      *
-    * @param array{authenticatedClientRef:string, operatorId:string, operatorBranchId:string, requestId:string, correlationId:string} $context
+     * @param  array{authenticatedClientRef:string, operatorId:string, operatorBranchId:string, requestId:string, correlationId:string}  $context
      * @return array{status:int, body:array<string,mixed>, replayed:bool}
      */
     public function reject(
@@ -142,7 +142,7 @@ class IntegrationReservationWriteService
                     'status' => 'CANCELLED',
                     'processedAt' => $now->toDateTimeString(),
                     'updatedAt' => $now->toDateTimeString(),
-                        'notes' => json_encode($legacyNotes, JSON_UNESCAPED_SLASHES),
+                    'notes' => json_encode($legacyNotes, JSON_UNESCAPED_SLASHES),
                 ]);
 
                 $this->recordAudit(
@@ -173,9 +173,9 @@ class IntegrationReservationWriteService
     }
 
     /**
-     * @param array<string,mixed> $semanticPayload
-    * @param array{authenticatedClientRef:string, operatorId:string, operatorBranchId:string, requestId:string, correlationId:string} $context
-     * @param callable(array<string,mixed>, Carbon): array<string,mixed> $transition
+     * @param  array<string,mixed>  $semanticPayload
+     * @param  array{authenticatedClientRef:string, operatorId:string, operatorBranchId:string, requestId:string, correlationId:string}  $context
+     * @param  callable(array<string,mixed>, Carbon): array<string,mixed>  $transition
      * @return array{status:int, body:array<string,mixed>, replayed:bool}
      */
     private function runCommand(
@@ -267,10 +267,10 @@ class IntegrationReservationWriteService
     }
 
     /**
-     * @param array<string,mixed> $previousState
-     * @param array<string,mixed> $newState
-     * @param array<string,mixed> $metadata
-    * @param array{authenticatedClientRef:string, operatorId:string, operatorBranchId:string, requestId:string, correlationId:string, idempotencyKey?:string} $context
+     * @param  array<string,mixed>  $previousState
+     * @param  array<string,mixed>  $newState
+     * @param  array<string,mixed>  $metadata
+     * @param  array{authenticatedClientRef:string, operatorId:string, operatorBranchId:string, requestId:string, correlationId:string, idempotencyKey?:string}  $context
      */
     private function recordAudit(
         string $action,
@@ -330,7 +330,7 @@ class IntegrationReservationWriteService
     }
 
     /**
-     * @param array<string,mixed> $state
+     * @param  array<string,mixed>  $state
      * @return array<string,mixed>
      */
     private function toAuditState(array $state): array

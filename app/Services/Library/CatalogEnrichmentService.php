@@ -36,7 +36,7 @@ class CatalogEnrichmentService
             ->first();
 
         if ($row === null) {
-            throw new \RuntimeException('Document not found: ' . $documentId);
+            throw new \RuntimeException('Document not found: '.$documentId);
         }
 
         $isbn = $row->isbn_normalized ?? $row->isbn_raw ?? null;
@@ -70,7 +70,7 @@ class CatalogEnrichmentService
     /**
      * Bulk-validate ISBNs for a batch of documents.
      *
-     * @param list<string> $documentIds  Empty = all documents with ISBNs
+     * @param  list<string>  $documentIds  Empty = all documents with ISBNs
      * @return array{processed: int, valid: int, invalid: int, noIsbn: int, results: list<array>}
      */
     public function bulkValidateIsbns(array $documentIds = [], int $limit = 500): array
@@ -157,7 +157,7 @@ class CatalogEnrichmentService
             ->first();
 
         if ($row === null) {
-            throw new \RuntimeException('Document not found: ' . $documentId);
+            throw new \RuntimeException('Document not found: '.$documentId);
         }
 
         $currentData = [
@@ -222,8 +222,8 @@ class CatalogEnrichmentService
     /**
      * Apply selected enrichment suggestions to a document (with audit trail).
      *
-     * @param array<string, mixed> $fields  Field => value to apply (e.g., ['publication_year' => 2020])
-     * @param array<string, mixed> $context Actor/request context
+     * @param  array<string, mixed>  $fields  Field => value to apply (e.g., ['publication_year' => 2020])
+     * @param  array<string, mixed>  $context  Actor/request context
      * @return array{documentId: string, applied: list<string>, skipped: list<string>}
      */
     public function applyEnrichment(string $documentId, array $fields, array $context = []): array
@@ -241,7 +241,7 @@ class CatalogEnrichmentService
                 ->first();
 
             if ($row === null) {
-                throw new \RuntimeException('Document not found: ' . $documentId);
+                throw new \RuntimeException('Document not found: '.$documentId);
             }
 
             $before = $this->snapshotDocument($row);

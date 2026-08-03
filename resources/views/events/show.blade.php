@@ -1,11 +1,11 @@
 @extends('layouts.public')
 
 @php
-    $lang = request()->query('lang', 'ru');
+    $lang = app()->getLocale();
     $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
 
     $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
-        if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+        if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
             $query['lang'] = $lang;
         }
         $qs = http_build_query(array_filter($query, static fn ($v) => $v !== null && $v !== ''));
@@ -18,11 +18,11 @@
     $indexCopy = $indexChrome[$lang];
 @endphp
 
-@section('title', $baseI18n['title'] . ' — KazUTB Smart Library')
+@section('title', $baseI18n['title'] . ' — KazUTB')
 
 @section('head')
 <style>
-    .event-detail {
+    .site-shell .event-detail {
         --primary: #000613;
         --secondary: #006a6a;
         --on-secondary-fixed-variant: #004f4f;
@@ -43,13 +43,17 @@
 
         background: var(--surface);
         color: var(--on-surface);
-        padding: 64px 0 96px;
-        font-family: 'Manrope', sans-serif;
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: clamp(40px, 5vw, 72px) 0;
+        font-family: 'Google Sans', sans-serif;
     }
-    .event-detail__container {
-        max-width: 1152px;
-        margin: 0 auto;
-        padding: 0 24px;
+    .site-shell .event-detail__container {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding-inline: var(--page-inset);
     }
     .event-detail__breadcrumb {
         display: flex;
@@ -126,7 +130,7 @@
         color: var(--on-tertiary-fixed);
     }
     .event-detail__title {
-        font-family: 'Newsreader', serif;
+        font-family: 'Literata', serif;
         font-size: clamp(40px, 5.5vw, 56px);
         line-height: 1.1;
         color: var(--primary);
@@ -183,7 +187,7 @@
         border: none;
         padding: 12px 32px;
         border-radius: 6px;
-        font-family: 'Manrope', sans-serif;
+        font-family: 'Google Sans', sans-serif;
         font-weight: 500;
         cursor: pointer;
         display: inline-flex;
@@ -200,7 +204,7 @@
         color: var(--secondary);
         padding: 12px 24px;
         border-radius: 6px;
-        font-family: 'Manrope', sans-serif;
+        font-family: 'Google Sans', sans-serif;
         font-weight: 500;
         cursor: pointer;
         display: inline-flex;
@@ -254,7 +258,7 @@
         }
     }
     .event-detail__section-heading {
-        font-family: 'Newsreader', serif;
+        font-family: 'Literata', serif;
         font-size: 28px;
         color: var(--primary);
         margin: 0 0 24px;
@@ -355,7 +359,7 @@
         font-size: 32px;
     }
     .event-detail__speaker-name {
-        font-family: 'Newsreader', serif;
+        font-family: 'Literata', serif;
         font-size: 20px;
         color: var(--primary);
         margin: 0 0 4px;
@@ -511,7 +515,7 @@
         z-index: 1;
     }
     .event-detail__related-title {
-        font-family: 'Newsreader', serif;
+        font-family: 'Literata', serif;
         font-size: 20px;
         color: var(--primary);
         margin: 0 0 12px;

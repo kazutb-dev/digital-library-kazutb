@@ -1,0 +1,44 @@
+{
+  "riskReassessment": [
+    {
+      "module": "Catalog/Public (R2)",
+      "original_risk_score": 16,
+      "observed_issues": "P2-UI-CAT-004 failed with HTTP 500 on /news; gate P2-QG-004 failed",
+      "updated_risk_score": 20,
+      "justification": "Likelihood increased due production-facing 5xx; impact remains high for public discovery journey",
+      "evidence": "qa/phase2/metrics/phase2-test-execution-log.csv;qa/phase2/metrics/phase2-quality-gate-results.csv"
+    },
+    {
+      "module": "Integration API (R4,R6)",
+      "original_risk_score": 10,
+      "observed_issues": "P2-API-INT-001 and P2-API-INT-002 failed (404); gate P2-QG-001 failed",
+      "updated_risk_score": 20,
+      "justification": "Repeated integration boundary failures on critical external interface increase both likelihood and business impact",
+      "evidence": "qa/phase2/metrics/phase2-test-execution-log.csv;qa/phase2/metrics/phase2-defects-vs-risk.csv"
+    },
+    {
+      "module": "Circulation/Operations (R3)",
+      "original_risk_score": 15,
+      "observed_issues": "Ops guard expectation mismatch surfaced; module coverage 66.7% (<70%)",
+      "updated_risk_score": 18,
+      "justification": "Coverage gap lowers detectability while operations remain critical to lending continuity",
+      "evidence": "qa/phase2/metrics/phase2-defects-vs-risk.csv;qa/phase2/metrics/phase2-automation-coverage.csv"
+    },
+    {
+      "module": "Admin Operations (R5)",
+      "original_risk_score": 8,
+      "observed_issues": "Admin guard path failed in API smoke with 404; coverage 50%",
+      "updated_risk_score": 15,
+      "justification": "Admin workflow instability and low automation depth increase operational risk substantially",
+      "evidence": "qa/phase2/metrics/phase2-test-execution-log.csv;qa/phase2/metrics/phase2-automation-coverage.csv"
+    },
+    {
+      "module": "Coverage Readiness (R13)",
+      "original_risk_score": 16,
+      "observed_issues": "Coverage driver unavailable in measured local environment (blocked)",
+      "updated_risk_score": 18,
+      "justification": "Low observability reduces defect detectability and delays confident risk closure",
+      "evidence": "qa/phase2/evidence/logs/phase2-coverage.log;qa/phase2/metrics/phase2-quality-gate-results.csv"
+    }
+  ]
+}

@@ -1,12 +1,12 @@
 @extends('layouts.public')
 
 @php
-  $lang = request()->query('lang', 'ru');
+  $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $activePage = $activePage ?? 'leadership';
 
   $routeWithLang = static function (string $path) use ($lang): string {
-      return $lang === 'ru' ? $path : $path . '?lang=' . $lang;
+      return $lang === 'kk' ? $path : $path . '?lang=' . $lang;
   };
 
   $header = $leadership['header'][$lang];
@@ -23,7 +23,7 @@
   ][$lang];
 @endphp
 
-@section('title', $header['headline'] . ' — KazUTB Smart Library')
+@section('title', $header['headline'] . ' — KazUTB')
 
 @section('content')
   <div class="leadership-canonical">

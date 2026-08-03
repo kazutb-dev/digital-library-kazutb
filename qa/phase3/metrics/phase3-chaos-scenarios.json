@@ -1,0 +1,54 @@
+[
+  {
+    "scenario_id": "CHS-001-API-DOWN",
+    "target_module": "Catalog/Public API",
+    "target_component": "Landing endpoint availability",
+    "fault_type": "API downtime simulation",
+    "injection_method": "Connection-refused target host:127.0.0.1:65535",
+    "duration_sec": 25.64,
+    "safety_level": "low-risk isolated",
+    "expected_behavior": "Graceful degradation with explicit error or delayed response",
+    "recovery_expectation": "Service should recover to baseline endpoint success after fault removal",
+    "dataset_type": "bounded synthetic",
+    "notes": "Executed via qa/phase3/chaos/scripts/run-phase3-chaos.ps1"
+  },
+  {
+    "scenario_id": "CHS-002-DB-SLOWDOWN",
+    "target_module": "Catalog DB API",
+    "target_component": "Catalog DB query path",
+    "fault_type": "Database slowdown proxy (client timeout)",
+    "injection_method": "Client timeout set to 1s on catalog-db endpoint",
+    "duration_sec": 20.1,
+    "safety_level": "low-risk timeout proxy",
+    "expected_behavior": "Graceful degradation with explicit error or delayed response",
+    "recovery_expectation": "Service should recover to baseline endpoint success after fault removal",
+    "dataset_type": "bounded synthetic",
+    "notes": "Executed via qa/phase3/chaos/scripts/run-phase3-chaos.ps1"
+  },
+  {
+    "scenario_id": "CHS-003-NET-LATENCY",
+    "target_module": "External API Path",
+    "target_component": "Landing endpoint via synthetic latency",
+    "fault_type": "Network latency injection (client-side bounded model)",
+    "injection_method": "Client-side injected 1500ms delay before each request",
+    "duration_sec": 34.45,
+    "safety_level": "low-risk synthetic",
+    "expected_behavior": "Graceful degradation with explicit error or delayed response",
+    "recovery_expectation": "Service should recover to baseline endpoint success after fault removal",
+    "dataset_type": "synthetic fault model",
+    "notes": "Executed via qa/phase3/chaos/scripts/run-phase3-chaos.ps1"
+  },
+  {
+    "scenario_id": "CHS-004-CPU-PRESSURE",
+    "target_module": "Web/API runtime",
+    "target_component": "Landing endpoint under local CPU pressure",
+    "fault_type": "Resource exhaustion proxy (CPU pressure)",
+    "injection_method": "Temporary local CPU stress background job during request window",
+    "duration_sec": 34.91,
+    "safety_level": "medium-risk local only",
+    "expected_behavior": "Graceful degradation with explicit error or delayed response",
+    "recovery_expectation": "Service should recover to baseline endpoint success after fault removal",
+    "dataset_type": "bounded synthetic",
+    "notes": "Executed via qa/phase3/chaos/scripts/run-phase3-chaos.ps1"
+  }
+]

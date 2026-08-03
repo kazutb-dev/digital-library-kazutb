@@ -1,0 +1,54 @@
+metric_name,metric_type,value,unit,date,week,notes
+# === TEST INVENTORY ===
+php_test_files_total,actual,112,files,2026-05-13,W2,Count of all PHP test files in tests/Feature + tests/Unit
+php_test_files_unit,actual,2,files,2026-05-13,W2,tests/Unit/ExampleTest.php + tests/Unit/Services/BibliographyFormatterTest.php
+php_test_files_feature_pages,actual,60,files,2026-05-13,W2,Blade page smoke tests in tests/Feature/ root
+php_test_files_feature_api,actual,50,files,2026-05-13,W2,API contract/integration tests in tests/Feature/Api/
+e2e_spec_files,actual,6,files,2026-05-13,W2,Playwright spec files in tests/e2e/
+e2e_test_scenarios,estimated,15,scenarios,2026-05-13,W2,Estimated from spec file content
+# === COVERAGE ===
+coverage_threshold_current,actual,4,percent,2026-05-13,W2,Minimum threshold in composer qa:coverage-threshold
+coverage_actual_estimated,estimated,30,percent,2026-05-13,W2,Estimated from test breadth vs codebase size - needs clover report
+coverage_target_assignment2,target,40,percent,2026-05-13,W2,Target for Assignment 2 exit criteria
+# === RISK METRICS ===
+risk_items_total,actual,17,count,2026-05-13,W2,Total risk items in risk register
+risk_items_p0,actual,5,count,2026-05-13,W2,P0 Critical risks
+risk_items_p1,actual,6,count,2026-05-13,W2,P1 High risks
+risk_items_p2,actual,6,count,2026-05-13,W2,P2 Medium risks
+risk_coverage_percent,estimated,35,percent,2026-05-13,W2,Percentage of risks that have at least one automated test
+# === CODEBASE SIZE ===
+api_controllers,actual,23,files,2026-05-13,W2,Files in app/Http/Controllers/Api/ (including Integration subdir)
+service_classes_library,actual,44,files,2026-05-13,W2,Service classes in app/Services/Library/
+service_classes_admin,actual,7,files,2026-05-13,W2,Service classes in app/Services/Admin/
+models_total,actual,17,files,2026-05-13,W2,Models in app/Models/ including Library/ subdirectory
+middleware_guards,actual,8,files,2026-05-13,W2,Files in app/Http/Middleware/
+database_migrations,actual,19,files,2026-05-13,W2,Migration files in database/migrations/
+api_endpoints_total,estimated,55,endpoints,2026-05-13,W2,Estimated from routes/api.php route count
+# === CI/CD ===
+ci_jobs,actual,3,count,2026-05-13,W2,Jobs: secret-scan + backend-quality + browser-smoke
+composer_qa_scripts,actual,10,count,2026-05-13,W2,Custom QA/test scripts in composer.json
+ci_coverage_gate,actual,yes,boolean,2026-05-13,W2,Coverage gate exists in CI
+ci_mutation_gate,actual,no,boolean,2026-05-13,W2,Mutation testing NOT in CI gate
+ci_performance_gate,actual,no,boolean,2026-05-13,W2,Performance gate NOT in CI
+ci_postgresql_job,actual,no,boolean,2026-05-13,W2,No PostgreSQL-backed CI job (only SQLite)
+# === FACTORIES & TEST DATA ===
+factories_count,actual,1,files,2026-05-13,W2,Only UserFactory.php exists
+seeders_count,actual,2,files,2026-05-13,W2,DatabaseSeeder + DigitalMaterialSeeder
+# === AUTOMATION RATIO ===
+automation_ratio_estimated,estimated,65,percent,2026-05-13,W2,Estimated: existing tests cover ~65% of critical scenarios
+# === PERFORMANCE BASELINE (to be filled) ===
+catalog_p50_ms,pending,,ms,2026-05-13,W2,Pending k6 measurement
+catalog_p95_ms,pending,,ms,2026-05-13,W2,Pending k6 measurement
+login_p50_ms,pending,,ms,2026-05-13,W2,Pending k6 measurement
+login_p95_ms,pending,,ms,2026-05-13,W2,Pending k6 measurement
+circulation_p50_ms,pending,,ms,2026-05-13,W2,Pending k6 measurement
+# === DEFECT TRACKING (to be filled) ===
+defects_found_total,pending,,count,2026-05-13,W2,To be updated during A1
+defects_p0_found,pending,,count,2026-05-13,W2,Critical defects found
+defects_p1_found,pending,,count,2026-05-13,W2,High defects found
+defects_fixed,pending,,count,2026-05-13,W2,Defects resolved
+# === MUTATION TESTING (to be filled) ===
+mutation_msi,pending,,percent,2026-05-13,W2,Mutation Score Index - run ./vendor/bin/infection
+mutation_covered_msi,pending,,percent,2026-05-13,W2,Covered Mutation Score Index
+# === WEEKLY SNAPSHOTS (add rows each week) ===
+# Format: same columns, new date + week value

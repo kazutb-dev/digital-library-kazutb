@@ -1,174 +1,365 @@
-@extends('layouts.librarian', ['title' => 'Librarian Overview — KazUTB Smart Library'])
+@extends('layouts.librarian')
 
-@php
-  $today = now();
-  $operationalDay = (int) $today->dayOfYear;
-  $dateLabel = $today->format('F j');
-
-  $snapshotOverdue = [
-      'label' => 'Overdue Items',
-      'value' => 42,
-      'note' => 'Requires automated notice dispatch or manual review.',
-      'cta' => 'Process Batch',
-      'href' => route('librarian.circulation'),
-      'eyebrow' => 'Circulation',
-      'icon' => 'sync_alt',
-  ];
-
-  $snapshotStacked = [
-      [
-          'eyebrow' => 'Data Integrity',
-          'title' => 'Merge Conflicts',
-          'body' => 'Duplicate catalog entries detected.',
-          'value' => 18,
-          'cta' => 'Review',
-          'href' => route('librarian.data-cleanup'),
-      ],
-      [
-          'eyebrow' => 'Reservations',
-          'title' => 'Pending Pulls',
-          'body' => 'Awaiting physical retrieval from stacks.',
-          'value' => '07',
-          'cta' => 'View List',
-          'href' => '#',
-      ],
-  ];
-
-  $repositoryFocus = [
-      'title' => 'Dissertation Moderation',
-      'body' => 'There are 5 newly uploaded thesis documents awaiting metadata verification and institutional approval before publication to the public directory.',
-      'cta' => 'Begin Review Queue',
-      'href' => '/internal/review',
-      'count' => '05',
-      'count_label' => 'Pending Review',
-  ];
-
-  $priorities = [
-      [
-          'icon' => 'inventory_2',
-          'title' => 'Process New Acquisitions',
-          'body' => 'Batch #8492 arrived this morning. Needs cataloging and physical labeling.',
-      ],
-      [
-          'icon' => 'mop',
-          'title' => 'Resolve Authority Records',
-          'body' => '3 author name conflicts detected in the latest MARC import.',
-      ],
-      [
-          'icon' => 'mail',
-          'title' => 'Faculty Interlibrary Requests',
-          'body' => '2 high-priority requests from the Engineering department pending dispatch.',
-      ],
-  ];
-@endphp
+@section('title', __('librarian.overview.title').' — '.__('common.app_name'))
 
 @section('content')
-  <!-- Morning Briefing header -->
-  <div class="max-w-7xl mx-auto mb-16 relative">
-    <h1 class="font-headline text-5xl md:text-6xl text-primary-container tracking-tight mb-4 -ml-1">Morning Briefing</h1>
-    <p class="font-body text-lg text-on-surface-variant max-w-2xl">Good morning. The library is operating at nominal capacity. You have 14 pending tasks requiring attention across circulation and scientific review.</p>
-    <div class="absolute top-2 right-0 hidden lg:flex flex-col items-end text-right">
-      <span class="font-headline text-2xl text-primary-container">{{ $dateLabel }}</span>
-      <span class="font-body text-sm text-outline tracking-widest uppercase mt-1">Operational Day {{ $operationalDay }}</span>
-    </div>
-  </div>
+    <x-admin.flash />
 
-  <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-    <!-- Main operations column -->
-    <div class="lg:col-span-8 space-y-16">
-      <!-- Operational Status bento grid -->
-      <section>
-        <h2 class="font-headline text-3xl text-primary-container mb-8 border-b border-surface-container-high/50 pb-4">Operational Status</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Circulation high-priority card -->
-          <article class="bg-surface-container-lowest rounded-xl p-8 hover:bg-surface-container-high transition-colors duration-500 relative overflow-hidden group">
-            <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <span class="material-symbols-outlined text-6xl text-primary-container">{{ $snapshotOverdue['icon'] }}</span>
-            </div>
-            <div class="relative z-10">
-              <div class="flex items-center gap-2 mb-6">
-                <span class="w-2 h-2 rounded-full bg-secondary"></span>
-                <span class="font-body text-xs text-outline tracking-wider uppercase">{{ $snapshotOverdue['eyebrow'] }}</span>
-              </div>
-              <div class="font-headline text-6xl text-primary-container mb-2">{{ $snapshotOverdue['value'] }}</div>
-              <h3 class="font-body text-lg font-semibold text-primary-container mb-1">{{ $snapshotOverdue['label'] }}</h3>
-              <p class="text-sm text-on-surface-variant mb-6">{{ $snapshotOverdue['note'] }}</p>
-              <a href="{{ $snapshotOverdue['href'] }}" class="inline-flex items-center gap-2 text-secondary text-sm font-medium hover:opacity-80 transition-opacity">
-                {{ $snapshotOverdue['cta'] }} <span class="material-symbols-outlined text-sm">arrow_forward</span>
-              </a>
-            </div>
-          </article>
+    @php
+        $staffUser = auth()->user();
+        $canonicalRole = (string) ($staffUser?->getRoleNames()->first() ?? '');
+        $foundationRoles = ['director', 'senior_librarian', 'acquisitions', 'cataloguer', 'bibliographer'];
+        $canSee = static fn (array $permissions): bool => $permissions === []
+            || ($staffUser?->canAny($permissions) ?? false);
 
-          <!-- Stacked secondary cards -->
-          <div class="flex flex-col gap-6">
-            @foreach ($snapshotStacked as $card)
-              <article class="bg-surface-container-lowest rounded-xl p-6 hover:bg-surface-container-high transition-colors duration-500 flex items-center justify-between">
+        $circulationPermissions = ['circulation.issue', 'circulation.return'];
+        $reservationPermissions = ['reservation.confirm'];
+        $repositoryPermissions = ['repository.upload', 'repository.approve', 'repository.publish'];
+        $cleanupPermissions = ['data_cleanup.access'];
+        $catalogEditPermissions = ['catalog.edit_record'];
+
+        // Every card points at the section that owns the figure, and is hidden
+        // outright when the account lacks the permission guarding that section.
+        $metricCards = [
+            [
+                'key' => 'active_loans',
+                'icon' => 'sync_alt',
+                'href' => route('librarian.circulation'),
+                'permissions' => $circulationPermissions,
+            ],
+            [
+                'key' => 'overdue',
+                'icon' => 'running_with_errors',
+                'href' => route('librarian.circulation'),
+                'permissions' => $circulationPermissions,
+                'alert' => true,
+            ],
+            [
+                'key' => 'pending_pulls',
+                'icon' => 'bookmark_manager',
+                'href' => route('librarian.reservations.index'),
+                'permissions' => $reservationPermissions,
+            ],
+            [
+                'key' => 'ready_pickups',
+                'icon' => 'inventory',
+                'href' => route('librarian.reservations.index'),
+                'permissions' => $reservationPermissions,
+            ],
+            [
+                'key' => 'draft_records',
+                'icon' => 'edit_note',
+                'href' => route('librarian.data-cleanup'),
+                'permissions' => $cleanupPermissions,
+            ],
+            [
+                'key' => 'repository_pending',
+                'icon' => 'school',
+                'href' => route('librarian.repository'),
+                'permissions' => $repositoryPermissions,
+            ],
+            [
+                'key' => 'pending_fines',
+                'icon' => 'payments',
+                'href' => route('librarian.fines.index'),
+                'permissions' => ['fines.view'],
+            ],
+            [
+                'key' => 'unresolved_messages',
+                'icon' => 'mail',
+                'href' => route('librarian.messages.index'),
+                'permissions' => ['messages.view_all'],
+            ],
+        ];
+
+        $visibleMetricCards = array_values(array_filter(
+            $metricCards,
+            static fn (array $card): bool => $canSee($card['permissions']),
+        ));
+    @endphp
+
+    <div class="mx-auto w-full max-w-7xl">
+        @if (in_array($canonicalRole, $foundationRoles, true))
+            <x-role-foundation-notice :role="$canonicalRole" class="mb-6" />
+        @endif
+
+        <x-admin.page-header
+            :eyebrow="__('librarian.overview.eyebrow')"
+            :title="__('librarian.overview.title')"
+            :subtitle="__('librarian.overview.subtitle')"
+        >
+            @can('circulation.issue')
+                <a class="admin-btn admin-btn-primary" href="{{ route('librarian.circulation.issue') }}">
+                    <span class="material-symbols-outlined text-[19px]">outbox</span>
+                    {{ __('librarian.circulation.issue_title') }}
+                </a>
+            @endcan
+            @can('circulation.return')
+                <a class="admin-btn admin-btn-secondary" href="{{ route('librarian.circulation.return') }}">
+                    <span class="material-symbols-outlined text-[19px]">move_to_inbox</span>
+                    {{ __('librarian.circulation.return_title') }}
+                </a>
+            @endcan
+        </x-admin.page-header>
+
+        @if ($canSee([...$circulationPermissions, 'reports.view_full']))
+        <section class="admin-card mb-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-[22px] text-secondary">today</span>
+                <p class="text-sm leading-6 text-on-surface-variant">
+                    {{ __('librarian.overview.today_summary', [
+                        'issued' => number_format($metrics['issued_today'], 0, ',', ' '),
+                        'returned' => number_format($metrics['returned_today'], 0, ',', ' '),
+                    ]) }}
+                </p>
+            </div>
+            <div class="flex shrink-0 gap-8 sm:gap-10">
                 <div>
-                  <div class="font-body text-xs text-outline tracking-wider uppercase mb-1">{{ $card['eyebrow'] }}</div>
-                  <h3 class="font-body text-base font-semibold text-primary-container">{{ $card['title'] }}</h3>
-                  <p class="text-xs text-on-surface-variant mt-1">{{ $card['body'] }}</p>
-                </div>
-                <div class="flex flex-col items-end flex-shrink-0 ml-4">
-                  <span class="font-headline text-3xl text-primary-container">{{ $card['value'] }}</span>
-                  <a href="{{ $card['href'] }}" class="text-secondary text-xs mt-1 hover:underline @if($card['href'] === '#') pointer-events-none opacity-50 @endif">{{ $card['cta'] }}</a>
-                </div>
-              </article>
-            @endforeach
-          </div>
-        </div>
-      </section>
-
-      <!-- Scientific Repository focus -->
-      <section class="bg-primary text-on-primary rounded-xl p-1 relative overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-br from-primary to-primary-container z-0"></div>
-        <div class="relative z-10 p-8 md:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-          <div class="max-w-md">
-            <div class="flex items-center gap-2 mb-4">
-              <span class="material-symbols-outlined text-secondary-container">school</span>
-              <span class="font-body text-xs text-secondary-container tracking-wider uppercase">Scientific Repository</span>
-            </div>
-            <h2 class="font-headline text-3xl mb-3 text-white">{{ $repositoryFocus['title'] }}</h2>
-            <p class="text-on-primary-container text-sm leading-relaxed mb-6">{{ $repositoryFocus['body'] }}</p>
-            <a href="{{ $repositoryFocus['href'] }}" class="inline-flex bg-transparent border border-outline-variant/40 hover:bg-surface-container-lowest/10 text-white px-5 py-2.5 rounded-md font-body text-sm transition-colors duration-300">
-              {{ $repositoryFocus['cta'] }}
-            </a>
-          </div>
-          <div class="w-full md:w-auto bg-surface-container-lowest/5 backdrop-blur-sm rounded-lg p-6 border border-white/10">
-            <div class="text-center">
-              <div class="font-headline text-5xl text-white mb-2">{{ $repositoryFocus['count'] }}</div>
-              <div class="text-xs text-on-primary-container uppercase tracking-widest">{{ $repositoryFocus['count_label'] }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <!-- Today's Priorities sidebar -->
-    <aside class="lg:col-span-4">
-      <div class="bg-surface-container-low rounded-xl p-8 sticky top-8">
-        <div class="flex items-center justify-between mb-8">
-          <h2 class="font-headline text-2xl text-primary-container">Today's Priorities</h2>
-          <span class="material-symbols-outlined text-outline">checklist</span>
-        </div>
-        <div class="space-y-8">
-          @foreach ($priorities as $priority)
-            <div class="group cursor-pointer">
-              <div class="flex items-start gap-4">
-                <div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0 group-hover:bg-secondary/10 transition-colors">
-                  <span class="material-symbols-outlined text-sm text-primary-container group-hover:text-secondary">{{ $priority['icon'] }}</span>
+                    <div class="text-[11px] font-bold uppercase tracking-[.14em] text-outline">
+                        {{ __('librarian.overview.metrics.issued_today') }}
+                    </div>
+                    <div class="mt-1 font-headline text-3xl leading-none text-primary-container">
+                        {{ number_format($metrics['issued_today'], 0, ',', ' ') }}
+                    </div>
                 </div>
                 <div>
-                  <h4 class="font-body font-semibold text-primary-container text-base group-hover:text-secondary transition-colors">{{ $priority['title'] }}</h4>
-                  <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">{{ $priority['body'] }}</p>
+                    <div class="text-[11px] font-bold uppercase tracking-[.14em] text-outline">
+                        {{ __('librarian.overview.metrics.returned_today') }}
+                    </div>
+                    <div class="mt-1 font-headline text-3xl leading-none text-primary-container">
+                        {{ number_format($metrics['returned_today'], 0, ',', ' ') }}
+                    </div>
                 </div>
-              </div>
             </div>
-          @endforeach
+        </section>
+        @endif
+
+        @if ($visibleMetricCards !== [])
+            <section class="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="{{ __('librarian.overview.eyebrow') }}">
+                @foreach ($visibleMetricCards as $card)
+                    @php
+                        $value = (int) ($metrics[$card['key']] ?? 0);
+                        $isAlert = ($card['alert'] ?? false) && $value > 0;
+                    @endphp
+                    <a
+                        href="{{ $card['href'] }}"
+                        class="group flex flex-col justify-between rounded-xl border p-5 transition duration-300 hover:-translate-y-0.5 hover:shadow-md {{ $isAlert ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white' }}"
+                    >
+                        <div class="flex items-start justify-between gap-3">
+                            <span class="material-symbols-outlined text-[22px] {{ $isAlert ? 'text-error' : 'text-secondary' }}">{{ $card['icon'] }}</span>
+                            <span class="material-symbols-outlined text-[18px] text-slate-300 transition-colors group-hover:text-secondary">arrow_forward</span>
+                        </div>
+                        <div class="mt-5">
+                            <div class="font-headline text-4xl leading-none {{ $isAlert ? 'text-error' : 'text-primary-container' }}">
+                                {{ number_format($value, 0, ',', ' ') }}
+                            </div>
+                            <div class="mt-2 text-sm font-semibold {{ $isAlert ? 'text-on-error-container' : 'text-primary-container' }}">
+                                {{ __('librarian.overview.metrics.'.$card['key']) }}
+                            </div>
+                            <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+                                {{ __('librarian.overview.metrics.'.$card['key'].'_hint') }}
+                            </p>
+                        </div>
+                    </a>
+                @endforeach
+            </section>
+        @endif
+
+        @can('data_quality.view_reports')
+            <section class="admin-card mb-8">
+                <div class="flex items-center justify-between gap-3">
+                    <div><h2 class="font-headline text-2xl text-primary">{{ __('data_quality.title') }}</h2><p class="text-sm text-slate-500">{{ __('data_quality.subtitle') }}</p></div>
+                    <a class="admin-btn admin-btn-secondary" href="{{ route('librarian.data-quality.index') }}">{{ __('common.actions.open') }}</a>
+                </div>
+                <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    @foreach(['open','critical','overdue','migration_batches'] as $metric)
+                        <div class="rounded-xl border p-4"><div class="text-xs uppercase tracking-wide text-slate-500">{{ $metric }}</div><strong class="mt-2 block font-headline text-3xl text-primary">{{ $qualityMetrics[$metric] }}</strong></div>
+                    @endforeach
+                </div>
+            </section>
+        @endcan
+
+        <div class="grid gap-6 xl:grid-cols-2">
+            @if ($canSee($circulationPermissions))
+                <section class="admin-card overflow-hidden p-0">
+                    <header class="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+                        <h2 class="flex items-center gap-2 font-headline text-xl text-primary-container">
+                            <span class="material-symbols-outlined text-[20px] text-error">running_with_errors</span>
+                            {{ __('librarian.overview.overdue_queue') }}
+                        </h2>
+                        <a class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[.12em] text-secondary hover:underline" href="{{ route('librarian.circulation') }}">
+                            {{ __('common.actions.open') }}
+                            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                        </a>
+                    </header>
+
+                    <div class="overflow-x-auto">
+                        <table class="admin-table min-w-[620px]">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('librarian.reservations.reader') }}</th>
+                                    <th>{{ __('librarian.reservations.record') }}</th>
+                                    <th>{{ __('librarian.circulation.due_date') }}</th>
+                                    <th>{{ __('librarian.overview.metrics.overdue') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($overdueLoans as $loan)
+                                    <tr>
+                                        <td>
+                                            <strong class="block text-sm text-primary-container">{{ $loan->reader?->name ?? '—' }}</strong>
+                                            <span class="block text-xs text-slate-500">{{ $loan->reader?->email ?? '—' }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="block max-w-xs truncate text-sm text-on-surface" title="{{ $loan->copy?->bibliographicRecord?->title }}">
+                                                {{ $loan->copy?->bibliographicRecord?->title ?? '—' }}
+                                            </span>
+                                            <span class="block text-xs text-slate-500">
+                                                {{ __('librarian.copies.fields.inventory_number') }}: {{ $loan->copy?->inventory_number ?? '—' }}
+                                            </span>
+                                        </td>
+                                        <td class="whitespace-nowrap text-on-surface-variant">
+                                            {{ $loan->due_at?->format('d.m.Y') ?? '—' }}
+                                        </td>
+                                        <td class="whitespace-nowrap">
+                                            <span class="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-800">
+                                                {{ __('librarian.circulation.overdue_days', ['count' => $loan->overdueDays()]) }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="py-14 text-center">
+                                            <span class="material-symbols-outlined mb-2 block text-4xl text-slate-300">check_circle</span>
+                                            <span class="text-sm text-slate-500">{{ __('librarian.overview.empty_overdue') }}</span>
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            @endif
+
+            @if ($canSee($reservationPermissions))
+                <section class="admin-card overflow-hidden p-0">
+                    <header class="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+                        <h2 class="flex items-center gap-2 font-headline text-xl text-primary-container">
+                            <span class="material-symbols-outlined text-[20px] text-secondary">inventory</span>
+                            {{ __('librarian.overview.ready_queue') }}
+                        </h2>
+                        <a class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[.12em] text-secondary hover:underline" href="{{ route('librarian.reservations.index') }}">
+                            {{ __('common.actions.open') }}
+                            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                        </a>
+                    </header>
+
+                    <div class="overflow-x-auto">
+                        <table class="admin-table min-w-[560px]">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('librarian.reservations.reader') }}</th>
+                                    <th>{{ __('librarian.reservations.record') }}</th>
+                                    <th>{{ __('librarian.reservations.expires_at') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($readyReservations as $reservation)
+                                    <tr>
+                                        <td>
+                                            <strong class="block text-sm text-primary-container">{{ $reservation->reader?->name ?? '—' }}</strong>
+                                            <span class="block text-xs text-slate-500">{{ $reservation->reader?->email ?? '—' }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="block max-w-xs truncate text-sm text-on-surface" title="{{ $reservation->bibliographicRecord?->title }}">
+                                                {{ $reservation->bibliographicRecord?->title ?? '—' }}
+                                            </span>
+                                            <span class="block text-xs text-slate-500">
+                                                {{ $reservation->bibliographicRecord?->primary_author ?? '—' }}
+                                            </span>
+                                        </td>
+                                        <td class="whitespace-nowrap text-on-surface-variant">
+                                            {{ $reservation->expires_at?->format('d.m.Y H:i') ?? '—' }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="3" class="py-14 text-center">
+                                            <span class="material-symbols-outlined mb-2 block text-4xl text-slate-300">inbox</span>
+                                            <span class="text-sm text-slate-500">{{ __('librarian.overview.empty_ready') }}</span>
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            @endif
         </div>
-        <div class="mt-12 pt-6 border-t border-outline-variant/30">
-          <p class="text-xs text-outline italic">System sync completed recently. All operational metrics are current.</p>
-        </div>
-      </div>
-    </aside>
-  </div>
+
+        @if ($canSee(array_merge($catalogEditPermissions, $cleanupPermissions)))
+            <section class="admin-card mt-6 overflow-hidden p-0">
+                <header class="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+                    <h2 class="flex items-center gap-2 font-headline text-xl text-primary-container">
+                        <span class="material-symbols-outlined text-[20px] text-secondary">edit_note</span>
+                        {{ __('librarian.overview.draft_queue') }}
+                    </h2>
+                    @can('data_cleanup.access')
+                        <a class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[.12em] text-secondary hover:underline" href="{{ route('librarian.data-cleanup') }}">
+                            {{ __('librarian.nav.data_cleanup') }}
+                            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                        </a>
+                    @endcan
+                </header>
+
+                @forelse ($draftRecords as $record)
+                    @php
+                        $missingFields = $record->missingRequiredFields();
+                        $missingLabels = array_map(
+                            static fn (string $field): string => __('librarian.catalog.fields.'.$field),
+                            $missingFields,
+                        );
+                    @endphp
+                    <article class="flex flex-col gap-3 border-b border-slate-100 px-6 py-4 last:border-b-0 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                @can('catalog.edit_record')
+                                    <a class="font-headline text-lg leading-tight text-primary-container hover:text-secondary" href="{{ route('librarian.catalog.edit', $record) }}">
+                                        {{ $record->title }}
+                                    </a>
+                                @else
+                                    <span class="font-headline text-lg leading-tight text-primary-container">{{ $record->title }}</span>
+                                @endcan
+                                <x-admin.status-badge status="pending" :label="__('librarian.catalog.draft_badge')" />
+                            </div>
+                            <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+                                {{ $record->primary_author ?? '—' }} · {{ $record->publication_year ?? '—' }}
+                            </p>
+                            @if ($missingLabels !== [])
+                                <p class="mt-2 text-xs leading-5 text-red-700">
+                                    {{ __('librarian.catalog.draft_notice', ['fields' => implode(', ', $missingLabels)]) }}
+                                </p>
+                            @endif
+                        </div>
+                        @can('catalog.edit_record')
+                            <a class="admin-btn admin-btn-secondary shrink-0 self-start" href="{{ route('librarian.catalog.edit', $record) }}">
+                                <span class="material-symbols-outlined text-[19px]">edit</span>
+                                {{ __('librarian.data_cleanup.fix_record') }}
+                            </a>
+                        @endcan
+                    </article>
+                @empty
+                    <div class="py-14 text-center">
+                        <span class="material-symbols-outlined mb-2 block text-4xl text-slate-300">task_alt</span>
+                        <span class="text-sm text-slate-500">{{ __('librarian.overview.empty_drafts') }}</span>
+                    </div>
+                @endforelse
+            </section>
+        @endif
+
+        <p class="mt-6 flex items-start gap-2 text-xs leading-5 text-outline">
+            <span class="material-symbols-outlined text-[16px]">info</span>
+            {{ __('librarian.overview.data_source_note') }}
+        </p>
+    </div>
 @endsection

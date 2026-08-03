@@ -1,0 +1,5 @@
+"aspect","planned_risk_score","actual_risk_score"
+"Catalog public stability","16","20"
+"Integration boundary/API contract","10","20"
+"Circulation and admin operations","15","18"
+"Coverage observability","16","18"

@@ -9,9 +9,9 @@ use Illuminate\Http\Request;
 
 class BookController extends Controller
 {
-    private function respondWithBook(string $identifier, BookDetailReadService $service): JsonResponse
+    private function respondWithBook(Request $request, string $identifier, BookDetailReadService $service): JsonResponse
     {
-        $book = $service->findByIdentifier($identifier);
+        $book = $service->findByIdentifier($identifier, $request->user());
 
         if (! $book) {
             return response()->json([
@@ -29,6 +29,6 @@ class BookController extends Controller
     public function dbShow(Request $request, BookDetailReadService $service): JsonResponse
     {
         $identifier = (string) $request->route('isbn');
-        return $this->respondWithBook($identifier, $service);
+        return $this->respondWithBook($request, $identifier, $service);
     }
 }

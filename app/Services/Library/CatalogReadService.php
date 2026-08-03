@@ -2,141 +2,59 @@
 
 namespace App\Services\Library;
 
+use App\Models\Catalog\BibliographicRecord;
+use App\Models\Catalog\BookCopy;
+use App\Models\Catalog\UdcCode;
+use App\Support\DatabaseSchema;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Public catalogue read model (Master.md §6, §8, §9).
+ *
+ * Reads the canonical `bibliographic_records` / `book_copies` tables. The
+ * response shape is preserved from the previous legacy-view implementation so
+ * the Blade catalogue, the React SPA, and /api/v1/catalog-db keep working
+ * unchanged. There is no demo fallback: an empty collection returns an empty
+ * result set, because a catalogue that invents books is worse than an empty one.
+ */
 class CatalogReadService
 {
     /**
-     * @var array<int, array<string, mixed>>
+     * Public institution filter values mapped onto real branch/fund codes.
+     * Keeping the legacy filter vocabulary avoids breaking existing links.
      */
-    private const DEMO_CATALOG = [
-        [
-            'id' => 'demo-catalog-001',
-            'title' => [
-                'display' => 'Artificial Intelligence in Higher Education',
-                'raw' => 'Artificial Intelligence in Higher Education',
-                'subtitle' => 'Tools, ethics, and learning design for modern universities',
-            ],
-            'primaryAuthor' => 'A. Kurmanbayev',
-            'publisher' => ['name' => 'KazUTB Press'],
-            'publicationYear' => 2026,
-            'language' => ['code' => 'en', 'raw' => 'English'],
-            'isbn' => ['raw' => '9780134610993'],
-            'copies' => ['available' => 4, 'total' => 6],
-            'availability' => ['locations' => []],
-            'classification' => [['id' => 'demo-udc-001', 'label' => '004.8 Artificial intelligence', 'sourceKind' => 'subject']],
-            'udc' => ['raw' => '004.8', 'source' => 'subject'],
-            'coverUrl' => '/images/news/ai-workshop.jpg',
-            'source' => 'demo.catalog',
-        ],
-        [
-            'id' => 'demo-catalog-002',
-            'title' => [
-                'display' => 'Data Science Methods for Research',
-                'raw' => 'Data Science Methods for Research',
-                'subtitle' => 'Practical workflows for analysis, visualization, and reporting',
-            ],
-            'primaryAuthor' => 'S. Tleubayeva',
-            'publisher' => ['name' => 'Data Lab Editions'],
-            'publicationYear' => 2024,
-            'language' => ['code' => 'en', 'raw' => 'English'],
-            'isbn' => ['raw' => '9781449373320'],
-            'copies' => ['available' => 2, 'total' => 5],
-            'availability' => ['locations' => []],
-            'classification' => [['id' => 'demo-udc-002', 'label' => '519.2 Statistics', 'sourceKind' => 'subject']],
-            'udc' => ['raw' => '519.2', 'source' => 'subject'],
-            'coverUrl' => '/images/news/default-library.jpg',
-            'source' => 'demo.catalog',
-        ],
-        [
-            'id' => 'demo-catalog-003',
-            'title' => [
-                'display' => 'Современное академическое письмо',
-                'raw' => 'Современное академическое письмо',
-                'subtitle' => 'Структура текста, аргументация и стиль научной работы',
-            ],
-            'primaryAuthor' => 'Ж. Панкей',
-            'publisher' => ['name' => 'University Methodics'],
-            'publicationYear' => 2023,
-            'language' => ['code' => 'ru', 'raw' => 'Русский'],
-            'isbn' => ['raw' => '9781506386706'],
-            'copies' => ['available' => 6, 'total' => 6],
-            'availability' => ['locations' => []],
-            'classification' => [['id' => 'demo-udc-003', 'label' => '808.02 Writing', 'sourceKind' => 'subject']],
-            'udc' => ['raw' => '808.02', 'source' => 'subject'],
-            'coverUrl' => '/images/news/classics-event.jpg',
-            'source' => 'demo.catalog',
-        ],
-        [
-            'id' => 'demo-catalog-004',
-            'title' => [
-                'display' => 'Экономические трансформации Казахстана',
-                'raw' => 'Экономические трансформации Казахстана',
-                'subtitle' => 'Анализ реформ, отраслей и цифровой адаптации',
-            ],
-            'primaryAuthor' => 'S. Tleubayeva',
-            'publisher' => ['name' => 'KazUTB Press'],
-            'publicationYear' => 2021,
-            'language' => ['code' => 'ru', 'raw' => 'Русский'],
-            'isbn' => ['raw' => '9781111111111'],
-            'copies' => ['available' => 1, 'total' => 3],
-            'availability' => [
-                'locations' => [
-                    [
-                        'institutionUnit' => ['code' => 'college', 'name' => 'Колледж'],
-                        'campus' => ['code' => 'college_main', 'name' => 'College Main'],
-                        'servicePoint' => ['code' => '3', 'name' => 'Библиотека колледжа'],
-                        'copies' => ['total' => 3, 'available' => 1],
-                    ],
-                ],
-            ],
-            'classification' => [['id' => 'demo-udc-004', 'label' => '330 Economics', 'sourceKind' => 'subject']],
-            'udc' => ['raw' => '330', 'source' => 'subject'],
-            'coverUrl' => '/images/news/campus-library.jpg',
-            'source' => 'demo.catalog',
-        ],
-        [
-            'id' => 'demo-catalog-005',
-            'title' => [
-                'display' => 'Тұрақты технологиялар және энергия',
-                'raw' => 'Тұрақты технологиялар және энергия',
-                'subtitle' => 'Инженерлік шешімдер для чистой инфраструктуры',
-            ],
-            'primaryAuthor' => 'A. Zhaksylyk',
-            'publisher' => ['name' => 'Tech Campus'],
-            'publicationYear' => 2025,
-            'language' => ['code' => 'kk', 'raw' => 'Қазақша'],
-            'isbn' => ['raw' => '9782222222222'],
-            'copies' => ['available' => 3, 'total' => 4],
-            'availability' => ['locations' => []],
-            'classification' => [['id' => 'demo-udc-005', 'label' => '620 Engineering', 'sourceKind' => 'subject']],
-            'udc' => ['raw' => '620', 'source' => 'subject'],
-            'coverUrl' => '/images/news/author-visit.jpg',
-            'source' => 'demo.catalog',
-        ],
-        [
-            'id' => 'demo-catalog-006',
-            'title' => [
-                'display' => 'История Центральной Азии: архивы и карты',
-                'raw' => 'История Центральной Азии: архивы и карты',
-                'subtitle' => 'Источники, хронология и исследовательские заметки',
-            ],
-            'primaryAuthor' => 'Various contributors',
-            'publisher' => ['name' => 'Heritage Archive'],
-            'publicationYear' => 2019,
-            'language' => ['code' => 'en', 'raw' => 'English'],
-            'isbn' => ['raw' => '9783333333333'],
-            'copies' => ['available' => 0, 'total' => 1],
-            'availability' => ['locations' => []],
-            'classification' => [['id' => 'demo-udc-006', 'label' => '94(5) Central Asia history', 'sourceKind' => 'subject']],
-            'udc' => ['raw' => '94(5)', 'source' => 'subject'],
-            'coverUrl' => '/images/news/default-library.jpg',
-            'source' => 'demo.catalog',
-        ],
+    private const INSTITUTION_MAP = [
+        'college_library' => ['funds' => ['COLLEGE'], 'branches' => []],
+        'economic_library' => ['funds' => ['UNIVERSITY-ECONOMIC'], 'branches' => ['ECONOMICS-DESK']],
+        'technology_library' => ['funds' => ['UNIVERSITY-TECHNOLOGY'], 'branches' => ['TECHNOLOGY-DESK']],
+        'ktslib' => ['funds' => ['MAIN', 'RESEARCH', 'EDUCATIONAL'], 'branches' => ['SCIENTIFIC-LIBRARY', 'READING-ROOM']],
     ];
 
     /**
-     * @return array{data: array<int, array<string, mixed>>, meta: array<string, int>}
+     * Service-point codes the catalogue UI already knows how to label
+     * ("Библиотека колледжа · каб. 3"). Emitting them keeps those curated
+     * labels working now that holdings come from branches and funds.
+     */
+    private const SERVICE_POINT_CODES = [
+        'ECONOMICS-DESK' => '1',
+        'TECHNOLOGY-DESK' => '2',
+        'SCIENTIFIC-LIBRARY' => 'kstlib',
+        'READING-ROOM' => 'kstlib',
+    ];
+
+    private const CAMPUS_CODES = [
+        'ECONOMICS-DESK' => 'university_economic',
+        'TECHNOLOGY-DESK' => 'university_technological',
+        'SCIENTIFIC-LIBRARY' => 'university_central',
+        'READING-ROOM' => 'university_central',
+    ];
+
+    /**
+     * @return array{data: list<array<string, mixed>>, meta: array<string, int>}
      */
     public function search(
         string $query = '',
@@ -144,6 +62,7 @@ class CatalogReadService
         ?string $author = null,
         ?string $publisher = null,
         ?string $isbn = null,
+        ?string $subject = null,
         ?string $udc = null,
         ?string $language = null,
         int $page = 1,
@@ -158,303 +77,73 @@ class CatalogReadService
         ?string $institution = null,
         bool $includeTotal = true,
         bool $includeLocations = true,
+        ?string $resourceType = null,
+        ?string $fund = null,
+        ?string $branch = null,
+        ?string $category = null,
+        ?string $availability = null,
+        ?string $format = null,
+        bool $completeOnly = false,
+        bool $includeUdcCode = false,
     ): array {
         $page = max($page, 1);
         $limit = min(max($limit, 1), 100);
 
-        if (DB::getDriverName() === 'sqlite') {
-            if ($includeTotal && $page === 1 && trim($query) === '') {
-                return $this->demoCatalogResponse($page, $limit, $sort);
-            }
-
-            $totalPages = 1;
-
-            return [
-                'data' => [],
-                'meta' => [
-                    'page' => $page,
-                    'per_page' => $limit,
-                    'total' => 0,
-                    'total_pages' => $totalPages,
-                    'totalPages' => $totalPages,
-                ],
-            ];
+        // A catalogue that has not been provisioned yet answers honestly with
+        // an empty result set rather than failing the whole public page.
+        if (! DatabaseSchema::hasTable('bibliographic_records')) {
+            return $this->emptyResult($page, $limit);
         }
 
-        try {
-            $builder = DB::table('app.document_detail_v as d')
-                ->select([
-                    'd.document_id',
-                    'd.legacy_doc_id',
-                    'd.title_display',
-                    'd.title_raw',
-                    'd.subtitle_raw',
-                    'd.isbn_normalized',
-                    'd.isbn_raw',
-                    'd.publication_year',
-                    'd.language_code',
-                    'd.language_raw',
-                    'd.publisher_name',
-                    'd.authors_json',
-                    'd.copy_summary_json',
-                    'd.subjects_json',
-                    'd.raw_marc',
-                ]);
+        // The public catalogue represents the whole physical fund. Incomplete
+        // metadata remains flagged for librarians through is_draft and the
+        // Data Cleanup queue, but it must not hide a real book from readers.
+        $builder = BibliographicRecord::query()
+            ->when($completeOnly, fn (Builder $query) => $query
+                ->where('is_draft', false)
+                ->whereNotNull('title')
+                ->whereRaw("TRIM(title) <> ''"))
+            ->withCount([
+                'copies',
+                'copies as physical_copies_count' => fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost']),
+                'copies as available_copies_count' => fn (Builder $copies) => $copies->where('status', 'available'),
+                'copies as issued_copies_count' => fn (Builder $copies) => $copies->whereIn('status', ['issued', 'overdue']),
+                'copies as processing_copies_count' => fn (Builder $copies) => $copies->where('status', 'in_processing'),
+                'copies as repair_copies_count' => fn (Builder $copies) => $copies->where('status', 'under_repair'),
+                'copies as reading_room_copies_count' => fn (Builder $copies) => $copies->where('access_restriction', 'reading_room'),
+                'copies as limited_copies_count' => fn (Builder $copies) => $copies->where('access_restriction', 'limited'),
+                'electronicMaterials as active_electronic_materials_count' => fn (Builder $materials) => $materials->where('is_active', true),
+            ]);
+        $builder
+            ->withSum('copies as total_issue_count', 'issue_count')
+            ->withMax('copies as latest_registration_date', 'registration_date');
 
-            if ($query !== '') {
-                $q = '%' . mb_strtolower($query) . '%';
-                $builder->where(function ($inner) use ($q): void {
-                    $inner
-                        ->whereRaw("LOWER(COALESCE(d.title_display, d.title_raw, '')) LIKE ?", [$q])
-                        ->orWhereRaw("LOWER(COALESCE(d.isbn_normalized, d.isbn_raw, '')) LIKE ?", [$q])
-                        ->orWhereRaw("LOWER(COALESCE(d.publisher_name, '')) LIKE ?", [$q])
-                        ->orWhereRaw("LOWER(COALESCE(d.authors_json::text, '')) LIKE ?", [$q]);
-                });
-            }
+        $this->applyTextFilters($builder, $query, $title, $author, $publisher, $isbn, $subject);
+        $this->applyFacets($builder, $udc, $language, $yearFrom, $yearTo, $materialType, $subjectId);
+        $this->applyCopyFilters($builder, $availableOnly, $physicalOnly, $institution);
+        $this->applyCanonicalFilters($builder, $resourceType, $fund, $branch, $category, $availability, $format);
 
-            if ($title !== null && trim($title) !== '') {
-                $value = '%' . mb_strtolower(trim($title)) . '%';
-                $builder->whereRaw("LOWER(COALESCE(d.title_display, d.title_raw, '')) LIKE ?", [$value]);
-            }
+        $total = $includeTotal ? (clone $builder)->count() : 0;
 
-            if ($author !== null && trim($author) !== '') {
-                $value = '%' . mb_strtolower(trim($author)) . '%';
-                $builder->whereRaw("LOWER(COALESCE(d.authors_json::text, '')) LIKE ?", [$value]);
-            }
+        $this->applySort($builder, $sort);
 
-            if ($publisher !== null && trim($publisher) !== '') {
-                $value = '%' . mb_strtolower(trim($publisher)) . '%';
-                $builder->whereRaw("LOWER(COALESCE(d.publisher_name, '')) LIKE ?", [$value]);
-            }
+        $records = $builder
+            ->offset(($page - 1) * $limit)
+            ->limit($limit)
+            ->get();
 
-            if ($isbn !== null && trim($isbn) !== '') {
-                $value = '%' . mb_strtolower(trim($isbn)) . '%';
-                $builder->whereRaw("LOWER(COALESCE(d.isbn_normalized, d.isbn_raw, '')) LIKE ?", [$value]);
-            }
+        $locations = $includeLocations
+            ? $this->loadLocations($records->pluck('id')->all(), $institution)
+            : [];
 
-            if ($udc !== null && trim($udc) !== '') {
-                $value = '%' . mb_strtolower(trim($udc)) . '%';
-                $builder->whereRaw("LOWER(COALESCE(d.raw_marc, '')::text) LIKE ?", [$value]);
-            }
-
-            if (!empty($language)) {
-                $aliases = $this->resolveLanguageAliases($language);
-
-                $builder->where(function ($query) use ($aliases): void {
-                    $query->whereIn(DB::raw("LOWER(COALESCE(d.language_code, ''))"), $aliases);
-
-                    foreach ($aliases as $alias) {
-                        $query->orWhereRaw("LOWER(COALESCE(d.language_raw, '')) ~ ?", ['(^|[^[:alpha:]])' . preg_quote($alias, '/') . '([^[:alpha:]]|$)']);
-                    }
-                });
-            }
-
-            if ($yearFrom !== null) {
-                $builder->where('d.publication_year', '>=', $yearFrom);
-            }
-
-            if ($yearTo !== null) {
-                $builder->where('d.publication_year', '<=', $yearTo);
-            }
-
-            if ($availableOnly) {
-                $builder->whereRaw("COALESCE((d.copy_summary_json->>'availableCopies')::int, 0) > 0");
-            }
-
-            if ($physicalOnly) {
-                $builder->whereRaw("COALESCE((d.copy_summary_json->>'totalCopies')::int, 0) > 0");
-            }
-
-            if ($materialType !== null && $materialType !== '' && $materialType !== 'all') {
-                $archiveMarkerSql = "(LOWER(COALESCE(d.subjects_json::text, '')) LIKE '%диссер%' OR LOWER(COALESCE(d.subjects_json::text, '')) LIKE '%thesis%' OR LOWER(COALESCE(d.subjects_json::text, '')) LIKE '%archive%')";
-
-                if ($materialType === 'archive') {
-                    $builder->whereRaw(
-                        "({$archiveMarkerSql} OR (COALESCE((d.copy_summary_json->>'totalCopies')::int, 0) > 0 AND COALESCE((d.copy_summary_json->>'availableCopies')::int, 0) = 0))"
-                    );
-                } elseif ($materialType === 'physical') {
-                    $builder
-                        ->whereRaw("COALESCE((d.copy_summary_json->>'totalCopies')::int, 0) > 0")
-                        ->whereRaw("COALESCE((d.copy_summary_json->>'availableCopies')::int, 0) > 0")
-                        ->whereRaw("NOT {$archiveMarkerSql}");
-                } elseif ($materialType === 'digital') {
-                    $builder
-                        ->whereRaw("COALESCE((d.copy_summary_json->>'totalCopies')::int, 0) = 0")
-                        ->whereRaw("NOT {$archiveMarkerSql}");
-                }
-            }
-
-            if ($subjectId !== null && $subjectId !== '') {
-                $builder->whereExists(function ($sub) use ($subjectId): void {
-                    $sub->select(DB::raw(1))
-                        ->from('app.document_subjects as ds')
-                        ->whereColumn('ds.document_id', 'd.document_id')
-                        ->where('ds.subject_id', $subjectId);
-                });
-            }
-
-            if ($institution !== null && $institution !== '') {
-                $builder->whereExists(function ($sub) use ($institution): void {
-                    $sub->select(DB::raw(1))
-                        ->from('app.document_availability_by_location_v as loc')
-                        ->whereColumn('loc.document_id', 'd.document_id');
-
-                    if ($institution === 'college_library') {
-                        $sub->where(function ($q): void {
-                            $q->whereRaw("LOWER(COALESCE(loc.campus_code, '')) = ?", ['college_main'])
-                                ->orWhereRaw("LOWER(COALESCE(loc.institution_unit_code, '')) = ?", ['college'])
-                                ->orWhereRaw("LOWER(COALESCE(loc.service_point_code, '')) = ?", ['3']);
-                        });
-                    } elseif ($institution === 'economic_library') {
-                        $sub->where(function ($q): void {
-                            $q->whereRaw("LOWER(COALESCE(loc.campus_code, '')) = ?", ['university_economic'])
-                                ->orWhereRaw("LOWER(COALESCE(loc.service_point_code, '')) = ?", ['1']);
-                        });
-                    } elseif ($institution === 'technology_library') {
-                        $sub->where(function ($q): void {
-                            $q->whereRaw("LOWER(COALESCE(loc.campus_code, '')) = ?", ['university_technological'])
-                                ->orWhereRaw("LOWER(COALESCE(loc.service_point_code, '')) = ?", ['2']);
-                        });
-                    } elseif ($institution === 'ktslib') {
-                        $sub->where(function ($q): void {
-                            $q->whereRaw("LOWER(COALESCE(loc.service_point_code, '')) = ?", ['kstlib'])
-                                ->orWhereRaw("LOWER(COALESCE(loc.campus_code, '')) = ?", ['university_central']);
-                        });
-                    }
-                });
-            }
-
-            $total = $includeTotal ? (clone $builder)->count() : 0;
-
-            $sortLower = mb_strtolower($sort);
-            if ($sortLower === 'newest') {
-                $builder->orderByDesc('d.publication_year')->orderBy('d.title_display');
-            } elseif ($sortLower === 'title') {
-                $builder->orderBy('d.title_display');
-            } elseif ($sortLower === 'author') {
-                $builder->orderByRaw('COALESCE((d.authors_json->0->>\'name\'), \'\') ASC')->orderBy('d.title_display');
-            } else {
-                $builder->orderByRaw('COALESCE((d.copy_summary_json->>\'availableCopies\')::int, 0) DESC')
-                    ->orderBy('d.title_display');
-            }
-
-            $rows = $builder
-                ->offset(($page - 1) * $limit)
-                ->limit($limit)
-                ->get();
-
-            if ($includeTotal && $rows->isEmpty() && $this->shouldUseDemoFallback(
-                query: $query,
-                title: $title,
-                author: $author,
-                publisher: $publisher,
-                isbn: $isbn,
-                udc: $udc,
-                language: $language,
-                yearFrom: $yearFrom,
-                yearTo: $yearTo,
-                availableOnly: $availableOnly,
-                physicalOnly: $physicalOnly,
-                materialType: $materialType,
-                subjectId: $subjectId,
-                institution: $institution,
-                page: $page,
-            )) {
-                return $this->demoCatalogResponse($page, $limit, $sort);
-            }
-        } catch (\Throwable $e) {
-            if ($this->shouldUseDemoFallback(
-                query: $query,
-                title: $title,
-                author: $author,
-                publisher: $publisher,
-                isbn: $isbn,
-                udc: $udc,
-                language: $language,
-                yearFrom: $yearFrom,
-                yearTo: $yearTo,
-                availableOnly: $availableOnly,
-                physicalOnly: $physicalOnly,
-                materialType: $materialType,
-                subjectId: $subjectId,
-                institution: $institution,
-                page: $page,
-            )) {
-                return $this->demoCatalogResponse($page, $limit, $sort);
-            }
-
-            return [
-                'data' => [],
-                'meta' => [
-                    'page' => $page,
-                    'per_page' => $limit,
-                    'total' => 0,
-                    'total_pages' => 1,
-                    'totalPages' => 1,
-                ],
-            ];
-        }
-
-        $documentIds = $rows
-            ->map(static fn (object $row): string => (string) ($row->document_id ?? ''))
-            ->filter(static fn (string $id): bool => $id !== '')
-            ->values()
+        $data = $records
+            ->map(fn (BibliographicRecord $record): array => $this->present(
+                $record,
+                $locations[$record->getKey()] ?? [],
+                $this->popularRecordIds(),
+                $includeUdcCode,
+            ))
             ->all();
-
-        $locationsByDocument = $includeLocations ? $this->loadLocationsByDocument($documentIds, $institution) : [];
-
-        $data = $rows->map(function (object $row) use ($locationsByDocument): array {
-            $authors = $this->decodeJsonValue($row->authors_json);
-            $copySummary = $this->decodeJsonValue($row->copy_summary_json);
-            $subjects = $this->decodeJsonValue($row->subjects_json);
-            $primaryAuthor = is_array($authors) && isset($authors[0]['name']) ? (string) $authors[0]['name'] : null;
-            $documentId = (string) ($row->document_id ?? '');
-            $languageCode = (string) ($row->language_code ?: '');
-            $languageRaw = (string) ($row->language_raw ?: $languageCode ?: '');
-
-            $available = is_array($copySummary) ? (int) ($copySummary['availableCopies'] ?? 0) : 0;
-            $totalCopies = is_array($copySummary) ? (int) ($copySummary['totalCopies'] ?? 0) : 0;
-
-            $classification = [];
-            if (is_array($subjects) && count($subjects) > 0) {
-                $classification = array_map(static fn (array $s): array => [
-                    'id' => (string) ($s['id'] ?? ''),
-                    'label' => (string) ($s['label'] ?? ''),
-                    'sourceKind' => (string) ($s['sourceKind'] ?? ''),
-                ], $subjects);
-            }
-
-            return [
-                'id' => (string) ($row->document_id ?? $row->legacy_doc_id ?? ''),
-                'title' => [
-                    'display' => (string) ($row->title_display ?: $row->title_raw ?: 'Без названия'),
-                    'raw' => (string) ($row->title_raw ?: $row->title_display ?: 'Без названия'),
-                    'subtitle' => (string) ($row->subtitle_raw ?: ''),
-                ],
-                'primaryAuthor' => $primaryAuthor,
-                'publisher' => [
-                    'name' => (string) ($row->publisher_name ?: ''),
-                ],
-                'publicationYear' => $row->publication_year,
-                'language' => [
-                    'code' => $this->normalizeLanguageCode($languageCode, $languageRaw),
-                    'raw' => $languageRaw,
-                ],
-                'isbn' => [
-                    'raw' => (string) ($row->isbn_normalized ?: $row->isbn_raw ?: ''),
-                ],
-                'copies' => [
-                    'available' => $available,
-                    'total' => $totalCopies,
-                ],
-                'availability' => [
-                    'locations' => $locationsByDocument[$documentId] ?? [],
-                ],
-                'classification' => $classification,
-                'udc' => $this->extractUdcData($row->raw_marc ?? null, $classification),
-                'source' => 'app.document_detail_v',
-            ];
-        })->all();
 
         $totalPages = max(1, $limit > 0 ? (int) ceil($total / $limit) : 1);
 
@@ -471,314 +160,768 @@ class CatalogReadService
     }
 
     /**
+     * Return the most requested records for one lending desk. Popularity is
+     * accumulated from the imported copy issue counters, scoped to the desk's
+     * real fund/branch mapping rather than a presentation fixture.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function popularByInstitution(string $institution, int $limit = 4): array
+    {
+        if (! DatabaseSchema::hasTable('bibliographic_records')) {
+            return [];
+        }
+
+        $mapping = self::INSTITUTION_MAP[$institution] ?? null;
+        if ($mapping === null) {
+            return [];
+        }
+
+        $deskCopies = function (Builder $copies) use ($mapping): Builder {
+            return $copies
+                ->whereNotIn('status', ['written_off', 'lost'])
+                ->where(function (Builder $scoped) use ($mapping): void {
+                    if ($mapping['funds'] !== []) {
+                        $scoped->orWhereHas('fund', fn (Builder $fund) => $fund->whereIn('code', $mapping['funds']));
+                    }
+                    if ($mapping['branches'] !== []) {
+                        $scoped->orWhereHas('branch', fn (Builder $branch) => $branch->whereIn('code', $mapping['branches']));
+                    }
+                });
+        };
+
+        return BibliographicRecord::query()
+            ->whereNotNull('title')
+            ->whereRaw("TRIM(title) <> ''")
+            ->where('title', 'not like', '[Без заглавия;%')
+            ->whereHas('copies', $deskCopies)
+            ->withCount([
+                'copies as desk_copies_count' => $deskCopies,
+                'copies as desk_available_copies_count' => fn (Builder $copies) => $deskCopies($copies)->where('status', 'available'),
+            ])
+            ->withSum(['copies as desk_issue_count' => $deskCopies], 'issue_count')
+            ->orderByDesc('desk_issue_count')
+            ->orderByDesc('desk_available_copies_count')
+            ->orderBy('title')
+            ->limit(max(1, min(12, $limit)))
+            ->get()
+            ->map(fn (BibliographicRecord $record): array => [
+                'id' => (string) $record->getKey(),
+                'identifier' => (string) ($record->isbn ?: $record->getKey()),
+                'title' => (string) $record->title,
+                'author' => (string) ($record->primary_author ?: __('common.catalog.author_unknown')),
+                'copies' => (int) ($record->desk_available_copies_count ?? 0),
+                'totalCopies' => (int) ($record->desk_copies_count ?? 0),
+                'issueCount' => (int) ($record->desk_issue_count ?? 0),
+                'coverPath' => $record->cover_path,
+            ])
+            ->all();
+    }
+
+    public function institutionCopiesCount(string $institution): int
+    {
+        if (! DatabaseSchema::hasTable('book_copies')) {
+            return 0;
+        }
+
+        $mapping = self::INSTITUTION_MAP[$institution] ?? null;
+        if ($mapping === null) {
+            return 0;
+        }
+
+        return (int) BookCopy::query()
+            ->whereNotIn('status', ['written_off', 'lost'])
+            ->where(function (Builder $scoped) use ($mapping): void {
+                if ($mapping['funds'] !== []) {
+                    $scoped->orWhereHas('fund', fn (Builder $fund) => $fund->whereIn('code', $mapping['funds']));
+                }
+                if ($mapping['branches'] !== []) {
+                    $scoped->orWhereHas('branch', fn (Builder $branch) => $branch->whereIn('code', $mapping['branches']));
+                }
+            })
+            ->count();
+    }
+
+    /**
+     * Canonical filter axes that map straight onto the schema (Master.md §8.2):
+     * document type, fund, branch, subject area, availability, and format.
+     * Multi-value axes accept a comma-separated list, so a reader can tick
+     * several boxes on one axis.
+     */
+    private function applyCanonicalFilters(
+        Builder $builder,
+        ?string $resourceType,
+        ?string $fund,
+        ?string $branch,
+        ?string $category,
+        ?string $availability,
+        ?string $format,
+    ): void {
+        if (($types = $this->splitList($resourceType)) !== []) {
+            $builder->whereIn('resource_type', $types);
+        }
+
+        if (($categories = $this->splitList($category)) !== []) {
+            $builder->whereIn('category', $categories);
+        }
+
+        if (($funds = $this->splitList($fund)) !== []) {
+            $builder->whereHas('copies', fn (Builder $copies) => $copies
+                ->whereNotIn('status', ['written_off'])
+                ->whereHas('fund', fn (Builder $related) => $related->whereIn('code', $funds)));
+        }
+
+        if (($branches = $this->splitList($branch)) !== []) {
+            $builder->whereHas('copies', fn (Builder $copies) => $copies
+                ->whereNotIn('status', ['written_off'])
+                ->whereHas('branch', fn (Builder $related) => $related->whereIn('code', $branches)));
+        }
+
+        // §8.3 — availability is an aggregate over the record's copies, not a
+        // column: a record is "available" when at least one copy is on shelf.
+        $availabilityKey = mb_strtolower(trim((string) $availability));
+        match ($availabilityKey) {
+            'available' => $builder->whereHas('copies', fn (Builder $copies) => $copies->where('status', 'available')),
+            'issued' => $builder
+                ->whereHas('copies', fn (Builder $copies) => $copies->whereIn('status', ['issued', 'overdue']))
+                ->whereDoesntHave('copies', fn (Builder $copies) => $copies->where('status', 'available')),
+            'electronic_only' => $builder
+                ->whereHas('electronicMaterials', fn (Builder $materials) => $materials->where('is_active', true))
+                ->whereDoesntHave('copies', fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost'])),
+            'processing' => $builder->whereHas('copies', fn (Builder $copies) => $copies->where('status', 'in_processing')),
+            'repair' => $builder->whereHas('copies', fn (Builder $copies) => $copies->where('status', 'under_repair')),
+            default => null,
+        };
+
+        // §8.4 — print / electronic / hybrid, derived from what the record
+        // actually holds rather than a stored flag.
+        $formatKey = mb_strtolower(trim((string) $format));
+        $hasPhysical = fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost']);
+        $hasDigital = fn (Builder $materials) => $materials->where('is_active', true);
+        match ($formatKey) {
+            'print' => $builder
+                ->whereHas('copies', $hasPhysical)
+                ->whereDoesntHave('electronicMaterials', $hasDigital),
+            'electronic' => $builder
+                ->whereHas('electronicMaterials', $hasDigital)
+                ->whereDoesntHave('copies', $hasPhysical),
+            'hybrid' => $builder
+                ->whereHas('copies', $hasPhysical)
+                ->whereHas('electronicMaterials', $hasDigital),
+            default => null,
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function splitList(?string $value): array
+    {
+        return collect(explode(',', (string) $value))
+            ->map(fn (string $item): string => trim($item))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Real filter axes with live counts, so the sidebar can only ever offer
+     * values that exist in the collection (Master.md §8.2). Every entry is
+     * derived from the database — nothing here is a curated constant list.
+     *
+     * @return array<string, mixed>
+     */
+    public function facets(): array
+    {
+        if (! DatabaseSchema::hasTable('bibliographic_records')) {
+            $currentYear = (int) date('Y');
+
+            return [
+                'resource_types' => [], 'languages' => [], 'categories' => [],
+                'funds' => [], 'branches' => [], 'udc' => [],
+                'availability' => [], 'formats' => [],
+                'years' => ['min' => $currentYear - 25, 'max' => $currentYear],
+                'total' => 0,
+            ];
+        }
+
+        $catalogRecords = fn (): Builder => BibliographicRecord::query();
+
+        $countBy = fn (string $column): array => $catalogRecords()
+            ->selectRaw("{$column} as value, count(*) as total")
+            ->whereNotNull($column)
+            ->groupBy($column)
+            ->orderByDesc('total')
+            ->get()
+            ->map(fn ($row): array => ['value' => (string) $row->value, 'count' => (int) $row->total])
+            ->all();
+
+        return [
+            'resource_types' => $countBy('resource_type'),
+            'languages' => $this->languageFacet(),
+            'categories' => $countBy('category'),
+            'funds' => $this->holdingFacet('fund'),
+            'branches' => $this->holdingFacet('branch'),
+            'udc' => $this->udcFacet(),
+            'availability' => $this->availabilityFacet(),
+            'formats' => $this->formatFacet(),
+            'years' => $this->yearBounds(),
+            'total' => $catalogRecords()->count(),
+        ];
+    }
+
+    /**
+     * Every interface language is always listed, with a zero count when the
+     * collection has nothing in it yet — the sidebar must not reshuffle as
+     * records are catalogued.
+     *
+     * @return list<array{value: string, count: int}>
+     */
+    private function languageFacet(): array
+    {
+        $counts = BibliographicRecord::query()
+            ->selectRaw('language, count(*) as total')
+            ->groupBy('language')
+            ->pluck('total', 'language');
+
+        return collect(['ru', 'kk', 'en', 'other'])
+            ->map(fn (string $code): array => ['value' => $code, 'count' => (int) ($counts[$code] ?? 0)])
+            ->all();
+    }
+
+    /**
+     * @return list<array{value: string, label: string, count: int}>
+     */
+    private function holdingFacet(string $relation): array
+    {
+        $table = $relation === 'fund' ? 'funds' : 'branches';
+
+        return DB::table('book_copies')
+            ->join($table, "{$table}.id", '=', "book_copies.{$relation}_id")
+            ->join('bibliographic_records', 'bibliographic_records.id', '=', 'book_copies.bibliographic_record_id')
+            ->whereNotIn('book_copies.status', ['written_off'])
+            ->selectRaw("{$table}.code as value, {$table}.name as label, count(distinct bibliographic_records.id) as total")
+            ->groupBy("{$table}.code", "{$table}.name")
+            ->orderByDesc('total')
+            ->get()
+            ->map(fn ($row): array => [
+                'value' => (string) $row->value,
+                'label' => (string) $row->label,
+                'count' => (int) $row->total,
+            ])
+            ->all();
+    }
+
+    /**
+     * Top-level UDC classes present in the collection, labelled from the
+     * classifier so the sidebar shows "004 — Информационные технологии".
+     *
+     * @return list<array{value: string, label: string, count: int}>
+     */
+    private function udcFacet(): array
+    {
+        $used = BibliographicRecord::query()
+            ->whereNotNull('udc_code')
+            ->pluck('udc_code');
+
+        if ($used->isEmpty()) {
+            return [];
+        }
+
+        $known = DatabaseSchema::hasTable('udc_codes')
+            ? UdcCode::query()->get()->keyBy('code')
+            : collect();
+
+        // Roll a code up to its parent class only when the classifier actually
+        // describes that parent — otherwise "159.9" would collapse to a bare
+        // "159" with no label to show for it.
+        $counts = $used->countBy(function (string $code) use ($known): string {
+            $root = $this->udcRoot($code);
+
+            return $known->has($root) || ! $known->has(trim($code)) ? $root : trim($code);
+        });
+
+        $labels = $known;
+
+        return $counts
+            ->map(fn (int $total, string $code): array => [
+                'value' => $code,
+                'label' => $labels->get($code)?->localizedDescription() ?? $code,
+                'count' => $total,
+            ])
+            ->sortKeys()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The classifier's top-level class for a UDC code: "004.8" and "004" both
+     * roll up to "004", "93/94" stays whole.
+     */
+    private function udcRoot(string $code): string
+    {
+        $code = trim($code);
+
+        return str_contains($code, '.') ? explode('.', $code)[0] : $code;
+    }
+
+    /**
+     * @return list<array{value: string, count: int}>
+     */
+    private function availabilityFacet(): array
+    {
+        $states = ['available', 'issued', 'electronic_only', 'processing', 'repair'];
+
+        return collect($states)
+            ->map(function (string $state): array {
+                $builder = BibliographicRecord::query();
+                $this->applyCanonicalFilters($builder, null, null, null, null, $state, null);
+
+                return ['value' => $state, 'count' => $builder->count()];
+            })
+            ->all();
+    }
+
+    /**
+     * @return list<array{value: string, count: int}>
+     */
+    private function formatFacet(): array
+    {
+        return collect(['print', 'electronic', 'hybrid'])
+            ->map(function (string $format): array {
+                $builder = BibliographicRecord::query();
+                $this->applyCanonicalFilters($builder, null, null, null, null, null, $format);
+
+                return ['value' => $format, 'count' => $builder->count()];
+            })
+            ->all();
+    }
+
+    /**
+     * @return array{data: list<array<string, mixed>>, meta: array<string, int>}
+     */
+    private function emptyResult(int $page, int $limit): array
+    {
+        return [
+            'data' => [],
+            'meta' => [
+                'page' => $page,
+                'per_page' => $limit,
+                'total' => 0,
+                'total_pages' => 1,
+                'totalPages' => 1,
+            ],
+        ];
+    }
+
+    /**
+     * Publication-year range across the catalogue, for the year slider.
+     *
      * @return array{min:int,max:int}
      */
     public function yearBounds(): array
     {
-        if (DB::getDriverName() === 'sqlite') {
-            return ['min' => 1950, 'max' => (int) date('Y')];
+        if (! DatabaseSchema::hasTable('bibliographic_records')) {
+            $currentYear = (int) date('Y');
+
+            return ['min' => $currentYear - 25, 'max' => $currentYear];
         }
 
-        $row = DB::table('app.document_detail_v')
+        $bounds = BibliographicRecord::query()
             ->whereNotNull('publication_year')
-            ->whereBetween('publication_year', [1900, 2100])
             ->selectRaw('MIN(publication_year) as min_year, MAX(publication_year) as max_year')
             ->first();
 
-        $min = (int) ($row->min_year ?? 1950);
-        $max = (int) ($row->max_year ?? (int) date('Y'));
+        $min = (int) ($bounds->min_year ?? 0);
+        $max = (int) ($bounds->max_year ?? 0);
 
-        if ($min <= 0 || $max <= 0 || $min > $max) {
-            return ['min' => 1950, 'max' => (int) date('Y')];
+        if ($min === 0 || $max === 0) {
+            $currentYear = (int) date('Y');
+
+            return ['min' => $currentYear - 25, 'max' => $currentYear];
         }
 
         return ['min' => $min, 'max' => $max];
     }
 
     /**
-     * @return array{data: array<int, array<string, mixed>>, meta: array<string, int>}
+     * Presentation shape shared with the book-detail service and the SPA.
+     *
+     * @param  list<array<string, mixed>>  $locations
+     * @return array<string, mixed>
      */
-    private function demoCatalogResponse(int $page, int $limit, string $sort): array
-    {
-        $items = $this->sortedDemoCatalog($sort);
-        $total = count($items);
-        $totalPages = max(1, $limit > 0 ? (int) ceil($total / $limit) : 1);
-        $safePage = max($page, 1);
+    public function present(
+        BibliographicRecord $record,
+        array $locations = [],
+        array $popularRecordIds = [],
+        bool $includeUdcCode = false,
+    ): array {
+        $available = (int) ($record->available_copies_count ?? $record->copies()->where('status', 'available')->count());
+        $totalCopies = (int) ($record->physical_copies_count ?? $record->copies()->whereNotIn('status', ['written_off', 'lost'])->count());
+        $digitalCount = (int) ($record->active_electronic_materials_count ?? 0);
+        $availabilityStatus = match (true) {
+            $available > 0 => 'available',
+            (int) ($record->processing_copies_count ?? 0) > 0 => 'in_processing',
+            (int) ($record->repair_copies_count ?? 0) > 0 => 'under_repair',
+            (int) ($record->issued_copies_count ?? 0) > 0 => 'issued',
+            default => 'no_holdings',
+        };
+        $format = match (true) {
+            $totalCopies > 0 && $digitalCount > 0 => 'hybrid',
+            $digitalCount > 0 || in_array($record->resource_type, ['ebook', 'digital_document'], true) => 'electronic',
+            default => 'print',
+        };
+        $accessRestriction = match (true) {
+            (int) ($record->limited_copies_count ?? 0) > 0 => 'limited',
+            (int) ($record->reading_room_copies_count ?? 0) > 0 => 'reading_room',
+            default => 'free',
+        };
+        $latestRegistrationDate = $record->latest_registration_date;
+        $registeredAt = $latestRegistrationDate === null
+            ? null
+            : Carbon::parse($latestRegistrationDate);
+        $isNewArrival = $registeredAt !== null
+            && $registeredAt->betweenIncluded(now()->subDays(30)->startOfDay(), now()->endOfDay());
+        $udcCode = trim((string) ($record->udc_code ?? ''));
+        $udcDescription = $this->udcDescription($udcCode);
 
         return [
-            'data' => array_slice($items, ($safePage - 1) * $limit, $limit),
-            'meta' => [
-                'page' => $safePage,
-                'per_page' => $limit,
-                'total' => $total,
-                'total_pages' => $totalPages,
-                'totalPages' => $totalPages,
+            'id' => (string) $record->getKey(),
+            'title' => [
+                'display' => (string) $record->title,
+                'raw' => (string) $record->title,
+                'subtitle' => (string) ($record->subtitle ?? ''),
             ],
+            'primaryAuthor' => $record->primary_author,
+            'authors' => $record->allAuthors(),
+            'publisher' => [
+                'name' => (string) ($record->publisher ?? ''),
+            ],
+            'publicationYear' => $record->publication_year,
+            'language' => [
+                'code' => (string) $record->language,
+                'raw' => (string) $record->language,
+            ],
+            'isbn' => [
+                'raw' => (string) ($record->isbn ?? ''),
+            ],
+            'resourceType' => (string) $record->resource_type,
+            'annotation' => (string) ($record->annotation ?? ''),
+            'keywords' => (array) ($record->keywords ?? []),
+            'coverPath' => $record->cover_path,
+            'copies' => [
+                'available' => $available,
+                'total' => $totalCopies,
+            ],
+            'availability' => [
+                'locations' => $locations,
+            ],
+            'indicators' => [
+                'availability' => $availabilityStatus,
+                'format' => $format,
+                'copySupply' => $available === 1 ? 'last_copy' : ($available > 1 ? 'in_stock' : 'absent'),
+                'popular' => in_array((int) $record->getKey(), $popularRecordIds, true),
+                'newArrival' => $isNewArrival,
+                'accessRestriction' => $accessRestriction,
+                'issueCount' => (int) ($record->total_issue_count ?? 0),
+                'latestRegistrationDate' => $latestRegistrationDate,
+            ],
+            'classification' => $record->category !== null && $record->category !== ''
+                ? [['id' => $record->category, 'label' => $record->category, 'sourceKind' => 'subject']]
+                : [],
+            'udc' => [
+                'raw' => $includeUdcCode ? $udcCode : '',
+                'description' => $udcDescription,
+                'display' => $includeUdcCode
+                    ? trim($udcCode.($udcDescription !== '' ? ' — '.$udcDescription : ''))
+                    : $udcDescription,
+                'source' => $udcCode !== '' ? 'udc' : '',
+            ],
+            'authorMark' => (string) ($record->author_mark ?? ''),
+            'source' => 'catalog.bibliographic_records',
         ];
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function sortedDemoCatalog(string $sort): array
+    private function udcDescription(string $code): string
     {
-        $items = self::DEMO_CATALOG;
-        $sortLower = mb_strtolower($sort);
+        if ($code === '' || ! DatabaseSchema::hasTable('udc_codes')) {
+            return '';
+        }
 
-        usort($items, static function (array $left, array $right) use ($sortLower): int {
-            $leftTitle = (string) ($left['title']['display'] ?? '');
-            $rightTitle = (string) ($right['title']['display'] ?? '');
-            $leftAuthor = (string) ($left['primaryAuthor'] ?? '');
-            $rightAuthor = (string) ($right['primaryAuthor'] ?? '');
-            $leftYear = (int) ($left['publicationYear'] ?? 0);
-            $rightYear = (int) ($right['publicationYear'] ?? 0);
-            $leftAvailable = (int) ($left['copies']['available'] ?? 0);
-            $rightAvailable = (int) ($right['copies']['available'] ?? 0);
+        $reference = UdcCode::query()
+            ->whereRaw('? LIKE code || ?', [$code, '%'])
+            ->orderByRaw('LENGTH(code) DESC')
+            ->first();
 
-            return match ($sortLower) {
-                'newest' => $rightYear <=> $leftYear ?: strcasecmp($leftTitle, $rightTitle),
-                'title' => strcasecmp($leftTitle, $rightTitle),
-                'author' => strcasecmp($leftAuthor, $rightAuthor) ?: strcasecmp($leftTitle, $rightTitle),
-                default => $rightAvailable <=> $leftAvailable ?: strcasecmp($leftTitle, $rightTitle),
-            };
-        });
-
-        return $items;
+        return $reference?->localizedDescription() ?? '';
     }
 
-    private function shouldUseDemoFallback(
+    /**
+     * Exact top decile by accumulated copy issue_count. IDs are cached briefly
+     * because the same set is reused for all twelve cards in one response.
+     *
+     * @return list<int>
+     */
+    private function popularRecordIds(): array
+    {
+        return Cache::remember('catalog.popular_record_ids', now()->addMinutes(15), function (): array {
+            $recordCount = BibliographicRecord::query()->count();
+            if ($recordCount === 0) {
+                return [];
+            }
+
+            return DB::table('book_copies')
+                ->selectRaw('bibliographic_record_id, SUM(issue_count) AS issue_total')
+                ->groupBy('bibliographic_record_id')
+                ->havingRaw('SUM(issue_count) > 0')
+                ->orderByDesc('issue_total')
+                ->orderBy('bibliographic_record_id')
+                ->limit(max(1, (int) ceil($recordCount * 0.10)))
+                ->pluck('bibliographic_record_id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
+        });
+    }
+
+    private function applyTextFilters(
+        Builder $builder,
         string $query,
         ?string $title,
         ?string $author,
         ?string $publisher,
         ?string $isbn,
+        ?string $subject,
+    ): void {
+        if (($term = trim($query)) !== '') {
+            $builder->search($term);
+        }
+        if (($value = trim((string) $title)) !== '') {
+            $builder->whereRaw('LOWER(title) LIKE ?', ['%'.mb_strtolower($value).'%']);
+        }
+        if (($value = trim((string) $author)) !== '') {
+            $needle = '%'.mb_strtolower($value).'%';
+            $builder->where(function (Builder $inner) use ($needle): void {
+                $inner
+                    ->whereRaw('LOWER(COALESCE(primary_author, \'\')) LIKE ?', [$needle])
+                    ->orWhereRaw('LOWER(CAST(additional_authors AS TEXT)) LIKE ?', [$needle]);
+            });
+        }
+        if (($value = trim((string) $publisher)) !== '') {
+            $builder->whereRaw('LOWER(COALESCE(publisher, \'\')) LIKE ?', ['%'.mb_strtolower($value).'%']);
+        }
+        if (($value = trim((string) $isbn)) !== '') {
+            $normalized = preg_replace('/[^0-9xX]/', '', $value) ?: $value;
+            $builder->where(function (Builder $inner) use ($value, $normalized): void {
+                $inner
+                    ->where('isbn', 'like', '%'.$value.'%')
+                    ->orWhere('isbn', 'like', '%'.$normalized.'%');
+            });
+        }
+        if (($value = trim((string) $subject)) !== '') {
+            $needle = '%'.mb_strtolower($value).'%';
+            $builder->where(function (Builder $inner) use ($needle, $value): void {
+                $inner
+                    ->whereRaw('LOWER(COALESCE(annotation, \'\')) LIKE ?', [$needle])
+                    ->orWhereRaw('LOWER(COALESCE(category, \'\')) LIKE ?', [$needle])
+                    ->orWhereRaw('LOWER(COALESCE(udc_code, \'\')) LIKE ?', [$needle])
+                    ->orWhereRaw('LOWER(CAST(keywords AS TEXT)) LIKE ?', [$needle])
+                    ->orWhereJsonContains('keywords', $value);
+            });
+        }
+    }
+
+    private function applyFacets(
+        Builder $builder,
         ?string $udc,
         ?string $language,
         ?int $yearFrom,
         ?int $yearTo,
-        bool $availableOnly,
-        bool $physicalOnly,
         ?string $materialType,
         ?string $subjectId,
+    ): void {
+        if (($value = trim((string) $udc)) !== '') {
+            // Prefix match so "33" also returns 330, 336, 338.
+            $builder->where('udc_code', 'like', $value.'%');
+        }
+        if (($value = trim((string) $language)) !== '') {
+            $builder->whereIn('language', $this->languageAliases($value));
+        }
+        if ($yearFrom !== null) {
+            $builder->where('publication_year', '>=', $yearFrom);
+        }
+        if ($yearTo !== null) {
+            $builder->where('publication_year', '<=', $yearTo);
+        }
+        // `materialType` carries the public format vocabulary (Master.md §8.4),
+        // not the bibliographic resource type: печатный / электронный / гибрид.
+        $format = mb_strtolower(trim((string) $materialType));
+        if ($format === 'physical') {
+            $builder->whereHas('copies', fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost']));
+        } elseif ($format === 'digital') {
+            $builder->where(function (Builder $inner): void {
+                $inner
+                    ->whereHas('electronicMaterials', fn (Builder $materials) => $materials->where('is_active', true))
+                    ->orWhereIn('resource_type', ['ebook', 'digital_document']);
+            });
+        } elseif ($format === 'archive') {
+            $builder->whereIn('resource_type', ['dissertation', 'abstract', 'publication', 'periodical']);
+        }
+
+        if (($value = trim((string) $subjectId)) !== '') {
+            // Accepts either a category slug or a UDC branch, since the
+            // discover page deep-links by UDC while facets use categories.
+            $builder->where(function (Builder $inner) use ($value): void {
+                $inner->where('category', $value)->orWhere('udc_code', 'like', $value.'%');
+            });
+        }
+    }
+
+    private function applyCopyFilters(
+        Builder $builder,
+        bool $availableOnly,
+        bool $physicalOnly,
         ?string $institution,
-        int $page,
-    ): bool {
-        return $page === 1
-            && trim($query) === ''
-            && trim((string) $title) === ''
-            && trim((string) $author) === ''
-            && trim((string) $publisher) === ''
-            && trim((string) $isbn) === ''
-            && trim((string) $udc) === ''
-            && trim((string) $language) === ''
-            && $yearFrom === null
-            && $yearTo === null
-            && ! $availableOnly
-            && ! $physicalOnly
-            && (trim((string) $materialType) === '' || trim((string) $materialType) === 'all')
-            && trim((string) $subjectId) === ''
-            && trim((string) $institution) === '';
-    }
+    ): void {
+        $institutionKey = trim((string) $institution);
+        $mapping = self::INSTITUTION_MAP[$institutionKey] ?? null;
 
-    /**
-     * @param array<int, array<string, string>> $classification
-     * @return array{raw: string, source: string}
-     */
-    private function extractUdcData(mixed $rawMarc, array $classification = []): array
-    {
-        if (is_string($rawMarc) && $rawMarc !== '') {
-            foreach (['080', '084'] as $tag) {
-                $value = $this->extractMarcFieldValue($rawMarc, $tag);
-                if ($value !== '') {
-                    return ['raw' => $value, 'source' => $tag];
+        if ($availableOnly || $physicalOnly || $mapping !== null) {
+            $builder->whereHas('copies', function (Builder $copies) use ($availableOnly, $mapping): void {
+                if ($availableOnly) {
+                    $copies->where('status', 'available');
+                } else {
+                    // "Physical holdings" means a copy that still belongs to
+                    // the collection — written-off and lost items do not count.
+                    $copies->whereNotIn('status', ['written_off', 'lost']);
                 }
-            }
-        }
 
-        foreach ($classification as $item) {
-            $kind = (string) ($item['sourceKind'] ?? '');
-            $label = trim((string) ($item['label'] ?? ''));
-            if ($label !== '' && in_array($kind, ['subject', 'specialization'], true)) {
-                return ['raw' => $label, 'source' => $kind];
-            }
+                if ($mapping !== null) {
+                    $copies->where(function (Builder $scoped) use ($mapping): void {
+                        if ($mapping['funds'] !== []) {
+                            $scoped->orWhereHas('fund', fn (Builder $fund) => $fund->whereIn('code', $mapping['funds']));
+                        }
+                        if ($mapping['branches'] !== []) {
+                            $scoped->orWhereHas('branch', fn (Builder $branch) => $branch->whereIn('code', $mapping['branches']));
+                        }
+                    });
+                }
+            });
         }
-
-        return ['raw' => '', 'source' => ''];
     }
 
-    private function extractMarcFieldValue(string $rawMarc, string $tag): string
+    private function applySort(Builder $builder, string $sort): void
     {
-        $pattern = sprintf('/(?:^|\x1E)%s\s{0,2}([^\x1E]+)/u', preg_quote($tag, '/'));
-        if (! preg_match($pattern, $rawMarc, $matches)) {
-            return '';
-        }
-
-        $fieldData = (string) ($matches[1] ?? '');
-        $subfields = preg_split('/\x1F/u', $fieldData) ?: [];
-        $values = [];
-
-        foreach ($subfields as $subfield) {
-            $subfield = trim($subfield);
-            if ($subfield === '') {
-                continue;
-            }
-
-            $code = mb_substr($subfield, 0, 1);
-            $value = trim(mb_substr($subfield, 1));
-            if ($value === '') {
-                continue;
-            }
-
-            if (in_array($code, ['a', 'x'], true)) {
-                $values[] = preg_replace('/\s+/u', ' ', $value) ?: $value;
-            }
-        }
-
-        if ($values !== []) {
-            return trim(implode(' · ', array_unique($values)));
-        }
-
-        $normalized = preg_replace('/[\x1F\\]+/u', ' ', $fieldData);
-
-        return trim(preg_replace('/\s+/u', ' ', $normalized ?: '') ?: '');
+        match (mb_strtolower($sort)) {
+            'recently_added' => $builder
+                ->orderByDesc(
+                    BookCopy::query()
+                        ->selectRaw('MAX(registration_date)')
+                        ->whereColumn('book_copies.bibliographic_record_id', 'bibliographic_records.id'),
+                )
+                ->orderByDesc('created_at')
+                ->orderBy('title'),
+            'newest' => $builder->orderByDesc('publication_year')->orderBy('title'),
+            'title' => $builder->orderBy('title'),
+            'author' => $builder->orderByRaw('COALESCE(primary_author, \'\') ASC')->orderBy('title'),
+            default => $builder->orderByDesc('available_copies_count')->orderBy('title'),
+        };
     }
 
     /**
-     * @return array<int, string>
+     * Holdings grouped per record, in the legacy institution/campus/service
+     * point shape the catalogue UI renders.
+     *
+     * @param  list<int>  $recordIds
+     * @return array<int, list<array<string, mixed>>>
      */
-    private function resolveLanguageAliases(string $language): array
+    private function loadLocations(array $recordIds, ?string $institution = null): array
+    {
+        if ($recordIds === []) {
+            return [];
+        }
+
+        $mapping = self::INSTITUTION_MAP[trim((string) $institution)] ?? null;
+
+        $rows = BookCopy::query()
+            ->whereIn('bibliographic_record_id', $recordIds)
+            ->whereNotIn('status', ['written_off', 'lost'])
+            ->when($mapping !== null, function (Builder $builder) use ($mapping): void {
+                $builder->where(function (Builder $scoped) use ($mapping): void {
+                    if ($mapping['funds'] !== []) {
+                        $scoped->orWhereHas('fund', fn (Builder $fund) => $fund->whereIn('code', $mapping['funds']));
+                    }
+                    if ($mapping['branches'] !== []) {
+                        $scoped->orWhereHas('branch', fn (Builder $branch) => $branch->whereIn('code', $mapping['branches']));
+                    }
+                });
+            })
+            ->with(['branch', 'fund'])
+            ->get()
+            ->groupBy('bibliographic_record_id');
+
+        $result = [];
+
+        foreach ($rows as $recordId => $copies) {
+            /** @var Collection $copies */
+            $grouped = $copies->groupBy(fn ($copy): string => ($copy->branch?->code ?? 'unassigned').'|'.($copy->fund?->code ?? ''));
+
+            $locations = $grouped
+                ->map(function (Collection $group): array {
+                    $first = $group->first();
+                    $branchCode = (string) ($first->branch?->code ?? '');
+                    $fundCode = (string) ($first->fund?->code ?? '');
+                    // The college collection is identified by its fund, since
+                    // it has no dedicated service point of its own.
+                    $servicePointCode = $fundCode === 'COLLEGE'
+                        ? '3'
+                        : (self::SERVICE_POINT_CODES[$branchCode] ?? $branchCode);
+
+                    return [
+                        'institutionUnit' => [
+                            'code' => $fundCode === 'COLLEGE' ? 'college' : $fundCode,
+                            'name' => (string) ($first->fund?->name ?? ''),
+                        ],
+                        'campus' => [
+                            'code' => $fundCode === 'COLLEGE' ? 'college_main' : (self::CAMPUS_CODES[$branchCode] ?? $branchCode),
+                            'name' => (string) ($first->branch?->name ?? ''),
+                        ],
+                        'servicePoint' => [
+                            'code' => $servicePointCode,
+                            'name' => (string) ($first->branch?->name ?? ''),
+                        ],
+                        // Public catalogue responses expose the fund/branch,
+                        // never the exact shelf. Exact placement is added by
+                        // BookDetailReadService only for signed-in readers.
+                        'shelf' => '',
+                        'copies' => [
+                            'total' => $group->count(),
+                            'available' => $group->where('status', 'available')->count(),
+                        ],
+                    ];
+                })
+                ->sortByDesc(fn (array $location): int => $location['copies']['available'])
+                ->values()
+                ->all();
+
+            $result[(int) $recordId] = $locations;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function languageAliases(string $language): array
     {
         $normalized = mb_strtolower(trim($language));
 
         return match ($normalized) {
-            'ru', 'rus', 'russian' => ['ru', 'rus', 'russian'],
-            'kk', 'kaz', 'kz', 'kazakh', 'қазақ' => ['kk', 'kaz', 'kz', 'kazakh', 'қазақ'],
-            'en', 'eng', 'english' => ['en', 'eng', 'english'],
+            'kk', 'kaz', 'kz', 'kazakh', 'қазақша' => ['kk'],
+            'ru', 'rus', 'russian', 'русский' => ['ru'],
+            'en', 'eng', 'english', 'английский' => ['en'],
             default => [$normalized],
         };
-    }
-
-    private function normalizeLanguageCode(string $languageCode, string $languageRaw = ''): string
-    {
-        $candidates = [mb_strtolower(trim($languageCode)), mb_strtolower(trim($languageRaw))];
-
-        foreach ($candidates as $candidate) {
-            if (in_array($candidate, ['ru', 'rus', 'russian'], true)) {
-                return 'ru';
-            }
-
-            if (in_array($candidate, ['kk', 'kaz', 'kz', 'kazakh', 'қазақ'], true)) {
-                return 'kk';
-            }
-
-            if (in_array($candidate, ['en', 'eng', 'english'], true)) {
-                return 'en';
-            }
-        }
-
-        return $candidates[0] ?? '';
-    }
-
-    /**
-     * @return array<string, mixed>|array<int, mixed>|null
-     */
-    private function decodeJsonValue(mixed $value): array|null
-    {
-        if (is_array($value)) {
-            return $value;
-        }
-
-        if (!is_string($value) || $value === '') {
-            return null;
-        }
-
-        $decoded = json_decode($value, true);
-
-        return is_array($decoded) ? $decoded : null;
-    }
-
-    /**
-     * @param array<int,string> $documentIds
-     * @return array<string,array<int,array<string,mixed>>>
-     */
-    private function loadLocationsByDocument(array $documentIds, ?string $institution = null): array
-    {
-        if ($documentIds === []) {
-            return [];
-        }
-
-        $rowsQuery = DB::table('app.document_availability_by_location_v')
-            ->select([
-                'document_id',
-                'institution_unit_name',
-                'institution_unit_code',
-                'campus_name',
-                'campus_code',
-                'service_point_name',
-                'service_point_code',
-                'total_copy_count',
-                'available_copy_count',
-            ])
-            ->whereIn('document_id', $documentIds);
-
-        if ($institution !== null && $institution !== '') {
-            if ($institution === 'college_library') {
-                $rowsQuery->where(function ($q): void {
-                    $q->whereRaw("LOWER(COALESCE(campus_code, '')) = ?", ['college_main'])
-                        ->orWhereRaw("LOWER(COALESCE(institution_unit_code, '')) = ?", ['college'])
-                        ->orWhereRaw("LOWER(COALESCE(service_point_code, '')) = ?", ['3']);
-                });
-            } elseif ($institution === 'economic_library') {
-                $rowsQuery->where(function ($q): void {
-                    $q->whereRaw("LOWER(COALESCE(campus_code, '')) = ?", ['university_economic'])
-                        ->orWhereRaw("LOWER(COALESCE(service_point_code, '')) = ?", ['1']);
-                });
-            } elseif ($institution === 'technology_library') {
-                $rowsQuery->where(function ($q): void {
-                    $q->whereRaw("LOWER(COALESCE(campus_code, '')) = ?", ['university_technological'])
-                        ->orWhereRaw("LOWER(COALESCE(service_point_code, '')) = ?", ['2']);
-                });
-            } elseif ($institution === 'ktslib') {
-                $rowsQuery->where(function ($q): void {
-                    $q->whereRaw("LOWER(COALESCE(service_point_code, '')) = ?", ['kstlib'])
-                        ->orWhereRaw("LOWER(COALESCE(campus_code, '')) = ?", ['university_central']);
-                });
-            }
-        }
-
-        $rows = $rowsQuery
-            ->orderByDesc('available_copy_count')
-            ->orderByDesc('total_copy_count')
-            ->get();
-
-        $result = [];
-
-        foreach ($rows as $row) {
-            $documentId = (string) ($row->document_id ?? '');
-            if ($documentId === '') {
-                continue;
-            }
-
-            $result[$documentId][] = [
-                'institutionUnit' => [
-                    'code' => (string) ($row->institution_unit_code ?? ''),
-                    'name' => (string) ($row->institution_unit_name ?? ''),
-                ],
-                'campus' => [
-                    'code' => (string) ($row->campus_code ?? ''),
-                    'name' => (string) ($row->campus_name ?? ''),
-                ],
-                'servicePoint' => [
-                    'code' => (string) ($row->service_point_code ?? ''),
-                    'name' => (string) ($row->service_point_name ?? ''),
-                ],
-                'copies' => [
-                    'total' => (int) ($row->total_copy_count ?? 0),
-                    'available' => (int) ($row->available_copy_count ?? 0),
-                ],
-            ];
-        }
-
-        return $result;
     }
 }

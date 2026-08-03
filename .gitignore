@@ -63,6 +63,9 @@ Thumbs.db
 /design-system/design-exports/
 /docs/design-exports/
 
+# ── Local catalog/database exports (large and environment-specific) ───
+/DBfrom10-0-1-16-server/
+
 # ── Obsidian local config (not knowledge) ──────────────────────
 /kazutb-library-vault/.obsidian/workspace.json
 /kazutb-library-vault/.obsidian/workspace-mobile.json

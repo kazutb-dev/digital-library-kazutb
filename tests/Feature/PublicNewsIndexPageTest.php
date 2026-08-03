@@ -29,20 +29,18 @@ class PublicNewsIndexPageTest extends TestCase
         parent::setUp();
 
         config()->set('demo_auth.enabled', true);
+        config()->set('demo_users.enabled', true);
         $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
+        $this->withSession(['locale' => 'ru']);
     }
 
     private function loginAs(string $identitySlug): void
     {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token'      => csrf_token(),
-            'login'       => $identity['login'],
-            'password'    => $identity['password'],
-            'device_name' => 'phpunit',
+        session()->put('library.user', [
+            'role' => in_array($identitySlug, ['student', 'teacher'], true) ? 'reader' : $identitySlug,
+            'profile_type' => $identitySlug,
         ]);
+        $this->post('/locale', ['locale' => 'en', 'return_to' => '/news']);
     }
 
     // ── 1. HTTP status ────────────────────────────────────────────────
@@ -81,7 +79,7 @@ class PublicNewsIndexPageTest extends TestCase
         $r->assertSee('data-test-id="news-canonical-header"', false);
         $r->assertSee('data-test-id="news-canonical-featured"', false);
         $r->assertSee('data-test-id="news-canonical-filter"', false);
-        $r->assertSee('data-test-id="news-canonical-bento"', false);
+        $r->assertDontSee('data-test-id="news-canonical-bento"', false);
     }
 
     public function test_canonical_css_prefix_applied(): void
@@ -146,8 +144,8 @@ class PublicNewsIndexPageTest extends TestCase
         // Grid articles
         $r->assertSee('Integration of the 19th-Century Eurasian Manuscripts', false);
         $r->assertSee('Expanded Digital Access for External Academic Partners', false);
-        // Bento canonical element
-        $r->assertSee('Library Events', false);
+        // The events promotion is intentionally omitted from the news index.
+        $r->assertDontSee('Open lectures, collection showcases, and academic symposia', false);
         // Load more
         $r->assertSee('Load More Dispatches', false);
     }
@@ -215,13 +213,12 @@ class PublicNewsIndexPageTest extends TestCase
         $r->assertSee('href="/news/digital-access-partner-institutions?lang=en"', false);
     }
 
-    public function test_bento_events_link_is_well_formed(): void
+    public function test_events_promotion_is_not_rendered_on_news_index(): void
     {
         $r = $this->get('/news?lang=en');
 
         $r->assertOk();
-        $r->assertSee('href="/events?lang=en"', false);
-        $r->assertSee('View all events', false);
+        $r->assertDontSee('View all events', false);
     }
 
     public function test_default_lang_links_omit_lang_param(): void
@@ -229,9 +226,9 @@ class PublicNewsIndexPageTest extends TestCase
         $r = $this->get('/news');
 
         $r->assertOk();
-        // Default lang (ru) links should NOT append ?lang=ru
-        $r->assertSee('href="/news/global-symposium-archival-integrity"', false);
-        $r->assertSee('href="/events"', false);
+        // Russian is an explicit non-default locale and remains shareable.
+        $r->assertSee('href="/news/global-symposium-archival-integrity?lang=ru"', false);
+        $r->assertSee('href="/events?lang=ru"', false);
     }
 
     // ── Image assets ─────────────────────────────────────────────────
@@ -276,7 +273,7 @@ class PublicNewsIndexPageTest extends TestCase
         $r->assertOk();
         $r->assertSee('Library Dispatch', false);
         $r->assertSee('Recent Articles', false);
-        $r->assertSee('Sign out', false);
+        $r->assertSee('aria-label="Open portal"', false);
     }
 
     public function test_librarian_can_view_news_index(): void

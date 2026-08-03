@@ -1,12 +1,12 @@
 @extends('layouts.public')
 
 @php
-  $lang = request()->query('lang', 'ru');
+  $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $activePage = $activePage ?? 'contacts';
 
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
       $qs = http_build_query(array_filter($query, static fn ($v) => $v !== null && $v !== ''));
@@ -15,9 +15,9 @@
 
   $copy = $contacts[$lang];
   $chromeTitle = [
-      'ru' => 'Контакты — KazUTB Smart Library',
-      'kk' => 'Байланыс — KazUTB Smart Library',
-      'en' => 'Contacts — KazUTB Smart Library',
+      'ru' => 'Контакты — KazUTB',
+      'kk' => 'Байланыс — KazUTB',
+      'en' => 'Contacts — KazUTB',
   ][$lang];
 @endphp
 
@@ -27,17 +27,20 @@
   <div class="contacts-canonical">
     {{-- Left (7fr): hero intro + support channels. Right (5fr): form + location. --}}
     {{-- Hero is the first child of the left column so it baseline-aligns with the form card. --}}
-    <div class="contacts-canonical__grid">
-      <div class="contacts-canonical__col-left-wrap">
-        <div class="contacts-canonical__hero-inline" data-section="contacts-canonical-hero">
-          <div class="contacts-canonical__hero-glow" aria-hidden="true"></div>
-          <h1 class="contacts-canonical__display">
-            {{ $copy['hero_title_a'] }}<br>
-            <span class="contacts-canonical__display-accent">{{ $copy['hero_title_b'] }}</span>
-          </h1>
-          <p class="contacts-canonical__lead">{{ $copy['hero_body'] }}</p>
-        </div>
+    <header class="hs hs-section contacts-canonical__hero-inline" data-section="contacts-canonical-hero">
+      <div class="hs-head__copy">
+        @isset($copy['hero_eyebrow'])
+          <p class="hs-kicker">{{ $copy['hero_eyebrow'] }}</p>
+        @endisset
+        <h1 class="hs-title hs-title--display contacts-canonical__display">
+          {{ $copy['hero_title_a'] }} {{ $copy['hero_title_b'] }}
+        </h1>
+        <p class="hs-lead contacts-canonical__lead">{{ $copy['hero_body'] }}</p>
+      </div>
+    </header>
 
+    <div class="hs hs-section hs-section--wash hs-section--ruled contacts-canonical__grid">
+      <div class="contacts-canonical__col-left-wrap">
         <section class="contacts-canonical__col-left" data-section="contacts-canonical-support">
         <h2 class="contacts-canonical__section-heading">{{ $copy['support_heading'] }}</h2>
         <div class="contacts-canonical__channels">
@@ -149,42 +152,52 @@
       </aside>
     </div>
 
-    {{-- Fund Guidance & Wayfinding (canonical location_fund_rooms pattern). --}}
-    <section class="contacts-canonical__section contacts-canonical__wayfinding" data-section="contacts-canonical-fund-guidance">
-      <div class="contacts-canonical__wayfinding-head">
-        <span class="material-symbols-outlined" aria-hidden="true">account_tree</span>
-        <h2 class="contacts-canonical__section-heading">{{ $copy['wayfinding_title'] }}</h2>
-      </div>
-      <p class="contacts-canonical__wayfinding-body">{{ $copy['wayfinding_body'] }}</p>
 
-      <figure class="contacts-canonical__map" aria-label="{{ $copy['map_label'] }}" data-test-id="contacts-canonical-map">
-        <div class="contacts-canonical__map-canvas" role="img" aria-hidden="true">
-          <span class="contacts-canonical__map-pin">📍</span>
-          <span class="contacts-canonical__map-label">{{ $copy['map_label'] }}</span>
+    {{--
+      Reading-room staff. Placed after the fund rooms and before the visit
+      guidance: the reader has just seen which room holds what, so the next
+      useful thing is who to ask there.
+
+      Each card shows a portrait when one exists under public/ and the person's
+      initials until then, so adding a photo is a file drop with no code change.
+    --}}
+    @if(!empty($copy['staff']))
+      <section class="hs hs-section contacts-canonical__section contacts-canonical__staff" data-section="contacts-canonical-staff">
+        <div class="contacts-canonical__staff-head">
+          <span class="material-symbols-outlined" aria-hidden="true">badge</span>
+          <h2 class="contacts-canonical__section-heading">{{ $copy['staff_heading'] }}</h2>
         </div>
-        <figcaption>{{ $copy['map_caption'] }}</figcaption>
-      </figure>
+        <p class="contacts-canonical__staff-note">{{ $copy['staff_note'] }}</p>
 
-      <div class="contacts-canonical__rooms">
-        @foreach($copy['fund_rooms'] as $room)
-          <article class="contacts-canonical__room" data-fund-room-slot data-room-code="{{ $room['room'] }}">
-            <header class="contacts-canonical__room-head">
-              <h4 class="contacts-canonical__room-code">{{ $copy['room_prefix'] }} {{ $room['room'] }}</h4>
-              <span class="contacts-canonical__room-level">{{ $room['floor'] }}</span>
-            </header>
-            <p class="contacts-canonical__room-fund">{{ $room['fund_label'] }}</p>
-            <p class="contacts-canonical__room-desc">{{ $room['short_description'] }}</p>
-            <p class="contacts-canonical__room-access">
-              <span class="material-symbols-outlined" aria-hidden="true">info</span>
-              {{ $room['access_note'] }}
-            </p>
-          </article>
-        @endforeach
-      </div>
-    </section>
+        <div class="contacts-canonical__staff-grid">
+          @foreach($copy['staff'] as $member)
+            @php
+              $photoPath = trim((string) ($member['photo'] ?? ''));
+              $hasPhoto = $photoPath !== '' && is_file(public_path($photoPath));
+            @endphp
+            <article class="contacts-canonical__staff-card" data-staff-slot data-staff-slug="{{ $member['slug'] }}">
+              <div class="contacts-canonical__staff-media">
+                @if($hasPhoto)
+                  <img class="contacts-canonical__staff-photo"
+                       src="/{{ ltrim($photoPath, '/') }}"
+                       alt="{{ $member['name'] }}"
+                       loading="lazy" decoding="async">
+                @else
+                  <span class="contacts-canonical__staff-photo--empty" aria-hidden="true">{{ $member['initials'] }}</span>
+                @endif
+              </div>
+              <div class="contacts-canonical__staff-body">
+                <h3 class="contacts-canonical__staff-name">{{ $member['name'] }}</h3>
+                <p class="contacts-canonical__staff-role">{{ $member['role'] }}</p>
+              </div>
+            </article>
+          @endforeach
+        </div>
+      </section>
+    @endif
 
     {{-- Visit guidance + cross-links to /rules and /leadership. --}}
-    <section class="contacts-canonical__section contacts-canonical__visit" data-section="contacts-canonical-visit-rules">
+    <section class="hs hs-section hs-section--wash hs-section--ruled contacts-canonical__section contacts-canonical__visit" data-section="contacts-canonical-visit-rules">
       <div class="contacts-canonical__visit-grid">
         <div class="contacts-canonical__visit-copy">
           <h3 class="contacts-canonical__section-heading">{{ $copy['visit_title'] }}</h3>
@@ -723,37 +736,23 @@
     line-height: 1.6;
   }
 
-  .contacts-canonical__wayfinding {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 32px;
-    border: 1px solid rgba(196, 198, 207, 0.5);
-    box-shadow: 0 12px 28px rgba(0, 6, 19, 0.03);
-  }
-
-  @media (min-width: 768px) {
-    .contacts-canonical__wayfinding {
-      padding: 40px;
-    }
-  }
-
-  .contacts-canonical__wayfinding-head {
+  .contacts-canonical__staff-head {
     display: inline-flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 8px;
   }
 
-  .contacts-canonical__wayfinding-head .material-symbols-outlined {
+  .contacts-canonical__staff-head .material-symbols-outlined {
     font-size: 28px;
     color: #000613;
   }
 
-  .contacts-canonical__wayfinding-head .contacts-canonical__section-heading {
+  .contacts-canonical__staff-head .contacts-canonical__section-heading {
     margin: 0;
   }
 
-  .contacts-canonical__wayfinding-body {
+  .contacts-canonical__staff-note {
     font-family: 'Manrope', sans-serif;
     font-size: 15px;
     line-height: 1.6;
@@ -762,115 +761,106 @@
     max-width: 720px;
   }
 
-  .contacts-canonical__map {
-    margin: 0 0 32px;
-    padding: 0;
-    border-radius: 12px;
-    overflow: hidden;
-    background: #f3f4f5;
-  }
 
-  .contacts-canonical__map-canvas {
-    aspect-ratio: 16 / 9;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    background: linear-gradient(135deg, #e7e8e9 0%, #d4e3ff 60%, #afc8f0 100%);
-    color: #001f3f;
-  }
+  /* ── Reading-room staff ──────────────────────────────────── */
 
-  .contacts-canonical__map-pin {
-    font-size: 40px;
-  }
-
-  .contacts-canonical__map-label {
-    font-family: 'Manrope', sans-serif;
-    font-size: 15px;
-    font-weight: 600;
-  }
-
-  .contacts-canonical__map figcaption {
-    padding: 16px 20px;
-    font-family: 'Manrope', sans-serif;
-    font-size: 13px;
-    color: #43474e;
-  }
-
-  .contacts-canonical__rooms {
+  /* auto-FILL, not auto-fit: with only two people on the roster auto-fit would
+     collapse the empty tracks and stretch each card to half the page, and a 4:5
+     portrait that wide becomes absurdly tall. auto-fill keeps the track width,
+     so cards stay portrait-sized and the row simply fills up as staff are added. */
+  .contacts-canonical__staff-grid {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 32px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
   }
 
-  @media (min-width: 768px) {
-    .contacts-canonical__rooms {
-      grid-template-columns: repeat(3, 1fr);
+  /* Single column below the point where a 210px track would squeeze the name. */
+  @media (max-width: 479px) {
+    .contacts-canonical__staff-grid {
+      grid-template-columns: 1fr;
     }
   }
 
-  .contacts-canonical__room {
-    border-top: 1px solid rgba(116, 119, 127, 0.2);
-    padding-top: 20px;
-  }
-
-  .contacts-canonical__room-head {
+  .contacts-canonical__staff-card {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding-bottom: 12px;
-    margin-bottom: 12px;
-    border-bottom: 1px solid rgba(116, 119, 127, 0.2);
+    flex-direction: column;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid rgba(196, 198, 207, 0.5);
+    border-radius: 12px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
   }
 
-  .contacts-canonical__room-code {
-    font-family: 'Manrope', sans-serif;
-    font-weight: 700;
-    font-size: 17px;
-    color: #000613;
-    margin: 0;
+  .contacts-canonical__staff-card:hover {
+    border-color: rgba(0, 106, 106, 0.4);
+    box-shadow: 0 6px 18px rgba(25, 28, 29, 0.06);
   }
 
-  .contacts-canonical__room-level {
-    background: #edeeef;
-    padding: 4px 12px;
-    border-radius: 9999px;
-    font-family: 'Manrope', sans-serif;
-    font-size: 12px;
-    font-weight: 500;
-    color: #43474e;
+  /* Fixed portrait ratio on the media box, not on the image: every card keeps
+     the same height whether it carries a photo or the initials placeholder, so
+     the grid does not go ragged while portraits are still being collected. */
+  .contacts-canonical__staff-media {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    background: rgba(0, 106, 106, 0.08);
   }
 
-  .contacts-canonical__room-fund {
-    font-family: 'Manrope', sans-serif;
-    font-size: 15px;
-    color: #43474e;
-    margin: 0 0 8px;
-    line-height: 1.5;
+  /* Full-width single-column card: keep the portrait shallower, because a 4:5
+     crop at phone width would push the name below the fold. Declared after the
+     base rule on purpose — same specificity, so source order decides. */
+  @media (max-width: 479px) {
+    .contacts-canonical__staff-media {
+      aspect-ratio: 4 / 3;
+    }
   }
 
-  .contacts-canonical__room-desc {
-    font-family: 'Manrope', sans-serif;
-    font-size: 13px;
-    color: #76889d;
-    line-height: 1.5;
-    margin: 0 0 12px;
+  /* Absolutely positioned so the photo cannot drive the media box's height:
+     in normal flow its intrinsic ratio wins over the box's aspect-ratio, and
+     cards end up different heights depending on how each portrait was shot. */
+  .contacts-canonical__staff-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Portraits will not all be framed alike; biasing the crop upwards keeps
+       faces in view rather than chins. */
+    object-position: center 25%;
+    display: block;
   }
 
-  .contacts-canonical__room-access {
-    display: inline-flex;
+  .contacts-canonical__staff-photo--empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
     align-items: center;
-    gap: 6px;
-    font-family: 'Manrope', sans-serif;
-    font-size: 12px;
+    justify-content: center;
     color: #006a6a;
-    margin: 0;
-    line-height: 1.4;
+    font-family: 'Newsreader', serif;
+    font-size: 56px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
-  .contacts-canonical__room-access .material-symbols-outlined {
-    font-size: 16px;
+  .contacts-canonical__staff-body {
+    padding: 24px;
+    border-top: 1px solid rgba(196, 198, 207, 0.5);
+  }
+
+  .contacts-canonical__staff-name {
+    font-family: 'Newsreader', serif;
+    font-size: 22px;
+    line-height: 1.3;
+    color: #000613;
+    margin: 0 0 8px;
+  }
+
+  .contacts-canonical__staff-role {
+    font-family: 'Manrope', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #43474e;
+    margin: 0;
   }
 
   .contacts-canonical__visit {
@@ -947,7 +937,6 @@
 
     .contacts-canonical__channel-card,
     .contacts-canonical__form-card,
-    .contacts-canonical__wayfinding,
     .contacts-canonical__visit {
       padding: 24px;
     }

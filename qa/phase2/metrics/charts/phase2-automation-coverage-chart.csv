@@ -1,0 +1,8 @@
+"module_feature","coverage_percent","test_automated","automated_checks","total_planned_high_risk_checks"
+"Authentication","100","Yes","3","3"
+"Authorization/RBAC","75","Partial","6","8"
+"Catalog/Public","87.5","Partial","7","8"
+"Circulation/Operations","66.7","Partial","4","6"
+"Integration API","50","Partial","2","4"
+"Admin operations","50","Partial","2","4"
+"Shortlist/Member account","100","Yes","3","3"

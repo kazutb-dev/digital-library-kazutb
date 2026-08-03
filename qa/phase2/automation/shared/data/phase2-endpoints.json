@@ -1,0 +1,18 @@
+{
+    "baseUrlDefault": "http://localhost",
+    "public": [
+        "/api/v1/landing",
+        "/api/v1/catalog-db?limit=5&sort=popular",
+        "/api/v1/subjects",
+        "/api/v1/book-db/9786013380013"
+    ],
+    "protected": [
+        "/api/v1/me",
+        "/api/v1/account/reservations",
+        "/api/v1/internal/circulation/summary"
+    ],
+    "integration": [
+        "/integration/v1/_boundary/ping",
+        "/integration/v1/reservations"
+    ]
+}

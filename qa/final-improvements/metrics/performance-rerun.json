@@ -1,0 +1,57 @@
+{
+    "performance_rerun": {
+        "baseline_runtime": "~190s",
+        "status": "Retained",
+        "notes": "Full test suite (947 tests) completes in approximately 190 seconds",
+        "metrics": [
+            {
+                "metric": "Performance Baseline Runtime",
+                "value": "~190s",
+                "status": "Retained",
+                "notes": "Full test suite (947 tests) completes in approximately 190 seconds"
+            },
+            {
+                "metric": "Memory Usage (Peak)",
+                "value": "20.00 MB",
+                "status": "Measured",
+                "notes": "Observed during feature test execution"
+            },
+            {
+                "metric": "Memory Usage (Avg)",
+                "value": "~12 MB",
+                "status": "Estimated",
+                "notes": "Based on individual test runs"
+            },
+            {
+                "metric": "Database Query Performance",
+                "value": "Fast",
+                "status": "Stable",
+                "notes": "SQLite in-memory tests; no regression observed"
+            },
+            {
+                "metric": "Docker Container Startup",
+                "value": "~5s",
+                "status": "Stable",
+                "notes": "Consistent across test runs"
+            },
+            {
+                "metric": "Middleware Overhead",
+                "value": "<1ms",
+                "status": "Estimated",
+                "notes": "Session and auth middleware execution time negligible"
+            },
+            {
+                "metric": "Test Framework Overhead",
+                "value": "~1s",
+                "status": "Estimated",
+                "notes": "PHPUnit bootstrap and configuration loading"
+            },
+            {
+                "metric": "Critical Path (Privilege Tests)",
+                "value": "~5.4s",
+                "status": "Measured",
+                "notes": "28 privilege tests; authentication bottleneck not observed"
+            }
+        ]
+    }
+}

@@ -1,0 +1,79 @@
+[
+  {
+    "area": "Performance",
+    "metric": "Scenario pass rate",
+    "expected": ">= 8/9 scenarios pass",
+    "observed": "8/9 scenarios pass",
+    "expected_value": "88.89",
+    "observed_value": "88.89",
+    "unit": "percent",
+    "status": "Matched",
+    "evidence": "qa/phase3/metrics/phase3-performance-results.csv"
+  },
+  {
+    "area": "Performance",
+    "metric": "Integration boundary latency threshold",
+    "expected": "<= 2000 ms (S08)",
+    "observed": "3237.12 ms",
+    "expected_value": "2000",
+    "observed_value": "3237.12",
+    "unit": "ms",
+    "status": "Deviation",
+    "evidence": "qa/phase3/metrics/phase3-performance-results.csv"
+  },
+  {
+    "area": "Mutation",
+    "metric": "Overall mutation score",
+    "expected": ">= 80 percent for bounded campaign",
+    "observed": "85.71 percent",
+    "expected_value": "80",
+    "observed_value": "85.71",
+    "unit": "percent",
+    "status": "Matched",
+    "evidence": "qa/phase3/metrics/phase3-mutation-score.csv"
+  },
+  {
+    "area": "Mutation",
+    "metric": "Surviving mutants",
+    "expected": "0 preferred",
+    "observed": "2 survived",
+    "expected_value": "0",
+    "observed_value": "2",
+    "unit": "count",
+    "status": "Deviation",
+    "evidence": "qa/phase3/metrics/phase3-mutation-results.csv"
+  },
+  {
+    "area": "Chaos",
+    "metric": "Recovery availability after fault removal",
+    "expected": "100 percent in bounded isolated tests",
+    "observed": "100 percent",
+    "expected_value": "100",
+    "observed_value": "100",
+    "unit": "percent",
+    "status": "Matched",
+    "evidence": "qa/phase3/metrics/phase3-chaos-results.csv"
+  },
+  {
+    "area": "Chaos",
+    "metric": "Failure propagation class",
+    "expected": "No cascading failure in isolated scenarios",
+    "observed": "4 isolated, 0 cascading",
+    "expected_value": "0 cascading",
+    "observed_value": "0 cascading",
+    "unit": "class",
+    "status": "Matched",
+    "evidence": "qa/phase3/metrics/phase3-chaos-metrics.csv"
+  },
+  {
+    "area": "Midterm Risk",
+    "metric": "Integration API remains highest-risk domain",
+    "expected": "Elevated risk persists",
+    "observed": "Performance S08 fail + mutation survivors in integration controllers + chaos timeout sensitivity",
+    "expected_value": "High",
+    "observed_value": "High",
+    "unit": "qualitative",
+    "status": "Matched",
+    "evidence": "qa/midterm/metrics/midterm-risk-reassessment.csv; qa/phase3/metrics/phase3-performance-results.csv; qa/phase3/metrics/phase3-mutation-score.csv; qa/phase3/metrics/phase3-chaos-results.csv"
+  }
+]

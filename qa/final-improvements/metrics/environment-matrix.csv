@@ -1,0 +1,11 @@
+Component,Version / Config,Role,Notes
+PHP,8.4.21,Runtime,"Primary application runtime; Laravel 13 requires 8.1+"
+Laravel,13,Framework,"Latest stable; Eloquent ORM, middleware-based auth"
+PostgreSQL,18,Database,"Production and live-query database; schema incomplete for test env"
+SQLite,In-memory (:memory:),Test Database,"Fast test execution; transactions supported"
+Docker Compose,Multi-service,Orchestration,"app (PHP-FPM + Nginx), postgres (DB), frontend-dev (Node.js)"
+PHPUnit,12.5.14,Test Framework,"Latest stable; supports testdox formatter, parallel execution"
+Nginx,Latest (Docker),Web Server,"Reverse proxy; handles static assets and PHP routing"
+Mockery,Latest,Mocking Library,"For service/API mocking in integration tests"
+Authentication,Session-based,Auth Method,"library.user session key; middleware-driven"
+Authorization,Role-based (RBAC),Access Control,"4 roles: guest, reader, librarian, admin"

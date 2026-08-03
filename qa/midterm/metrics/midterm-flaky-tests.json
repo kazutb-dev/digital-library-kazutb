@@ -1,0 +1,31 @@
+{
+  "flakyTests": [
+    {
+      "test_id": "P2-PHP-SUITE-001",
+      "pass_count": 0,
+      "fail_count": 1,
+      "suspected_cause": "environment-sensitive DB shape assumptions (sqlite mismatch noted)",
+      "evidence_source": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "classification": "suspected instability",
+      "notes": "Only one measured run available; repeated-run evidence missing"
+    },
+    {
+      "test_id": "P2-UI-CAT-004",
+      "pass_count": 0,
+      "fail_count": 1,
+      "suspected_cause": "public route runtime/server-state dependency",
+      "evidence_source": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "classification": "insufficient repeated-run evidence",
+      "notes": "Cannot confirm flakiness without multi-run variance dataset"
+    },
+    {
+      "test_id": "MID-E2E-002",
+      "pass_count": 1,
+      "fail_count": 0,
+      "suspected_cause": "none observed",
+      "evidence_source": "qa/midterm/evidence/logs/midterm-new-playwright.log",
+      "classification": "not enough data",
+      "notes": "Single-run pass only"
+    }
+  ]
+}

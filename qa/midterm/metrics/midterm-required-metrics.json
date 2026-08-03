@@ -1,0 +1,76 @@
+{
+  "requiredMetrics": [
+    {
+      "metric_category": "Coverage",
+      "metric": "High-risk module automation presence",
+      "value": "7/7 modules",
+      "numeric_value": 100,
+      "unit": "percent",
+      "source": "qa/phase2/metrics/phase2-automation-coverage.csv",
+      "notes": "Module-level presence"
+    },
+    {
+      "metric_category": "Coverage",
+      "metric": "Weighted high-risk check coverage",
+      "value": "27/36 checks",
+      "numeric_value": 75.0,
+      "unit": "percent",
+      "source": "qa/phase2/metrics/phase2-automation-coverage.csv",
+      "notes": "Depth-sensitive coverage view"
+    },
+    {
+      "metric_category": "Defect detection",
+      "metric": "Observed defects/issues",
+      "value": "9",
+      "numeric_value": 9,
+      "unit": "count",
+      "source": "qa/phase2/metrics/phase2-defects-vs-risk.csv",
+      "notes": "Module-level defect tally from measured run"
+    },
+    {
+      "metric_category": "Defect detection",
+      "metric": "Failing high-risk modules",
+      "value": "6/7",
+      "numeric_value": 85.7,
+      "unit": "percent",
+      "source": "qa/phase2/metrics/phase2-defects-vs-risk.csv",
+      "notes": "High concentration of unresolved risk"
+    },
+    {
+      "metric_category": "Efficiency",
+      "metric": "Phase2 combined automation runtime",
+      "value": "154.578",
+      "numeric_value": 154.578,
+      "unit": "seconds",
+      "source": "qa/phase2/metrics/phase2-execution-time.csv",
+      "notes": "API+UI+targeted PHPUnit"
+    },
+    {
+      "metric_category": "Efficiency",
+      "metric": "Midterm new tests runtime (phpunit + playwright)",
+      "value": "24.15",
+      "numeric_value": 24.15,
+      "unit": "seconds",
+      "source": "qa/midterm/evidence/logs/midterm-new-phpunit.log;qa/midterm/evidence/logs/midterm-new-playwright.log",
+      "notes": "11.75s + 12.4s"
+    },
+    {
+      "metric_category": "Stability",
+      "metric": "Confirmed flaky test rate",
+      "value": "not measurable",
+      "numeric_value": "n/a",
+      "unit": "n/a",
+      "source": "qa/midterm/metrics/midterm-flaky-tests.csv",
+      "notes": "Insufficient repeated-run evidence"
+    },
+    {
+      "metric_category": "Governance",
+      "metric": "Current-enforced gate distribution",
+      "value": "pass=5, fail=3, warn=1",
+      "numeric_value": "n/a",
+      "unit": "distribution",
+      "source": "qa/phase2/metrics/phase2-quality-gate-results.csv",
+      "notes": "Based on phase2 current_enforced rows"
+    }
+  ]
+}

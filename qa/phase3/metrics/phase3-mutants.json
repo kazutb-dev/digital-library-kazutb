@@ -1,0 +1,215 @@
+[
+  {
+    "mutant_id": "MUT-INTB-001",
+    "module": "Integration Boundary Middleware",
+    "component": "EnsureIntegrationBoundary::handle",
+    "file": "app/Http/Middleware/EnsureIntegrationBoundary.php",
+    "target": "Missing bearer token guard",
+    "mutation_type": "Guard condition inversion",
+    "original_behavior": "Reject only when bearer token is empty.",
+    "mutated_behavior": "Reject when bearer token is present.",
+    "rationale": "Validates boundary auth gate correctness.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/IntegrationBoundarySkeletonTest.php",
+      "tests/Feature/Api/Integration/IntegrationRateLimitTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-INTB-002",
+    "module": "Integration Boundary Middleware",
+    "component": "EnsureIntegrationBoundary::handle",
+    "file": "app/Http/Middleware/EnsureIntegrationBoundary.php",
+    "target": "Source-system validation",
+    "mutation_type": "Logical operator change",
+    "original_behavior": "Accept only X-Source-System=crm.",
+    "mutated_behavior": "Reject requests where source-system is crm.",
+    "rationale": "Checks test sensitivity to source-system governance rule.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/IntegrationBoundarySkeletonTest.php",
+      "tests/Feature/Api/Integration/IntegrationRateLimitTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-INTB-003",
+    "module": "Integration Boundary Middleware",
+    "component": "EnsureIntegrationBoundary::isTokenAllowed",
+    "file": "app/Http/Middleware/EnsureIntegrationBoundary.php",
+    "target": "Legacy allowlist fallback",
+    "mutation_type": "Return value modification",
+    "original_behavior": "Allow non-empty bearer token when allowlist is empty.",
+    "mutated_behavior": "Deny all tokens when allowlist is empty.",
+    "rationale": "Tests whether successful integration flows would detect fallback breakage.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/IntegrationBoundarySkeletonTest.php",
+      "tests/Feature/Api/Integration/IntegrationRateLimitTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-RDR-001",
+    "module": "Integration Reservations Read API",
+    "component": "ReservationReadController::index",
+    "file": "app/Http/Controllers/Api/Integration/ReservationReadController.php",
+    "target": "Pagination validation",
+    "mutation_type": "Logical operator change",
+    "original_behavior": "Reject if page OR per_page invalid.",
+    "mutated_behavior": "Reject only if both page AND per_page invalid.",
+    "rationale": "Verifies detection of weakened pagination validation.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/ReservationReadTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-RDR-002",
+    "module": "Integration Reservations Read API",
+    "component": "ReservationReadController::show",
+    "file": "app/Http/Controllers/Api/Integration/ReservationReadController.php",
+    "target": "Not-found branch",
+    "mutation_type": "Guard condition inversion",
+    "original_behavior": "Return 404 when reservation is null.",
+    "mutated_behavior": "Return 404 when reservation exists.",
+    "rationale": "Verifies detail response correctness and negative path tests.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/ReservationReadTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-RDR-003",
+    "module": "Integration Reservations Read API",
+    "component": "ReservationReadController::index",
+    "file": "app/Http/Controllers/Api/Integration/ReservationReadController.php",
+    "target": "user_id UUID validation",
+    "mutation_type": "Logical operator change",
+    "original_behavior": "Reject non-UUID user_id filter.",
+    "mutated_behavior": "Reject only UUID user_id filter values.",
+    "rationale": "Evaluates validation test precision for invalid identifiers.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/ReservationReadTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-MUT-001",
+    "module": "Integration Reservations Mutate API",
+    "component": "ReservationMutateController::approve",
+    "file": "app/Http/Controllers/Api/Integration/ReservationMutateController.php",
+    "target": "Approve role gate",
+    "mutation_type": "Guard condition inversion",
+    "original_behavior": "Deny approve without reservations.approve role.",
+    "mutated_behavior": "Deny approve when reservations.approve role exists.",
+    "rationale": "Checks role authorization test effectiveness for approve path.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/ReservationMutateTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-MUT-002",
+    "module": "Integration Reservations Mutate API",
+    "component": "ReservationMutateController::approve",
+    "file": "app/Http/Controllers/Api/Integration/ReservationMutateController.php",
+    "target": "Idempotency-key guard",
+    "mutation_type": "Guard condition inversion",
+    "original_behavior": "Reject when Idempotency-Key is missing.",
+    "mutated_behavior": "Reject when Idempotency-Key is present.",
+    "rationale": "Checks defensive header validation assertions.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/ReservationMutateTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-MUT-003",
+    "module": "Integration Reservations Mutate API",
+    "component": "ReservationMutateController::reject",
+    "file": "app/Http/Controllers/Api/Integration/ReservationMutateController.php",
+    "target": "Reject payload required fields",
+    "mutation_type": "Logical operator change",
+    "original_behavior": "Reject when cancel_origin OR cancel_reason_code is missing.",
+    "mutated_behavior": "Reject only when both fields are missing.",
+    "rationale": "Checks negative reject-path coverage for partial payload.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/ReservationMutateTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-MUT-004",
+    "module": "Integration Reservations Mutate API",
+    "component": "ReservationMutateController::context",
+    "file": "app/Http/Controllers/Api/Integration/ReservationMutateController.php",
+    "target": "Operator header mapping",
+    "mutation_type": "Key lookup alteration",
+    "original_behavior": "Reads operator id from X-Operator-Id header.",
+    "mutated_behavior": "Reads operator id from misspelled header X-Operator-Idx.",
+    "rationale": "Tests whether current suite validates context payload details sent to service.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/ReservationMutateTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-DOC-001",
+    "module": "Integration Document Management API",
+    "component": "DocumentManagementController::show",
+    "file": "app/Http/Controllers/Api/Integration/DocumentManagementController.php",
+    "target": "Document id validation",
+    "mutation_type": "Guard condition inversion",
+    "original_behavior": "Reject non-UUID document ids.",
+    "mutated_behavior": "Reject UUID document ids.",
+    "rationale": "Ensures UUID validation tests kill inverted guards.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/DocumentManagementTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-DOC-002",
+    "module": "Integration Document Management API",
+    "component": "DocumentManagementController::patch",
+    "file": "app/Http/Controllers/Api/Integration/DocumentManagementController.php",
+    "target": "No-mutable-fields guard",
+    "mutation_type": "Guard condition inversion",
+    "original_behavior": "Reject only when patch payload has no mutable fields.",
+    "mutated_behavior": "Reject when mutable fields are present.",
+    "rationale": "Checks patch success assertions against guard inversion.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/DocumentManagementTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-DOC-003",
+    "module": "Integration Document Management API",
+    "component": "DocumentManagementController::index",
+    "file": "app/Http/Controllers/Api/Integration/DocumentManagementController.php",
+    "target": "per_page upper bound rule",
+    "mutation_type": "Constant alteration",
+    "original_behavior": "per_page maximum is 100.",
+    "mutated_behavior": "per_page maximum increased to 1000.",
+    "rationale": "Checks if boundary validation tests catch relaxed constraints.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/DocumentManagementTest.php"
+    ]
+  },
+  {
+    "mutant_id": "MUT-DOC-004",
+    "module": "Integration Document Management API",
+    "component": "DocumentManagementController::context",
+    "file": "app/Http/Controllers/Api/Integration/DocumentManagementController.php",
+    "target": "Operator header mapping",
+    "mutation_type": "Key lookup alteration",
+    "original_behavior": "Reads operator id from X-Operator-Id header.",
+    "mutated_behavior": "Reads operator id from misspelled header X-Operator-Idx.",
+    "rationale": "Assesses whether tests verify service context payload semantics.",
+    "execution_method": "manual-scripted",
+    "tests": [
+      "tests/Feature/Api/Integration/DocumentManagementTest.php"
+    ]
+  }
+]

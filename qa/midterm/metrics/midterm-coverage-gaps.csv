@@ -1,0 +1,5 @@
+"module","high_risk_function","coverage_status","coverage_percent","gap_description","evidence"
+"Circulation/Operations","internal operations access boundaries","partial","66.7","Coverage below 70%; limited depth across circulation operations","qa/phase2/metrics/phase2-automation-coverage.csv"
+"Integration API","boundary and reservation integration behavior","partial","50","Half of planned high-risk checks automated","qa/phase2/metrics/phase2-automation-coverage.csv"
+"Admin operations","admin guard and integration access paths","partial","50","Coverage significantly below 70% threshold","qa/phase2/metrics/phase2-automation-coverage.csv"
+"Coverage readiness (cross-cutting)","line-level coverage observability","blocked","n/a","Local measured run blocked by missing coverage driver","qa/phase2/evidence/logs/phase2-coverage.log"

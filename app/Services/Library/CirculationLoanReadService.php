@@ -153,7 +153,7 @@ class CirculationLoanReadService
         }
 
         if ($renewCount >= CirculationLoanWriteService::MAX_RENEWALS) {
-            return [false, 'Достигнут лимит продлений (' . CirculationLoanWriteService::MAX_RENEWALS . '/' . CirculationLoanWriteService::MAX_RENEWALS . ').'];
+            return [false, 'Достигнут лимит продлений ('.CirculationLoanWriteService::MAX_RENEWALS.'/'.CirculationLoanWriteService::MAX_RENEWALS.').'];
         }
 
         return [true, null];

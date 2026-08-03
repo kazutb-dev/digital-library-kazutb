@@ -1,0 +1,7 @@
+"test_id","module","failure_type","failure_frequency_runs","evidence_source","notes"
+"P2-API-INT-001","Integration API","endpoint contract/status mismatch (404)","1","qa/phase2/metrics/phase2-test-execution-log.csv","Expected 200/401/403 but observed 404 in measured run"
+"P2-API-INT-002","Integration API","endpoint contract/status mismatch (404)","1","qa/phase2/metrics/phase2-test-execution-log.csv","Expected 200/401/403/422 but observed 404"
+"P2-API-OPS-002","Admin Operations","route access/policy mismatch","1","qa/phase2/metrics/phase2-test-execution-log.csv","Expected guard policy response, observed 404"
+"P2-UI-CAT-004","Catalog/Public routes","server error (HTTP 500)","1","qa/phase2/metrics/phase2-test-execution-log.csv","Public news route produced 5xx"
+"P2-PHP-SUITE-001","Authorization/Critical backend subset","suite-level logic/environment instability","1","qa/phase2/metrics/phase2-test-execution-log.csv","6 failed, 4 skipped, 31 passed"
+"P2-GATE-EVAL-001","Quality governance","quality gate failure","1","qa/phase2/metrics/phase2-test-execution-log.csv","3 fail-level gates and 1 warn-level attention"

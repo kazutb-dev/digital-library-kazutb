@@ -1,0 +1,68 @@
+[
+  {
+    "source": "figure-00-cicd-pipeline.md",
+    "output": "figure-00-cicd-pipeline.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-01-qa-pipeline.md",
+    "output": "figure-01-qa-pipeline.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-02-testing-architecture.md",
+    "output": "figure-02-testing-architecture.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-03-risk-heatmap.md",
+    "output": "figure-03-risk-heatmap.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-04-test-coverage-map.md",
+    "output": "figure-04-test-coverage-map.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-05-quality-gates-dashboard.md",
+    "output": "figure-05-quality-gates-dashboard.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-06-risk-distribution-chart.md",
+    "output": "figure-06-risk-distribution-chart.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-07-test-execution-timeline.md",
+    "output": "figure-07-test-execution-timeline.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-08-coverage-vs-risk-matrix.md",
+    "output": "figure-08-coverage-vs-risk-matrix.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-09-defect-detection-flow.md",
+    "output": "figure-09-defect-detection-flow.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  },
+  {
+    "source": "figure-10-performance-dashboard.md",
+    "output": "figure-10-performance-dashboard.png",
+    "exitCode": 0,
+    "status": "FAILED"
+  }
+]

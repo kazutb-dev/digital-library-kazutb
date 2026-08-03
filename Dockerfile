@@ -10,9 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     supervisor \
     libpq-dev \
     libzip-dev \
+    freetds-dev \
     curl \
     && docker-php-ext-install \
     pdo \
+    pdo_dblib \
     pdo_pgsql \
     pgsql \
     zip \

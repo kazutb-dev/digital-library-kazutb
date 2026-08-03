@@ -1,0 +1,11 @@
+scenario_id,module,endpoint,avg_ms,median_ms,p95_ms,min_ms,max_ms,threshold_ms,threshold_status
+S01-NL-CATALOG,Catalog/Public API,GET /api/v1/landing,3443.66,3462.75,3553.05,3068.42,3592.31,5000,PASS
+S02-PL-CATALOG,Catalog/Public API,GET /api/v1/catalog-db,3497.38,3584.38,3796.10,2742.78,4014.69,6000,PASS
+S03-NL-SUBJECTS,Catalog/Public API,GET /api/v1/subjects,3359.51,3233.23,3969.37,2831.09,4417.13,5000,PASS
+S04-SL-MIXED,Catalog/Public API,GET /api/v1/landing+subjects,3464.90,3434.04,3659.68,2734.71,4894.81,6000,PASS
+S05-NL-EXTRES,External Resources,GET /api/v1/external-resources,3077.66,3147.37,3334.84,2176.44,3382.91,5000,PASS
+S06-NL-WEBCATALOG,Web Catalog UI,GET /catalog,3784.74,3734.60,4037.13,3550.00,4037.13,8000,PASS
+S07-PL-WEBCATALOG,Web Catalog UI,GET /catalog (peak),3639.72,3723.84,4014.71,2784.19,4188.03,10000,PASS
+S08A-NO-AUTH,Integration API,GET /api/integration (no-auth),3331.68,3374.42,3661.04,2360.61,3661.04,2000,FAIL
+S08B-BAD-TOKEN,Integration API,GET /api/integration (bad-token),3142.56,3230.91,3329.11,2227.53,3329.11,2000,FAIL
+S09-END-CATALOG,Catalog/Public API,GET /api/v1/landing (endurance),3454.20,3464.23,3562.67,3163.47,3713.70,6000,PASS

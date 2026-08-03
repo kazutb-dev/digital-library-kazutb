@@ -44,7 +44,7 @@ class MemberDashboardPageTest extends TestCase
         $response = $this->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('KazUTB Library', false);
         $response->assertSee('Member dashboard', false);
         $response->assertSee('Priority action', false);
         $response->assertSee('Research nodes', false);

@@ -1,0 +1,5 @@
+"scenario_id","mttr_ms","recovered","recovery_avg_ms"
+"CHS-001-API-DOWN","2987.83","True","3335.45"
+"CHS-002-DB-SLOWDOWN","3522.52","True","3509.12"
+"CHS-003-NET-LATENCY","3425.76","True","3453.52"
+"CHS-004-CPU-PRESSURE","3627.96","True","3583.66"

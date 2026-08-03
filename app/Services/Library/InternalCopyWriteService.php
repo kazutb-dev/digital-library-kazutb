@@ -2,12 +2,12 @@
 
 namespace App\Services\Library;
 
+use App\Models\Library\CirculationAuditEvent;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use App\Models\Library\CirculationAuditEvent;
 
 class InternalCopyWriteService
 {
@@ -41,8 +41,8 @@ class InternalCopyWriteService
     ) {}
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     public function createCopy(array $payload, array $context): array
@@ -151,8 +151,8 @@ class InternalCopyWriteService
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     public function patchCopy(string $copyId, array $payload, array $context): array
@@ -231,8 +231,8 @@ class InternalCopyWriteService
     }
 
     /**
-     * @param list<string> $allowedFields
-     * @param array<string, mixed> $payload
+     * @param  list<string>  $allowedFields
+     * @param  array<string, mixed>  $payload
      */
     private function rejectUnsupportedFields(array $payload, array $allowedFields, string $operation): void
     {
@@ -245,13 +245,13 @@ class InternalCopyWriteService
         throw new InternalCopyWriteException(
             'unsupported_mutation_field',
             400,
-            'Field "' . $unsupported[0] . '" is not allowed for copy ' . $operation . '.',
+            'Field "'.$unsupported[0].'" is not allowed for copy '.$operation.'.',
         );
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<int, string> $currentReviewReasonCodes
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, string>  $currentReviewReasonCodes
      * @return array{needsReview: bool, reviewReasonCodes: array<int, string>}
      */
     private function resolveReviewState(array $payload, bool $currentNeedsReview, array $currentReviewReasonCodes): array
@@ -279,8 +279,8 @@ class InternalCopyWriteService
     }
 
     /**
-     * @param array<string, mixed> $branch
-     * @param array<string, mixed> $sigla
+     * @param  array<string, mixed>  $branch
+     * @param  array<string, mixed>  $sigla
      */
     private function assertBranchLocationCoherence(array $branch, array $sigla): void
     {
@@ -307,8 +307,8 @@ class InternalCopyWriteService
     }
 
     /**
-     * @param array<string, mixed> $branch
-     * @param array<string, mixed> $sigla
+     * @param  array<string, mixed>  $branch
+     * @param  array<string, mixed>  $sigla
      */
     private function resolveReferenceValue(array $branch, array $sigla, string $column): ?string
     {
@@ -392,7 +392,7 @@ class InternalCopyWriteService
 
     private function nextLegacyInventoryId(): int
     {
-        DB::connection('pgsql')->statement('LOCK TABLE ' . self::COPY_TABLE . ' IN EXCLUSIVE MODE');
+        DB::connection('pgsql')->statement('LOCK TABLE '.self::COPY_TABLE.' IN EXCLUSIVE MODE');
 
         $max = DB::connection('pgsql')
             ->table(self::COPY_TABLE)
@@ -418,7 +418,7 @@ class InternalCopyWriteService
     }
 
     /**
-     * @param array<int, string> $values
+     * @param  array<int, string>  $values
      */
     private function toPgTextArray(array $values): string
     {
@@ -429,10 +429,10 @@ class InternalCopyWriteService
         $escaped = array_map(static function (string $value): string {
             $normalized = str_replace(['\\', '"'], ['\\\\', '\\"'], $value);
 
-            return '"' . $normalized . '"';
+            return '"'.$normalized.'"';
         }, $values);
 
-        return '{' . implode(',', $escaped) . '}';
+        return '{'.implode(',', $escaped).'}';
     }
 
     /**
@@ -460,10 +460,10 @@ class InternalCopyWriteService
     }
 
     /**
-     * @param array<string, mixed>|null $previousState
-     * @param array<string, mixed> $newState
-     * @param array<string, mixed> $context
-     * @param array<string, mixed> $metadata
+     * @param  array<string, mixed>|null  $previousState
+     * @param  array<string, mixed>  $newState
+     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  $metadata
      */
     private function recordAudit(
         string $action,

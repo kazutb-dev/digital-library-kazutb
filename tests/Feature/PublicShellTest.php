@@ -6,15 +6,25 @@ use Tests\TestCase;
 
 class PublicShellTest extends TestCase
 {
+    /**
+     * The homepage was rebuilt around the hero plus five content sections;
+     * the retired "collections"/"services" bento tiles are gone. The full
+     * per-section contract lives in PublicHomepagePageTest — this only checks
+     * that the shell still composes the page.
+     */
     public function test_homepage_exposes_canonical_sections(): void
     {
         $response = $this->get('/');
 
         $response
             ->assertOk()
+            ->assertSee('data-section="homepage-canonical-page"', false)
             ->assertSee('data-section="homepage-canonical-hero"', false)
-            ->assertSee('data-section="homepage-canonical-collections"', false)
-            ->assertSee('data-section="homepage-canonical-services"', false);
+            ->assertSee('data-section="homepage-faculty-picks"', false)
+            ->assertSee('data-section="homepage-new-arrivals"', false)
+            ->assertSee('data-section="homepage-collections"', false)
+            ->assertSee('data-section="homepage-statistics"', false)
+            ->assertSee('data-section="homepage-faq"', false);
     }
 
     public function test_resources_page_uses_accessible_shared_public_shell(): void
@@ -36,8 +46,8 @@ class PublicShellTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('data-locale-switcher', false)
-            ->assertSee('?lang=kk', false)
-            ->assertSee('?lang=en', false);
+            ->assertSee('name="locale" value="kk"', false)
+            ->assertSee('name="locale" value="en"', false);
     }
 
     public function test_contacts_page_can_render_in_english(): void
@@ -45,7 +55,7 @@ class PublicShellTest extends TestCase
         // Post-Cluster-B.6 cleanup: /contacts is now a standalone canonical view
         // (resources/views/contacts.blade.php). The legacy brand string
         // "KazTBU Digital Library" has been replaced by the canonical
-        // "KazUTB Smart Library" brand used consistently across the public layer,
+        // "KazUTB Library" brand used consistently across the public layer,
         // and the legacy "How to reach the library" helper copy was superseded by
         // the canonical "Support Channels" section heading.
         $response = $this->get('/contacts?lang=en');
@@ -53,7 +63,7 @@ class PublicShellTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('<html lang="en">', false)
-            ->assertSee('KazUTB Smart Library')
+            ->assertSee('Scientific Library')
             ->assertSee('Support Channels');
     }
 

@@ -42,7 +42,7 @@ class EventsIndexPageTest extends TestCase
         $response = $this->get('/events?lang=en');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('KazUTB Library', false);
         $response->assertSee('Public Events Index', false);
     }
 
@@ -192,7 +192,7 @@ class EventsIndexPageTest extends TestCase
         $response = $this->get('/events?lang=en');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('KazUTB Library', false);
         $response->assertSee('Sign out', false);
     }
 }

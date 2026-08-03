@@ -24,12 +24,12 @@
   // canonical export but each faculty card carries its own UDC label so the UDC
   // contract is never hidden).
 
-  $lang = request()->query('lang', 'ru');
+  $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $activePage = $activePage ?? 'discover';
 
   $withLang = static function (string $path, array $query = []) use ($lang): string {
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
       $queryString = http_build_query(array_filter($query, static fn ($v) => $v !== null && $v !== ''));
@@ -41,7 +41,7 @@
   // and projected per-locale through $facultyLabels / $udcLabels below.
   $copy = [
       'ru' => [
-          'title' => 'Центр академического поиска — KazUTB Smart Library',
+          'title' => 'Центр академического поиска — KazUTB',
           'hero_title' => 'Центр академического поиска',
           'hero_body' => 'Навигация по совокупному институциональному знанию. Исследуйте профильные факультеты, углубляйтесь в Универсальную десятичную классификацию (УДК) или открывайте кураторский каталог.',
           'faculties_title' => 'Факультеты и кафедры',
@@ -50,7 +50,7 @@
           'udc_view_all' => 'Открыть полное дерево УДК',
       ],
       'kk' => [
-          'title' => 'Академиялық ізденіс орталығы — KazUTB Smart Library',
+          'title' => 'Академиялық ізденіс орталығы — KazUTB',
           'hero_title' => 'Академиялық ізденіс орталығы',
           'hero_body' => 'Институционалдық білімнің жиынтығы бойынша навигация. Профильдік факультеттерді зерттеңіз, Әмбебап ондық жіктеуге (ӘОЖ) тереңдеңіз немесе кураторлық каталогты ашыңыз.',
           'faculties_title' => 'Факультеттер мен кафедралар',
@@ -59,7 +59,7 @@
           'udc_view_all' => 'ӘОЖ толық ағашын ашу',
       ],
       'en' => [
-          'title' => 'Academic Discovery Hub — KazUTB Smart Library',
+          'title' => 'Academic Discovery Hub — KazUTB',
           'hero_title' => 'Academic Discovery Hub',
           'hero_body' => 'Navigate the sum of our institutional knowledge. Explore specialized faculties, deep-dive into the Universal Decimal Classification (UDC), or search the curated catalog.',
           'faculties_title' => 'Faculties & Departments',
@@ -199,30 +199,18 @@
         </div>
         <a
           class="discover-canonical__udc-view-all"
-          href="{{ $withLang('/catalog', ['sort' => 'udc']) }}"
+          href="#udc-tree"
           data-test-id="discover-canonical-udc-view-all"
         >
           {{ $copy['udc_view_all'] }}
           <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
         </a>
       </div>
-      <div class="discover-canonical__udc-grid">
-        @foreach($udcPathways as $pathway)
-          <a
-            class="discover-canonical__udc-card"
-            href="{{ $withLang('/catalog', ['udc' => $pathway['code']]) }}"
-            data-udc-slot
-            data-udc-code="{{ $pathway['code'] }}"
-            data-test-id="discover-canonical-udc-{{ $pathway['code'] }}"
-          >
-            <div class="discover-canonical__udc-code">UDC {{ $pathway['code'] }}</div>
-            <h4 class="discover-canonical__udc-title">{{ $udcLabels[$pathway['code']][$lang] }}</h4>
-            <div class="discover-canonical__udc-foot">
-              <span class="material-symbols-outlined" aria-hidden="true">{{ $pathway['icon'] }}</span>
-            </div>
-          </a>
+      <ul class="discover-canonical__udc-tree" id="udc-tree">
+        @foreach($udcTree as $node)
+          @include('discover._udc-node', ['node' => $node, 'depth' => 0])
         @endforeach
-      </div>
+      </ul>
     </section>
 
   </div>
@@ -421,6 +409,68 @@
   }
 
   /* --- UDC pathways ------------------------------------------------------- */
+  .discover-canonical__udc-tree,
+  .discover-canonical__udc-tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .discover-canonical__udc-tree > li {
+    margin-bottom: 12px;
+    border: 1px solid rgba(196, 198, 207, 0.35);
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  .discover-canonical__udc-node summary,
+  .discover-canonical__udc-leaf {
+    display: grid;
+    grid-template-columns: minmax(90px, auto) 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    color: inherit;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .discover-canonical__udc-node ul {
+    margin: 0 20px 16px 32px;
+    border-left: 2px solid rgba(0, 106, 106, 0.16);
+  }
+
+  .discover-canonical__udc-node ul .discover-canonical__udc-node {
+    margin-left: 12px;
+  }
+
+  .discover-canonical__udc-node-title {
+    font-weight: 650;
+    color: #000613;
+  }
+
+  .discover-canonical__udc-count {
+    color: #5f6368;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .discover-canonical__udc-open {
+    display: inline-block;
+    margin: 0 20px 12px;
+    color: #006a6a;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  @media (max-width: 640px) {
+    .discover-canonical__udc-node summary,
+    .discover-canonical__udc-leaf {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+  }
+
   .discover-canonical__udc-head {
     display: flex;
     flex-direction: column;

@@ -1,0 +1,39 @@
+{
+  "run_id": "20260513-134513",
+  "scenario_id": "S08-BND-INTEGRATION",
+  "module": "Integration API",
+  "component": "BoundaryMiddleware",
+  "load_type": "boundary_auth",
+  "endpoint": "http://localhost/api/integration/v1/_boundary/ping",
+  "dataset_type": "bounded_synthetic",
+  "environment": "local_nginx_php84",
+  "auth_mode_a": "no_auth_headers",
+  "auth_mode_b": "invalid_bearer_token",
+  "sub_scenario_a": {
+    "sub_scenario_id": "S08A-NO-AUTH",
+    "label": "No-auth (expect 401)",
+    "total_requests": 10,
+    "auth_error_count": 10,
+    "avg_ms": 3331.68,
+    "median_ms": 3374.42,
+    "p95_ms": 3661.04,
+    "min_ms": 2360.61,
+    "max_ms": 3661.04
+  },
+  "sub_scenario_b": {
+    "sub_scenario_id": "S08B-BAD-TOKEN",
+    "label": "Invalid-token (expect 400/401)",
+    "total_requests": 10,
+    "auth_error_count": 10,
+    "avg_ms": 3142.56,
+    "median_ms": 3230.91,
+    "p95_ms": 3329.11,
+    "min_ms": 2227.53,
+    "max_ms": 3329.11
+  },
+  "middleware_overhead_avg_ms": 3237.12,
+  "threshold_ms": 2000,
+  "scenario_passed": false,
+  "note": "Integration API rejects test requests; measuring auth rejection latency as middleware overhead metric",
+  "timestamp": "2026-05-13T13:46:17Z"
+}

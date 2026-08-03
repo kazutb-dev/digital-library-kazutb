@@ -2,6 +2,7 @@
 
 namespace App\Services\Library;
 
+use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -63,7 +64,7 @@ class IntegrationReservationReadService
     /**
      * Find a single reservation by its canonical UUID, scoped to the operator's org context.
      *
-     * @return array<string, mixed>|null  null when not found or outside org scope
+     * @return array<string, mixed>|null null when not found or outside org scope
      */
     public function findById(string $id, string $orgContext): ?array
     {
@@ -200,7 +201,7 @@ class IntegrationReservationReadService
             return null;
         }
 
-        return \Carbon\Carbon::parse((string) $datetime)->toISOString();
+        return Carbon::parse((string) $datetime)->toISOString();
     }
 
     /**

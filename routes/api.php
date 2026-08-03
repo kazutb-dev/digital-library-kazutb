@@ -8,21 +8,21 @@ use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\DemoAuthController;
 use App\Http\Controllers\Api\DigitalMaterialController;
 use App\Http\Controllers\Api\ExternalResourceController;
-use App\Http\Controllers\Api\ShortlistController;
-use App\Http\Controllers\Api\SubjectController;
+use App\Http\Controllers\Api\Integration\DocumentManagementController;
+use App\Http\Controllers\Api\Integration\ReservationMutateController;
+use App\Http\Controllers\Api\Integration\ReservationReadController;
 use App\Http\Controllers\Api\InternalAiAssistantController;
+use App\Http\Controllers\Api\InternalCirculationController;
 use App\Http\Controllers\Api\InternalCopyReadController;
 use App\Http\Controllers\Api\InternalCopyWriteController;
-use App\Http\Controllers\Api\InternalCirculationController;
 use App\Http\Controllers\Api\InternalEnrichmentController;
 use App\Http\Controllers\Api\InternalReaderContactController;
 use App\Http\Controllers\Api\InternalReviewController;
-use App\Http\Controllers\Api\LibraryController;
 use App\Http\Controllers\Api\LandingController;
+use App\Http\Controllers\Api\LibraryController;
 use App\Http\Controllers\Api\ReviewController;
-use App\Http\Controllers\Api\Integration\DocumentManagementController;
-use App\Http\Controllers\Api\Integration\ReservationReadController;
-use App\Http\Controllers\Api\Integration\ReservationMutateController;
+use App\Http\Controllers\Api\ShortlistController;
+use App\Http\Controllers\Api\SubjectController;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Http\Request;
@@ -35,18 +35,20 @@ Route::middleware('web')->group(function (): void {
 
     // Demo/dev quick-login — gated by config('demo_auth.enabled').
     Route::get('/demo-auth/identities', [DemoAuthController::class, 'identities']);
-    Route::post('/demo-auth/login', [DemoAuthController::class, 'login']);
+    Route::post('/demo-auth/login', [DemoAuthController::class, 'login'])->middleware('throttle:login');
 
     // Reader-authenticated routes — middleware enforces library.user session check.
     Route::middleware('library.auth')->group(function (): void {
-        Route::get('/v1/account/summary', [AccountController::class, 'summary']);
-        Route::get('/v1/account/loans', [AccountController::class, 'loans']);
-        Route::get('/v1/account/loans/summary', [AccountController::class, 'loanSummary']);
-        Route::post('/v1/account/loans/{loanId}/renew', [AccountController::class, 'renewLoan']);
-        Route::get('/v1/account/reservations', [AccountController::class, 'reservations']);
-        Route::post('/v1/account/reservations', [AccountController::class, 'createReservation']);
-        Route::post('/v1/account/reservations/{id}/cancel', [AccountController::class, 'cancelReservation']);
-        Route::get('/v1/account/reservations/check', [AccountController::class, 'checkReservation']);
+        Route::middleware('member.reader')->group(function (): void {
+            Route::get('/v1/account/summary', [AccountController::class, 'summary']);
+            Route::get('/v1/account/loans', [AccountController::class, 'loans']);
+            Route::get('/v1/account/loans/summary', [AccountController::class, 'loanSummary']);
+            Route::post('/v1/account/loans/{loanId}/renew', [AccountController::class, 'renewLoan']);
+            Route::get('/v1/account/reservations', [AccountController::class, 'reservations']);
+            Route::post('/v1/account/reservations', [AccountController::class, 'createReservation']);
+            Route::post('/v1/account/reservations/{id}/cancel', [AccountController::class, 'cancelReservation']);
+            Route::get('/v1/account/reservations/check', [AccountController::class, 'checkReservation']);
+        });
         Route::get('/v1/me', [AuthController::class, 'me']);
         Route::post('/v1/logout', [AuthController::class, 'logout']);
     });
@@ -62,6 +64,10 @@ Route::middleware('web')->group(function (): void {
         Route::post('/clear', [ShortlistController::class, 'clear']);
         Route::post('/check', [ShortlistController::class, 'check']);
     });
+
+    // Writing a reading position mutates reader state, so unlike the read-only
+    // digital-material routes below it stays in the web group for CSRF cover.
+    Route::put('/v1/digital-materials/{id}/progress', [DigitalMaterialController::class, 'saveProgress']);
 });
 
 Route::prefix('v1')->group(function (): void {
@@ -74,13 +80,18 @@ Route::prefix('v1')->group(function (): void {
             'internal.circulation.staff',
         ])
         ->group(function (): void {
-        Route::get('/loans/{loanId}', [InternalCirculationController::class, 'showLoan']);
-        Route::get('/copies/{copyId}/active-loan', [InternalCirculationController::class, 'showActiveLoanForCopy']);
-        Route::get('/readers/{readerId}/loans', [InternalCirculationController::class, 'listReaderLoans']);
-        Route::post('/checkouts', [InternalCirculationController::class, 'checkout']);
-        Route::post('/returns', [InternalCirculationController::class, 'returnCopy']);
-        Route::post('/loans/{loanId}/renew', [InternalCirculationController::class, 'renewLoan']);
-    });
+            Route::middleware('permission:circulation.view_any_history')->group(function (): void {
+                Route::get('/loans/{loanId}', [InternalCirculationController::class, 'showLoan']);
+                Route::get('/copies/{copyId}/active-loan', [InternalCirculationController::class, 'showActiveLoanForCopy']);
+                Route::get('/readers/{readerId}/loans', [InternalCirculationController::class, 'listReaderLoans']);
+            });
+            Route::post('/checkouts', [InternalCirculationController::class, 'checkout'])
+                ->middleware('permission:circulation.issue');
+            Route::post('/returns', [InternalCirculationController::class, 'returnCopy'])
+                ->middleware('permission:circulation.return');
+            Route::post('/loans/{loanId}/renew', [InternalCirculationController::class, 'renewLoan'])
+                ->middleware('permission:circulation.renew');
+        });
 
     Route::prefix('internal')
         ->middleware([
@@ -91,40 +102,54 @@ Route::prefix('v1')->group(function (): void {
             'internal.circulation.staff',
         ])
         ->group(function (): void {
-            Route::get('/copies/{copyId}', [InternalCopyReadController::class, 'show']);
-            Route::get('/documents/{documentId}/copies', [InternalCopyReadController::class, 'listByDocument']);
-            Route::post('/copies', [InternalCopyWriteController::class, 'store']);
-            Route::patch('/copies/{copyId}', [InternalCopyWriteController::class, 'patch']);
-            Route::post('/copies/{copyId}/retire', [InternalCopyWriteController::class, 'retire']);
-            Route::get('/review/copies', [InternalReviewController::class, 'copyQueue']);
-            Route::get('/review/copies-summary', [InternalReviewController::class, 'copySummary']);
-            Route::post('/review/copies/{copyId}/resolve', [InternalReviewController::class, 'resolveCopy']);
-            Route::post('/review/copies/bulk-resolve', [InternalReviewController::class, 'bulkResolveCopies']);
-            Route::get('/review/documents', [InternalReviewController::class, 'documentQueue']);
-            Route::get('/review/documents-summary', [InternalReviewController::class, 'documentSummary']);
-            Route::post('/review/documents/{documentId}/flag', [InternalReviewController::class, 'flagDocument']);
-            Route::post('/review/documents/{documentId}/resolve', [InternalReviewController::class, 'resolveDocument']);
-            Route::post('/review/documents/bulk-flag', [InternalReviewController::class, 'bulkFlagDocuments']);
-            Route::post('/review/documents/bulk-resolve', [InternalReviewController::class, 'bulkResolveDocuments']);
-            Route::get('/review/readers', [InternalReviewController::class, 'readerQueue']);
-            Route::get('/review/readers-summary', [InternalReviewController::class, 'readerSummary']);
-            Route::post('/review/readers/{readerId}/resolve', [InternalReviewController::class, 'resolveReader']);
-            Route::post('/review/readers/bulk-resolve', [InternalReviewController::class, 'bulkResolveReaders']);
-            Route::get('/review/triage-summary', [InternalReviewController::class, 'triageSummary']);
-            Route::get('/review/triage-reason-codes', [InternalReviewController::class, 'triageReasonCodes']);
-            Route::get('/review/stewardship-metrics', [InternalReviewController::class, 'stewardshipMetrics']);
-            Route::get('/enrichment/stats', [InternalEnrichmentController::class, 'stats']);
-            Route::post('/enrichment/validate-isbn', [InternalEnrichmentController::class, 'validateIsbn']);
-            Route::post('/enrichment/bulk-validate', [InternalEnrichmentController::class, 'bulkValidate']);
-            Route::get('/enrichment/lookup/{documentId}', [InternalEnrichmentController::class, 'lookup']);
-            Route::post('/enrichment/apply/{documentId}', [InternalEnrichmentController::class, 'apply']);
-            Route::post('/enrichment/check-isbn', [InternalEnrichmentController::class, 'checkIsbn']);
-            Route::get('/reader-contacts/stats', [InternalReaderContactController::class, 'stats']);
-            Route::get('/reader-contacts/{readerId}', [InternalReaderContactController::class, 'contacts']);
-            Route::put('/reader-contacts/{contactId}/update', [InternalReaderContactController::class, 'update']);
-            Route::post('/reader-contacts/{readerId}/add', [InternalReaderContactController::class, 'add']);
-            Route::post('/reader-contacts/bulk-normalize', [InternalReaderContactController::class, 'bulkNormalize']);
-            Route::post('/reader-contacts/validate', [InternalReaderContactController::class, 'validate']);
+            Route::middleware('permission:copies.edit|copies.create|circulation.issue|circulation.return')->group(function (): void {
+                Route::get('/copies/{copyId}', [InternalCopyReadController::class, 'show']);
+                Route::get('/documents/{documentId}/copies', [InternalCopyReadController::class, 'listByDocument']);
+            });
+            Route::post('/copies', [InternalCopyWriteController::class, 'store'])
+                ->middleware('permission:copies.create');
+            Route::patch('/copies/{copyId}', [InternalCopyWriteController::class, 'patch'])
+                ->middleware('permission:copies.edit');
+            Route::post('/copies/{copyId}/retire', [InternalCopyWriteController::class, 'retire'])
+                ->middleware('permission:copies.delete');
+
+            Route::middleware('permission:data_cleanup.access')->group(function (): void {
+                Route::get('/review/copies', [InternalReviewController::class, 'copyQueue']);
+                Route::get('/review/copies-summary', [InternalReviewController::class, 'copySummary']);
+                Route::post('/review/copies/{copyId}/resolve', [InternalReviewController::class, 'resolveCopy']);
+                Route::post('/review/copies/bulk-resolve', [InternalReviewController::class, 'bulkResolveCopies']);
+                Route::get('/review/documents', [InternalReviewController::class, 'documentQueue']);
+                Route::get('/review/documents-summary', [InternalReviewController::class, 'documentSummary']);
+                Route::post('/review/documents/{documentId}/flag', [InternalReviewController::class, 'flagDocument']);
+                Route::post('/review/documents/{documentId}/resolve', [InternalReviewController::class, 'resolveDocument']);
+                Route::post('/review/documents/bulk-flag', [InternalReviewController::class, 'bulkFlagDocuments']);
+                Route::post('/review/documents/bulk-resolve', [InternalReviewController::class, 'bulkResolveDocuments']);
+                Route::get('/review/readers', [InternalReviewController::class, 'readerQueue']);
+                Route::get('/review/readers-summary', [InternalReviewController::class, 'readerSummary']);
+                Route::post('/review/readers/{readerId}/resolve', [InternalReviewController::class, 'resolveReader']);
+                Route::post('/review/readers/bulk-resolve', [InternalReviewController::class, 'bulkResolveReaders']);
+                Route::get('/review/triage-summary', [InternalReviewController::class, 'triageSummary']);
+                Route::get('/review/triage-reason-codes', [InternalReviewController::class, 'triageReasonCodes']);
+                Route::get('/review/stewardship-metrics', [InternalReviewController::class, 'stewardshipMetrics']);
+            });
+
+            Route::middleware('permission:catalog.edit_record')->group(function (): void {
+                Route::get('/enrichment/stats', [InternalEnrichmentController::class, 'stats']);
+                Route::post('/enrichment/validate-isbn', [InternalEnrichmentController::class, 'validateIsbn']);
+                Route::post('/enrichment/bulk-validate', [InternalEnrichmentController::class, 'bulkValidate']);
+                Route::get('/enrichment/lookup/{documentId}', [InternalEnrichmentController::class, 'lookup']);
+                Route::post('/enrichment/apply/{documentId}', [InternalEnrichmentController::class, 'apply']);
+                Route::post('/enrichment/check-isbn', [InternalEnrichmentController::class, 'checkIsbn']);
+            });
+
+            Route::middleware('permission:messages.resolve')->group(function (): void {
+                Route::get('/reader-contacts/stats', [InternalReaderContactController::class, 'stats']);
+                Route::get('/reader-contacts/{readerId}', [InternalReaderContactController::class, 'contacts']);
+                Route::put('/reader-contacts/{contactId}/update', [InternalReaderContactController::class, 'update']);
+                Route::post('/reader-contacts/{readerId}/add', [InternalReaderContactController::class, 'add']);
+                Route::post('/reader-contacts/bulk-normalize', [InternalReaderContactController::class, 'bulkNormalize']);
+                Route::post('/reader-contacts/validate', [InternalReaderContactController::class, 'validate']);
+            });
         });
 
     Route::get('/bridge/summary', [BridgeController::class, 'summary']);
@@ -133,8 +158,13 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/bridge/books', [BridgeController::class, 'books']);
 
     // Canonical public catalog APIs (WS1 converged).
-    Route::get('/book-db/{isbn}', [BookController::class, 'dbShow']);
+    Route::get('/book-db/{isbn}', [BookController::class, 'dbShow'])->middleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+    ]);
     Route::get('/catalog-db', [CatalogController::class, 'dbIndex']);
+    Route::get('/catalog-facets', [CatalogController::class, 'facets']);
     Route::get('/subjects', [SubjectController::class, 'index']);
 
     // External licensed resources (public, config-backed).
@@ -142,8 +172,26 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/external-resources/{slug}', [ExternalResourceController::class, 'show']);
 
     // Digital materials: controlled viewer access.
-    Route::get('/documents/{documentId}/digital-materials', [DigitalMaterialController::class, 'forDocument']);
-    Route::get('/digital-materials/{id}/stream', [DigitalMaterialController::class, 'stream']);
+    Route::get('/documents/{documentId}/digital-materials', [DigitalMaterialController::class, 'forDocument'])->middleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+    ]);
+    Route::get('/digital-materials/{id}/stream', [DigitalMaterialController::class, 'stream'])->middleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+    ]);
+    Route::get('/digital-materials/{id}/download', [DigitalMaterialController::class, 'download'])->middleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+    ]);
+    Route::get('/digital-materials/{id}/progress', [DigitalMaterialController::class, 'progress'])->middleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+    ]);
 
     Route::get('/library/health-summary', [LibraryController::class, 'healthSummary']);
     Route::get('/review/issues', [ReviewController::class, 'issues']);
@@ -164,6 +212,7 @@ Route::prefix('v1')->group(function (): void {
             StartSession::class,
             ShareErrorsFromSession::class,
             'internal.circulation.staff',
+            'permission:data_cleanup.access',
         ])
         ->group(function (): void {
             Route::post('/token', [InternalAiAssistantController::class, 'token']);

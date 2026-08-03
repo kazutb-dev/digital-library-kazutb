@@ -1,0 +1,81 @@
+{
+  "coverage": [
+    {
+      "module_feature": "Authentication",
+      "high_risk_function": "Session and protected endpoint guard behavior",
+      "test_automated": "Yes",
+      "automation_layer": "API and Feature",
+      "automated_checks": 3,
+      "total_planned_high_risk_checks": 3,
+      "coverage_percent": 100.0,
+      "evidence": "qa/phase2/evidence/logs/phase2-api-tests.log",
+      "notes": "3/3 checks automated and executed"
+    },
+    {
+      "module_feature": "Authorization/RBAC",
+      "high_risk_function": "Guest access to protected role routes",
+      "test_automated": "Partial",
+      "automation_layer": "UI and API",
+      "automated_checks": 6,
+      "total_planned_high_risk_checks": 8,
+      "coverage_percent": 75.0,
+      "evidence": "qa/phase2/evidence/logs/phase2-playwright.log",
+      "notes": "6/8 mapped checks automated; gaps remain"
+    },
+    {
+      "module_feature": "Catalog/Public",
+      "high_risk_function": "Public route and API stability",
+      "test_automated": "Partial",
+      "automation_layer": "UI and API",
+      "automated_checks": 7,
+      "total_planned_high_risk_checks": 8,
+      "coverage_percent": 87.5,
+      "evidence": "qa/phase2/evidence/logs/phase2-playwright.log",
+      "notes": "one route currently failing"
+    },
+    {
+      "module_feature": "Circulation/Operations",
+      "high_risk_function": "Internal operations access boundaries",
+      "test_automated": "Partial",
+      "automation_layer": "API and UI",
+      "automated_checks": 4,
+      "total_planned_high_risk_checks": 6,
+      "coverage_percent": 66.7,
+      "evidence": "qa/phase2/evidence/logs/phase2-api-tests.log",
+      "notes": "partial automated coverage only"
+    },
+    {
+      "module_feature": "Integration API",
+      "high_risk_function": "Boundary and reservations integration behavior",
+      "test_automated": "Partial",
+      "automation_layer": "API",
+      "automated_checks": 2,
+      "total_planned_high_risk_checks": 4,
+      "coverage_percent": 50.0,
+      "evidence": "qa/phase2/evidence/logs/phase2-api-tests.log",
+      "notes": "automated checks exist but endpoint instability present"
+    },
+    {
+      "module_feature": "Admin operations",
+      "high_risk_function": "Admin route guard and integration access",
+      "test_automated": "Partial",
+      "automation_layer": "API and UI",
+      "automated_checks": 2,
+      "total_planned_high_risk_checks": 4,
+      "coverage_percent": 50.0,
+      "evidence": "qa/phase2/evidence/logs/phase2-api-tests.log",
+      "notes": "2/4 checks automated"
+    },
+    {
+      "module_feature": "Shortlist/Member account",
+      "high_risk_function": "Guest protection on member endpoints",
+      "test_automated": "Yes",
+      "automation_layer": "API and UI",
+      "automated_checks": 3,
+      "total_planned_high_risk_checks": 3,
+      "coverage_percent": 100.0,
+      "evidence": "qa/phase2/evidence/logs/phase2-playwright.log",
+      "notes": "3/3 checks automated and executed"
+    }
+  ]
+}

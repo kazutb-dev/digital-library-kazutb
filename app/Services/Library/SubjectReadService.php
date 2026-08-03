@@ -11,7 +11,7 @@ class SubjectReadService
      */
     public function listGrouped(): array
     {
-        $rows = DB::select("
+        $rows = DB::select('
             SELECT
                 s.id,
                 s.display_subject,
@@ -22,7 +22,7 @@ class SubjectReadService
             GROUP BY s.id, s.display_subject, ds.source_kind
             HAVING COUNT(DISTINCT ds.document_id) > 0
             ORDER BY ds.source_kind, COUNT(DISTINCT ds.document_id) DESC
-        ");
+        ');
 
         $grouped = [
             'faculties' => [],

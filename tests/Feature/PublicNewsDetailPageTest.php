@@ -317,7 +317,7 @@ class PublicNewsDetailPageTest extends TestCase
         $this->loginAs('student');
         $this->get('/news/global-symposium-archival-integrity?lang=en')
             ->assertOk()
-            ->assertSee('KazUTB Smart Library', false);
+            ->assertSee('KazUTB Library', false);
     }
 
     public function test_librarian_can_view_news_detail(): void
@@ -325,7 +325,7 @@ class PublicNewsDetailPageTest extends TestCase
         $this->loginAs('librarian');
         $this->get('/news/global-symposium-archival-integrity?lang=en')
             ->assertOk()
-            ->assertSee('KazUTB Smart Library', false);
+            ->assertSee('KazUTB Library', false);
     }
 
     public function test_admin_can_view_news_detail(): void
@@ -333,6 +333,6 @@ class PublicNewsDetailPageTest extends TestCase
         $this->loginAs('admin');
         $this->get('/news/global-symposium-archival-integrity?lang=en')
             ->assertOk()
-            ->assertSee('KazUTB Smart Library', false);
+            ->assertSee('KazUTB Library', false);
     }
 }

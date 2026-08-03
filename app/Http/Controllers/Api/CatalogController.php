@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Services\Library\CatalogReadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class CatalogController extends Controller
             'author' => ['nullable', 'string', 'max:255'],
             'publisher' => ['nullable', 'string', 'max:255'],
             'isbn' => ['nullable', 'string', 'max:64'],
+            'subject' => ['nullable', 'string', 'max:255'],
             'udc' => ['nullable', 'string', 'max:128'],
             'language' => ['nullable', 'string', 'max:10'],
             'material_type' => ['nullable', 'string', 'in:all,digital,archive,physical'],
@@ -28,8 +30,18 @@ class CatalogController extends Controller
             'year_to' => ['nullable', 'integer', 'min:1900', 'max:2100'],
             'available_only' => ['nullable', 'string', 'in:0,1,true,false'],
             'physical_only' => ['nullable', 'string', 'in:0,1,true,false'],
+            // Subject identifiers stay UUID-shaped: the canonical catalogue
+            // classifies by UDC and category, which the `udc` parameter serves.
             'subject_id' => ['nullable', 'string', 'uuid'],
             'institution' => ['nullable', 'string', 'in:college_library,economic_library,technology_library,ktslib'],
+            // Canonical axes (Master.md §8.2). Multi-value axes take a
+            // comma-separated list so several boxes can be ticked at once.
+            'resource_type' => ['nullable', 'string', 'max:255'],
+            'fund' => ['nullable', 'string', 'max:255'],
+            'branch' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'availability' => ['nullable', 'string', 'in:available,issued,electronic_only,processing,repair'],
+            'format' => ['nullable', 'string', 'in:print,electronic,hybrid'],
         ]);
 
         $result = $service->search(
@@ -38,10 +50,11 @@ class CatalogController extends Controller
             author: isset($validated['author']) ? (string) $validated['author'] : null,
             publisher: isset($validated['publisher']) ? (string) $validated['publisher'] : null,
             isbn: isset($validated['isbn']) ? (string) $validated['isbn'] : null,
+            subject: isset($validated['subject']) ? (string) $validated['subject'] : null,
             udc: isset($validated['udc']) ? (string) $validated['udc'] : null,
             language: isset($validated['language']) ? (string) $validated['language'] : null,
             page: (int) ($validated['page'] ?? 1),
-            limit: (int) ($validated['limit'] ?? 10),
+            limit: (int) ($validated['limit'] ?? Setting::catalogPageSize()),
             sort: (string) ($validated['sort'] ?? 'popular'),
             yearFrom: isset($validated['year_from']) ? (int) $validated['year_from'] : null,
             yearTo: isset($validated['year_to']) ? (int) $validated['year_to'] : null,
@@ -50,9 +63,26 @@ class CatalogController extends Controller
             materialType: isset($validated['material_type']) ? (string) $validated['material_type'] : null,
             subjectId: isset($validated['subject_id']) ? (string) $validated['subject_id'] : null,
             institution: isset($validated['institution']) ? (string) $validated['institution'] : null,
+            resourceType: isset($validated['resource_type']) ? (string) $validated['resource_type'] : null,
+            fund: isset($validated['fund']) ? (string) $validated['fund'] : null,
+            branch: isset($validated['branch']) ? (string) $validated['branch'] : null,
+            category: isset($validated['category']) ? (string) $validated['category'] : null,
+            availability: isset($validated['availability']) ? (string) $validated['availability'] : null,
+            format: isset($validated['format']) ? (string) $validated['format'] : null,
+            includeUdcCode: $request->user() !== null,
         );
 
         return response()->json($result);
+    }
+
+    /**
+     * Live filter axes for the catalogue sidebar — every value and count is
+     * read from the collection, so the UI can never offer a filter that
+     * matches nothing that exists.
+     */
+    public function facets(CatalogReadService $service): JsonResponse
+    {
+        return response()->json(['data' => $service->facets()]);
     }
 
     /**

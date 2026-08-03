@@ -14,7 +14,7 @@ class AccountSummaryReadService
     }
 
     /**
-     * @param array<string, mixed> $sessionUser
+     * @param  array<string, mixed>  $sessionUser
      * @return array<string, mixed>
      */
     public function summary(array $sessionUser): array
@@ -69,7 +69,7 @@ class AccountSummaryReadService
     }
 
     /**
-     * @param array<string, mixed> $sessionUser
+     * @param  array<string, mixed>  $sessionUser
      * @return array<string, string>
      */
     private function normalizeSessionProfile(array $sessionUser): array
@@ -84,7 +84,7 @@ class AccountSummaryReadService
     }
 
     /**
-     * @param array<string, string> $sessionProfile
+     * @param  array<string, string>  $sessionProfile
      */
     private function findReaderBySessionProfile(array $sessionProfile): ?object
     {
@@ -118,7 +118,7 @@ class AccountSummaryReadService
     }
 
     /**
-     * @param array<string, string> $sessionProfile
+     * @param  array<string, string>  $sessionProfile
      * @return array<int, string>
      */
     private function candidateIdentifiers(array $sessionProfile): array

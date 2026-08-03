@@ -1,0 +1,44 @@
+{
+  "plannedVsActual": [
+    {
+      "aspect": "Catalog public stability",
+      "planned_phase1": "High risk (R2 score 16), expect robust smoke coverage and no 5xx",
+      "actual_phase2_midterm": "Coverage 87.5 percent but /news failed with HTTP 500",
+      "gap": "Runtime reliability gap despite broad coverage",
+      "interpretation": "Coverage breadth did not guarantee production stability",
+      "next_action": "Add route-level diagnostics and enforce 0 public 5xx in CI"
+    },
+    {
+      "aspect": "Integration boundary/API contract",
+      "planned_phase1": "R4/R6 medium risk with middleware-based protection",
+      "actual_phase2_midterm": "Two integration smoke failures with 404 outcomes; new midterm integration tests pass for boundary validation",
+      "gap": "Contract-path instability persists beyond boundary middleware",
+      "interpretation": "Core boundary checks are strong, downstream route/data paths remain fragile",
+      "next_action": "Stabilize integration endpoint routing/data shape and add CI contract checks"
+    },
+    {
+      "aspect": "Circulation and admin operations",
+      "planned_phase1": "Critical operations with strong guard expectations",
+      "actual_phase2_midterm": "One circulation/admin guard mismatch and low admin/circulation coverage (50-66.7%)",
+      "gap": "Detectability and depth insufficient for high-impact workflows",
+      "interpretation": "High-impact modules need deeper scenario coverage",
+      "next_action": "Increase admin/circulation automated checks beyond 70 percent"
+    },
+    {
+      "aspect": "Coverage observability",
+      "planned_phase1": "R13 score 16 with coverage reporting expected",
+      "actual_phase2_midterm": "Local coverage driver blocked; CI coverage exists but local reproducibility reduced",
+      "gap": "Measurement parity across environments missing",
+      "interpretation": "Tooling gap impacts confidence and defect detectability",
+      "next_action": "Standardize coverage tooling across local and CI"
+    },
+    {
+      "aspect": "Automation depth by level",
+      "planned_phase1": "Multi-level testing strategy envisioned",
+      "actual_phase2_midterm": "Midterm added 8 tests across Unit/Integration/E2E with evidence logs",
+      "gap": "Some concurrency/flakiness dimensions still under-sampled",
+      "interpretation": "Progress achieved, but repeated-run stability dataset is still limited",
+      "next_action": "Introduce scheduled reruns and flaky-rate tracking"
+    }
+  ]
+}

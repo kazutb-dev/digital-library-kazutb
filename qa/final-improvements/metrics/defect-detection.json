@@ -1,0 +1,53 @@
+{
+    "defect_detection": [
+        {
+            "test_type": "Feature Tests",
+            "defects_found": 112,
+            "severity": "Mixed",
+            "detection_stage": "Post-Rerun Review",
+            "notes": "Feature failures across catalog, news, stewardship, and other modules"
+        },
+        {
+            "test_type": "Integration Tests",
+            "defects_found": 0,
+            "severity": "N/A",
+            "detection_stage": "N/A",
+            "notes": "Enhanced integration tests pass with no defects detected"
+        },
+        {
+            "test_type": "API Tests (Enhanced)",
+            "defects_found": 0,
+            "severity": "N/A",
+            "detection_stage": "N/A",
+            "notes": "AdminPrivilegeNegativePathTest and ReservationMutateTest pass without defect"
+        },
+        {
+            "test_type": "API Tests (Blocked)",
+            "defects_found": 0,
+            "severity": "N/A",
+            "detection_stage": "Environment",
+            "notes": "ReaderReservationTest and AccountReservationsTest blocked by PostgreSQL schema"
+        },
+        {
+            "test_type": "Unit Tests",
+            "defects_found": 0,
+            "severity": "N/A",
+            "detection_stage": "N/A",
+            "notes": "Bibliography formatter and service tests pass without defect"
+        },
+        {
+            "test_type": "Errors (Infrastructure)",
+            "defects_found": 36,
+            "severity": "High",
+            "detection_stage": "Post-Rerun Review",
+            "notes": "Environment/runtime errors; not application logic failures"
+        },
+        {
+            "test_type": "Risky Tests",
+            "defects_found": 5,
+            "severity": "Low",
+            "detection_stage": "Post-Rerun Review",
+            "notes": "Tests without assertions; structure correct but execution incomplete"
+        }
+    ]
+}

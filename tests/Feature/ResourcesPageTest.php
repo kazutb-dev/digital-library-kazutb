@@ -81,7 +81,7 @@ class ResourcesPageTest extends TestCase
             ->assertOk()
             ->assertDontSee('KazTBU Digital Library')
             ->assertDontSee('Athenaeum')
-            ->assertSee('KazUTB Smart Library');
+            ->assertSee('KazUTB Library');
     }
 
     public function test_resources_page_renders_real_premium_resources(): void

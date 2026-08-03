@@ -3,10 +3,10 @@
 @extends('layouts.public')
 
 @php
-  $lang = request()->query('lang', 'ru');
+  $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
       $qs = http_build_query(array_filter($query, static fn ($v) => $v !== null && $v !== ''));
@@ -15,7 +15,7 @@
 
   $chrome = [
       'ru' => [
-          'title_suffix'       => 'KazUTB Smart Library',
+          'title_suffix'       => 'KazUTB',
           'back'               => 'Вернуться к новостям',
           'read_time'          => '5 мин. чтение',
         'highlights_heading' => 'Ключевые акценты',
@@ -24,7 +24,7 @@
         'author_name'        => 'Редакционная группа',
         'author_role'        => 'Институциональные коммуникации',
         'author_alt'         => 'Редакционная группа библиотеки',
-        'editorial_bio'      => 'Освещает институциональные обновления, исследовательские инициативы и цифровые проекты KazUTB Smart Library.',
+        'editorial_bio'      => 'Освещает институциональные обновления, исследовательские инициативы и цифровые проекты KazUTB.',
           'editorial_articles' => 'Все публикации',
           'related_heading'    => 'Связанные материалы',
           'newsletter_heading' => 'Будьте в курсе',
@@ -33,7 +33,7 @@
           'newsletter_cta'     => 'Подписаться',
       ],
       'kk' => [
-          'title_suffix'       => 'KazUTB Smart Library',
+          'title_suffix'       => 'KazUTB',
           'back'               => 'Жаңалықтарға оралу',
           'read_time'          => '5 мин. оқу',
           'highlights_heading' => 'Негізгі тұстар',
@@ -42,7 +42,7 @@
           'author_name'        => 'Редакциялық топ',
           'author_role'        => 'Институционалдық коммуникациялар',
           'author_alt'         => 'Кітапхананың редакциялық тобы',
-          'editorial_bio'      => 'KazUTB Smart Library институционалдық жаңартуларын, зерттеу бастамаларын және цифрлық жобаларын жариялайды.',
+          'editorial_bio'      => 'KazUTB институционалдық жаңартуларын, зерттеу бастамаларын және цифрлық жобаларын жариялайды.',
           'editorial_articles' => 'Барлық жарияланымдар',
           'related_heading'    => 'Байланысты материалдар',
           'newsletter_heading' => 'Хабардар болыңыз',
@@ -51,7 +51,7 @@
           'newsletter_cta'     => 'Жазылу',
       ],
       'en' => [
-          'title_suffix'       => 'KazUTB Smart Library',
+          'title_suffix'       => 'KazUTB',
           'back'               => 'Return to News & Announcements',
           'read_time'          => '5 min read',
           'highlights_heading' => 'Project Highlights',
@@ -60,7 +60,7 @@
           'author_name'        => 'Editorial Team',
           'author_role'        => 'Institutional Communications',
           'author_alt'         => 'Library editorial team',
-          'editorial_bio'      => 'Covering institutional updates, research initiatives, and digital projects for the KazUTB Smart Library ecosystem.',
+          'editorial_bio'      => 'Covering institutional updates, research initiatives, and digital projects for the KazUTB ecosystem.',
           'editorial_articles' => 'All dispatches',
           'related_heading'    => 'Related Updates',
           'newsletter_heading' => 'Stay Informed',

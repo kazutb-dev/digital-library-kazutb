@@ -1,0 +1,5 @@
+"module","coverage_percent","coverage_status"
+"Circulation/Operations","66.7","partial"
+"Integration API","50","partial"
+"Admin operations","50","partial"
+"Coverage readiness (cross-cutting)","n/a","blocked"

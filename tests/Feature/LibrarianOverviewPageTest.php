@@ -84,7 +84,7 @@ class LibrarianOverviewPageTest extends TestCase
         $response = $this->get('/librarian');
 
         $response->assertOk();
-        $response->assertSee('Librarian Console', false);
+        $response->assertSee('Library workspace', false);
         $response->assertSee(route('librarian.overview'), false);
     }
 }

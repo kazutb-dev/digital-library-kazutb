@@ -1,0 +1,6 @@
+"suite","seconds","source"
+"Phase2 API smoke","38.435","qa/phase2/metrics/phase2-execution-time.csv"
+"Phase2 UI smoke","54.885","qa/phase2/metrics/phase2-execution-time.csv"
+"Phase2 targeted PHPUnit","61.258","qa/phase2/metrics/phase2-execution-time.csv"
+"Midterm new PHPUnit tests","11.75","qa/midterm/evidence/logs/midterm-new-phpunit.log"
+"Midterm new Playwright tests","12.4","qa/midterm/evidence/logs/midterm-new-playwright.log"

@@ -1,0 +1,6 @@
+"module_feature","number_of_test_cases","avg_execution_time_per_test_case_seconds","total_execution_time_seconds","environment"
+"API smoke critical suites","10","3.844","38.435","local"
+"UI smoke critical routes","11","4.989","54.885","local"
+"Targeted PHPUnit high-risk subset","41","1.494","61.258","local"
+"Combined automation run","62","2.493","154.578","local"
+"CI execution benchmark","n/a","n/a","not measured in current dataset","ci"

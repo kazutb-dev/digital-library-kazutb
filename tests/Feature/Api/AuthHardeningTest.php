@@ -2,17 +2,26 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\ActivityLog;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class AuthHardeningTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpAdminControlPlane();
+    }
+
     // ──────────────────────────────────────────────────
     // Login: information leak prevention
     // ──────────────────────────────────────────────────
@@ -116,7 +125,7 @@ class AuthHardeningTest extends TestCase
 
         $response
             ->assertStatus(502)
-            ->assertJsonPath('message', 'Authentication service returned an unexpected response.');
+            ->assertJsonPath('message', __('auth.provider_invalid_response'));
 
         $this->assertNull(session('library.crm_token'));
         $this->assertNull(session('library.user'));
@@ -217,8 +226,6 @@ class AuthHardeningTest extends TestCase
             '*' => Http::response(['message' => 'Invalid credentials'], 401),
         ]);
 
-        Log::spy();
-
         $this
             ->withoutMiddleware(PreventRequestForgery::class)
             ->postJson('/api/login', [
@@ -226,13 +233,14 @@ class AuthHardeningTest extends TestCase
                 'password' => 'wrong-pass',
             ]);
 
-        Log::shouldHaveReceived('warning')
-            ->withArgs(function (string $message, array $context) {
-                return $message === 'Library CRM login failed'
-                    && ($context['login'] ?? '') === 'bad-user'
-                    && ($context['crm_status'] ?? 0) === 401;
-            })
-            ->once();
+        $event = ActivityLog::query()
+            ->where('action_type', 'login.fail')
+            ->where('entity_id', 'bad-user')
+            ->latest('occurred_at')
+            ->firstOrFail();
+
+        $this->assertSame('invalid_credentials', data_get($event->new_values, 'reason'));
+        $this->assertSame(401, data_get($event->metadata, 'provider_status'));
     }
 
     public function test_crm_unavailable_is_logged_as_error(): void
@@ -243,8 +251,6 @@ class AuthHardeningTest extends TestCase
             },
         ]);
 
-        Log::spy();
-
         $this
             ->withoutMiddleware(PreventRequestForgery::class)
             ->postJson('/api/login', [
@@ -252,13 +258,13 @@ class AuthHardeningTest extends TestCase
                 'password' => 'pass',
             ]);
 
-        Log::shouldHaveReceived('error')
-            ->withArgs(function (string $message, array $context) {
-                return $message === 'CRM auth service unavailable'
-                    && ($context['login'] ?? '') === 'user'
-                    && isset($context['error']);
-            })
-            ->once();
+        $event = ActivityLog::query()
+            ->where('action_type', 'login.fail')
+            ->where('entity_id', 'user')
+            ->latest('occurred_at')
+            ->firstOrFail();
+
+        $this->assertSame('provider_unavailable', data_get($event->new_values, 'reason'));
     }
 
     // ──────────────────────────────────────────────────
@@ -283,6 +289,39 @@ class AuthHardeningTest extends TestCase
         });
 
         $this->assertTrue($hasThrottle, 'Login route must have throttle:login middleware');
+    }
+
+    public function test_login_rate_limit_normalizes_identifier_case(): void
+    {
+        Http::fake([
+            '*' => Http::response(['message' => 'Invalid credentials'], 401),
+        ]);
+
+        foreach (['RateUser', 'RATEUSER', 'rateuser', 'RaTeUsEr', 'rateUSER'] as $identifier) {
+            $this
+                ->withoutMiddleware(PreventRequestForgery::class)
+                ->postJson('/api/login', [
+                    'login' => $identifier,
+                    'password' => 'wrong-pass',
+                ])
+                ->assertUnauthorized();
+        }
+
+        $this
+            ->withoutMiddleware(PreventRequestForgery::class)
+            ->postJson('/api/login', [
+                'login' => 'rAtEuSeR',
+                'password' => 'wrong-pass',
+            ])
+            ->assertTooManyRequests();
+
+        $event = ActivityLog::query()
+            ->where('action_type', 'login.throttled')
+            ->where('entity_id', 'rateuser')
+            ->where('new_values->reason', 'rate_limited')
+            ->firstOrFail();
+
+        $this->assertSame('login', data_get($event->metadata, 'limiter'));
     }
 
     public function test_login_validation_rejects_blank_credentials(): void

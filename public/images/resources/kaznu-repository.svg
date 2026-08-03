@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title">
+  <title id="title">KazNU Repository</title>
+  <rect width="160" height="160" fill="#fff"/>
+  <rect x="8" y="8" width="144" height="144" fill="none" stroke="#dfe6e4" stroke-width="2"/>
+  <path d="M80 26l45 18v31c0 30-18 50-45 59-27-9-45-29-45-59V44l45-18z" fill="#0b6fb3"/>
+  <path d="M80 36l32 13v24c0 22-13 37-32 44-19-7-32-22-32-44V49l32-13z" fill="#f3c434"/>
+  <path d="M80 52l15 31H65l15-31z" fill="#0b6fb3"/>
+  <path d="M59 94h42v9H59z" fill="#0b6fb3"/>
+  <text x="80" y="139" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#102945">KazNU</text>
+</svg>

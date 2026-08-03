@@ -213,7 +213,7 @@ class InternalCirculationController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function forbiddenActorOverrideResponse(Request $request, array $validated): ?JsonResponse
     {
@@ -227,14 +227,13 @@ class InternalCirculationController extends Controller
         }
 
         $sessionUserId = (string) ($staffUser['id'] ?? '');
-        $sessionRole = mb_strtolower(trim((string) ($staffUser['role'] ?? '')));
         $requestedActorUserId = (string) $validated['actor_user_id'];
 
         if ($requestedActorUserId === '' || $requestedActorUserId === $sessionUserId) {
             return null;
         }
 
-        if ($sessionRole === 'admin') {
+        if ($request->user()?->hasRole('admin')) {
             return null;
         }
 

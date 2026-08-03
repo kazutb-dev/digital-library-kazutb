@@ -1,0 +1,88 @@
+{
+    "coverage_vs_risk": [
+        {
+            "risk_id": "R-PRIV-001",
+            "priority": "CRITICAL",
+            "coverage_percent": 100,
+            "test_types": "Feature, API",
+            "notes": "AdminPrivilegeNegativePathTest: 28 tests covering all routes and roles"
+        },
+        {
+            "risk_id": "R-PRIV-002",
+            "priority": "CRITICAL",
+            "coverage_percent": 100,
+            "test_types": "Feature, API",
+            "notes": "Session validation integrated into privilege tests"
+        },
+        {
+            "risk_id": "R-API-001",
+            "priority": "HIGH",
+            "coverage_percent": 100,
+            "test_types": "Integration, API",
+            "notes": "ReservationMutateTest: operator role enforcement 2/2 tests"
+        },
+        {
+            "risk_id": "R-API-002",
+            "priority": "MEDIUM",
+            "coverage_percent": 100,
+            "test_types": "Integration, API",
+            "notes": "Context propagation: 2/2 tests pass"
+        },
+        {
+            "risk_id": "R-API-003",
+            "priority": "HIGH",
+            "coverage_percent": 100,
+            "test_types": "Integration, API",
+            "notes": "Idempotency: 3/3 tests pass"
+        },
+        {
+            "risk_id": "R-RESV-001",
+            "priority": "MEDIUM",
+            "coverage_percent": 30,
+            "test_types": "Feature, API",
+            "notes": "4/14 auth tests pass; 10 blocked by schema"
+        },
+        {
+            "risk_id": "R-RESV-002",
+            "priority": "MEDIUM",
+            "coverage_percent": 33,
+            "test_types": "Feature, API",
+            "notes": "2/6 auth tests pass; 4 blocked by schema"
+        },
+        {
+            "risk_id": "R-AUTH-001",
+            "priority": "CRITICAL",
+            "coverage_percent": 100,
+            "test_types": "Feature, API",
+            "notes": "Guest redirect: 7/7 tests in AdminPrivilegeNegativePathTest"
+        },
+        {
+            "risk_id": "R-DATA-001",
+            "priority": "HIGH",
+            "coverage_percent": 50,
+            "test_types": "Feature, API",
+            "notes": "Validation structure established; execution blocked by environment"
+        },
+        {
+            "risk_id": "R-DATA-002",
+            "priority": "MEDIUM",
+            "coverage_percent": 100,
+            "test_types": "Integration, API",
+            "notes": "Response contracts: 2/2 tests pass"
+        },
+        {
+            "risk_id": "R-PERF-001",
+            "priority": "MEDIUM",
+            "coverage_percent": 100,
+            "test_types": "Suite",
+            "notes": "Full suite: 904 tests in ~190s"
+        },
+        {
+            "risk_id": "R-DB-001",
+            "priority": "CRITICAL",
+            "coverage_percent": 40,
+            "test_types": "Feature, Schema",
+            "notes": "Environment blocker documented; tests remain for future"
+        }
+    ]
+}

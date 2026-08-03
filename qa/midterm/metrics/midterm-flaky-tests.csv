@@ -1,0 +1,4 @@
+"test_id","pass_count","fail_count","suspected_cause","evidence_source","classification","notes"
+"P2-PHP-SUITE-001","0","1","environment-sensitive DB shape assumptions (sqlite mismatch noted)","qa/phase2/metrics/phase2-test-execution-log.csv","suspected instability","Only one measured run available; repeated-run evidence missing"
+"P2-UI-CAT-004","0","1","public route runtime/server-state dependency","qa/phase2/metrics/phase2-test-execution-log.csv","insufficient repeated-run evidence","Cannot confirm flakiness without multi-run variance dataset"
+"MID-E2E-002","1","0","none observed","qa/midterm/evidence/logs/midterm-new-playwright.log","not enough data","Single-run pass only"

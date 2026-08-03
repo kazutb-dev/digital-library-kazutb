@@ -26,7 +26,7 @@ class InternalReviewWorkflowService
         $normalizedReason = $this->normalizeOptionalReasonCode($reasonCode);
 
         $builder = DB::connection('pgsql')
-            ->table(self::COPY_TABLE . ' as bc')
+            ->table(self::COPY_TABLE.' as bc')
             ->leftJoin('app.documents as d', 'd.id', '=', 'bc.document_id')
             ->select([
                 'bc.id',
@@ -143,7 +143,7 @@ class InternalReviewWorkflowService
     }
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      * @return array{data: array<string, mixed>, source: string}
      */
     public function resolveCopyReview(string $copyId, ?string $resolutionNote, array $context = []): array

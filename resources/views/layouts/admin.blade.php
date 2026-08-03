@@ -1,179 +1,271 @@
 @php
-  $pageLang = in_array(app()->getLocale(), ['kk', 'ru', 'en'], true) ? app()->getLocale() : 'ru';
-  $adminUser = is_array($internalStaffUser ?? null) ? $internalStaffUser : [];
-  $userName = trim((string) ($adminUser['name'] ?? 'Library Administrator')) ?: 'Library Administrator';
-  $userTitle = trim((string) ($adminUser['title'] ?? 'Administrator')) ?: 'Administrator';
-  $userInitial = mb_strtoupper(mb_substr($userName, 0, 1));
-  $loginRedirectUrl = $pageLang === 'ru' ? '/login' : ('/login?lang=' . $pageLang);
-  $adminNav = [
-      ['label' => 'Governance Dashboard', 'icon' => 'dashboard', 'href' => route('admin.overview'), 'active' => request()->routeIs('admin.overview')],
-      ['label' => 'User & Role Management', 'icon' => 'group', 'href' => route('admin.users'), 'active' => request()->routeIs('admin.users')],
-      ['label' => 'Governance & Logs', 'icon' => 'gavel', 'href' => route('admin.logs'), 'active' => request()->routeIs('admin.logs')],
-      ['label' => 'News Management', 'icon' => 'campaign', 'href' => route('admin.news'), 'active' => request()->routeIs('admin.news')],
-      ['label' => 'Feedback Inbox', 'icon' => 'inbox', 'href' => route('admin.feedback'), 'active' => request()->routeIs('admin.feedback')],
-      ['label' => 'Reports & Analytics', 'icon' => 'analytics', 'href' => route('admin.reports'), 'active' => request()->routeIs('admin.reports')],
-      ['label' => 'System Settings', 'icon' => 'settings_suggest', 'href' => route('admin.settings'), 'active' => request()->routeIs('admin.settings')],
-  ];
+    $pageLang = in_array(app()->getLocale(), ['kk', 'ru', 'en'], true) ? app()->getLocale() : 'kk';
+    $eloquentAdmin = auth()->user();
+    $legacyAdmin = is_array(session('library.user')) ? session('library.user') : [];
+    $userName = trim((string) ($eloquentAdmin?->name ?? $legacyAdmin['name'] ?? __('roles.names.admin'))) ?: __('roles.names.admin');
+    $userInitial = mb_strtoupper(mb_substr($userName, 0, 1));
+    $adminNav = [
+        ['label' => __('admin.nav.dashboard'), 'icon' => 'dashboard', 'href' => route('admin.overview'), 'active' => request()->routeIs('admin.overview'), 'permissions' => []],
+        ['label' => __('admin.users.title'), 'icon' => 'group', 'href' => route('admin.users.index'), 'active' => request()->routeIs('admin.users.*'), 'permissions' => ['users.manage']],
+        ['label' => __('roles.title'), 'icon' => 'shield_person', 'href' => route('admin.roles.index'), 'active' => request()->routeIs('admin.roles.*'), 'permissions' => ['roles.manage']],
+        ['label' => __('admin.nav.audit_logs'), 'icon' => 'gavel', 'href' => route('admin.logs.index'), 'active' => request()->routeIs('admin.logs.*'), 'permissions' => ['system.logs']],
+        ['label' => __('admin.nav.news'), 'icon' => 'campaign', 'href' => route('admin.news.index'), 'active' => request()->routeIs('admin.news.*'), 'permissions' => ['news.edit_any', 'news.edit_own']],
+        ['label' => __('admin.nav.feedback'), 'icon' => 'inbox', 'href' => route('admin.messages.index'), 'active' => request()->routeIs('admin.messages.*', 'admin.feedback'), 'permissions' => ['messages.view_all']],
+        ['label' => __('admin.nav.reports'), 'icon' => 'analytics', 'href' => route('admin.reports.index'), 'active' => request()->routeIs('admin.reports.*'), 'permissions' => ['reports.view_full']],
+        ['label' => __('admin.nav.integrations'), 'icon' => 'hub', 'href' => route('admin.integrations.index'), 'active' => request()->routeIs('admin.integrations.*'), 'permissions' => ['system.settings']],
+        ['label' => __('admin.nav.branches_funds'), 'icon' => 'account_balance', 'href' => route('admin.branches.index'), 'active' => request()->routeIs('admin.branches.*', 'admin.funds.*'), 'permissions' => ['branches.manage']],
+        ['label' => __('admin.nav.external_resources'), 'icon' => 'language', 'href' => route('admin.external-resources.index'), 'active' => request()->routeIs('admin.external-resources.*'), 'permissions' => ['external_resources.manage']],
+        ['label' => __('admin.nav.settings'), 'icon' => 'settings_suggest', 'href' => route('admin.settings.index'), 'active' => request()->routeIs('admin.settings.*'), 'permissions' => ['system.settings']],
+    ];
+    $adminNav = array_values(array_filter(
+        $adminNav,
+        static fn (array $item): bool => $item['permissions'] === [] || ($eloquentAdmin?->canAny($item['permissions']) ?? false),
+    ));
 @endphp
 <!DOCTYPE html>
 <html lang="{{ $pageLang }}">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>@yield('title', 'Admin Portal — KazUTB Smart Library')</title>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-  <script id="tailwind-config">
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            'surface-bright': '#f8f9fa',
-            'inverse-primary': '#afc8f0',
-            'on-surface-variant': '#43474e',
-            'inverse-on-surface': '#f0f1f2',
-            'on-secondary': '#ffffff',
-            'surface': '#f8f9fa',
-            'surface-container-low': '#f3f4f5',
-            'primary-fixed-dim': '#afc8f0',
-            'on-secondary-fixed': '#002020',
-            'tertiary-fixed': '#d1e4fb',
-            'primary-fixed': '#d4e3ff',
-            'surface-container-highest': '#e1e3e4',
-            'on-tertiary-fixed-variant': '#36485b',
-            'surface-tint': '#476083',
-            'secondary': '#006a6a',
-            'tertiary': '#000610',
-            'outline': '#74777f',
-            'error-container': '#ffdad6',
-            'on-tertiary-container': '#76889d',
-            'background': '#f8f9fa',
-            'on-secondary-fixed-variant': '#004f4f',
-            'error': '#ba1a1a',
-            'on-surface': '#191c1d',
-            'primary': '#000613',
-            'on-primary': '#ffffff',
-            'on-error': '#ffffff',
-            'surface-container-high': '#e7e8e9',
-            'on-error-container': '#93000a',
-            'inverse-surface': '#2e3132',
-            'secondary-fixed-dim': '#76d6d5',
-            'primary-container': '#001f3f',
-            'outline-variant': '#c4c6cf',
-            'on-primary-fixed': '#001c3a',
-            'surface-container': '#edeeef',
-            'on-tertiary-fixed': '#091d2e',
-            'on-background': '#191c1d',
-            'on-primary-container': '#6f88ad',
-            'tertiary-fixed-dim': '#b5c8df',
-            'on-secondary-container': '#006e6e',
-            'secondary-fixed': '#93f2f2',
-            'secondary-container': '#90efef',
-            'surface-container-lowest': '#ffffff',
-            'on-primary-fixed-variant': '#2f486a',
-            'surface-dim': '#d9dadb',
-            'tertiary-container': '#0d2031'
-          },
-          borderRadius: {
-            DEFAULT: '0.125rem',
-            lg: '0.25rem',
-            xl: '0.5rem',
-            full: '0.75rem'
-          },
-          fontFamily: {
-            headline: ['Newsreader', 'serif'],
-            body: ['Manrope', 'sans-serif'],
-            label: ['Manrope', 'sans-serif']
-          }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>@yield('title', __('brand.workspace.admin').' — '.__('brand.library.name'))</title>
+    @include('partials.favicons')
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link rel="stylesheet" href="/fonts/fonts.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        surface: '#f8f9fa',
+                        'surface-low': '#f3f4f5',
+                        'surface-high': '#e7e8e9',
+                        'surface-highest': '#e1e3e4',
+                        primary: '#000613',
+                        'primary-container': '#001f3f',
+                        secondary: '#006a6a',
+                        'secondary-soft': '#d8f4f1',
+                        outline: '#74777f',
+                        danger: '#ba1a1a'
+                    },
+                    fontFamily: {
+                        headline: ['Newsreader', 'serif'],
+                        body: ['Manrope', 'sans-serif']
+                    },
+                    borderRadius: {
+                        xl: '0.75rem',
+                        '2xl': '1rem'
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        body { font-family: 'Manrope', sans-serif; }
+        .font-headline { font-family: 'Newsreader', serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        [x-cloak] { display: none !important; }
+        .admin-input {
+            width: 100%; border: 1px solid #d8dade; background: #fff; border-radius: .5rem;
+            padding: .68rem .8rem; font-size: .875rem; color: #191c1d;
         }
-      }
-    }
-  </script>
-  <style>
-    body { font-family: 'Manrope', sans-serif; }
-    .font-headline { font-family: 'Newsreader', serif; }
-    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-  </style>
-  @yield('head')
+        .admin-input:focus { border-color: #006a6a; box-shadow: 0 0 0 2px rgba(0,106,106,.12); outline: none; }
+        .admin-label { display: block; margin-bottom: .4rem; color: #43474e; font-size: .72rem; font-weight: 700; letter-spacing: .055em; text-transform: uppercase; }
+        .admin-card { border-radius: .75rem; background: #fff; padding: 1.5rem; box-shadow: 0 12px 35px rgba(0,6,19,.035); }
+        .admin-btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: .5rem; padding: .68rem 1rem; font-size: .875rem; font-weight: 700; transition: .2s ease; }
+        .admin-btn-primary { color: #fff; background: #001f3f; }
+        .admin-btn-primary:hover { background: #000613; }
+        .admin-btn-secondary { color: #006a6a; background: #fff; border: 1px solid #d8dade; }
+        .admin-btn-secondary:hover { background: #f3f4f5; }
+        .admin-btn-danger { color: #93000a; background: #fff; border: 1px solid #ffc7c2; }
+        .admin-btn-danger:hover { background: #fff0ee; }
+        .admin-table { width: 100%; border-collapse: collapse; }
+        .admin-table th { padding: .85rem 1rem; text-align: left; background: #f3f4f5; color: #43474e; font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+        .admin-table td { padding: 1rem; border-bottom: 1px solid #edeeef; vertical-align: top; font-size: .875rem; }
+        .admin-table tbody tr:hover { background: rgba(243,244,245,.65); }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+    </style>
+    @stack('head')
 </head>
-<body class="bg-surface text-on-surface antialiased flex min-h-screen">
-  <nav class="bg-surface-container-lowest text-primary font-body h-screen w-72 fixed left-0 top-0 hidden md:flex flex-col z-40 pt-4 pb-6 shadow-none">
-    <div class="px-6 mb-12 flex items-center gap-4">
-      <div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary font-headline font-bold">{{ $userInitial }}</div>
-      <div>
-        <h2 class="font-headline text-2xl font-black text-primary leading-tight">Admin Portal</h2>
-        <p class="text-sm text-on-surface-variant">High-Control Governance</p>
-      </div>
-    </div>
-
-    <div class="flex-1 flex flex-col gap-2 overflow-y-auto">
-      @foreach ($adminNav as $item)
-        <a href="{{ $item['href'] }}" class="{{ $item['active'] ? 'bg-primary text-white rounded-md mx-2 px-4 py-3 flex items-center gap-3' : 'text-on-surface/70 mx-2 px-4 py-3 flex items-center gap-3 hover:bg-primary/5 transition-all duration-200 ease-in-out' }}">
-          <span class="material-symbols-outlined" @if($item['active']) style="font-variation-settings: 'FILL' 1;" @endif>{{ $item['icon'] }}</span>
-          <span>{{ $item['label'] }}</span>
-        </a>
-      @endforeach
-    </div>
-
-    <div class="px-4 mt-auto">
-      <a href="{{ route('admin.news') }}" class="w-full py-3 mb-6 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-md font-medium text-sm hover:opacity-90 transition-opacity inline-flex items-center justify-center">Post Announcement</a>
-      <div class="flex flex-col gap-2">
-        <a href="/librarian/data-cleanup" class="text-on-surface/70 mx-2 px-4 py-2 flex items-center gap-3 hover:bg-primary/5 transition-all duration-200 text-sm">
-          <span class="material-symbols-outlined text-[20px]">open_in_new</span>
-          <span>Librarian Console →</span>
-        </a>
-        <button id="admin-logout-btn" type="button" class="text-on-surface/70 mx-2 px-4 py-2 flex items-center gap-3 hover:bg-primary/5 transition-all duration-200 text-sm text-left">
-          <span class="material-symbols-outlined text-[20px]">logout</span>
-          <span>Logout</span>
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <main class="flex-1 md:ml-72 flex flex-col min-h-screen">
-    <header class="bg-white/80 backdrop-blur-xl text-primary tracking-tight text-[1.75rem] w-full top-0 sticky bg-surface-container-low border-b-0 shadow-sm shadow-primary/5 flex justify-between items-center px-8 py-3 z-30">
-      <div class="flex items-center gap-4">
-        <span class="font-headline text-xl font-bold text-primary md:hidden">Admin Portal</span>
-        <div class="hidden md:flex relative items-center">
-          <span class="material-symbols-outlined absolute left-3 text-on-surface-variant">search</span>
-          <input class="pl-10 pr-4 py-2 bg-surface-container-highest border-b border-transparent focus:border-secondary outline-none rounded-t-md w-96 text-[1rem] font-body text-on-surface placeholder:text-on-surface-variant/60 transition-colors" placeholder="Search across collections, patrons, and metrics..." type="text" />
+<body class="min-h-screen bg-surface text-slate-900 antialiased">
+    <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col bg-white px-3 py-5 md:flex">
+        <div class="mb-7 px-2">
+            <x-library-brand variant="sidebar" :href="route('admin.overview')" />
+            <div class="mt-4 border-t border-slate-100 pt-3 pl-1" data-workspace-role>
+                <div class="text-[10px] font-bold uppercase tracking-[.15em] text-secondary">{{ __('brand.workspace.system') }}</div>
+                <div class="mt-1 text-sm font-bold text-primary-container">{{ __('brand.workspace.admin') }}</div>
+            </div>
         </div>
-      </div>
 
-      <div class="flex items-center gap-4">
-        <button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface hover:bg-surface transition-colors duration-300" type="button">
-          <span class="material-symbols-outlined">notifications</span>
-        </button>
-        <button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface hover:bg-surface transition-colors duration-300" type="button">
-          <span class="material-symbols-outlined">help_outline</span>
-        </button>
-        <div class="w-9 h-9 rounded-full bg-primary-container text-on-primary overflow-hidden ml-2 flex items-center justify-center text-sm font-bold">{{ $userInitial }}</div>
-      </div>
-    </header>
+        <nav aria-label="{{ __('admin.layout.main_navigation') }}" class="flex-1 space-y-1 overflow-y-auto">
+            @foreach ($adminNav as $item)
+                <a href="{{ $item['href'] }}" @class([
+                    'flex items-center gap-3 rounded-lg px-4 py-3 text-sm transition',
+                    'bg-primary text-white' => $item['active'],
+                    'text-slate-600 hover:bg-slate-100 hover:text-primary' => ! $item['active'],
+                ])>
+                    <span class="material-symbols-outlined text-[21px]" @if($item['active']) style="font-variation-settings:'FILL' 1" @endif>{{ $item['icon'] }}</span>
+                    <span>{{ $item['label'] }}</span>
+                </a>
+            @endforeach
+        </nav>
 
-    <div class="p-8 lg:p-12 max-w-7xl mx-auto w-full">
-      @yield('content')
+        <div class="mt-5 border-t border-slate-100 pt-4">
+            @can('news.create')
+                <a href="{{ route('admin.news.create') }}" class="admin-btn admin-btn-primary mb-3 w-full">
+                    <span class="material-symbols-outlined text-[19px]">add</span>{{ __('news.create') }}
+                </a>
+            @endcan
+            <a href="/librarian" class="flex items-center gap-3 rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">
+                <span class="material-symbols-outlined text-[20px]">open_in_new</span>{{ __('admin.nav.librarian_console') }}
+            </a>
+            <form method="POST" action="{{ url('/logout') }}">
+                @csrf
+                <button class="flex w-full items-center gap-3 rounded-lg px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-100" type="submit">
+                    <span class="material-symbols-outlined text-[20px]">logout</span>{{ __('admin.nav.logout') }}
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <div class="min-h-screen md:ml-72">
+        <header class="sticky top-0 z-30 border-b border-slate-100 bg-white/90 px-4 py-3 backdrop-blur-xl sm:px-8">
+            <div class="mx-auto flex max-w-[1480px] items-center justify-between gap-4">
+                <details class="relative md:hidden">
+                    <summary class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg hover:bg-slate-100">
+                        <span class="material-symbols-outlined">menu</span>
+                    </summary>
+                    <div class="absolute left-0 top-12 w-72 rounded-xl border border-slate-100 bg-white p-2 shadow-xl">
+                        <div class="border-b border-slate-100 px-2 pb-3 pt-1">
+                            <x-library-brand variant="sidebar" :href="route('admin.overview')" />
+                            <div class="mt-3 text-xs font-bold text-primary-container">{{ __('brand.workspace.system') }} · {{ __('brand.workspace.admin') }}</div>
+                        </div>
+                        @foreach ($adminNav as $item)
+                            <a href="{{ $item['href'] }}" @class(['flex items-center gap-3 rounded-lg px-3 py-2 text-sm', 'bg-primary text-white' => $item['active'], 'hover:bg-slate-100' => ! $item['active']])>
+                                <span class="material-symbols-outlined text-[20px]">{{ $item['icon'] }}</span>{{ $item['label'] }}
+                            </a>
+                        @endforeach
+                    </div>
+                </details>
+
+                <x-library-brand variant="compact" :href="route('admin.overview')" class="md:hidden" />
+
+                <div class="hidden min-w-0 items-center gap-3 text-sm text-slate-500 sm:flex">
+                    <span class="material-symbols-outlined text-[20px] text-secondary">verified_user</span>
+                    <span class="truncate">{{ $userName }}</span>
+                </div>
+
+                <div class="relative hidden w-full max-w-md flex-1 sm:block" id="admin-global-search">
+                    <form method="GET" action="{{ route('admin.search') }}" role="search">
+                        <span class="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[19px] text-slate-400">search</span>
+                        <input
+                            class="w-full rounded-lg border border-slate-200 bg-surface-low py-2 pl-10 pr-3 text-sm focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
+                            type="search"
+                            name="q"
+                            minlength="2"
+                            autocomplete="off"
+                            placeholder="{{ __('admin.search.placeholder') }}"
+                            aria-label="{{ __('admin.search.title') }}"
+                            data-search-input
+                        >
+                    </form>
+                    <div
+                        class="absolute left-0 right-0 top-12 z-40 hidden max-h-[70vh] overflow-y-auto rounded-xl border border-slate-100 bg-white p-2 shadow-xl"
+                        data-search-results
+                    ></div>
+                </div>
+
+                <div class="ml-auto flex items-center gap-2">
+                    <x-locale-switcher variant="light" />
+                    <a
+                        href="{{ route('admin.profile.edit') }}"
+                        class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-container text-sm font-bold text-white transition hover:opacity-80"
+                        title="{{ __('admin.profile.title') }}"
+                        aria-label="{{ __('admin.profile.title') }}"
+                    >{{ $userInitial }}</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="mx-auto w-full max-w-[1480px] px-4 py-8 sm:px-8 lg:px-12 lg:py-12">
+            <x-admin.flash />
+            @yield('content')
+        </main>
     </div>
-  </main>
 
-  <script>
-    document.getElementById('admin-logout-btn')?.addEventListener('click', async () => {
-      try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        await fetch('/api/v1/logout', {
-          method: 'POST',
-          headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken },
-        });
-      } catch (_) {}
-      localStorage.removeItem('library.auth.user');
-      window.location.href = @json($loginRedirectUrl);
-    });
-  </script>
-  @stack('scripts')
+    <script>
+        (function () {
+            const root = document.getElementById('admin-global-search');
+            if (!root) return;
+            const input = root.querySelector('[data-search-input]');
+            const results = root.querySelector('[data-search-results]');
+            const endpoint = @json(route('admin.search'));
+            const emptyLabel = @json(__('admin.search.no_results_short'));
+            let timer = null;
+            let controller = null;
+
+            function hide() { results.classList.add('hidden'); }
+            function show() { results.classList.remove('hidden'); }
+
+            function render(data) {
+                if (!data.groups.length) {
+                    results.innerHTML = '<p class="px-3 py-4 text-center text-sm text-slate-500"></p>';
+                    results.querySelector('p').textContent = emptyLabel;
+                    show();
+                    return;
+                }
+                results.innerHTML = '';
+                data.groups.forEach(function (group) {
+                    const heading = document.createElement('p');
+                    heading.className = 'px-3 pb-1 pt-3 text-[11px] font-bold uppercase tracking-wider text-slate-400';
+                    heading.textContent = group.label;
+                    results.appendChild(heading);
+                    group.items.forEach(function (item) {
+                        const link = document.createElement('a');
+                        link.className = 'block rounded-lg px-3 py-2 hover:bg-slate-100';
+                        link.href = item.url;
+                        const title = document.createElement('span');
+                        title.className = 'block truncate text-sm font-semibold text-slate-800';
+                        title.textContent = item.title;
+                        link.appendChild(title);
+                        if (item.subtitle) {
+                            const subtitle = document.createElement('span');
+                            subtitle.className = 'block truncate text-xs text-slate-500';
+                            subtitle.textContent = item.subtitle;
+                            link.appendChild(subtitle);
+                        }
+                        results.appendChild(link);
+                    });
+                });
+                show();
+            }
+
+            input.addEventListener('input', function () {
+                clearTimeout(timer);
+                const query = input.value.trim();
+                if (query.length < 2) { hide(); return; }
+                timer = setTimeout(function () {
+                    if (controller) controller.abort();
+                    controller = new AbortController();
+                    fetch(endpoint + '?format=json&q=' + encodeURIComponent(query), {
+                        headers: { 'Accept': 'application/json' },
+                        signal: controller.signal,
+                    })
+                        .then(function (response) { return response.ok ? response.json() : null; })
+                        .then(function (data) { if (data) render(data); })
+                        .catch(function () {});
+                }, 250);
+            });
+
+            input.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') hide();
+            });
+            document.addEventListener('click', function (event) {
+                if (!root.contains(event.target)) hide();
+            });
+        })();
+    </script>
+    @stack('scripts')
 </body>
 </html>

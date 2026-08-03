@@ -1,0 +1,36 @@
+# Phase 1 CI Snippet
+
+name: Phase 1 QA Foundation
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Validate Composer
+        run: composer validate
+
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit --log-junit evidence/logs/phase1-phpunit.log
+
+      - name: Run Playwright
+        run: npx playwright test --reporter=list > evidence/logs/phase1-playwright.log 2>&1
+
+      - name: Collect Baseline Metrics
+        run: |
+          php artisan optimize:clear
+          phpunit --coverage
+          npx playwright test
+
+      - name: Upload Evidence
+        uses: actions/upload-artifact@v3
+        with:
+          name: phase1-evidence
+          path: evidence/logs/

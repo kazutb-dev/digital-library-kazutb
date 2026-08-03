@@ -115,7 +115,7 @@ class InternalCopyWriteController extends Controller
         }
 
         $validated = $this->validateOrError($request, [
-            'reason_code' => ['required', 'string', 'in:' . implode(',', InternalCopyRetireService::ALLOWED_REASON_CODES)],
+            'reason_code' => ['required', 'string', 'in:'.implode(',', InternalCopyRetireService::ALLOWED_REASON_CODES)],
             'note' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'actor_user_id' => ['sometimes', 'nullable', 'uuid'],
             'request_id' => ['sometimes', 'nullable', 'string', 'max:128'],
@@ -166,7 +166,7 @@ class InternalCopyWriteController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $rules
+     * @param  array<string, mixed>  $rules
      * @return array<string, mixed>|JsonResponse
      */
     private function validateOrError(Request $request, array $rules): array|JsonResponse
@@ -185,7 +185,7 @@ class InternalCopyWriteController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     private function context(Request $request, array $validated): array
@@ -199,7 +199,8 @@ class InternalCopyWriteController extends Controller
         return [
             'actorUserId' => $actorUserId,
             'actorType' => 'staff_operator',
-            'actorRole' => is_array($staffUser) ? (string) ($staffUser['role'] ?? '') : null,
+            'actorRole' => (string) ($request->user()?->getRoleNames()->first()
+                ?? (is_array($staffUser) ? ($staffUser['canonical_role'] ?? $staffUser['role'] ?? null) : null)),
             'actorLogin' => is_array($staffUser) ? (string) ($staffUser['login'] ?? '') : null,
             'requestId' => isset($validated['request_id']) ? (string) $validated['request_id'] : null,
             'correlationId' => isset($validated['correlation_id']) ? (string) $validated['correlation_id'] : null,
@@ -207,7 +208,7 @@ class InternalCopyWriteController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function forbiddenActorOverrideResponse(Request $request, array $validated): ?JsonResponse
     {
@@ -221,14 +222,13 @@ class InternalCopyWriteController extends Controller
         }
 
         $sessionUserId = (string) ($staffUser['id'] ?? '');
-        $sessionRole = mb_strtolower(trim((string) ($staffUser['role'] ?? '')));
         $requestedActorUserId = (string) $validated['actor_user_id'];
 
         if ($requestedActorUserId === '' || $requestedActorUserId === $sessionUserId) {
             return null;
         }
 
-        if ($sessionRole === 'admin') {
+        if ($request->user()?->hasRole('admin')) {
             return null;
         }
 

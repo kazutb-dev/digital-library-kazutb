@@ -10,7 +10,7 @@
 .PHONY: help install dev-up dev-down dev-logs dev-shell dev-migrate dev-seed \
         prod-up prod-down prod-build prod-deploy \
         test test-unit test-e2e build lint \
-	db-status fresh migrate \
+	db-status fresh migrate vendor-pdfjs \
 	audit-infra audit-schema audit-db audit-all \
 	audit-catalog-quality recover-known-volume \
         branches-status
@@ -33,9 +33,13 @@ help: ## Show this help
 install: ## Install all dependencies (composer + npm)
 	composer install
 	npm ci
+	$(MAKE) vendor-pdfjs
 
 build: ## Build frontend assets for production
 	npm run build
+
+vendor-pdfjs: ## Refresh the vendored pdf.js reader assets from node_modules
+	./scripts/vendor-pdfjs.sh
 
 lint: ## Run pint (PHP) linter
 	./vendor/bin/pint --test

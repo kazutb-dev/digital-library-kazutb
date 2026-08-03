@@ -5,6 +5,7 @@ namespace App\Services\Library;
 class ReaderReservationException extends \RuntimeException
 {
     private string $errorCode;
+
     private int $httpStatus;
 
     public function __construct(string $errorCode, string $message, int $httpStatus = 422)

@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 class ReaderContactNormalizationService
 {
     private const CONTACT_TABLE = 'app.reader_contacts';
+
     private const READER_TABLE = 'app.readers';
 
     /**
@@ -75,7 +76,7 @@ class ReaderContactNormalizationService
             ->first();
 
         if ($reader === null) {
-            throw new \RuntimeException('Reader not found: ' . $readerId);
+            throw new \RuntimeException('Reader not found: '.$readerId);
         }
 
         $contacts = DB::connection('pgsql')
@@ -118,7 +119,7 @@ class ReaderContactNormalizationService
                 ->first();
 
             if ($contact === null) {
-                throw new \RuntimeException('Contact not found: ' . $contactId);
+                throw new \RuntimeException('Contact not found: '.$contactId);
             }
 
             $before = $this->snapshotContact($contact);
@@ -193,12 +194,12 @@ class ReaderContactNormalizationService
             ->first();
 
         if ($reader === null) {
-            throw new \RuntimeException('Reader not found: ' . $readerId);
+            throw new \RuntimeException('Reader not found: '.$readerId);
         }
 
         $contactType = strtoupper(trim($contactType));
         if (! in_array($contactType, ['EMAIL', 'PHONE'], true)) {
-            throw new \InvalidArgumentException('Invalid contact type: ' . $contactType);
+            throw new \InvalidArgumentException('Invalid contact type: '.$contactType);
         }
 
         $trimmed = trim($value);
@@ -352,9 +353,9 @@ class ReaderContactNormalizationService
 
         // Kazakhstan phone normalization: 8xxx → +7xxx, 7xxx → +7xxx
         if (preg_match('/^8(\d{10})$/', $cleaned, $m)) {
-            $cleaned = '+7' . $m[1];
+            $cleaned = '+7'.$m[1];
         } elseif (preg_match('/^7(\d{10})$/', $cleaned, $m)) {
-            $cleaned = '+7' . $m[1];
+            $cleaned = '+7'.$m[1];
         }
 
         // Must be 10-15 digits (with optional leading +)
@@ -412,7 +413,7 @@ class ReaderContactNormalizationService
             $update['needs_review'] = false;
             $update['review_reason_codes'] = DB::raw("'{}'::text[]");
         } else {
-            $pgLiteral = '{' . implode(',', $remaining) . '}';
+            $pgLiteral = '{'.implode(',', $remaining).'}';
             $update['review_reason_codes'] = $pgLiteral;
         }
         $update['updated_at'] = Carbon::now('UTC')->toDateTimeString();

@@ -1,0 +1,52 @@
+{
+  "failedTests": [
+    {
+      "test_id": "P2-API-INT-001",
+      "module": "Integration API",
+      "failure_type": "endpoint contract/status mismatch (404)",
+      "failure_frequency_runs": 1,
+      "evidence_source": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "notes": "Expected 200/401/403 but observed 404 in measured run"
+    },
+    {
+      "test_id": "P2-API-INT-002",
+      "module": "Integration API",
+      "failure_type": "endpoint contract/status mismatch (404)",
+      "failure_frequency_runs": 1,
+      "evidence_source": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "notes": "Expected 200/401/403/422 but observed 404"
+    },
+    {
+      "test_id": "P2-API-OPS-002",
+      "module": "Admin Operations",
+      "failure_type": "route access/policy mismatch",
+      "failure_frequency_runs": 1,
+      "evidence_source": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "notes": "Expected guard policy response, observed 404"
+    },
+    {
+      "test_id": "P2-UI-CAT-004",
+      "module": "Catalog/Public routes",
+      "failure_type": "server error (HTTP 500)",
+      "failure_frequency_runs": 1,
+      "evidence_source": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "notes": "Public news route produced 5xx"
+    },
+    {
+      "test_id": "P2-PHP-SUITE-001",
+      "module": "Authorization/Critical backend subset",
+      "failure_type": "suite-level logic/environment instability",
+      "failure_frequency_runs": 1,
+      "evidence_source": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "notes": "6 failed, 4 skipped, 31 passed"
+    },
+    {
+      "test_id": "P2-GATE-EVAL-001",
+      "module": "Quality governance",
+      "failure_type": "quality gate failure",
+      "failure_frequency_runs": 1,
+      "evidence_source": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "notes": "3 fail-level gates and 1 warn-level attention"
+    }
+  ]
+}

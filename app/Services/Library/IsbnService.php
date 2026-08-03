@@ -9,7 +9,9 @@ namespace App\Services\Library;
 class IsbnService
 {
     private const OPENLIBRARY_API = 'https://openlibrary.org/api/books';
+
     private const OPENLIBRARY_SEARCH = 'https://openlibrary.org/search.json';
+
     private const HTTP_TIMEOUT = 8;
 
     /**
@@ -110,7 +112,7 @@ class IsbnService
             return null;
         }
 
-        $base = '978' . substr($normalized, 0, 9);
+        $base = '978'.substr($normalized, 0, 9);
         $sum = 0;
         for ($i = 0; $i < 12; $i++) {
             $digit = (int) $base[$i];
@@ -119,7 +121,7 @@ class IsbnService
 
         $check = (10 - ($sum % 10)) % 10;
 
-        return $base . $check;
+        return $base.$check;
     }
 
     /**
@@ -134,8 +136,8 @@ class IsbnService
             return ['found' => false, 'source' => 'openlibrary', 'metadata' => null, 'error' => 'Empty ISBN'];
         }
 
-        $key = 'ISBN:' . $normalized;
-        $url = self::OPENLIBRARY_API . '?' . http_build_query([
+        $key = 'ISBN:'.$normalized;
+        $url = self::OPENLIBRARY_API.'?'.http_build_query([
             'bibkeys' => $key,
             'format' => 'json',
             'jscmd' => 'data',
@@ -184,7 +186,7 @@ class IsbnService
             $params['first_publish_year'] = $year;
         }
 
-        $url = self::OPENLIBRARY_SEARCH . '?' . http_build_query($params);
+        $url = self::OPENLIBRARY_SEARCH.'?'.http_build_query($params);
 
         try {
             $ctx = stream_context_create([

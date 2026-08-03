@@ -1,0 +1,8 @@
+Test Type,Defects Found,Severity,Detection Stage,Notes
+Feature Tests,112,Mixed,"Post-Rerun Review","Feature failures across catalog, news, stewardship, and other modules"
+Integration Tests,0,N/A,N/A,"Enhanced integration tests pass with no defects detected"
+API Tests (Enhanced),0,N/A,N/A,"AdminPrivilegeNegativePathTest and ReservationMutateTest pass without defect"
+API Tests (Blocked),0,N/A,"Environment","ReaderReservationTest and AccountReservationsTest blocked by PostgreSQL schema"
+Unit Tests,0,N/A,N/A,"Bibliography formatter and service tests pass without defect"
+Errors (Infrastructure),36,High,"Post-Rerun Review","Environment/runtime errors; not application logic failures"
+Risky Tests,5,Low,"Post-Rerun Review","Tests without assertions; structure correct but execution incomplete"

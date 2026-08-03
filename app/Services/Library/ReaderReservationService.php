@@ -2,13 +2,16 @@
 
 namespace App\Services\Library;
 
+use App\Models\Setting;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class ReaderReservationService
 {
-    private const RESERVATION_EXPIRY_DAYS = 7;
-    private const MAX_ACTIVE_RESERVATIONS = 5;
+    private const RESERVATION_EXPIRY_DAYS = 3;
+
+    private const MAX_ACTIVE_RESERVATIONS = 3;
 
     /**
      * Create a reservation for a reader.
@@ -47,8 +50,12 @@ class ReaderReservationService
             ->whereIn('status', ['PENDING', 'READY'])
             ->count();
 
-        if ($activeCount >= self::MAX_ACTIVE_RESERVATIONS) {
-            throw ReaderReservationException::limitReached(self::MAX_ACTIVE_RESERVATIONS);
+        $maxActiveReservations = $this->integerSetting(
+            'max_active_reservations',
+            self::MAX_ACTIVE_RESERVATIONS,
+        );
+        if ($activeCount >= $maxActiveReservations) {
+            throw ReaderReservationException::limitReached($maxActiveReservations);
         }
         // Find an available copy for this book (prefer first available).
         $copy = DB::connection('pgsql')
@@ -83,7 +90,9 @@ class ReaderReservationService
                 'id' => $reservationId,
                 'status' => 'PENDING',
                 'reservedAt' => $now,
-                'expiresAt' => $now->copy()->addDays(self::RESERVATION_EXPIRY_DAYS),
+                'expiresAt' => $now->copy()->addDays(
+                    $this->integerSetting('reservation_lifespan_days', self::RESERVATION_EXPIRY_DAYS)
+                ),
                 'userId' => $crmUserId,
                 'bookId' => $bookId,
                 'libraryBranchId' => $libraryBranchId,
@@ -221,5 +230,16 @@ class ReaderReservationService
             ->value('id');
 
         return is_string($id) ? $id : null;
+    }
+
+    private function integerSetting(string $key, int $default): int
+    {
+        try {
+            return Schema::hasTable('settings')
+                ? max(1, (int) Setting::valueFor($key, $default))
+                : $default;
+        } catch (\Throwable) {
+            return $default;
+        }
     }
 }

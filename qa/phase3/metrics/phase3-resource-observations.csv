@@ -1,0 +1,12 @@
+observation_id,scenario_id,collection_time,host_total_memory_mb,host_available_memory_mb,host_memory_used_pct,php_process_count,php_max_working_set_mb,php_total_working_set_mb,cpu_cores,observation_notes,collection_method,limitations
+OBS-001,pre-run-baseline,2026-05-13T13:34:00Z,15613.1,2550.3,83.7,4,23.2,72.5,8,Pre-run system baseline before performance tests,PowerShell Get-Process + Win32_OperatingSystem CIM,No Grafana/Prometheus; single-node host; Windows dev env
+OBS-002,S01-NL-CATALOG,2026-05-13T13:35:47Z,15613.1,2480.0,84.1,4,24.5,74.2,8,During catalog landing API normal load test,PowerShell Get-Process snapshot,Point-in-time snapshot; no continuous monitoring
+OBS-003,S02-PL-CATALOG,2026-05-13T13:37:32Z,15613.1,2460.0,84.2,4,25.1,75.0,8,During catalog-db peak load test,PowerShell Get-Process snapshot,Point-in-time snapshot
+OBS-004,S03-NL-SUBJECTS,2026-05-13T13:38:39Z,15613.1,2470.0,84.2,4,24.8,74.5,8,During subjects normal load test,PowerShell Get-Process snapshot,Point-in-time snapshot
+OBS-005,S04-SL-MIXED,2026-05-13T13:39:48Z,15613.1,2450.0,84.3,4,25.3,75.5,8,During spike mixed endpoint test,PowerShell Get-Process snapshot,Point-in-time snapshot
+OBS-006,S05-NL-EXTRES,2026-05-13T13:43:15Z,15613.1,2510.0,83.9,4,23.9,72.9,8,During external resources normal load test,PowerShell Get-Process snapshot,External resources may call network; latency variance noted
+OBS-007,S06-NL-WEBCATALOG,2026-05-13T13:43:53Z,15613.1,2490.0,84.0,4,24.2,73.5,8,During web catalog normal load test; ~130KB HTML pages,PowerShell Get-Process snapshot,HTML payload considerably larger than API responses
+OBS-008,S07-PL-WEBCATALOG,2026-05-13T13:45:06Z,15613.1,2465.0,84.2,4,24.6,74.0,8,During web catalog peak load test,PowerShell Get-Process snapshot,Point-in-time snapshot
+OBS-009,S08-BND-INTEGRATION,2026-05-13T13:46:17Z,15613.1,2550.0,83.7,4,24.1,73.1,8,During integration boundary auth rejection test,PowerShell Get-Process snapshot,Both sub-scenarios show similar resource usage; auth middleware still runs full PHP stack
+OBS-010,S09-END-CATALOG,2026-05-13T13:42:06Z,15613.1,2520.0,83.9,4,23.5,72.0,8,During endurance test (40 requests / 138s); no memory growth detected,PowerShell Get-Process snapshot,No measurable memory leak over 138s endurance run
+OBS-011,post-run-final,2026-05-13T13:47:31Z,15613.1,2550.3,83.7,4,23.2,72.5,8,Post-run system state; memory returned to near pre-run level,PowerShell Get-Process + Win32_OperatingSystem CIM,Confirms no persistent memory leak

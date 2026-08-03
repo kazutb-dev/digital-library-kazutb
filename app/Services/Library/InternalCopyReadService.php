@@ -16,7 +16,7 @@ class InternalCopyReadService
     public function findCopyDetail(string $copyId): ?array
     {
         $row = DB::connection('pgsql')
-            ->table(self::COPY_TABLE . ' as bc')
+            ->table(self::COPY_TABLE.' as bc')
             ->leftJoin('app.documents as d', 'd.id', '=', 'bc.document_id')
             ->select($this->copySelectColumns())
             ->where('bc.id', $copyId)
@@ -37,7 +37,7 @@ class InternalCopyReadService
     public function listCopiesByDocument(string $documentId): array
     {
         $rows = DB::connection('pgsql')
-            ->table(self::COPY_TABLE . ' as bc')
+            ->table(self::COPY_TABLE.' as bc')
             ->leftJoin('app.documents as d', 'd.id', '=', 'bc.document_id')
             ->select($this->copySelectColumns())
             ->where('bc.document_id', $documentId)
@@ -86,13 +86,13 @@ class InternalCopyReadService
 
         foreach ($copyColumns as $column) {
             if ($this->hasCopyColumn($column)) {
-                $select[] = 'bc.' . $column;
+                $select[] = 'bc.'.$column;
             }
         }
 
         foreach ($documentColumns as $column) {
             if ($this->hasDocumentColumn($column)) {
-                $select[] = 'd.' . $column;
+                $select[] = 'd.'.$column;
             }
         }
 
@@ -110,7 +110,7 @@ class InternalCopyReadService
     }
 
     /**
-     * @param list<array<string,mixed>> $rows
+     * @param  list<array<string,mixed>>  $rows
      * @return list<array<string,mixed>>
      */
     private function mapRows(array $rows): array
@@ -194,7 +194,7 @@ class InternalCopyReadService
     }
 
     /**
-     * @param list<string> $copyIds
+     * @param  list<string>  $copyIds
      * @return array<string,string>
      */
     private function activeLoanIndex(array $copyIds): array

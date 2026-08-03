@@ -1,0 +1,36 @@
+{
+  "coverageGaps": [
+    {
+      "module": "Circulation/Operations",
+      "high_risk_function": "internal operations access boundaries",
+      "coverage_status": "partial",
+      "coverage_percent": 66.7,
+      "gap_description": "Coverage below 70%; limited depth across circulation operations",
+      "evidence": "qa/phase2/metrics/phase2-automation-coverage.csv"
+    },
+    {
+      "module": "Integration API",
+      "high_risk_function": "boundary and reservation integration behavior",
+      "coverage_status": "partial",
+      "coverage_percent": 50.0,
+      "gap_description": "Half of planned high-risk checks automated",
+      "evidence": "qa/phase2/metrics/phase2-automation-coverage.csv"
+    },
+    {
+      "module": "Admin operations",
+      "high_risk_function": "admin guard and integration access paths",
+      "coverage_status": "partial",
+      "coverage_percent": 50.0,
+      "gap_description": "Coverage significantly below 70% threshold",
+      "evidence": "qa/phase2/metrics/phase2-automation-coverage.csv"
+    },
+    {
+      "module": "Coverage readiness (cross-cutting)",
+      "high_risk_function": "line-level coverage observability",
+      "coverage_status": "blocked",
+      "coverage_percent": "n/a",
+      "gap_description": "Local measured run blocked by missing coverage driver",
+      "evidence": "qa/phase2/evidence/logs/phase2-coverage.log"
+    }
+  ]
+}

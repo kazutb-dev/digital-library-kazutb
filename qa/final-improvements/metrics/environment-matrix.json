@@ -1,0 +1,64 @@
+{
+    "environment_matrix": [
+        {
+            "component": "PHP",
+            "version": "8.4.21",
+            "role": "Runtime",
+            "notes": "Primary application runtime; Laravel 13 requires 8.1+"
+        },
+        {
+            "component": "Laravel",
+            "version": "13",
+            "role": "Framework",
+            "notes": "Latest stable; Eloquent ORM, middleware-based auth"
+        },
+        {
+            "component": "PostgreSQL",
+            "version": "18",
+            "role": "Database",
+            "notes": "Production and live-query database; schema incomplete for test env"
+        },
+        {
+            "component": "SQLite",
+            "version": "In-memory (:memory:)",
+            "role": "Test Database",
+            "notes": "Fast test execution; transactions supported"
+        },
+        {
+            "component": "Docker Compose",
+            "version": "Multi-service",
+            "role": "Orchestration",
+            "notes": "app (PHP-FPM + Nginx), postgres (DB), frontend-dev (Node.js)"
+        },
+        {
+            "component": "PHPUnit",
+            "version": "12.5.14",
+            "role": "Test Framework",
+            "notes": "Latest stable; supports testdox formatter, parallel execution"
+        },
+        {
+            "component": "Nginx",
+            "version": "Latest (Docker)",
+            "role": "Web Server",
+            "notes": "Reverse proxy; handles static assets and PHP routing"
+        },
+        {
+            "component": "Mockery",
+            "version": "Latest",
+            "role": "Mocking Library",
+            "notes": "For service/API mocking in integration tests"
+        },
+        {
+            "component": "Authentication",
+            "version": "Session-based",
+            "role": "Auth Method",
+            "notes": "library.user session key; middleware-driven"
+        },
+        {
+            "component": "Authorization",
+            "version": "Role-based (RBAC)",
+            "role": "Access Control",
+            "notes": "4 roles: guest, reader, librarian, admin"
+        }
+    ]
+}

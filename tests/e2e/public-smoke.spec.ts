@@ -28,7 +28,9 @@ test.describe("public smoke coverage", () => {
     }) => {
         await page.goto("/account");
         await expect(page).toHaveURL(/\/login\?redirect=%2Faccount/);
-        await expect(page.locator("form")).toBeVisible();
+        // The page also carries one POST form per demo identity, so target the
+        // credential form itself rather than "any form".
+        await expect(page.locator("#login-form")).toBeVisible();
 
         await page.goto("/resources?lang=en");
         await expect(

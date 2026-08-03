@@ -7,9 +7,13 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "barryvdh/laravel-dompdf": "^3.1",
+        "endroid/qr-code": "^6.0",
         "laravel/framework": "^13.0",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^3.0"
+        "laravel/tinker": "^3.0",
+        "picqer/php-barcode-generator": "^3.2",
+        "spatie/laravel-permission": "^8.3"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -45,8 +49,10 @@
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
         ],
         "test": [
-            "@php artisan config:clear --ansi",
-            "@php artisan test"
+            "@php vendor/bin/phpunit"
+        ],
+        "test:postgres": [
+            "bash scripts/dev/test-postgres.sh"
         ],
         "qa:ci": [
             "bash scripts/dev/run-ci-gates.sh"
@@ -92,8 +98,7 @@
             "@dev:catalog-paths"
         ],
         "test:critical-paths": [
-            "@php artisan config:clear --ansi",
-            "@php artisan test --filter='BibliographyFormatterTest|CatalogDbSearchTest|BookDetailDbTest|AuthSessionMeTest|AuthSessionLifecycleTest|LoginTest|ReservationReadTest|ReservationMutateTest|AccountReservationsTest|InternalCirculationCheckoutReturnTest|InternalCirculationRenewalTest|InternalCirculationReadbackTest|DocumentManagementTest|IntegrationRateLimitTest'"
+            "@php vendor/bin/phpunit --filter='BibliographyFormatterTest|CatalogDbSearchTest|BookDetailDbTest|AuthSessionMeTest|AuthSessionLifecycleTest|LoginTest|ReservationReadTest|ReservationMutateTest|AccountReservationsTest|InternalCirculationCheckoutReturnTest|InternalCirculationRenewalTest|InternalCirculationReadbackTest|DocumentManagementTest|IntegrationRateLimitTest'"
         ],
         "dev:critical-paths": [
             "bash scripts/dev/check-runtime-critical-paths.sh"

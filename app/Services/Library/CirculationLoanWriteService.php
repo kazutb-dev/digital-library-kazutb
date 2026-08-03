@@ -6,14 +6,16 @@ use App\Models\Library\BookCopy;
 use App\Models\Library\CirculationAuditEvent;
 use App\Models\Library\CirculationLoan;
 use App\Models\Library\Reader;
+use App\Models\Setting;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class CirculationLoanWriteService
 {
     /**
-     * @param array{actorUserId?: string|null, actorType?: string|null, requestId?: string|null, correlationId?: string|null, metadata?: array<string, mixed>} $context
+     * @param  array{actorUserId?: string|null, actorType?: string|null, requestId?: string|null, correlationId?: string|null, metadata?: array<string, mixed>}  $context
      * @return array<string, mixed>
      */
     public function checkout(string $readerId, string $copyId, ?string $dueAt = null, array $context = []): array
@@ -31,6 +33,36 @@ class CirculationLoanWriteService
 
             if ($copy->retired_at !== null) {
                 throw new CirculationWriteException('copy_retired', 409, 'Retired copy is not checkout-eligible.');
+            }
+
+            $maxActiveLoans = $this->integerSetting('max_active_loans', 5);
+            $readerActiveLoans = CirculationLoan::query()
+                ->where('reader_id', $readerId)
+                ->where('status', 'active')
+                ->whereNull('returned_at')
+                ->count();
+            if ($readerActiveLoans >= $maxActiveLoans) {
+                throw new CirculationWriteException(
+                    'max_active_loans_reached',
+                    409,
+                    "Maximum active loans ({$maxActiveLoans}) reached."
+                );
+            }
+
+            if ($this->booleanSetting('overdue_blocking_enabled', true)) {
+                $hasOverdue = CirculationLoan::query()
+                    ->where('reader_id', $readerId)
+                    ->where('status', 'active')
+                    ->whereNull('returned_at')
+                    ->where('due_at', '<', Carbon::now('UTC'))
+                    ->exists();
+                if ($hasOverdue) {
+                    throw new CirculationWriteException(
+                        'reader_has_overdue_loans',
+                        409,
+                        'New loans are blocked while the reader has overdue items.'
+                    );
+                }
             }
 
             $activeLoan = $this->findActiveLoanModelByCopy($copyId);
@@ -73,7 +105,7 @@ class CirculationLoanWriteService
     public const RENEWAL_DAYS = 14;
 
     /**
-     * @param array{actorUserId?: string|null, actorType?: string|null, requestId?: string|null, correlationId?: string|null, metadata?: array<string, mixed>} $context
+     * @param  array{actorUserId?: string|null, actorType?: string|null, requestId?: string|null, correlationId?: string|null, metadata?: array<string, mixed>}  $context
      * @return array<string, mixed>
      */
     public function renew(string $loanId, bool $allowOverdue = false, ?string $newDueAt = null, array $context = []): array
@@ -88,9 +120,18 @@ class CirculationLoanWriteService
                 throw new CirculationWriteException('loan_not_active', 409, 'Only active loans can be renewed.');
             }
 
+            if (! $this->booleanSetting('renewal_allowed', true)
+                && ! (bool) ($context['overridePolicy'] ?? false)) {
+                throw new CirculationWriteException(
+                    'renewal_disabled',
+                    409,
+                    'Loan renewal is disabled by the current circulation policy.'
+                );
+            }
+
             if ($loan->renew_count >= self::MAX_RENEWALS) {
                 throw new CirculationWriteException('max_renewals_reached', 409,
-                    'Maximum renewals (' . self::MAX_RENEWALS . ') reached.');
+                    'Maximum renewals ('.self::MAX_RENEWALS.') reached.');
             }
 
             $isOverdue = $loan->due_at !== null && Carbon::parse($loan->due_at)->isPast();
@@ -113,7 +154,9 @@ class CirculationLoanWriteService
                         'New due date must be after current due date.');
                 }
             } else {
-                $resolvedDueAt = $currentDueAt->copy()->addDays(self::RENEWAL_DAYS);
+                $resolvedDueAt = $currentDueAt->copy()->addDays(
+                    $this->integerSetting('renewal_period_days', self::RENEWAL_DAYS)
+                );
             }
 
             $loan->forceFill([
@@ -140,7 +183,7 @@ class CirculationLoanWriteService
     }
 
     /**
-     * @param array{actorUserId?: string|null, actorType?: string|null, requestId?: string|null, correlationId?: string|null, metadata?: array<string, mixed>} $context
+     * @param  array{actorUserId?: string|null, actorType?: string|null, requestId?: string|null, correlationId?: string|null, metadata?: array<string, mixed>}  $context
      * @return array<string, mixed>
      */
     public function returnCopy(string $copyId, array $context = []): array
@@ -195,7 +238,9 @@ class CirculationLoanWriteService
     private function resolveDueAt(Carbon $issuedAt, ?string $dueAt): Carbon
     {
         if ($dueAt === null || trim($dueAt) === '') {
-            return $issuedAt->copy()->addDays(14);
+            return $issuedAt->copy()->addDays(
+                $this->integerSetting('standard_loan_period_days', 14)
+            );
         }
 
         try {
@@ -212,9 +257,9 @@ class CirculationLoanWriteService
     }
 
     /**
-     * @param array<string, mixed>|null $previousState
-     * @param array<string, mixed> $newState
-     * @param array{actorUserId?: string|null, actorType?: string|null, requestId?: string|null, correlationId?: string|null, metadata?: array<string, mixed>, copyId?: string|null} $context
+     * @param  array<string, mixed>|null  $previousState
+     * @param  array<string, mixed>  $newState
+     * @param  array{actorUserId?: string|null, actorType?: string|null, requestId?: string|null, correlationId?: string|null, metadata?: array<string, mixed>, copyId?: string|null}  $context
      */
     private function recordAuditEvent(
         string $action,
@@ -272,5 +317,27 @@ class CirculationLoanWriteService
             'renewCount' => (int) $loan->renew_count,
             'maxRenewals' => self::MAX_RENEWALS,
         ];
+    }
+
+    private function integerSetting(string $key, int $default): int
+    {
+        try {
+            return Schema::hasTable('settings')
+                ? max(1, (int) Setting::valueFor($key, $default))
+                : $default;
+        } catch (\Throwable) {
+            return $default;
+        }
+    }
+
+    private function booleanSetting(string $key, bool $default): bool
+    {
+        try {
+            return Schema::hasTable('settings')
+                ? (bool) Setting::valueFor($key, $default)
+                : $default;
+        } catch (\Throwable) {
+            return $default;
+        }
     }
 }

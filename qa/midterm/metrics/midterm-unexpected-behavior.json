@@ -1,0 +1,40 @@
+{
+  "unexpectedBehavior": [
+    {
+      "observation_id": "UB-001",
+      "module": "Catalog/Public",
+      "category": "unexpected runtime failure",
+      "description": "Public /news route returned HTTP 500 in smoke run",
+      "predicted_in_phase1": "no",
+      "evidence": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "impact": "High user-facing disruption"
+    },
+    {
+      "observation_id": "UB-002",
+      "module": "Integration API",
+      "category": "new failure pattern",
+      "description": "Integration endpoints expected policy codes but returned 404",
+      "predicted_in_phase1": "partial",
+      "evidence": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "impact": "High external-system contract risk"
+    },
+    {
+      "observation_id": "UB-003",
+      "module": "Coverage pipeline",
+      "category": "tooling anomaly",
+      "description": "Coverage driver unavailable in local measured environment",
+      "predicted_in_phase1": "yes",
+      "evidence": "qa/phase2/evidence/logs/phase2-coverage.log",
+      "impact": "Reduced detectability and delayed risk closure"
+    },
+    {
+      "observation_id": "UB-004",
+      "module": "Targeted backend regression suite",
+      "category": "environment anomaly",
+      "description": "SQLite table/view mismatch noted in failing subset",
+      "predicted_in_phase1": "no",
+      "evidence": "qa/phase2/metrics/phase2-test-execution-log.csv",
+      "impact": "Medium reliability and reproducibility risk"
+    }
+  ]
+}

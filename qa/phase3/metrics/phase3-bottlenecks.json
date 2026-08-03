@@ -1,0 +1,127 @@
+[
+    {
+        "bottleneck_id": "BN-001",
+        "scenario_id": "ALL",
+        "module": "All Modules",
+        "observation": "All endpoints average 3.1–3.8s response time — 6–8x above typical 500ms production target for public API",
+        "severity": "CRITICAL",
+        "metric_affected": "avg_ms / p95_ms",
+        "evidence": {
+            "S01_avg_ms": 3443.66,
+            "S02_avg_ms": 3497.38,
+            "S03_avg_ms": 3359.51,
+            "S05_avg_ms": 3077.66,
+            "S06_avg_ms": 3784.74,
+            "S09_avg_ms": 3454.2,
+            "target_ms": 500
+        },
+        "root_cause_hypothesis": "PHP-FPM cold path + SQLite/development DB I/O on each request; no opcode-cache warm-up in dev env; local Windows dev machine not Linux production server",
+        "recommendation": "1) Enable PHP OPcache; 2) Use PostgreSQL connection pooling; 3) Profile with Xdebug/Blackfire to isolate top 3 slow queries; 4) Add HTTP response caching (Redis) for read-heavy API endpoints; 5) Re-test on Linux staging server to separate dev-env overhead"
+    },
+    {
+        "bottleneck_id": "BN-002",
+        "scenario_id": "S08-BND-INTEGRATION",
+        "module": "Integration API",
+        "observation": "Integration middleware rejection latency 3237ms avg — 62% above 2000ms threshold; SCENARIO FAIL",
+        "severity": "CRITICAL",
+        "metric_affected": "middleware_overhead_avg_ms / threshold_ms",
+        "evidence": {
+            "S08A_avg_ms": 3331.68,
+            "S08B_avg_ms": 3142.56,
+            "middleware_overhead_avg_ms": 3237.12,
+            "threshold_ms": 2000,
+            "overage_pct": 61.9
+        },
+        "root_cause_hypothesis": "Middleware chain executes full PHP bootstrap even for rejected requests; no short-circuit before database/service layer; possible eager service provider loading on every request",
+        "recommendation": "1) Move auth token validation to earliest-possible middleware with short-circuit return; 2) Avoid loading CatalogReadService/DB connections before auth check; 3) Add integration API route-level middleware cache; 4) Consider Nginx-level JWT pre-validation"
+    },
+    {
+        "bottleneck_id": "BN-003",
+        "scenario_id": "S06-NL-WEBCATALOG",
+        "module": "Web Catalog UI",
+        "observation": "Web catalog page averages 3784ms with 130KB HTML payload — largest response size and slowest API endpoint",
+        "severity": "HIGH",
+        "metric_affected": "avg_ms / avg_body_bytes",
+        "evidence": {
+            "S06_avg_ms": 3784.74,
+            "S06_avg_body_bytes": 130180,
+            "S07_avg_ms": 3639.72,
+            "S07_avg_body_bytes": 130180
+        },
+        "root_cause_hypothesis": "Full server-side rendered Blade template includes embedded catalog data in a single HTML response; no fragment caching; CDN not configured",
+        "recommendation": "1) Enable Blade partial caching via Laravel cache tags; 2) Split catalog data fetch from HTML rendering; 3) Compress HTML responses with Gzip/Brotli; 4) Paginate catalog results on server; 5) CDN for static assets"
+    },
+    {
+        "bottleneck_id": "BN-004",
+        "scenario_id": "ALL",
+        "module": "All Modules",
+        "observation": "Throughput 0.26–0.33 rps across all scenarios — severely limiting concurrent user capacity",
+        "severity": "HIGH",
+        "metric_affected": "throughput_rps",
+        "evidence": {
+            "S01_rps": 0.29,
+            "S02_rps": 0.286,
+            "S05_rps": 0.325,
+            "S06_rps": 0.264,
+            "test_vu_count": 1
+        },
+        "root_cause_hypothesis": "Sequential request model (1 VU) with 3–4s avg latency yields natural ~0.29 rps ceiling; actual production concurrency would be much higher",
+        "recommendation": "1) Full load test with k6 or Locust at 50–100 concurrent VUs to determine actual capacity ceiling; 2) PHP-FPM pool size tuning; 3) Async queue for heavy operations; 4) Database read replicas for catalog queries"
+    },
+    {
+        "bottleneck_id": "BN-005",
+        "scenario_id": "S03-NL-SUBJECTS",
+        "module": "Catalog/Public API",
+        "observation": "/api/v1/subjects p95=3969ms — highest p95 variance of all API endpoints",
+        "severity": "MEDIUM",
+        "metric_affected": "p95_ms",
+        "evidence": {
+            "S03_min_ms": 2831.09,
+            "S03_median_ms": 3233.23,
+            "S03_p95_ms": 3969.37,
+            "S03_max_ms": 4417.13,
+            "S03_range_ms": 1586.04
+        },
+        "root_cause_hypothesis": "Subjects endpoint may perform a GROUP BY or aggregate query without proper index; first-request overhead from cold query plan cache; variable row count per request",
+        "recommendation": "1) Add composite index on subjects table; 2) Cache subjects list in Redis with 5-minute TTL; 3) Review query plan via EXPLAIN ANALYZE"
+    },
+    {
+        "bottleneck_id": "BN-006",
+        "scenario_id": "UNTESTED",
+        "module": "Public Web",
+        "observation": "/news endpoint returns HTTP 500 under test — cannot measure news module load performance",
+        "severity": "MEDIUM",
+        "metric_affected": "availability",
+        "evidence": "HTTP 500 confirmed from phase2 and phase3 pre-test check",
+        "root_cause_hypothesis": "Underlying error in news controller/view — likely missing DB record or template variable binding failure",
+        "recommendation": "1) Fix /news controller error; 2) Add integration test asserting /news returns 200; 3) Check LibraryNews model seeder and DB migration"
+    },
+    {
+        "bottleneck_id": "BN-007",
+        "scenario_id": "UNTESTED",
+        "module": "Auth API",
+        "observation": "/api/login endpoint times out (>10s) — cannot measure authentication flow under load",
+        "severity": "MEDIUM",
+        "metric_affected": "response_time / availability",
+        "evidence": "Timeout confirmed from phase2; /api/login not included in phase3 scenarios",
+        "root_cause_hypothesis": "Laravel Sanctum token generation may be triggering slow hashing or DB query; possible misconfiguration of session/cookie driver in dev env",
+        "recommendation": "1) Profile /api/login with Xdebug; 2) Verify bcrypt cost factor is ≤12 in dev; 3) Check Sanctum token cleanup queries"
+    },
+    {
+        "bottleneck_id": "BN-008",
+        "scenario_id": "S09-END-CATALOG",
+        "module": "Catalog/Public API",
+        "observation": "Endurance test (40 req/138s) shows consistent latency — no memory leak detected but no warm-up improvement",
+        "severity": "LOW",
+        "metric_affected": "avg_ms stability",
+        "evidence": {
+            "S09_avg_ms": 3454.2,
+            "S01_avg_ms": 3443.66,
+            "delta_ms": 10.54,
+            "S09_max_ms": 3713.7,
+            "S01_max_ms": 3592.31
+        },
+        "root_cause_hypothesis": "PHP-FPM workers are long-lived enough to reuse opcode cache but no per-process query caching; stable behavior confirms no regression but also no warm-up benefit",
+        "recommendation": "1) Implement in-memory result caching (Redis); 2) Pre-warm PHP-FPM workers before load tests; 3) Endurance tests over longer window (>10 min) on staging"
+    }
+]

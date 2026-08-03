@@ -4,7 +4,7 @@
   $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $withLang = function (string $path, array $query = []) use ($lang): string {
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
 
@@ -28,6 +28,9 @@
           'draft_title_placeholder' => 'Например: Подборка для дисциплины «Информатика»',
           'draft_notes_label' => 'Заметки исследователя',
           'draft_notes_placeholder' => 'Семестр, группа, комментарии или заметка для себя...',
+          'status_title' => 'Статус сохранения',
+          'status_ready' => 'Подборка сохранена и готова к работе',
+          'status_items' => 'материалов',
           'summary_title' => 'Сводка подборки',
           'total_label' => 'Всего записей',
           'digital_label' => 'Цифровые',
@@ -61,6 +64,9 @@
           'draft_title_placeholder' => 'Мысалы: «Информатика» пәніне арналған іріктеме',
           'draft_notes_label' => 'Зерттеуші ескертпесі',
           'draft_notes_placeholder' => 'Семестр, топ, түсініктеме немесе өзіңізге белгі...',
+          'status_title' => 'Сақтау күйі',
+          'status_ready' => 'Іріктеме сақталды және жұмысқа дайын',
+          'status_items' => 'материал',
           'summary_title' => 'Іріктеме жиынтығы',
           'total_label' => 'Барлығы',
           'digital_label' => 'Цифрлық',
@@ -94,6 +100,9 @@
           'draft_title_placeholder' => 'For example: Reading list for “Computer Science”',
           'draft_notes_label' => 'Research notes',
           'draft_notes_placeholder' => 'Semester, group, comments, or a note for yourself...',
+          'status_title' => 'Save status',
+          'status_ready' => 'Shortlist saved and ready',
+          'status_items' => 'items',
           'summary_title' => 'Shortlist Summary',
           'total_label' => 'Total Items',
           'digital_label' => 'Digital',
@@ -118,111 +127,127 @@
 @section('title', $copy['title'])
 
 @section('content')
-  <section class="research-shortlist-page" data-shortlist-page>
-    <div class="shortlist-shell">
-      <header class="research-shortlist-hero" data-shortlist-hero>
-        <h1>{{ $copy['hero_title'] }}</h1>
-        <p>{{ $copy['hero_body'] }}</p>
-      </header>
-
-      <div id="shortlist-loading" class="shortlist-state shortlist-state--loading">
-        <div class="shortlist-spinner" aria-hidden="true"></div>
-        <p>{{ $copy['loading'] }}</p>
-      </div>
-
-      <div id="shortlist-empty" class="shortlist-state shortlist-state--empty" style="display:none;">
-        <h2>{{ $copy['empty_title'] }}</h2>
-        <p>{{ $copy['empty_body'] }}</p>
-        <div class="shortlist-state-actions">
-          <a href="{{ $withLang('/catalog') }}" class="shortlist-btn shortlist-btn--light">{{ $copy['open_catalog'] }}</a>
-          <a href="{{ $withLang('/resources') }}" class="shortlist-btn shortlist-btn--dark">{{ $copy['resources'] }}</a>
-          <a href="{{ $withLang('/discover') }}" class="shortlist-btn shortlist-btn--ghost">{{ $copy['browse_subjects'] }}</a>
+  <section class="research-shortlist-page public-v2 shortlist-v2" data-shortlist-page>
+    <header class="public-v2__hero" data-shortlist-hero>
+      <div class="public-v2__inset public-v2__hero-grid">
+        <div>
+          <p class="public-v2__kicker">{{ $copy['hero_title'] }}</p>
+          <h1 class="public-v2__title">{{ $copy['hero_title'] }}</h1>
+          <p class="public-v2__lead">{{ $copy['hero_body'] }}</p>
         </div>
+        <aside class="public-v2__hero-note shortlist-hero-note">
+          <strong id="shortlist-summary-total-hero">00</strong>
+          <span>{{ $copy['total_label'] }}</span>
+        </aside>
       </div>
+    </header>
 
-      <div id="shortlist-content" style="display:none;">
-        <div class="research-shortlist-layout">
-          <div class="research-shortlist-list-column" data-shortlist-items>
-            @if(session('library.user'))
-              <div class="account-return-link-wrap">
-                <a href="{{ $withLang('/dashboard') }}" class="account-return-link">{{ $copy['back_to_account'] }}</a>
-              </div>
-            @endif
+    <div class="public-v2__body">
+      <div class="public-v2__inset shortlist-shell">
+        <div id="shortlist-loading" class="shortlist-state shortlist-state--loading">
+          <div class="shortlist-spinner" aria-hidden="true"></div>
+          <p>{{ $copy['loading'] }}</p>
+        </div>
 
-            <div id="draft-meta-block" class="working-draft-card">
-              <div class="working-draft-toolbar">
-                <div id="draft-persistence-badge" class="draft-persistence-badge" style="display:none;"></div>
-                <button type="button" class="draft-clear-link" onclick="clearShortlist()">{{ $copy['clear'] }}</button>
-              </div>
-              <div class="working-draft-fields">
-                <div class="draft-field-group">
-                  <label for="draft-title" class="draft-label">{{ $copy['draft_title_label'] }}</label>
-                  <input type="text" id="draft-title" class="draft-input" placeholder="{{ $copy['draft_title_placeholder'] }}" maxlength="500">
+        <div id="shortlist-empty" class="shortlist-state shortlist-state--empty" style="display:none;">
+          <h2>{{ $copy['empty_title'] }}</h2>
+          <p>{{ $copy['empty_body'] }}</p>
+        </div>
+
+        <div id="shortlist-content" style="display:none;">
+          <div class="research-shortlist-layout">
+            <div class="research-shortlist-list-column" data-shortlist-items>
+              @if(session('library.user'))
+                <div class="account-return-link-wrap">
+                  <a href="{{ $withLang('/dashboard') }}" class="account-return-link">{{ $copy['back_to_account'] }}</a>
                 </div>
-                <div class="draft-field-group">
-                  <label for="draft-notes" class="draft-label">{{ $copy['draft_notes_label'] }}</label>
-                  <textarea id="draft-notes" class="draft-textarea" placeholder="{{ $copy['draft_notes_placeholder'] }}" maxlength="2000" rows="2"></textarea>
+              @endif
+
+              <div id="draft-meta-block" class="working-draft-card">
+                <div class="working-draft-toolbar">
+                  <div>
+                    <span class="working-draft-eyebrow">{{ $copy['status_title'] }}</span>
+                    <div id="draft-persistence-badge" class="draft-persistence-badge" style="display:none;"></div>
+                  </div>
+                  <button type="button" class="draft-clear-link" onclick="clearShortlist()">{{ $copy['clear'] }}</button>
                 </div>
+                <div class="shortlist-save-panel" data-shortlist-save-panel>
+                  <span class="material-symbols-outlined shortlist-save-panel__icon" aria-hidden="true">cloud_done</span>
+                  <div>
+                    <strong id="shortlist-save-panel-title">{{ $copy['status_ready'] }}</strong>
+                    <span><span id="shortlist-save-panel-count">00</span> {{ $copy['status_items'] }}</span>
+                  </div>
+                </div>
+                <div class="working-draft-fields">
+                  <div class="draft-field-group">
+                    <label for="draft-title" class="draft-label">{{ $copy['draft_title_label'] }}</label>
+                    <input type="text" id="draft-title" class="draft-input" placeholder="{{ $copy['draft_title_placeholder'] }}" maxlength="500">
+                  </div>
+                  <div class="draft-field-group">
+                    <label for="draft-notes" class="draft-label">{{ $copy['draft_notes_label'] }}</label>
+                    <textarea id="draft-notes" class="draft-textarea" placeholder="{{ $copy['draft_notes_placeholder'] }}" maxlength="2000" rows="2"></textarea>
+                  </div>
+                </div>
+                <div id="draft-save-status" class="draft-save-status"></div>
               </div>
-              <div id="draft-save-status" class="draft-save-status"></div>
+
+              <div id="shortlist-items-list" class="shortlist-item-stack"></div>
             </div>
 
-            <div id="shortlist-items-list" class="shortlist-item-stack"></div>
-          </div>
-
-          <aside class="research-shortlist-sidebar" data-shortlist-sidebar>
-            <div class="shortlist-summary-card">
-              <h3>{{ $copy['summary_title'] }}</h3>
-              <div class="summary-metric-row">
-                <span>{{ $copy['total_label'] }}</span>
+            <aside class="research-shortlist-sidebar" data-shortlist-sidebar>
+              <div class="shortlist-summary-card">
+                <h3>{{ $copy['summary_title'] }}</h3>
+                <div class="summary-metric-row">
+                  <span>{{ $copy['total_label'] }}</span>
                 <strong id="shortlist-summary-total">00</strong>
+                </div>
+                <div class="summary-metric-row">
+                  <span>{{ $copy['digital_label'] }}</span>
+                  <strong id="shortlist-summary-digital">00</strong>
+                </div>
+                <div class="summary-metric-row">
+                  <span>{{ $copy['physical_label'] }}</span>
+                  <strong id="shortlist-summary-physical">00</strong>
+                </div>
               </div>
-              <div class="summary-metric-row">
-                <span>{{ $copy['digital_label'] }}</span>
-                <strong id="shortlist-summary-digital">00</strong>
-              </div>
-              <div class="summary-metric-row">
-                <span>{{ $copy['physical_label'] }}</span>
-                <strong id="shortlist-summary-physical">00</strong>
-              </div>
-            </div>
 
-            <div class="smart-export-card" data-smart-export>
-              <span class="material-symbols-outlined smart-export-icon" aria-hidden="true">auto_awesome</span>
-              <h4>{{ $copy['smart_export_title'] }}</h4>
-              <p>{{ $copy['smart_export_body'] }}</p>
-              <div class="bibliography-format-controls">
-                <label class="bibliography-format-label" for="bib-format">{{ $copy['format'] }}</label>
-                <select id="bib-format" class="bibliography-format-select" onchange="loadExport()">
-                  <option value="numbered">{{ $copy['format_numbered'] }}</option>
-                  <option value="grouped" selected>{{ $copy['format_grouped'] }}</option>
-                  <option value="syllabus">{{ $copy['format_syllabus'] }}</option>
-                </select>
+              <div class="smart-export-card" data-smart-export>
+                <span class="material-symbols-outlined smart-export-icon" aria-hidden="true">auto_awesome</span>
+                <h4>{{ $copy['smart_export_title'] }}</h4>
+                <p>{{ $copy['smart_export_body'] }}</p>
+                <div class="bibliography-format-controls">
+                  <label class="bibliography-format-label" for="bib-format">{{ $copy['format'] }}</label>
+                  <select id="bib-format" class="bibliography-format-select" onchange="loadExport()">
+                    <option value="numbered">{{ $copy['format_numbered'] }}</option>
+                    <option value="grouped" selected>{{ $copy['format_grouped'] }}</option>
+                    <option value="syllabus">{{ $copy['format_syllabus'] }}</option>
+                  </select>
+                </div>
+                <div id="bibliography-text" class="bibliography-preview"></div>
+                <div class="smart-export-actions">
+                  <button class="shortlist-btn shortlist-btn--teal" onclick="copyBibliography()" id="copy-bib-btn">{{ $copy['copy_text'] }}</button>
+                  <button class="shortlist-btn shortlist-btn--ghost" onclick="window.print()">{{ $copy['print'] }}</button>
+                </div>
               </div>
-              <div id="bibliography-text" class="bibliography-preview"></div>
-              <div class="smart-export-actions">
-                <button class="shortlist-btn shortlist-btn--teal" onclick="copyBibliography()" id="copy-bib-btn">{{ $copy['copy_text'] }}</button>
-                <button class="shortlist-btn shortlist-btn--ghost" onclick="window.print()">{{ $copy['print'] }}</button>
-              </div>
-            </div>
 
-            <div class="librarian-note-card">
-              <h4>{{ $copy['librarian_note_title'] }}</h4>
-              <p>{{ $copy['librarian_note'] }}</p>
+              <div class="librarian-note-card">
+                <h4>{{ $copy['librarian_note_title'] }}</h4>
+                <p>{{ $copy['librarian_note'] }}</p>
+              </div>
+            </aside>
+          </div>
+
+          <section class="research-shortlist-bridge" data-shortlist-bridge>
+            <div>
+              <h3>{{ $copy['continue_title'] }}</h3>
+              <p>{{ $copy['continue_body'] }}</p>
             </div>
-          </aside>
+            <div class="bridge-actions">
+              <a href="{{ $withLang('/catalog') }}" class="shortlist-btn shortlist-btn--light">{{ $copy['open_catalog'] }}</a>
+              <a href="{{ $withLang('/resources') }}" class="shortlist-btn shortlist-btn--dark">{{ $copy['resources'] }}</a>
+            </div>
+          </section>
         </div>
-
-        <section class="research-shortlist-bridge" data-shortlist-bridge>
-          <div>
-            <h3>{{ $copy['continue_title'] }}</h3>
-            <p>{{ $copy['continue_body'] }}</p>
-          </div>
-          <div class="bridge-actions">
-            <a href="{{ $withLang('/catalog') }}" class="shortlist-btn shortlist-btn--light">{{ $copy['open_catalog'] }}</a>
-            <a href="{{ $withLang('/resources') }}" class="shortlist-btn shortlist-btn--dark">{{ $copy['resources'] }}</a>
-          </div>
-        </section>
       </div>
     </div>
   </section>
@@ -290,7 +315,9 @@
     margin-bottom: 1.5rem;
     padding: 1rem 1.1rem;
     border-radius: 1rem;
-    background: #f3f4f5;
+    border: 1px solid rgba(0,106,106,.14);
+    background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(243,244,245,.94));
+    box-shadow: 0 18px 50px rgba(0,31,63,.08);
   }
 
   .working-draft-toolbar {
@@ -305,6 +332,54 @@
   .working-draft-fields {
     display: grid;
     gap: .75rem;
+  }
+
+  .working-draft-eyebrow {
+    display: block;
+    margin-bottom: .35rem;
+    color: #5f6368;
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  .shortlist-save-panel {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    margin-bottom: 1rem;
+    padding: .85rem;
+    border: 1px solid rgba(0,106,106,.16);
+    background: rgba(0,106,106,.07);
+  }
+
+  .shortlist-save-panel__icon {
+    display: inline-flex;
+    width: 2.4rem;
+    height: 2.4rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #006a6a;
+    color: #fff;
+  }
+
+  .shortlist-save-panel strong,
+  .shortlist-save-panel span {
+    display: block;
+  }
+
+  .shortlist-save-panel strong {
+    color: #001f3f;
+    font-size: .98rem;
+  }
+
+  .shortlist-save-panel span {
+    color: #43474e;
+    font-size: .82rem;
+    font-weight: 700;
   }
 
   .draft-field-group {
@@ -454,6 +529,24 @@
     background: #f3f4f5;
     color: #6d7278;
     font-size: .7rem;
+  }
+
+  .shortlist-saved-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .28rem;
+    padding: .18rem .46rem;
+    border-radius: 999px;
+    background: rgba(0,106,106,.1);
+    color: #006a6a;
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .shortlist-saved-badge .material-symbols-outlined {
+    font-size: .88rem;
   }
 
   .shortlist-card-title {
@@ -847,6 +940,252 @@
     }
   }
 </style>
+<style>
+  .research-shortlist-page {
+    background: #f8f9fa;
+    color: #102945;
+    font-family: 'Google Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  .shortlist-shell {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .research-shortlist-hero {
+    max-width: 60rem;
+    margin-bottom: 0;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #e3e6e5;
+  }
+
+  .research-shortlist-hero h1,
+  .shortlist-summary-card h3,
+  .smart-export-card h4,
+  .research-shortlist-bridge h3,
+  .shortlist-state h2,
+  .shortlist-card-title,
+  .librarian-note-card h4 {
+    font-family: 'Literata', serif;
+  }
+
+  .research-shortlist-hero h1 {
+    margin: 0 0 .9rem;
+    font-size: clamp(38px, 4vw, 56px);
+    line-height: .96;
+    letter-spacing: -.04em;
+    color: #102945;
+  }
+
+  .research-shortlist-hero p {
+    max-width: 46rem;
+    margin: 0;
+    font-size: clamp(16px, 1.2vw, 18px);
+    line-height: 1.75;
+    color: #5c6866;
+  }
+
+  .research-shortlist-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    gap: clamp(32px, 4vw, 56px);
+    align-items: start;
+  }
+
+  .working-draft-card,
+  .shortlist-summary-card,
+  .librarian-note-card,
+  .smart-export-card,
+  .research-shortlist-bridge,
+  .shortlist-state {
+    border: 1px solid #e3e6e5;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+  }
+
+  .working-draft-card,
+  .shortlist-summary-card,
+  .librarian-note-card,
+  .smart-export-card {
+    padding: 1.25rem;
+  }
+
+  .working-draft-card {
+    margin-bottom: 1.5rem;
+  }
+
+  .draft-label,
+  .bibliography-format-label,
+  .shortlist-type-label,
+  .shortlist-added-badge,
+  .summary-metric-row,
+  .librarian-note-card h4 {
+    font-family: 'Google Sans', system-ui, sans-serif;
+  }
+
+  .draft-label,
+  .bibliography-format-label,
+  .shortlist-type-label,
+  .librarian-note-card h4 {
+    color: #5c6866;
+  }
+
+  .draft-input,
+  .draft-textarea,
+  .bibliography-format-select {
+    border-color: #e3e6e5;
+    border-radius: 0;
+  }
+
+  .shortlist-item-stack {
+    gap: 0;
+    border-top: 1px solid #e3e6e5;
+  }
+
+  .shortlist-card {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid #e3e6e5;
+    background: transparent;
+  }
+
+  .shortlist-card:hover {
+    transform: none;
+    box-shadow: none;
+    background: #fafbfb;
+  }
+
+  .shortlist-card-inner {
+    grid-template-columns: 5rem minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .shortlist-cover {
+    width: 5rem;
+    height: 7rem;
+    border-radius: 0;
+  }
+
+  .shortlist-card-title {
+    font-size: clamp(22px, 2.5vw, 34px);
+    line-height: 1.08;
+    color: #102945;
+  }
+
+  .shortlist-card-meta,
+  .shortlist-card-snippet,
+  .research-shortlist-bridge p,
+  .shortlist-state p,
+  .librarian-note-card p {
+    color: #5c6866;
+  }
+
+  .shortlist-card-actions {
+    gap: .5rem;
+  }
+
+  .shortlist-action,
+  .shortlist-btn {
+    border-radius: 0;
+    border: 1px solid #e3e6e5;
+    background: #fff;
+    color: #102945;
+  }
+
+  .shortlist-btn--ghost {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .shortlist-action--dark,
+  .shortlist-btn--dark,
+  .shortlist-btn--teal {
+    background: #102945;
+    color: #fff;
+    border-color: #102945;
+  }
+
+  .shortlist-action--danger {
+    color: #b54708;
+  }
+
+  .shortlist-summary-card h3,
+  .smart-export-card h4,
+  .research-shortlist-bridge h3,
+  .shortlist-state h2 {
+    color: #102945;
+    font-size: clamp(24px, 2.6vw, 36px);
+    line-height: 1.02;
+  }
+
+  .summary-metric-row strong {
+    font-family: 'Literata', serif;
+    color: #102945;
+  }
+
+  .smart-export-card {
+    background: #102945;
+    color: rgba(255,255,255,.9);
+  }
+
+  .smart-export-card p,
+  .bibliography-format-label,
+  .bibliography-preview {
+    color: rgba(255,255,255,.82);
+  }
+
+  .bibliography-format-select,
+  .bibliography-preview {
+    background: rgba(255,255,255,.06);
+    border-color: rgba(255,255,255,.18);
+  }
+
+  .research-shortlist-bridge {
+    margin-top: 4rem;
+    padding: 1.5rem;
+    border-top: 1px solid #e3e6e5;
+  }
+
+  .shortlist-state {
+    padding: 2.5rem 1.25rem;
+  }
+
+  @media (max-width: 1024px) {
+    .research-shortlist-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 680px) {
+    .shortlist-card-inner {
+      grid-template-columns: 1fr;
+    }
+
+    .shortlist-card,
+    .working-draft-card,
+    .shortlist-summary-card,
+    .librarian-note-card,
+    .smart-export-card,
+    .research-shortlist-bridge {
+      padding-inline: 1rem;
+    }
+
+    .shortlist-card-actions,
+    .bridge-actions,
+    .shortlist-state-actions,
+    .smart-export-actions {
+      flex-direction: column;
+    }
+
+    .shortlist-action,
+    .shortlist-btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+</style>
 @endsection
 
 @section('scripts')
@@ -884,6 +1223,7 @@
       'addedPrefix' => 'Добавлено',
       'addedRecently' => 'Добавлено недавно',
       'addedYesterday' => 'Добавлено вчера',
+      'savedBadge' => 'Сохранено',
       'bookSnippet' => 'Печатное издание доступно для проверки по каталожной записи, резервирования и последующего цитирования.',
       'externalSnippet' => 'Электронный источник подключён к рабочей подборке и готов для перехода и цитирования.',
     ],
@@ -916,6 +1256,7 @@
       'addedPrefix' => 'Қосылды',
       'addedRecently' => 'Жақында қосылды',
       'addedYesterday' => 'Кеше қосылды',
+      'savedBadge' => 'Сақталды',
       'bookSnippet' => 'Баспа басылымын каталог жазбасы арқылы тексеруге, брондауға және дәйексөзге енгізуге болады.',
       'externalSnippet' => 'Электрондық дереккөз жұмыс іріктемесіне қосылған және ашуға, дәйексөздеуге дайын.',
     ],
@@ -948,6 +1289,7 @@
       'addedPrefix' => 'Added',
       'addedRecently' => 'Added recently',
       'addedYesterday' => 'Added yesterday',
+      'savedBadge' => 'Saved',
       'bookSnippet' => 'This print title is ready for live catalog review, reservation, and citation export.',
       'externalSnippet' => 'This electronic source is attached to your working shortlist and ready for access and citation.',
     ],
@@ -1014,18 +1356,33 @@
       return SHORTLIST_I18N[item.access_type] || SHORTLIST_I18N.instantAccess;
     }
 
-    if (typeof item.available === 'number' && typeof item.total === 'number') {
-      return `${SHORTLIST_I18N.catalogStatus} · ${item.available}/${item.total}`;
+    if (typeof item.available === 'number') {
+      return `${SHORTLIST_I18N.catalogStatus} · ${item.available}`;
     }
 
     return SHORTLIST_I18N.catalogStatus;
   }
 
+  function updateShortlistSavePanel(items = currentItems) {
+    const count = Array.isArray(items) ? items.length : 0;
+    const padded = padCount(count);
+    const panelCount = document.getElementById('shortlist-save-panel-count');
+    const total = document.getElementById('shortlist-summary-total');
+    const heroTotal = document.getElementById('shortlist-summary-total-hero');
+
+    if (panelCount) panelCount.textContent = padded;
+    if (total) total.textContent = padded;
+    if (heroTotal) heroTotal.textContent = padded;
+  }
+
   function renderItemCard(item, index) {
     const identifier = item.identifier || '';
     const isExternal = item.type === 'external_resource';
-    const detailHref = isExternal && item.url ? item.url : withLang(`/book/${encodeURIComponent(identifier)}`);
-    const detailTarget = isExternal && item.url ? ' target="_blank" rel="noopener"' : '';
+    const rawHref = isExternal && item.url ? item.url : identifier;
+    const detailHref = rawHref.startsWith('http')
+      ? rawHref
+      : withLang(rawHref.startsWith('/') ? rawHref : `/book/${encodeURIComponent(rawHref)}`);
+    const detailTarget = rawHref.startsWith('http') ? ' target="_blank" rel="noopener"' : '';
     const leadMeta = item.author || item.provider || '';
     const trailingMeta = [item.year, item.publisher].filter(Boolean).join(' • ');
     const metaMarkup = leadMeta
@@ -1039,6 +1396,7 @@
           <div>
             <div class="shortlist-card-top">
               <span class="shortlist-type-label ${isExternal ? '' : 'is-book'}">${isExternal ? SHORTLIST_I18N.electronic : SHORTLIST_I18N.physical}</span>
+              <span class="shortlist-saved-badge"><span class="material-symbols-outlined" aria-hidden="true">bookmark</span>${SHORTLIST_I18N.savedBadge}</span>
               <span class="shortlist-added-badge">${escapeHtml(formatAddedLabel(item.addedAt))}</span>
             </div>
             <h2 class="shortlist-card-title"><a href="${detailHref}"${detailTarget}>${escapeHtml(item.title || SHORTLIST_I18N.untitled)}</a></h2>
@@ -1084,10 +1442,13 @@
 
       currentItems = items;
       loading.style.display = 'none';
+      updateShortlistSavePanel(items);
 
       if (items.length === 0) {
         empty.style.display = 'block';
         content.style.display = 'none';
+        document.getElementById('shortlist-summary-digital').textContent = '00';
+        document.getElementById('shortlist-summary-physical').textContent = '00';
         return;
       }
 
@@ -1097,7 +1458,6 @@
       const digital = items.filter((item) => item.type === 'external_resource').length;
       const physical = items.length - digital;
 
-      document.getElementById('shortlist-summary-total').textContent = padCount(items.length);
       document.getElementById('shortlist-summary-digital').textContent = padCount(digital);
       document.getElementById('shortlist-summary-physical').textContent = padCount(physical);
 

@@ -1,0 +1,11 @@
+scenario_id,module,endpoint,total_requests,success_count,fail_count,error_rate_pct,scenario_passed,fail_reason
+S01-NL-CATALOG,Catalog/Public API,GET /api/v1/landing,20,20,0,0.0,TRUE,n/a
+S02-PL-CATALOG,Catalog/Public API,GET /api/v1/catalog-db,30,30,0,0.0,TRUE,n/a
+S03-NL-SUBJECTS,Catalog/Public API,GET /api/v1/subjects,20,20,0,0.0,TRUE,n/a
+S04-SL-MIXED,Catalog/Public API,GET /api/v1/landing+subjects,20,20,0,0.0,TRUE,n/a
+S05-NL-EXTRES,External Resources,GET /api/v1/external-resources,20,20,0,0.0,TRUE,n/a
+S06-NL-WEBCATALOG,Web Catalog UI,GET /catalog,10,10,0,0.0,TRUE,n/a
+S07-PL-WEBCATALOG,Web Catalog UI,GET /catalog (peak),20,20,0,0.0,TRUE,n/a
+S08A-NO-AUTH,Integration API,GET /api/integration (no-auth),10,0,10,100.0,FALSE,Expected 401 auth rejection; measures middleware latency (3331ms > 2000ms threshold)
+S08B-BAD-TOKEN,Integration API,GET /api/integration (bad-token),10,0,10,100.0,FALSE,Expected 400/401 auth rejection; measures token validation latency (3142ms > 2000ms threshold)
+S09-END-CATALOG,Catalog/Public API,GET /api/v1/landing (endurance),40,40,0,0.0,TRUE,n/a

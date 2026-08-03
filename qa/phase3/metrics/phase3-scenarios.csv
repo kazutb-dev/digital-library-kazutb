@@ -1,0 +1,10 @@
+scenario_id,target_module,component,endpoint,load_type,concurrent_users,duration_sec,total_requests,request_pattern,dataset_type,expected_threshold_ms,success_criteria,notes
+S01-NL-CATALOG,Catalog/Public API,LandingController,GET /api/v1/landing,normal_load,1,30,20,sequential,bounded_synthetic,5000,p95<5000ms and error_rate<5%,Baseline sequential load; 20 requests 1 VU; bounded synthetic
+S02-PL-CATALOG,Catalog/Public API,CatalogReadService,GET /api/v1/catalog-db?limit=10,peak_load,1,60,30,sequential,bounded_synthetic,6000,p95<6000ms and error_rate<5%,Peak sequential load; 30 requests; catalog with limit param
+S03-NL-SUBJECTS,Catalog/Public API,SubjectController,GET /api/v1/subjects,normal_load,1,30,20,sequential,bounded_synthetic,5000,p95<5000ms and error_rate<5%,Subjects list endpoint; bounded sequential
+S04-SL-MIXED,Catalog/Public API,Mixed Public,GET /api/v1/landing + /api/v1/subjects,spike_load,1,30,10+10,alternating,bounded_synthetic,6000,p95<6000ms and error_rate<10%,Spike mix of 2 endpoints alternating; 20 total requests
+S05-NL-EXTRES,External Resources,ExternalResourceService,GET /api/v1/external-resources,normal_load,1,30,20,sequential,bounded_synthetic,5000,p95<5000ms and error_rate<5%,External resources API; may invoke external calls
+S06-NL-WEBCATALOG,Web Catalog UI,CatalogController,GET /catalog,normal_load,1,30,10,sequential,bounded_synthetic,8000,p95<8000ms and error_rate<5%,Web catalog page; HTML; heavier than API
+S07-PL-WEBCATALOG,Web Catalog UI,CatalogController,GET /catalog,peak_load,1,60,20,sequential,bounded_synthetic,10000,p95<10000ms and error_rate<10%,Peak web catalog; 20 sequential requests
+S08-BND-INTEGRATION,Integration API,BoundaryMiddleware,GET /api/integration/v1/_boundary/ping,boundary_auth,1,30,10,sequential,bounded_synthetic,2000,401/400 documented; measure auth overhead,Integration boundary; 401 expected without valid token; measures middleware response latency
+S09-END-CATALOG,Catalog/Public API,LandingController,GET /api/v1/landing,endurance,1,120,40,sequential,bounded_synthetic,6000,p95<6000ms over sustained run; error_rate<5%,Short 120s endurance; 40 requests; monitors for degradation

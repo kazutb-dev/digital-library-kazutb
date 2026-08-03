@@ -4,15 +4,25 @@ namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Config;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class DemoAuthTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Config::set('demo_users.enabled', true);
+        $this->setUpAdminControlPlane();
+    }
+
     // ── Login disabled (default) ──────────────────────────────────
 
     public function test_demo_login_returns_403_when_disabled(): void
     {
-        Config::set('demo_auth.enabled', false);
+        Config::set('demo_users.enabled', false);
 
         $response = $this->withoutMiddleware(PreventRequestForgery::class)
             ->postJson('/api/demo-auth/login', ['role' => 'student']);
@@ -24,7 +34,7 @@ class DemoAuthTest extends TestCase
 
     public function test_identities_returns_empty_when_disabled(): void
     {
-        Config::set('demo_auth.enabled', false);
+        Config::set('demo_users.enabled', false);
 
         $response = $this->getJson('/api/demo-auth/identities');
 
@@ -38,7 +48,7 @@ class DemoAuthTest extends TestCase
 
     public function test_demo_login_succeeds_for_student(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->withoutMiddleware(PreventRequestForgery::class)
             ->withSession([])
@@ -53,7 +63,7 @@ class DemoAuthTest extends TestCase
 
     public function test_demo_login_succeeds_for_teacher(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->withoutMiddleware(PreventRequestForgery::class)
             ->withSession([])
@@ -68,7 +78,7 @@ class DemoAuthTest extends TestCase
 
     public function test_demo_login_succeeds_for_librarian(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->withoutMiddleware(PreventRequestForgery::class)
             ->withSession([])
@@ -78,16 +88,14 @@ class DemoAuthTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('user.role', 'librarian')
-            ->assertJsonPath('user.login', 'zh.pankey')
-            ->assertJsonPath('user.name', 'Панкей Ж.')
-            ->assertJsonPath('user.email', 'zh.pankey@kaztbu.edu.kz')
-            ->assertJsonPath('user.title', 'Директор')
-            ->assertJsonPath('user.phone_extension', '112');
+            ->assertJsonPath('user.login', 'demo_librarian')
+            ->assertJsonPath('user.name', 'Демо-библиотекарь')
+            ->assertJsonPath('user.email', 'demo-librarian@kazutb.local');
     }
 
     public function test_demo_login_succeeds_for_admin(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->withoutMiddleware(PreventRequestForgery::class)
             ->withSession([])
@@ -102,7 +110,7 @@ class DemoAuthTest extends TestCase
 
     public function test_demo_login_sets_session_correctly(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->withoutMiddleware(PreventRequestForgery::class)
             ->withSession([])
@@ -110,14 +118,15 @@ class DemoAuthTest extends TestCase
 
         $response->assertOk();
 
-        // Verify session state by calling the account summary (which reads session)
-        $meResponse = $this->getJson('/api/v1/shortlist/summary');
-        $meResponse->assertOk();
+        $this->getJson('/api/v1/me')
+            ->assertOk()
+            ->assertJsonPath('authenticated', true)
+            ->assertJsonPath('user.login', 'demo_librarian');
     }
 
     public function test_demo_login_rejects_unknown_slug(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->withoutMiddleware(PreventRequestForgery::class)
             ->withSession([])
@@ -130,7 +139,7 @@ class DemoAuthTest extends TestCase
 
     public function test_demo_login_validates_role_required(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->withoutMiddleware(PreventRequestForgery::class)
             ->withSession([])
@@ -143,22 +152,32 @@ class DemoAuthTest extends TestCase
 
     public function test_identities_lists_all_roles_when_enabled(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->getJson('/api/demo-auth/identities');
 
         $response
             ->assertOk()
             ->assertJsonPath('enabled', true)
-            ->assertJsonCount(4, 'identities');
+            ->assertJsonCount(9, 'identities');
 
         $slugs = collect($response->json('identities'))->pluck('slug')->all();
-        $this->assertEquals(['student', 'teacher', 'librarian', 'admin'], $slugs);
+        $this->assertEquals([
+            'student',
+            'teacher',
+            'librarian',
+            'director',
+            'senior_librarian',
+            'acquisitions',
+            'cataloguer',
+            'bibliographer',
+            'admin',
+        ], $slugs);
     }
 
     public function test_identities_include_label_and_description(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->getJson('/api/demo-auth/identities');
 
@@ -175,7 +194,7 @@ class DemoAuthTest extends TestCase
 
     public function test_login_page_shows_demo_cards_when_enabled(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->get('/login');
 
@@ -189,7 +208,7 @@ class DemoAuthTest extends TestCase
 
     public function test_login_page_hides_demo_cards_when_disabled(): void
     {
-        Config::set('demo_auth.enabled', false);
+        Config::set('demo_users.enabled', false);
 
         $response = $this->get('/login');
 
@@ -202,7 +221,7 @@ class DemoAuthTest extends TestCase
 
     public function test_login_page_form_still_works_with_demo_enabled(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->get('/login');
 
@@ -215,7 +234,7 @@ class DemoAuthTest extends TestCase
 
     public function test_login_page_does_not_expose_quick_fill_credentials(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         $response = $this->get('/login');
 
@@ -230,7 +249,7 @@ class DemoAuthTest extends TestCase
 
     public function test_real_login_route_unaffected_by_demo_config(): void
     {
-        Config::set('demo_auth.enabled', true);
+        Config::set('demo_users.enabled', true);
 
         // Real login should still be available (will fail to connect to CRM, but route works)
         $response = $this->withoutMiddleware(PreventRequestForgery::class)

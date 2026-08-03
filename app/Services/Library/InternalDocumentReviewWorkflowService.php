@@ -22,7 +22,7 @@ class InternalDocumentReviewWorkflowService
         $normalizedReason = $this->normalizeOptionalReasonCode($reasonCode);
 
         $builder = DB::connection('pgsql')
-            ->table(self::DOCUMENT_TABLE . ' as d')
+            ->table(self::DOCUMENT_TABLE.' as d')
             ->select([
                 'd.id',
                 'd.isbn_raw',
@@ -134,8 +134,8 @@ class InternalDocumentReviewWorkflowService
     /**
      * Flag a document for review with one or more reason codes.
      *
-     * @param list<string> $reasonCodes
-     * @param array<string, mixed> $context
+     * @param  list<string>  $reasonCodes
+     * @param  array<string, mixed>  $context
      * @return array{data: array<string, mixed>, source: string}
      */
     public function flagDocumentForReview(string $documentId, array $reasonCodes, ?string $flagNote, array $context = []): array
@@ -164,7 +164,7 @@ class InternalDocumentReviewWorkflowService
 
             $update = ['needs_review' => true];
             if ($this->hasDocumentColumn('review_reason_codes')) {
-                $pgLiteral = '{' . implode(',', $mergedCodes) . '}';
+                $pgLiteral = '{'.implode(',', $mergedCodes).'}';
                 $update['review_reason_codes'] = $pgLiteral;
             }
             if ($this->hasDocumentColumn('updated_at')) {
@@ -227,7 +227,7 @@ class InternalDocumentReviewWorkflowService
     }
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      * @return array{data: array<string, mixed>, source: string}
      */
     public function resolveDocumentReview(string $documentId, ?string $resolutionNote, array $context = []): array

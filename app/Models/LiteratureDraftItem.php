@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Catalog\BibliographicRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -23,6 +24,9 @@ class LiteratureDraftItem extends Model
         'provider',
         'access_type',
         'added_at',
+        'bibliographic_record_id',
+        'sort_order',
+        'inclusion_reason',
     ];
 
     protected function casts(): array
@@ -31,6 +35,7 @@ class LiteratureDraftItem extends Model
             'available' => 'integer',
             'total' => 'integer',
             'added_at' => 'datetime',
+            'sort_order' => 'integer',
         ];
     }
 
@@ -40,6 +45,11 @@ class LiteratureDraftItem extends Model
     public function draft(): BelongsTo
     {
         return $this->belongsTo(LiteratureDraft::class, 'draft_id');
+    }
+
+    public function bibliographicRecord(): BelongsTo
+    {
+        return $this->belongsTo(BibliographicRecord::class);
     }
 
     /**

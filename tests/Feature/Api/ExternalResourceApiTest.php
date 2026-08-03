@@ -2,10 +2,19 @@
 
 namespace Tests\Feature\Api;
 
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class ExternalResourceApiTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpAdminControlPlane();
+    }
+
     public function test_external_resources_index_returns_all_resources(): void
     {
         $response = $this->getJson('/api/v1/external-resources');
@@ -42,10 +51,11 @@ class ExternalResourceApiTest extends TestCase
 
         $slugs = collect($response->json('data'))->pluck('slug')->all();
 
-        $this->assertContains('ipr-smart', $slugs);
-        $this->assertContains('rmeb', $slugs);
-        $this->assertContains('elibrary', $slugs);
-        $this->assertContains('polpred', $slugs);
+        $this->assertContains('cyberleninka', $slugs);
+        $this->assertContains('doaj', $slugs);
+        $this->assertContains('oapen', $slugs);
+        $this->assertContains('kaznu-repository', $slugs);
+        $this->assertNotContains('ipr-smart', $slugs);
     }
 
     public function test_external_resources_filter_by_category(): void
@@ -62,6 +72,7 @@ class ExternalResourceApiTest extends TestCase
 
     public function test_external_resources_filter_by_access_type(): void
     {
+        $this->signInToLibraryAs($this->makeControlPlaneUser('member'));
         $response = $this->getJson('/api/v1/external-resources?access_type=campus');
 
         $response->assertOk();
@@ -98,12 +109,12 @@ class ExternalResourceApiTest extends TestCase
 
     public function test_external_resources_show_returns_resource_by_slug(): void
     {
-        $response = $this->getJson('/api/v1/external-resources/ipr-smart');
+        $response = $this->getJson('/api/v1/external-resources/cyberleninka');
 
         $response
             ->assertOk()
-            ->assertJsonPath('data.slug', 'ipr-smart')
-            ->assertJsonPath('data.title', 'IPR SMART')
+            ->assertJsonPath('data.slug', 'cyberleninka')
+            ->assertJsonPath('data.title', 'КиберЛенинка')
             ->assertJsonStructure([
                 'data' => [
                     'slug',
@@ -156,12 +167,18 @@ class ExternalResourceApiTest extends TestCase
 
     public function test_ipr_smart_has_expiry_date(): void
     {
+        $this->signInToLibraryAs($this->makeControlPlaneUser('member'));
         $response = $this->getJson('/api/v1/external-resources/ipr-smart');
 
         $response->assertOk();
 
         $this->assertNotNull($response->json('data.expiry_date'));
         $this->assertEquals('2026-09-30', $response->json('data.expiry_date'));
+    }
+
+    public function test_guest_cannot_open_member_only_licensed_resource(): void
+    {
+        $this->getJson('/api/v1/external-resources/ipr-smart')->assertNotFound();
     }
 
     public function test_open_access_resources_have_no_expiry(): void

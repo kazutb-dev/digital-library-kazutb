@@ -1,77 +1,132 @@
 @php
-  $pageLang = in_array(app()->getLocale(), ['kk', 'ru', 'en'], true) ? app()->getLocale() : 'ru';
+  $pageLang = in_array(app()->getLocale(), ['kk', 'ru', 'en'], true) ? app()->getLocale() : 'kk';
   $librarianUser = is_array($librarianStaffUser ?? null) ? $librarianStaffUser : [];
-  $userName = trim((string) ($librarianUser['name'] ?? 'Library Operator')) ?: 'Library Operator';
-  $userTitle = trim((string) ($librarianUser['title'] ?? 'Librarian')) ?: 'Librarian';
+  $userName = trim((string) ($librarianUser['name'] ?? __('shell.librarian.operator'))) ?: __('shell.librarian.operator');
+  $userTitle = trim((string) ($librarianUser['title'] ?? __('shell.librarian.role'))) ?: __('shell.librarian.role');
   $userInitial = mb_strtoupper(mb_substr($userName, 0, 1));
-  $loginRedirectUrl = $pageLang === 'ru' ? '/login' : ('/login?lang=' . $pageLang);
-  $librarianRole = mb_strtolower(trim((string) ($librarianUser['role'] ?? '')));
+  $loginRedirectUrl = '/login';
+  $librarianRole = mb_strtolower(trim((string) ($librarianUser['canonical_role'] ?? $librarianUser['role'] ?? 'librarian')));
+  $workspaceRole = match ($librarianRole) {
+      'director' => 'director',
+      'senior_librarian' => 'senior_librarian',
+      'acquisitions' => 'acquisitions',
+      'cataloguer' => 'cataloguer',
+      'bibliographer' => 'bibliographer',
+      default => 'librarian',
+  };
 
-  // Canonical librarian nav. Items without a dedicated /librarian/* route yet
-  // fall back to the transitional /internal/* pages so operational continuity
-  // is preserved during Phase 1 migration. Items with no current target use '#'.
-  $librarianNav = [
+  // Canonical librarian navigation. Every entry maps to a real controller
+  // route; items the current staff account lacks permission for are filtered
+  // out rather than shown as dead links.
+  $staffUser = auth()->user();
+  $librarianNav = collect([
       [
-          'label' => 'Overview',
+          'label' => __('librarian.nav.overview'),
           'icon' => 'dashboard',
           'href' => route('librarian.overview'),
           'active' => request()->routeIs('librarian.overview'),
+          'permissions' => [],
       ],
       [
-          'label' => 'Circulation',
+          'label' => __('librarian.nav.circulation'),
           'icon' => 'sync_alt',
           'href' => route('librarian.circulation'),
-          'active' => request()->routeIs('librarian.circulation'),
+          'active' => request()->routeIs('librarian.circulation') || request()->routeIs('librarian.circulation.*'),
+          'permissions' => ['circulation.issue', 'circulation.return'],
       ],
       [
-          'label' => 'Reservations',
+          'label' => __('librarian.nav.visits'),
+          'icon' => 'sensor_door',
+          'href' => route('librarian.visits.index'),
+          'active' => request()->routeIs('librarian.visits.*'),
+          'permissions' => ['visits.record'],
+      ],
+      [
+          'label' => __('librarian.nav.reservations'),
           'icon' => 'bookmark_manager',
-          'href' => '#',
-          'active' => false,
+          'href' => route('librarian.reservations.index'),
+          'active' => request()->routeIs('librarian.reservations.*'),
+          'permissions' => ['reservation.confirm'],
       ],
       [
-          'label' => 'Catalog',
+          'label' => __('librarian.nav.catalog'),
           'icon' => 'menu_book',
-          'href' => '/catalog',
-          'active' => false,
+          'href' => route('librarian.catalog.index'),
+          'active' => request()->routeIs('librarian.catalog.*'),
+          'permissions' => [
+              'catalog.search',
+              'catalog.view_full_metadata',
+              'catalog.view_udc',
+              'catalog.create_record',
+              'catalog.edit_record',
+          ],
       ],
       [
-          'label' => 'Copies / Items',
+          'label' => __('librarian.nav.copies'),
           'icon' => 'inventory_2',
-          'href' => '#',
-          'active' => false,
+          'href' => route('librarian.copies.index'),
+          'active' => request()->routeIs('librarian.copies.*'),
+          'permissions' => ['copies.create', 'copies.edit', 'copies.delete'],
       ],
       [
-          'label' => 'Data Cleanup',
+          'label' => __('librarian.nav.inventory'),
+          'icon' => 'barcode_scanner',
+          'href' => route('librarian.inventory.index'),
+          'active' => request()->routeIs('librarian.inventory.*'),
+          'permissions' => ['inventory.view'],
+      ],
+      [
+          'label' => __('librarian.nav.fines'),
+          'icon' => 'payments',
+          'href' => route('librarian.fines.index'),
+          'active' => request()->routeIs('librarian.fines.*'),
+          'permissions' => ['fines.view'],
+      ],
+      [
+          'label' => __('incidents.nav'),
+          'icon' => 'report_problem',
+          'href' => route('librarian.incidents.index'),
+          'active' => request()->routeIs('librarian.incidents.*'),
+          'permissions' => ['incidents.view'],
+      ],
+      [
+          'label' => __('librarian.nav.data_cleanup'),
           'icon' => 'mop',
-          'href' => route('librarian.data-cleanup'),
-          'active' => request()->routeIs('librarian.data-cleanup'),
+          'href' => route('librarian.data-quality.index'),
+          'active' => request()->routeIs('librarian.data-quality.*') || request()->routeIs('librarian.data-cleanup*'),
+          'permissions' => ['data_quality.view'],
       ],
       [
-          'label' => 'Scientific Repository',
+          'label' => __('librarian.nav.repository'),
           'icon' => 'school',
           'href' => route('librarian.repository'),
-          'active' => request()->routeIs('librarian.repository'),
+          'active' => request()->routeIs('librarian.repository') || request()->routeIs('librarian.repository.*'),
+          'permissions' => ['repository.upload', 'repository.approve', 'repository.publish'],
       ],
       [
-          'label' => 'News',
+          'label' => __('librarian.nav.news'),
           'icon' => 'newspaper',
-          'href' => '#',
-          'active' => false,
+          'href' => route('librarian.news.index'),
+          'active' => request()->routeIs('librarian.news.*'),
+          'permissions' => ['news.create', 'news.edit_own'],
       ],
       [
-          'label' => 'Reports',
+          'label' => __('librarian.nav.reports'),
           'icon' => 'analytics',
-          'href' => '#',
-          'active' => false,
+          'href' => route('librarian.reports.index'),
+          'active' => request()->routeIs('librarian.reports.*'),
+          'permissions' => ['reports.view_ops', 'reports.view_full'],
       ],
       [
-          'label' => 'Messages',
+          'label' => __('librarian.nav.messages'),
           'icon' => 'mail',
-          'href' => '#',
-          'active' => false,
+          'href' => route('librarian.messages.index'),
+          'active' => request()->routeIs('librarian.messages.*'),
+          'permissions' => ['messages.view_all'],
       ],
-  ];
+  ])->filter(
+      fn (array $item): bool => $item['permissions'] === [] || ($staffUser?->canAny($item['permissions']) ?? false),
+  )->values()->all();
 @endphp
 <!DOCTYPE html>
 <html lang="{{ $pageLang }}">
@@ -79,12 +134,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>@yield('title', 'Librarian Console — KazUTB Smart Library')</title>
+  <title>@yield('title', __('brand.workspace.'.$workspaceRole).' — '.__('brand.library.name'))</title>
+  @include('partials.favicons')
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/fonts/fonts.css">
   <script id="tailwind-config">
     tailwind.config = {
       darkMode: 'class',
@@ -157,20 +210,43 @@
     .font-headline { font-family: 'Newsreader', serif; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
     .material-symbols-outlined.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    [x-cloak] { display: none !important; }
+    /* Shared control-plane utility classes — identical to the admin console so
+       the x-admin.* components render the same way in both workspaces. */
+    .admin-input {
+        width: 100%; border: 1px solid #d8dade; background: #fff; border-radius: .5rem;
+        padding: .68rem .8rem; font-size: .875rem; color: #191c1d;
+    }
+    .admin-input:focus { border-color: #006a6a; box-shadow: 0 0 0 2px rgba(0,106,106,.12); outline: none; }
+    .admin-label { display: block; margin-bottom: .4rem; color: #43474e; font-size: .72rem; font-weight: 700; letter-spacing: .055em; text-transform: uppercase; }
+    .admin-card { border-radius: .75rem; background: #fff; padding: 1.5rem; box-shadow: 0 12px 35px rgba(0,6,19,.035); }
+    .admin-btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: .5rem; padding: .68rem 1rem; font-size: .875rem; font-weight: 700; transition: .2s ease; }
+    .admin-btn-primary { color: #fff; background: #001f3f; }
+    .admin-btn-primary:hover { background: #000613; }
+    .admin-btn-secondary { color: #006a6a; background: #fff; border: 1px solid #d8dade; }
+    .admin-btn-secondary:hover { background: #f3f4f5; }
+    .admin-btn-danger { color: #93000a; background: #fff; border: 1px solid #ffc7c2; }
+    .admin-btn-danger:hover { background: #fff0ee; }
+    .admin-table { width: 100%; border-collapse: collapse; }
+    .admin-table th { padding: .85rem 1rem; text-align: left; background: #f3f4f5; color: #43474e; font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+    .admin-table td { padding: 1rem; border-bottom: 1px solid #edeeef; vertical-align: top; font-size: .875rem; }
+    .admin-table tbody tr:hover { background: rgba(243,244,245,.65); }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
   </style>
   @yield('head')
 </head>
 <body class="bg-surface text-on-surface antialiased flex min-h-screen">
   <aside class="bg-surface-container-low text-primary font-body h-screen w-72 flex-shrink-0 fixed left-0 top-0 hidden md:flex flex-col z-40 py-8 border-r-0">
-    <div class="px-6 mb-10 flex items-center gap-4">
-      <div class="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center text-on-primary font-headline font-bold text-lg flex-shrink-0">{{ $userInitial }}</div>
-      <div>
-        <div class="font-headline text-lg font-bold text-primary-container leading-tight">Operations</div>
-        <div class="text-on-surface-variant text-xs mt-0.5">Librarian Console</div>
+    <div class="px-5 mb-7">
+      <x-library-brand variant="sidebar" :href="route('librarian.overview')" />
+      <div class="mt-4 border-t border-surface-container-high pt-3 pl-1" data-workspace-role>
+        <div class="text-[10px] font-bold uppercase tracking-[.15em] text-secondary">{{ __('brand.workspace.label') }}</div>
+        <div class="mt-1 text-sm font-bold text-primary-container">{{ __('brand.workspace.'.$workspaceRole) }}</div>
       </div>
     </div>
 
-    <nav class="flex-1 overflow-y-auto px-2 space-y-1" aria-label="Librarian navigation">
+    <nav class="flex-1 overflow-y-auto px-2 space-y-1" aria-label="{{ __('shell.librarian.navigation') }}">
       @foreach ($librarianNav as $item)
         @php $isDisabled = ($item['href'] ?? '#') === '#'; @endphp
         @if ($item['active'])
@@ -182,7 +258,7 @@
           <span class="text-slate-600 py-3 px-6 flex items-center gap-3 w-[95%] rounded-r-full opacity-50 cursor-not-allowed select-none" aria-disabled="true" role="link" tabindex="-1">
             <span class="material-symbols-outlined">{{ $item['icon'] }}</span>
             <span>{{ $item['label'] }}</span>
-            <span class="ml-auto text-[10px] uppercase tracking-wider text-on-surface-variant/70 font-semibold">soon</span>
+            <span class="ml-auto text-[10px] uppercase tracking-wider text-on-surface-variant/70 font-semibold">{{ __('shell.librarian.coming_soon') }}</span>
           </span>
         @else
           <a href="{{ $item['href'] }}" class="text-slate-600 py-3 px-6 flex items-center gap-3 w-[95%] rounded-r-full hover:bg-surface-container hover:pl-8 hover:text-secondary transition-all duration-500">
@@ -194,18 +270,28 @@
     </nav>
 
     <div class="px-6 mt-8 space-y-4">
-      <a href="{{ route('librarian.circulation') }}" class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3 rounded-md font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
-        <span class="material-symbols-outlined">add</span>
-        <span>New Transaction</span>
-      </a>
-      <div class="pt-4 border-t border-surface-container-high border-opacity-50">
-        <a href="#" class="text-slate-600 py-2 flex items-center gap-3 hover:text-secondary transition-colors opacity-60 pointer-events-none">
-          <span class="material-symbols-outlined">settings</span>
-          <span>Settings</span>
+      @can('circulation.issue')
+        <a href="{{ route('librarian.circulation.issue') }}" class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3 rounded-md font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined">add</span>
+          <span>{{ __('librarian.nav.new_transaction') }}</span>
         </a>
+      @endcan
+      <div class="pt-4 border-t border-surface-container-high border-opacity-50">
+        @can('system.settings')
+          <a href="/admin/settings" class="text-slate-600 py-2 flex items-center gap-3 hover:text-secondary transition-colors">
+            <span class="material-symbols-outlined">settings</span>
+            <span>{{ __('librarian.nav.settings') }}</span>
+          </a>
+        @endcan
+        @if ($staffUser?->hasAnyRole(['librarian', 'admin']))
+          <a href="/admin/profile" class="text-slate-600 py-2 flex items-center gap-3 hover:text-secondary transition-colors">
+            <span class="material-symbols-outlined">account_circle</span>
+            <span>{{ __('admin.profile.title') }}</span>
+          </a>
+        @endif
         <button id="librarian-logout-btn" type="button" class="text-slate-600 py-2 flex items-center gap-3 hover:text-secondary transition-colors w-full text-left">
           <span class="material-symbols-outlined">logout</span>
-          <span>Logout</span>
+          <span>{{ __('librarian.nav.logout') }}</span>
         </button>
       </div>
     </div>
@@ -214,22 +300,44 @@
   <main class="flex-1 md:ml-72 flex flex-col min-h-screen bg-surface relative">
     <header class="bg-surface-container-low/80 backdrop-blur-md text-primary tracking-tight w-full top-0 sticky z-30 flex justify-between items-center px-8 py-4 h-20 flex-shrink-0">
       <div class="flex items-center gap-6">
-        <div class="font-headline italic text-primary-container text-xl hidden md:block">KazUTB Smart Library</div>
-        <div class="relative ml-4 md:ml-12 hidden sm:block">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <span class="material-symbols-outlined text-outline text-[18px]">search</span>
-          </div>
-          <input class="bg-surface-container-highest border-0 border-b border-outline-variant/20 focus:border-secondary focus:ring-0 text-sm py-2 pl-10 pr-4 w-64 md:w-80 rounded-t-md transition-colors placeholder:text-outline/70" placeholder="Search operations..." type="text" />
-        </div>
+        <x-library-brand variant="compact" :href="route('librarian.overview')" />
+        @can('catalog.search')
+          <form method="GET" action="{{ route('librarian.catalog.index') }}" class="relative ml-4 md:ml-12 hidden sm:block" role="search">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span class="material-symbols-outlined text-outline text-[18px]">search</span>
+            </div>
+            <input
+              class="bg-surface-container-highest border-0 border-b border-outline-variant/20 focus:border-secondary focus:ring-0 text-sm py-2 pl-10 pr-4 w-64 md:w-80 rounded-t-md transition-colors placeholder:text-outline/70"
+              placeholder="{{ __('librarian.nav.search_placeholder') }}"
+              aria-label="{{ __('librarian.nav.search_placeholder') }}"
+              name="search"
+              value="{{ request('search') }}"
+              type="search"
+            />
+          </form>
+        @endcan
       </div>
 
       <div class="flex items-center gap-2 md:gap-4">
-        <button class="text-slate-500 hover:text-primary-container hover:bg-slate-100 p-2 rounded-full transition-colors duration-300" type="button" aria-label="Notifications">
-          <span class="material-symbols-outlined">notifications</span>
-        </button>
-        <button class="text-slate-500 hover:text-primary-container hover:bg-slate-100 p-2 rounded-full transition-colors duration-300 hidden sm:block" type="button" aria-label="Recent activity">
-          <span class="material-symbols-outlined">history_edu</span>
-        </button>
+        <x-locale-switcher variant="light" />
+        @php
+          $librarianUnread = $staffUser
+              ? \App\Models\Catalog\ReaderNotification::query()->where('user_id', $staffUser->getKey())->whereNull('read_at')->count()
+              : 0;
+        @endphp
+        @can('messages.view_all')
+          <a href="{{ route('librarian.messages.index') }}" class="relative text-slate-500 hover:text-primary-container hover:bg-slate-100 p-2 rounded-full transition-colors duration-300" aria-label="{{ __('librarian.nav.messages') }}">
+            <span class="material-symbols-outlined">notifications</span>
+            @if ($librarianUnread > 0)
+              <span class="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold text-white">{{ $librarianUnread > 9 ? '9+' : $librarianUnread }}</span>
+            @endif
+          </a>
+        @endcan
+        @can('system.logs')
+          <a href="/admin/logs" class="text-slate-500 hover:text-primary-container hover:bg-slate-100 p-2 rounded-full transition-colors duration-300 hidden sm:block" aria-label="{{ __('admin.nav.audit_logs') }}">
+            <span class="material-symbols-outlined">history_edu</span>
+          </a>
+        @endcan
         <div class="h-9 w-9 ml-2 rounded-full bg-primary-container text-on-primary flex items-center justify-center text-sm font-bold cursor-default" title="{{ $userName }} — {{ $userTitle }}">{{ $userInitial }}</div>
       </div>
     </header>

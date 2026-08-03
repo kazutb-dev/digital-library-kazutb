@@ -16,6 +16,8 @@ class ShortlistPageTest extends TestCase
             ->assertSee('data-shortlist-hero', false)
             ->assertSee('data-shortlist-items', false)
             ->assertSee('data-shortlist-sidebar', false)
+            ->assertSee('id="shortlist-save-panel-count"', false)
+            ->assertSee('shortlist-saved-badge', false)
             ->assertSee('/api/v1/shortlist', false)
             ->assertSee('shortlist-loading', false)
             ->assertSee('shortlist-empty', false);

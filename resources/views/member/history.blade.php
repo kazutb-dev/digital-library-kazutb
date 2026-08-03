@@ -1,198 +1,153 @@
-@extends('layouts.member', ['title' => 'Borrowing history — KazUTB Smart Library'])
-
-@php
-  // Representative placeholder data — actual borrowing history arrives when
-  // the circulation backend for the member module is wired up.
-  //
-  // Status vocabulary for the historical record:
-  //   returned · currently_borrowed · overdue_returned
-  $historyGroups = [
-      [
-          'term' => 'Spring term 2026',
-          'items' => [
-              [
-                  'title' => 'Typographic Systems of Design',
-                  'author' => 'Kimberly Elam',
-                  'edition' => 'Princeton Architectural Press, 2007',
-                  'call_number' => 'Z246 .E43 2007',
-                  'status' => 'currently_borrowed',
-                  'status_label' => 'Currently on loan',
-                  'accent' => true,
-                  'branch' => 'KazUTB Central Library · Floor 1',
-                  'dates' => [
-                      ['label' => 'Borrowed', 'value' => 'Apr 01, 2026'],
-                      ['label' => 'Due date', 'value' => 'Apr 28, 2026', 'tone' => 'secondary'],
-                  ],
-                  'actions' => [
-                      ['label' => 'Renew loan', 'icon' => 'autorenew', 'tone' => 'primary'],
-                  ],
-              ],
-              [
-                  'title' => 'The Architecture of Complexity',
-                  'author' => 'Herbert A. Simon',
-                  'edition' => 'Proceedings of the American Philosophical Society, 1962',
-                  'call_number' => 'Q300 .S56',
-                  'status' => 'returned',
-                  'status_label' => 'Returned',
-                  'accent' => false,
-                  'branch' => 'Faculty depository · Technology wing',
-                  'dates' => [
-                      ['label' => 'Borrowed', 'value' => 'Feb 12, 2026'],
-                      ['label' => 'Returned', 'value' => 'Mar 04, 2026'],
-                  ],
-                  'actions' => [
-                      ['label' => 'Request again', 'icon' => 'menu_book', 'tone' => 'secondary'],
-                      ['label' => 'Cite', 'icon' => 'format_quote', 'tone' => 'neutral'],
-                  ],
-              ],
-          ],
-      ],
-      [
-          'term' => 'Autumn term 2025',
-          'items' => [
-              [
-                  'title' => 'Clean Architecture',
-                  'author' => 'Robert C. Martin',
-                  'edition' => 'Pearson, 2017',
-                  'call_number' => 'QA76.758 .M367 2017',
-                  'status' => 'returned',
-                  'status_label' => 'Returned',
-                  'accent' => false,
-                  'branch' => 'KazUTB Central Library · Floor 2',
-                  'dates' => [
-                      ['label' => 'Borrowed', 'value' => 'Oct 02, 2025'],
-                      ['label' => 'Returned', 'value' => 'Oct 30, 2025'],
-                  ],
-                  'actions' => [
-                      ['label' => 'Request again', 'icon' => 'menu_book', 'tone' => 'secondary'],
-                      ['label' => 'Cite', 'icon' => 'format_quote', 'tone' => 'neutral'],
-                  ],
-              ],
-              [
-                  'title' => 'Database System Concepts',
-                  'author' => 'A. Silberschatz, H. F. Korth, S. Sudarshan',
-                  'edition' => 'McGraw-Hill, Seventh Edition',
-                  'call_number' => 'QA76.9.D3 S5637 2020',
-                  'status' => 'returned',
-                  'status_label' => 'Returned',
-                  'accent' => false,
-                  'branch' => 'KazUTB Central Library · Reference hall',
-                  'dates' => [
-                      ['label' => 'Borrowed', 'value' => 'Sep 08, 2025'],
-                      ['label' => 'Returned', 'value' => 'Sep 29, 2025'],
-                  ],
-                  'actions' => [
-                      ['label' => 'Request again', 'icon' => 'menu_book', 'tone' => 'secondary'],
-                  ],
-              ],
-          ],
-      ],
-  ];
-
-  $totalItems = collect($historyGroups)->sum(fn ($g) => count($g['items']));
-@endphp
+@extends('layouts.member', ['title' => __('librarian.member.history.title').' — '.__('common.app_name')])
 
 @section('content')
-  <!-- Header -->
-  <header class="mb-12 md:mb-16 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-    <div>
-      <div class="inline-flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full mb-6">
-        <span class="w-2 h-2 rounded-full bg-secondary"></span>
-        <span class="font-label text-xs text-on-surface-variant tracking-widest uppercase">{{ $totalItems }} items on record</span>
-      </div>
-      <h1 class="font-headline text-4xl md:text-[3.5rem] text-primary tracking-tight leading-none mb-6">Borrowing history</h1>
-      <p class="font-body text-base md:text-lg text-on-surface-variant max-w-2xl leading-relaxed">
-        A chronological record of the materials you have borrowed from the KazUTB collection. Active loans are highlighted — renewals and citation exports remain available for items you have returned.
-      </p>
-    </div>
-    <div class="flex flex-wrap gap-3">
-      <span class="inline-flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-DEFAULT border-b border-outline-variant/20">
-        <span class="material-symbols-outlined text-on-surface-variant text-sm">filter_list</span>
-        <span class="font-label text-sm text-on-surface">Filter by term</span>
-      </span>
-      <span class="inline-flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-DEFAULT border-b border-outline-variant/20">
-        <span class="material-symbols-outlined text-on-surface-variant text-sm">sort</span>
-        <span class="font-label text-sm text-on-surface">Sort chronological</span>
+  @include('member.partials.flash')
+
+  <header class="mb-10 md:mb-14">
+    <div class="inline-flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full mb-6">
+      <span class="w-2 h-2 rounded-full bg-secondary"></span>
+      <span class="font-label text-xs text-on-surface-variant tracking-widest uppercase">
+        {{ __('librarian.member.history.summary', ['returned' => $totalReturned, 'lost' => $totalLost]) }}
       </span>
     </div>
+    <h1 class="font-headline text-4xl md:text-[3.5rem] text-primary tracking-tight leading-none mb-6">
+      {{ __('librarian.member.history.title') }}
+    </h1>
+    <p class="font-body text-base md:text-lg text-on-surface-variant max-w-2xl leading-relaxed">
+      {{ __('librarian.member.history.subtitle') }}
+    </p>
   </header>
 
-  <!-- Placeholder disclosure -->
-  <p class="font-body italic text-sm text-on-surface-variant mb-10 max-w-3xl">
-    The records shown below are representative placeholders. Real borrowing history will appear once the circulation backend is wired up to the member module.
-  </p>
+  <form method="GET" class="mb-10 grid gap-4 rounded-xl bg-surface-container-lowest p-5 sm:grid-cols-2 lg:grid-cols-5" aria-label="{{ __('librarian.member.history.filters') }}">
+    <label class="text-sm">{{ __('librarian.member.history.from') }}<input class="mt-1 w-full rounded-md border-outline-variant" type="date" name="from" value="{{ request('from') }}"></label>
+    <label class="text-sm">{{ __('librarian.member.history.to') }}<input class="mt-1 w-full rounded-md border-outline-variant" type="date" name="to" value="{{ request('to') }}"></label>
+    <label class="text-sm">{{ __('librarian.member.history.status') }}<select class="mt-1 w-full rounded-md border-outline-variant" name="status"><option value="">{{ __('librarian.member.history.all') }}</option><option value="returned" @selected(request('status')==='returned')>{{ __('librarian.member.history.returned_on_time') }}</option><option value="lost" @selected(request('status')==='lost')>{{ __('librarian.member.history.lost') }}</option></select></label>
+    <label class="flex items-end gap-2 pb-3 text-sm"><input type="checkbox" name="overdue" value="1" @checked(request('overdue'))> {{ __('librarian.member.history.only_overdue') }}</label>
+    <button class="self-end rounded-md bg-primary px-5 py-3 text-sm font-semibold text-on-primary" type="submit">{{ __('librarian.member.history.apply_filters') }}</button>
+  </form>
 
-  <!-- Timeline -->
-  <div class="space-y-14">
-    @foreach ($historyGroups as $group)
-      <section>
-        <h2 class="font-headline text-xl md:text-2xl text-on-surface-variant mb-6 md:mb-8 pl-0 md:pl-4 opacity-90">
-          {{ $group['term'] }}
-        </h2>
-        <div class="space-y-6 pl-0 md:pl-4">
-          @foreach ($group['items'] as $item)
-            <article class="group bg-surface-container-low p-6 md:p-8 rounded-lg transition-all duration-500 ease-out shadow-[0_4px_24px_rgba(0,31,63,0.02)] hover:bg-surface-container-lowest hover:shadow-[0_12px_48px_rgba(0,31,63,0.06)] flex flex-col md:flex-row gap-6 md:gap-8 {{ $item['accent'] ? 'border-l-4 border-secondary' : '' }}">
-              <div class="flex-shrink-0 w-full md:w-32 h-40 md:h-48 rounded-DEFAULT bg-gradient-to-br from-primary-fixed to-primary-container flex items-center justify-center">
-                <span class="material-symbols-outlined text-on-primary text-5xl opacity-80">menu_book</span>
+  @if($pastReservations->isNotEmpty())
+    <section class="mb-10" aria-labelledby="reservation-history-title">
+      <h2 id="reservation-history-title" class="mb-4 font-headline text-2xl text-primary">{{ __('librarian.member.reservations.past') }}</h2>
+      <div class="grid gap-3 md:grid-cols-2">
+        @foreach($pastReservations as $reservation)
+          <article class="rounded-xl bg-surface-container-lowest p-5">
+            <div class="flex justify-between gap-4"><h3 class="font-headline text-lg text-primary">{{ $reservation->bibliographicRecord?->title ?: __('common.catalog.title_unknown') }}</h3><span class="text-xs uppercase text-on-surface-variant">{{ __('librarian.reservations.statuses.'.$reservation->status) }}</span></div>
+            <p class="mt-2 text-xs text-on-surface-variant">{{ $reservation->created_at?->format('d.m.Y') }}@if($reservation->pickupBranch) · {{ $reservation->pickupBranch->name }}@endif</p>
+          </article>
+        @endforeach
+      </div>
+    </section>
+  @endif
+
+  @if ($loans->isEmpty())
+    <div class="bg-surface-container-lowest rounded-xl p-10 text-center">
+      <span class="material-symbols-outlined text-outline-variant text-5xl mb-4">history</span>
+      <p class="font-body text-base text-on-surface-variant">{{ __('librarian.member.history.empty') }}</p>
+    </div>
+  @else
+    <div class="space-y-6">
+      @foreach ($loans as $loan)
+        @php
+          $copy = $loan->copy;
+          $record = $copy?->bibliographicRecord;
+          $lateDays = ($loan->due_at !== null && $loan->returned_at !== null && $loan->returned_at->gt($loan->due_at))
+              ? (int) $loan->due_at->startOfDay()->diffInDays($loan->returned_at->startOfDay())
+              : 0;
+          $isLost = $loan->status === 'lost';
+        @endphp
+        <article class="bg-surface-container-low p-6 md:p-8 rounded-lg flex flex-col md:flex-row gap-6 md:gap-8 {{ $isLost ? 'border-l-4 border-error' : ($lateDays > 0 ? 'border-l-4 border-error/40' : '') }}">
+          <div class="flex-shrink-0 w-full md:w-28 h-32 md:h-40 rounded-DEFAULT bg-gradient-to-br from-primary-fixed to-primary-container flex items-center justify-center">
+            <span class="material-symbols-outlined text-on-primary text-4xl opacity-80">menu_book</span>
+          </div>
+
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap justify-between items-start gap-4 mb-2">
+              <h2 class="font-headline text-xl md:text-2xl text-primary leading-tight">
+                @if ($record !== null)
+                  <a href="/book/{{ $record->isbn ?: $record->getKey() }}" class="hover:text-secondary transition-colors">{{ $record->title }}</a>
+                @else
+                  {{ __('common.catalog.title_unknown') }}
+                @endif
+              </h2>
+              @if ($isLost)
+                <span class="inline-flex items-center px-3 py-1 bg-error-container text-on-error-container rounded-full font-label text-xs font-bold whitespace-nowrap">
+                  {{ __('librarian.member.history.lost') }}
+                </span>
+              @elseif ($lateDays > 0)
+                <span class="inline-flex items-center px-3 py-1 bg-error-container/50 text-on-error-container rounded-full font-label text-xs whitespace-nowrap">
+                  {{ __('librarian.member.history.returned_late', ['count' => $lateDays]) }}
+                </span>
+              @else
+                <span class="inline-flex items-center px-3 py-1 bg-secondary-container/40 text-on-secondary-container rounded-full font-label text-xs whitespace-nowrap">
+                  {{ __('librarian.member.history.returned_on_time') }}
+                </span>
+              @endif
+            </div>
+
+            <p class="font-body text-base text-on-surface-variant mb-1">
+              {{ $record?->primary_author ?: __('librarian.member.common.unknown_author') }}
+            </p>
+            <p class="font-label text-xs text-on-surface-variant/80 mb-4 uppercase tracking-wider">
+              {{ $record?->publisher ?: '—' }}@if ($record?->publication_year), {{ $record->publication_year }}@endif
+              · {{ __('librarian.copies.fields.inventory_number') }}: {{ $copy?->inventory_number ?: '—' }}
+            </p>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 max-w-2xl">
+              <div>
+                <p class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-0.5">{{ __('librarian.member.loans.issued_at') }}</p>
+                <p class="font-body text-sm text-on-surface">{{ $loan->issued_at?->format('d.m.Y') ?? '—' }}</p>
               </div>
-              <div class="flex-1 flex flex-col justify-between">
-                <div>
-                  <div class="flex justify-between items-start mb-2 gap-4">
-                    <h3 class="font-headline text-xl md:text-2xl text-primary leading-tight">{{ $item['title'] }}</h3>
-                    @if ($item['status'] === 'currently_borrowed')
-                      <span class="inline-flex items-center px-3 py-1 bg-secondary/10 text-secondary rounded-full font-label text-xs font-bold whitespace-nowrap">
-                        {{ $item['status_label'] }}
+              <div>
+                <p class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-0.5">{{ __('librarian.circulation.due_date') }}</p>
+                <p class="font-body text-sm text-on-surface">{{ $loan->due_at?->format('d.m.Y') ?? '—' }}</p>
+              </div>
+              <div>
+                <p class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-0.5">{{ __('librarian.member.history.returned_at') }}</p>
+                <p class="font-body text-sm text-on-surface">{{ $loan->returned_at?->format('d.m.Y') ?? '—' }}</p>
+              </div>
+              <div>
+                <p class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-0.5">{{ __('librarian.copies.fields.branch') }}</p>
+                <p class="font-body text-sm text-on-surface">{{ $copy?->branch?->name ?: '—' }}</p>
+              </div>
+            </div>
+
+            @if ($loan->fines->isNotEmpty())
+              <div class="rounded-lg bg-surface p-4">
+                <p class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-2">{{ __('librarian.member.history.linked_fines') }}</p>
+                <ul class="space-y-1">
+                  @foreach ($loan->fines as $fine)
+                    <li class="flex flex-wrap items-center justify-between gap-3 font-body text-sm">
+                      <span class="text-on-surface">
+                        {{ __('librarian.fines.reasons.'.$fine->reason) }}
+                        <span class="text-on-surface-variant text-xs">· {{ $fine->charged_at?->format('d.m.Y') ?? '—' }}</span>
                       </span>
-                    @else
-                      <span class="inline-flex items-center px-3 py-1 bg-surface-container-high rounded-full font-label text-xs text-on-surface-variant whitespace-nowrap">
-                        {{ $item['status_label'] }}
+                      <span class="inline-flex items-center gap-3">
+                        <strong class="text-primary">{{ number_format((float) $fine->amount, 0, ',', ' ') }} ₸</strong>
+                        <span class="font-label text-[11px] uppercase tracking-wider {{ $fine->status === 'pending' ? 'text-error' : 'text-on-surface-variant' }}">
+                          {{ __('librarian.fines.statuses.'.$fine->status) }}
+                        </span>
                       </span>
-                    @endif
-                  </div>
-                  <p class="font-body text-base text-on-surface-variant mb-1">{{ $item['author'] }}</p>
-                  <p class="font-label text-xs text-on-surface-variant/80 mb-4 uppercase tracking-wider">
-                    {{ $item['edition'] }} · {{ $item['call_number'] }}
-                  </p>
-                  <div class="grid grid-cols-2 gap-4 max-w-sm mb-4">
-                    @foreach ($item['dates'] as $date)
-                      <div>
-                        <p class="font-label text-xs {{ ($date['tone'] ?? null) === 'secondary' ? 'text-secondary font-bold' : 'text-on-surface-variant' }} mb-1 uppercase tracking-wider">{{ $date['label'] }}</p>
-                        <p class="font-body text-sm {{ ($date['tone'] ?? null) === 'secondary' ? 'text-primary font-medium' : 'text-on-surface' }}">{{ $date['value'] }}</p>
-                      </div>
-                    @endforeach
-                  </div>
-                  <p class="font-label text-xs text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
-                    <span class="material-symbols-outlined text-sm">location_on</span>
-                    {{ $item['branch'] }}
-                  </p>
-                </div>
-                <div class="flex flex-wrap gap-4 mt-5">
-                  @foreach ($item['actions'] as $action)
-                    @php
-                      $toneClass = match ($action['tone']) {
-                          'primary' => 'text-primary border-b border-outline-variant/40 hover:border-primary',
-                          'secondary' => 'text-secondary hover:text-primary',
-                          default => 'text-on-surface-variant hover:text-primary',
-                      };
-                    @endphp
-                    <span class="font-label text-sm {{ $toneClass }} transition-colors flex items-center gap-1">
-                      <span class="material-symbols-outlined text-sm">{{ $action['icon'] }}</span>
-                      {{ $action['label'] }}
-                    </span>
+                    </li>
                   @endforeach
-                </div>
+                </ul>
               </div>
-            </article>
-          @endforeach
-        </div>
-      </section>
-    @endforeach
-  </div>
+            @endif
+          </div>
+        </article>
+      @endforeach
+    </div>
 
-  <!-- Footer note -->
-  <footer class="mt-16 pt-8 border-t border-outline-variant/20">
+    <div class="mt-10">
+      {{ $loans->links() }}
+    </div>
+  @endif
+
+  <footer class="mt-14 pt-8 border-t border-outline-variant/20">
     <p class="font-body text-sm text-on-surface-variant max-w-2xl">
-      Need an older record? The KazUTB reference desk can retrieve borrowing history from prior academic years upon request — contact the library using the <a href="{{ route('member.messages') }}" class="text-secondary hover:text-primary transition-colors">Messages</a> workspace.
+      <a href="{{ route('member.fines') }}" class="text-secondary hover:text-primary transition-colors">{{ __('librarian.member.fines.title') }}</a>
+      ·
+      <a href="{{ route('member.messages') }}" class="text-secondary hover:text-primary transition-colors">{{ __('librarian.member.notifications.links.messages') }}</a>
     </p>
   </footer>
 @endsection

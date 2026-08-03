@@ -37,6 +37,13 @@
   --radius-md: 4px;
   --radius-sm: 2px;
   --container: 1280px;
+  /* Shared page container: every top-level surface (header, hero, sections,
+     footer) aligns its content to these edges. --page-inset resolves to the
+     distance from the viewport edge to the content, so full-bleed backgrounds
+     keep working while content stays on one vertical line. */
+  --page-max: 1440px;
+  --page-pad: clamp(16px, 3vw, 40px);
+  --page-inset: max(var(--page-pad), calc((100% - var(--page-max)) / 2 + var(--page-pad)));
   --shell-nav-height: 72px;
   --shell-sticky-offset: 92px;
   --shell-first-section-gap: 56px;

@@ -1,12 +1,12 @@
 @extends('layouts.public')
 
 @php
-  $lang = request()->query('lang', 'ru');
+  $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $activePage = $activePage ?? 'rules';
 
   $routeWithLang = static function (string $path) use ($lang): string {
-      return $lang === 'ru' ? $path : $path . '?lang=' . $lang;
+      return $lang === 'kk' ? $path : $path . '?lang=' . $lang;
   };
 
   $header = $rules['header'][$lang];
@@ -20,10 +20,35 @@
   $lastReviewedAt = $rules['last_reviewed_at'];
 @endphp
 
-@section('title', $header['headline'] . ' — KazUTB Smart Library')
+@section('title', $header['headline'] . ' — KazUTB')
 
 @section('content')
-  <div class="rules-canonical">
+  <div class="rules-canonical public-v2 rules-v2">
+    <header class="public-v2__hero rules-v2__hero" data-section="rules-header">
+      <div class="public-v2__inset public-v2__hero-grid">
+        <div>
+          <p class="public-v2__kicker">{{ $header['eyebrow'] }}</p>
+          <h1 class="public-v2__title">
+            {{ $header['headline'] }}
+            <span>({{ $header['subtitle_secondary_lang'] }})</span>
+          </h1>
+          <p class="public-v2__lead">{{ $header['preamble'] }}</p>
+        </div>
+        <dl class="rules-canonical__doc-meta public-v2__hero-note">
+          <div data-test-id="rules-effective-date">
+            <dt>{{ $header['effective_label'] }}</dt>
+            <dd><time datetime="{{ $header['effective_date'] }}">{{ $header['effective_date'] }}</time></dd>
+          </div>
+          <div data-test-id="rules-last-reviewed">
+            <dt>{{ $header['reviewed_label'] }}</dt>
+            <dd><time datetime="{{ $lastReviewedAt }}">{{ $lastReviewedAt }}</time></dd>
+          </div>
+        </dl>
+      </div>
+    </header>
+
+    <div class="public-v2__body">
+    <div class="public-v2__inset rules-v2__workspace">
     <aside class="rules-canonical__toc" data-section="rules-toc" aria-label="{{ $toc['label'] }}">
       <h2>{{ $toc['label'] }}</h2>
       <ul>
@@ -34,25 +59,6 @@
     </aside>
 
     <article class="rules-canonical__article">
-      <header class="rules-canonical__header" data-section="rules-header">
-        <p class="rules-canonical__policy">{{ $header['eyebrow'] }}</p>
-        <h1>
-          {{ $header['headline'] }}
-          <span>({{ $header['subtitle_secondary_lang'] }})</span>
-        </h1>
-        <p class="rules-canonical__lead">{{ $header['preamble'] }}</p>
-        <dl class="rules-canonical__doc-meta">
-          <div data-test-id="rules-effective-date">
-            <dt>{{ $header['effective_label'] }}</dt>
-            <dd><time datetime="{{ $header['effective_date'] }}">{{ $header['effective_date'] }}</time></dd>
-          </div>
-          <div data-test-id="rules-last-reviewed">
-            <dt>{{ $header['reviewed_label'] }}</dt>
-            <dd><time datetime="{{ $lastReviewedAt }}">{{ $lastReviewedAt }}</time></dd>
-          </div>
-        </dl>
-      </header>
-
       {{-- 1. General provisions --}}
       <section class="rules-canonical__section" id="general" data-section="rules-general">
         <h2><span class="rules-canonical__num">{{ $general['number'] }}</span>{{ $general['title'] }}</h2>
@@ -170,15 +176,18 @@
         <p class="rules-canonical__version">{{ $footerMeta['version_label'] }}: {{ $footerMeta['version_value'] }}</p>
       </section>
     </article>
+    </div>
+    </div>
   </div>
 @endsection
 
 @section('head')
 <style>
   .rules-canonical {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 128px 24px 120px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
     gap: 64px;

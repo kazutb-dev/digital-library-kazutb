@@ -1,0 +1,6 @@
+"gate_id","metric","threshold","observed_result","status","strictness_assessment","root_cause","evidence"
+"MT-QG-001","Critical regression pass rate (phase2 current_enforced fail-level)",">=90 percent","API 70.00 percent, UI 90.91 percent, PHPUnit 83.78 percent","Fail","Appropriate","Observed product and contract defects in high-risk modules","qa/phase2/metrics/phase2-quality-gate-results.csv"
+"MT-QG-002","Critical public 5xx errors","0 unexpected HTTP 5xx","1 (news route)","Fail","Appropriate","Public route runtime failure indicates real production risk","qa/phase2/metrics/phase2-test-execution-log.csv"
+"MT-QG-003","High-risk module weighted coverage",">=70 percent weighted checks","75.0 percent (27/36)","Pass","Slightly lenient","Pass achieved despite weak depth in some modules; module-level weak spots remain","qa/phase2/metrics/phase2-automation-coverage.csv"
+"MT-QG-004","Runtime threshold","API<=60s, UI<=90s, PHPUnit<=90s","API 38.435s, UI 54.885s, PHPUnit 61.258s","Pass","Appropriate","No runtime bottleneck observed in measured suite","qa/phase2/metrics/phase2-execution-time.csv"
+"MT-QG-005","Coverage observability","Coverage tooling available in measured environment","blocked locally","Warn","Appropriate","Environment/tooling gap, not necessarily code logic defect","qa/phase2/evidence/logs/phase2-coverage.log"

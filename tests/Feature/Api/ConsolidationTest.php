@@ -48,7 +48,7 @@ class ConsolidationTest extends TestCase
         $response = $this->get('/about');
         $response->assertOk();
         $response->assertSee('data-section="about-canonical-hero"', false);
-        $response->assertSee('KazUTB Smart Library');
+        $response->assertSee('KazUTB Library');
     }
 
     // ═══════════════════════════════════════════════════════════

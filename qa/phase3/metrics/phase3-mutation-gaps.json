@@ -1,0 +1,26 @@
+[
+  {
+    "mutant_id": "MUT-MUT-004",
+    "module": "Integration Reservations Mutate API",
+    "component": "ReservationMutateController::context",
+    "survived": "Yes",
+    "gap_type": "Weak assertion on service context payload",
+    "impact": "Medium",
+    "why_missed": "Tests mock service with broad Mockery::type(array) and do not assert operator_id/operatorId context values.",
+    "recommended_improvement": "Assert exact context array in ReservationMutateTest for approve/reject service calls, including operatorId and operatorBranchId.",
+    "priority": "P2",
+    "evidence_log": ".\\qa\\phase3\\evidence\\logs\\phase3-mutation-MUT-MUT-004-20260513-140552.log"
+  },
+  {
+    "mutant_id": "MUT-DOC-004",
+    "module": "Integration Document Management API",
+    "component": "DocumentManagementController::context",
+    "survived": "Yes",
+    "gap_type": "Weak assertion on service context payload",
+    "impact": "Medium",
+    "why_missed": "Tests mock service with broad Mockery::type(array) and do not assert operator_id/operatorId context values.",
+    "recommended_improvement": "Assert exact context array in DocumentManagementTest for list/create/patch/archive service calls, including operator_id.",
+    "priority": "P2",
+    "evidence_log": ".\\qa\\phase3\\evidence\\logs\\phase3-mutation-MUT-DOC-004-20260513-140552.log"
+  }
+]

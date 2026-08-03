@@ -1,0 +1,100 @@
+{
+  "newTests": [
+    {
+      "test_id": "MID-U-001",
+      "target_module": "Catalog/Formatting support",
+      "scenario_type": "edge",
+      "input_data": "Special characters in bibliography fields",
+      "expected_output": "Structured numbered bibliography text without crash",
+      "actual_result": "Pass",
+      "automation_level": "Unit",
+      "script_location": "tests/Unit/Services/BibliographyFormatterMidtermTest.php",
+      "evidence": "qa/midterm/evidence/logs/midterm-new-phpunit.log",
+      "notes": "Covers special-character handling in output formatting"
+    },
+    {
+      "test_id": "MID-U-002",
+      "target_module": "Integration resource formatting",
+      "scenario_type": "edge",
+      "input_data": "External resource title with long payload (256 chars)",
+      "expected_output": "Grouped format creates external section only",
+      "actual_result": "Pass",
+      "automation_level": "Unit",
+      "script_location": "tests/Unit/Services/BibliographyFormatterMidtermTest.php",
+      "evidence": "qa/midterm/evidence/logs/midterm-new-phpunit.log",
+      "notes": "Boundary-sized payload in formatter"
+    },
+    {
+      "test_id": "MID-INT-001",
+      "target_module": "Integration API",
+      "scenario_type": "failure",
+      "input_data": "Invalid bearer token + valid required headers",
+      "expected_output": "401 auth_failed invalid_bearer_token",
+      "actual_result": "Pass",
+      "automation_level": "Integration",
+      "script_location": "tests/Feature/Api/MidtermIntegrationRiskExpansionTest.php",
+      "evidence": "qa/midterm/evidence/logs/midterm-new-phpunit.log",
+      "notes": "Directly targets high-risk integration authentication failure"
+    },
+    {
+      "test_id": "MID-INT-002",
+      "target_module": "Integration API",
+      "scenario_type": "invalid input",
+      "input_data": "Missing X-Operator-Org-Context header",
+      "expected_output": "400 invalid_request missing_required_header",
+      "actual_result": "Pass",
+      "automation_level": "Integration",
+      "script_location": "tests/Feature/Api/MidtermIntegrationRiskExpansionTest.php",
+      "evidence": "qa/midterm/evidence/logs/midterm-new-phpunit.log",
+      "notes": "Validates required-header contract enforcement"
+    },
+    {
+      "test_id": "MID-INT-003",
+      "target_module": "Integration API",
+      "scenario_type": "invalid input",
+      "input_data": "Semantic-empty X-Operator-Roles",
+      "expected_output": "400 invalid_request missing_operator_roles",
+      "actual_result": "Pass",
+      "automation_level": "Integration",
+      "script_location": "tests/Feature/Api/MidtermIntegrationRiskExpansionTest.php",
+      "evidence": "qa/midterm/evidence/logs/midterm-new-phpunit.log",
+      "notes": "Prevents silent authorization context loss"
+    },
+    {
+      "test_id": "MID-INT-004",
+      "target_module": "Integration API",
+      "scenario_type": "concurrency-like rapid requests",
+      "input_data": "5 rapid authenticated boundary pings",
+      "expected_output": "All responses 200 and <500 with governance headers",
+      "actual_result": "Pass",
+      "automation_level": "Integration",
+      "script_location": "tests/Feature/Api/MidtermIntegrationRiskExpansionTest.php",
+      "evidence": "qa/midterm/evidence/logs/midterm-new-phpunit.log",
+      "notes": "Stress-style guard against transient middleware regression"
+    },
+    {
+      "test_id": "MID-E2E-001",
+      "target_module": "Auth/Permissions",
+      "scenario_type": "invalid user behavior",
+      "input_data": "Rapid repeated guest navigation to /dashboard",
+      "expected_output": "No 5xx; URL remains login/dashboard-protected",
+      "actual_result": "Pass",
+      "automation_level": "E2E",
+      "script_location": "tests/e2e/midterm-risk-expansion.spec.ts",
+      "evidence": "qa/midterm/evidence/logs/midterm-new-playwright.log",
+      "notes": "Covers repeated unauthorized navigation behavior"
+    },
+    {
+      "test_id": "MID-E2E-002",
+      "target_module": "Catalog/Public",
+      "scenario_type": "concurrency and edge",
+      "input_data": "Parallel requests with large query payload to catalog/resources",
+      "expected_output": "Responses remain below 500",
+      "actual_result": "Pass",
+      "automation_level": "E2E",
+      "script_location": "tests/e2e/midterm-risk-expansion.spec.ts",
+      "evidence": "qa/midterm/evidence/logs/midterm-new-playwright.log",
+      "notes": "Combines parallel request pressure with boundary-sized query input"
+    }
+  ]
+}

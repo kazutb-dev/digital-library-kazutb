@@ -1,0 +1,50 @@
+[
+  {
+    "metric": "scenarios_executed",
+    "value": 4,
+    "unit": "count",
+    "notes": "Total chaos scenarios executed"
+  },
+  {
+    "metric": "overall_fault_phase_availability",
+    "value": 50.0,
+    "unit": "percent",
+    "notes": "Across all fault-phase requests"
+  },
+  {
+    "metric": "overall_recovery_phase_availability",
+    "value": 100.0,
+    "unit": "percent",
+    "notes": "Across all recovery-phase requests"
+  },
+  {
+    "metric": "mean_mttr_ms",
+    "value": 3391.02,
+    "unit": "ms",
+    "notes": "Proxy MTTR measured as time from fault removal to first successful recovery probe"
+  },
+  {
+    "metric": "min_mttr_ms",
+    "value": 2987.83,
+    "unit": "ms",
+    "notes": "Best observed recovery proxy"
+  },
+  {
+    "metric": "max_mttr_ms",
+    "value": 3627.96,
+    "unit": "ms",
+    "notes": "Worst observed recovery proxy"
+  },
+  {
+    "metric": "isolated_failures",
+    "value": 4,
+    "unit": "count",
+    "notes": "Scenarios with healthy propagation probe"
+  },
+  {
+    "metric": "cascading_failures",
+    "value": 0,
+    "unit": "count",
+    "notes": "Scenarios where propagation probe became unreachable"
+  }
+]

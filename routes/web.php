@@ -1,11 +1,64 @@
 <?php
 
+use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\BranchController;
+use App\Http\Controllers\Admin\ContactMessageController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\ErrorLogController;
+use App\Http\Controllers\Admin\ExternalResourceController as AdminExternalResourceController;
+use App\Http\Controllers\Admin\FundController;
+use App\Http\Controllers\Admin\GlobalSearchController;
+use App\Http\Controllers\Admin\ImportController;
+use App\Http\Controllers\Admin\IntegrationController;
+use App\Http\Controllers\Admin\NewsController as AdminNewsController;
+use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
+use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\ContactMessageSubmissionController;
+use App\Http\Controllers\DigitalViewerController;
+use App\Http\Controllers\DiscoverController;
+use App\Http\Controllers\Librarian\CatalogAttachmentController as LibrarianCatalogAttachmentController;
+use App\Http\Controllers\Librarian\CatalogController as LibrarianCatalogController;
+use App\Http\Controllers\Librarian\CirculationController as LibrarianCirculationController;
+use App\Http\Controllers\Librarian\CopyController as LibrarianCopyController;
+use App\Http\Controllers\Librarian\DashboardController as LibrarianDashboardController;
+use App\Http\Controllers\Librarian\DataCleanupController as LibrarianDataCleanupController;
+use App\Http\Controllers\Librarian\DataQualityController as LibrarianDataQualityController;
+use App\Http\Controllers\Librarian\FineController as LibrarianFineController;
+use App\Http\Controllers\Librarian\IncidentController as LibrarianIncidentController;
+use App\Http\Controllers\Librarian\InventoryController as LibrarianInventoryController;
+use App\Http\Controllers\Librarian\MessageController as LibrarianMessageController;
+use App\Http\Controllers\Librarian\NewsController as LibrarianNewsController;
+use App\Http\Controllers\Librarian\ReportController as LibrarianReportController;
+use App\Http\Controllers\Librarian\RepositoryController as LibrarianRepositoryController;
+use App\Http\Controllers\Librarian\ReservationController as LibrarianReservationController;
+use App\Http\Controllers\Librarian\UdcReferenceController as LibrarianUdcReferenceController;
+use App\Http\Controllers\Librarian\VisitController as LibrarianVisitController;
+use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\Member\CabinetController as MemberCabinetController;
+use App\Http\Controllers\Member\CollectionController as MemberCollectionController;
+use App\Http\Controllers\Member\IncidentController as MemberIncidentController;
+use App\Http\Controllers\Member\NotificationController as MemberNotificationController;
+use App\Http\Controllers\Member\PortalController as MemberPortalController;
+use App\Http\Controllers\PasswordChangeController;
+use App\Http\Controllers\RepositoryController as PublicRepositoryController;
+use App\Http\Controllers\WebAuthController;
+use App\Models\News;
+use App\Models\Setting;
+use App\Services\ExternalResourceService;
 use App\Services\Library\BookDetailReadService;
 use App\Services\Library\CatalogReadService;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 // Route changes are intentionally tracked by the vault hook automation.
 // This file doubles as the final validation target for route-aware vault logging.
@@ -39,12 +92,6 @@ $postLoginDestination = static function (array $user): string {
     };
 };
 
-$adminView = static function (Request $request, string $view, array $data = []) {
-    return view($view, array_merge([
-        'internalStaffUser' => $request->session()->get('library.user'),
-    ], $data));
-};
-
 $librarianView = static function (Request $request, string $view, array $data = []) {
     return view($view, array_merge([
         'librarianStaffUser' => $request->session()->get('library.user'),
@@ -58,9 +105,9 @@ $memberView = static function (Request $request, string $view, array $data = [])
 };
 
 $newsModelToPublicArticle = static function ($record): array {
-    $publishedAt = $record->published_at ?? $record->updated_at ?? $record->created_at ?? now();
-    $publishedAt = $publishedAt instanceof \Carbon\CarbonInterface ? $publishedAt : now();
-    $content = trim((string) ($record->content ?? ''));
+    $publishedAt = $record->publish_at ?? $record->published_at ?? $record->updated_at ?? $record->created_at ?? now();
+    $publishedAt = $publishedAt instanceof CarbonInterface ? $publishedAt : now();
+    $content = trim((string) ($record->body ?? $record->content ?? ''));
     $paragraphs = preg_split('/\R{2,}/', $content) ?: [];
     $paragraphs = array_values(array_filter(array_map(static fn ($value) => trim((string) $value), $paragraphs)));
 
@@ -76,74 +123,40 @@ $newsModelToPublicArticle = static function ($record): array {
         ];
     }
 
-    $categoryLabel = \Illuminate\Support\Str::of((string) ($record->category ?? 'announcement'))
-        ->replace('-', ' ')
-        ->replace('_', ' ')
-        ->title()
-        ->toString();
-    $excerpt = trim((string) ($record->excerpt ?: \Illuminate\Support\Str::limit(preg_replace('/\s+/', ' ', strip_tags($content)), 220)));
+    $language = in_array((string) ($record->language ?? 'ru'), ['ru', 'kk', 'en'], true)
+        ? (string) $record->language
+        : 'ru';
+    $categoryKey = 'news.categories.'.(string) ($record->category ?? 'announcement');
+    $categoryLabel = Lang::has($categoryKey, $language)
+        ? trans($categoryKey, [], $language)
+        : Str::of((string) ($record->category ?? 'announcement'))
+            ->replace('-', ' ')
+            ->replace('_', ' ')
+            ->title()
+            ->toString();
+    $excerpt = trim((string) ($record->excerpt ?: Str::limit(preg_replace('/\s+/', ' ', strip_tags($content)), 220)));
 
     return [
         'id' => (string) $record->id,
         'slug' => (string) $record->slug,
-        'featured' => (bool) ($record->is_featured ?? false),
+        'topic' => (string) $record->category === 'event' ? 'events' : 'research',
+        'featured' => (bool) ($record->show_on_homepage ?? $record->is_featured ?? false),
+        'language' => $language,
         'published_at' => $publishedAt->toDateString(),
         'published_display' => [
             'ru' => $publishedAt->format('d.m.Y'),
             'kk' => $publishedAt->format('d.m.Y'),
             'en' => $publishedAt->format('F j, Y'),
         ],
-        'category' => [
-            'ru' => $categoryLabel,
-            'kk' => $categoryLabel,
-            'en' => $categoryLabel,
-        ],
-        'title' => [
-            'ru' => (string) $record->title,
-            'kk' => (string) $record->title,
-            'en' => (string) $record->title,
-        ],
-        'excerpt' => [
-            'ru' => $excerpt,
-            'kk' => $excerpt,
-            'en' => $excerpt,
-        ],
+        'category' => [$language => $categoryLabel],
+        'title' => [$language => (string) $record->title],
+        'excerpt' => [$language => $excerpt],
         'hero' => [
-            'image' => null,
-            'alt' => ['ru' => '', 'kk' => '', 'en' => ''],
+            'image' => ! empty($record->cover_image) ? 'storage/'.$record->cover_image : null,
+            'alt' => [$language => (string) $record->title],
         ],
-        'body' => [
-            'ru' => $blocks,
-            'kk' => $blocks,
-            'en' => $blocks,
-        ],
+        'body' => [$language => $blocks],
         'cta' => null,
-    ];
-};
-
-$newsModelToAdminEntry = static function ($record): array {
-    $status = (string) ($record->status ?? 'draft');
-    $publishedAt = $record->published_at ?? $record->updated_at ?? $record->created_at ?? now();
-    $publishedAt = $publishedAt instanceof \Carbon\CarbonInterface ? $publishedAt : now();
-
-    $dateLabel = match ($status) {
-        'published' => 'Published ' . $publishedAt->format('M d, Y'),
-        'archived' => 'Archived ' . $publishedAt->format('M d, Y'),
-        default => 'Last edited ' . $publishedAt->diffForHumans(),
-    };
-
-    return [
-        'id' => (string) $record->id,
-        'status' => \Illuminate\Support\Str::of($status)->title()->toString(),
-        'status_tone' => $status,
-        'date_icon' => $status === 'published' ? 'calendar_today' : ($status === 'archived' ? 'inventory_2' : 'edit'),
-        'date_label' => $dateLabel,
-        'featured' => (bool) ($record->is_featured ?? false),
-        'category' => \Illuminate\Support\Str::of((string) ($record->category ?? 'announcement'))->replace('-', ' ')->replace('_', ' ')->title()->toString(),
-        'title' => (string) $record->title,
-        'excerpt' => (string) ($record->excerpt ?? ''),
-        'has_cover' => false,
-        'public_url' => $status === 'published' && $publishedAt->lte(now()) ? '/news/' . $record->slug : null,
     ];
 };
 
@@ -152,7 +165,7 @@ $resolveCrmUserId = static function (array $sessionUser): ?string {
 
     // Session user ID from CRM is the authoritative CRM user identifier.
     // No DB lookup needed; if it's a valid UUID, use it directly.
-    if ($sessionId !== '' && \Illuminate\Support\Str::isUuid($sessionId)) {
+    if ($sessionId !== '' && Str::isUuid($sessionId)) {
         return $sessionId;
     }
 
@@ -226,9 +239,9 @@ $memberHistoryFeed = static function (string $crmUserId): array {
         ->limit(200)
         ->get()
         ->map(function (object $row): array {
-            $issuedAt = $row->issued_at !== null ? \Carbon\Carbon::parse($row->issued_at) : null;
-            $dueAt = $row->due_at !== null ? \Carbon\Carbon::parse($row->due_at) : null;
-            $returnedAt = $row->returned_at !== null ? \Carbon\Carbon::parse($row->returned_at) : null;
+            $issuedAt = $row->issued_at !== null ? Carbon::parse($row->issued_at) : null;
+            $dueAt = $row->due_at !== null ? Carbon::parse($row->due_at) : null;
+            $returnedAt = $row->returned_at !== null ? Carbon::parse($row->returned_at) : null;
 
             $status = 'returned';
             $statusLabel = 'Returned';
@@ -298,7 +311,7 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library провёл международный симпозиум по целостности архивов — площадку для обсуждения практик долговременного сохранения цифровых и гибридных коллекций в университетских библиотеках.'],
+                    ['type' => 'lead', 'text' => 'KazUTB провёл международный симпозиум по целостности архивов — площадку для обсуждения практик долговременного сохранения цифровых и гибридных коллекций в университетских библиотеках.'],
                     ['type' => 'h2', 'text' => 'Темы программы'],
                     ['type' => 'p', 'text' => 'Программа объединила библиотекарей, архивистов и исследователей. В центре обсуждения — связность метаданных, устойчивость форматов и контролируемый доступ к институциональному архиву.'],
                     ['type' => 'list', 'items' => [
@@ -310,7 +323,7 @@ $newsSeedProvider = static function (): array {
                     ['type' => 'p', 'text' => 'По итогам симпозиума библиотека публикует методические рекомендации по работе с институциональным архивом и расширяет программу проверенных поступлений в научном репозитории университета.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library университет кітапханаларындағы цифрлық және гибридті жинақтарды ұзақ мерзімді сақтау тәжірибесін талқылауға арналған мұрағат тұтастығы жөніндегі халықаралық симпозиумды өткізді.'],
+                    ['type' => 'lead', 'text' => 'KazUTB университет кітапханаларындағы цифрлық және гибридті жинақтарды ұзақ мерзімді сақтау тәжірибесін талқылауға арналған мұрағат тұтастығы жөніндегі халықаралық симпозиумды өткізді.'],
                     ['type' => 'h2', 'text' => 'Бағдарлама тақырыптары'],
                     ['type' => 'p', 'text' => 'Бағдарлама кітапханашылар, архивистер мен зерттеушілерді біріктірді. Негізгі тақырыптар: метадерек байланыстылығы, формат тұрақтылығы және институционалдық мұрағатқа бақыланатын қолжетімділік.'],
                     ['type' => 'list', 'items' => [
@@ -322,7 +335,7 @@ $newsSeedProvider = static function (): array {
                     ['type' => 'p', 'text' => 'Симпозиум қорытындысы бойынша кітапхана институционалдық мұрағатпен жұмысқа арналған әдістемелік ұсынымдарды жариялайды және университеттің ғылыми репозиторийіндегі тексерілген түсімдер бағдарламасын кеңейтеді.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library hosted an international symposium on archival integrity — a working space to discuss long-term preservation practice for digital and hybrid collections in university libraries.'],
+                    ['type' => 'lead', 'text' => 'KazUTB hosted an international symposium on archival integrity — a working space to discuss long-term preservation practice for digital and hybrid collections in university libraries.'],
                     ['type' => 'h2', 'text' => 'Programme themes'],
                     ['type' => 'p', 'text' => 'The programme brought together librarians, archivists, and researchers. Central themes were metadata continuity, format resilience, and controlled access to the institutional archive.'],
                     ['type' => 'list', 'items' => [
@@ -335,9 +348,113 @@ $newsSeedProvider = static function (): array {
                 ],
             ],
             'cta' => [
-                'ru' => ['heading' => 'Продолжить работу', 'body' => 'Перейдите в научный репозиторий KazUTB Smart Library, чтобы ознакомиться с проверенными публикациями.', 'label' => 'Открыть репозиторий', 'href' => '/discover'],
-                'kk' => ['heading' => 'Жұмысты жалғастыру', 'body' => 'Тексерілген жарияланымдармен танысу үшін KazUTB Smart Library ғылыми репозиторийіне өтіңіз.', 'label' => 'Репозиторийді ашу', 'href' => '/discover'],
-                'en' => ['heading' => 'Continue from here', 'body' => 'Open the KazUTB Smart Library scholarly repository to browse reviewed publications.', 'label' => 'Open the repository', 'href' => '/discover'],
+                'ru' => ['heading' => 'Продолжить работу', 'body' => 'Перейдите в научный репозиторий KazUTB, чтобы ознакомиться с проверенными публикациями.', 'label' => 'Открыть репозиторий', 'href' => '/repository'],
+                'kk' => ['heading' => 'Жұмысты жалғастыру', 'body' => 'Тексерілген жарияланымдармен танысу үшін KazUTB ғылыми репозиторийіне өтіңіз.', 'label' => 'Репозиторийді ашу', 'href' => '/repository'],
+                'en' => ['heading' => 'Continue from here', 'body' => 'Open the KazUTB scholarly repository to browse reviewed publications.', 'label' => 'Open the repository', 'href' => '/repository'],
+            ],
+        ],
+        'catalog-assistance-pilot-2026' => [
+            'slug' => 'catalog-assistance-pilot-2026',
+            'featured' => false,
+            'published_at' => '2026-04-22',
+            'published_display' => [
+                'ru' => '22 апреля 2026',
+                'kk' => '2026 жылғы 22 сәуір',
+                'en' => 'April 22, 2026',
+            ],
+            'category' => [
+                'ru' => 'Цифровые сервисы',
+                'kk' => 'Цифрлық сервистер',
+                'en' => 'Digital Services',
+            ],
+            'title' => [
+                'ru' => 'Библиотека запустила пилот ассистента для навигации по каталогу',
+                'kk' => 'Кітапхана каталог бойынша навигацияға арналған көмекші пилотын іске қосты',
+                'en' => 'Library Launches a Pilot Catalog Navigation Assistant',
+            ],
+            'excerpt' => [
+                'ru' => 'Новая демо-среда помогает читателям быстрее находить книги, ориентироваться в фильтрах и переходить к связанным материалам без лишних кликов.',
+                'kk' => 'Жаңа демо-орта оқырмандарға кітаптарды тезірек табуға, сүзгілерді түсінуге және байланысты материалдарға артық қадамсыз өтуге көмектеседі.',
+                'en' => 'The new demo environment helps readers find books faster, understand filters, and move to related materials with fewer clicks.',
+            ],
+            'hero' => [
+                'image' => 'images/news/ai-workshop.jpg',
+                'alt' => [
+                    'ru' => 'Рабочий стол с цифровым интерфейсом каталога',
+                    'kk' => 'Каталогтың цифрлық интерфейсі көрсетілген жұмыс орны',
+                    'en' => 'Workstation with a digital catalog interface',
+                ],
+            ],
+            'body' => [
+                'ru' => [
+                    ['type' => 'lead', 'text' => 'Пилотный ассистент каталога KazUTB показывает подсказки по поиску, подборкам и фильтрам в едином потоке.'],
+                    ['type' => 'p', 'text' => 'Демо-режим позволяет проверить ключевые сценарии поиска до внедрения обновлённого интерфейса. Команда наблюдает, какие элементы навигации помогают быстрее добираться до книги и как пользователи взаимодействуют с подборками.'],
+                ],
+                'kk' => [
+                    ['type' => 'lead', 'text' => 'KazUTB каталогының пилоттық көмекшісі іздеу, подборка және сүзгілер бойынша кеңестерді бір сценарийде көрсетеді.'],
+                    ['type' => 'p', 'text' => 'Демо режимі жаңартылған интерфейс енгізілгенге дейін негізгі іздеу сценарийлерін тексеруге мүмкіндік береді. Команда навигацияның қай элементтері кітапқа тезірек жетуге көмектесетінін және оқырмандардың подборкалармен қалай әрекеттесетінін бақылайды.'],
+                ],
+                'en' => [
+                    ['type' => 'lead', 'text' => 'The KazUTB pilot catalog assistant surfaces search tips, shortlist actions, and filter guidance in one flow.'],
+                    ['type' => 'p', 'text' => 'The demo mode makes it possible to validate the core search journeys before the refreshed interface ships. The team is observing which navigation elements help readers reach a book faster and how shortlist actions are used.'],
+                ],
+            ],
+            'cta' => [
+                'ru' => ['heading' => 'Открыть каталог', 'body' => 'Попробуйте обновлённый поиск и быстрые сценарии работы с подборкой в публичном каталоге.', 'label' => 'Перейти в каталог', 'href' => '/catalog'],
+                'kk' => ['heading' => 'Каталогты ашу', 'body' => 'Ашық каталогтағы жаңартылған іздеу мен подборкамен жұмыс істеудің жедел сценарийлерін көріңіз.', 'label' => 'Каталогқа өту', 'href' => '/catalog'],
+                'en' => ['heading' => 'Open the catalog', 'body' => 'Try the refreshed search flow and the quick shortlist actions in the public catalog.', 'label' => 'Go to catalog', 'href' => '/catalog'],
+            ],
+        ],
+        'student-research-showcase-2026' => [
+            'slug' => 'student-research-showcase-2026',
+            'featured' => false,
+            'published_at' => '2026-04-18',
+            'published_display' => [
+                'ru' => '18 апреля 2026',
+                'kk' => '2026 жылғы 18 сәуір',
+                'en' => 'April 18, 2026',
+            ],
+            'category' => [
+                'ru' => 'События кампуса',
+                'kk' => 'Кампус оқиғалары',
+                'en' => 'Campus Updates',
+            ],
+            'title' => [
+                'ru' => 'Студенческая исследовательская витрина открыла весенний цикл постеров',
+                'kk' => 'Студенттік зерттеу витринасы көктемгі постерлер циклін ашты',
+                'en' => 'Student Research Showcase Opens the Spring Poster Cycle',
+            ],
+            'excerpt' => [
+                'ru' => 'На открытой витрине собраны лучшие постеры магистрантов и проектные работы, которые можно быстро просмотреть по темам и направлениям.',
+                'kk' => 'Ашық витринаға магистранттардың үздік постерлері мен жобалық жұмыстары жиналды, оларды тақырыптар мен бағыттар бойынша жылдам қарауға болады.',
+                'en' => 'The public showcase gathers the best master’s posters and project works, all ready to browse quickly by topic and discipline.',
+            ],
+            'hero' => [
+                'image' => 'images/news/classics-event.jpg',
+                'alt' => [
+                    'ru' => 'Выставка постеров в светлом читальном пространстве',
+                    'kk' => 'Жарық оқу кеңістігіндегі постер көрмесі',
+                    'en' => 'Poster showcase in a bright reading space',
+                ],
+            ],
+            'body' => [
+                'ru' => [
+                    ['type' => 'lead', 'text' => 'Весенняя витрина показывает, как студенческие исследования превращаются в понятные и доступные публичные материалы.'],
+                    ['type' => 'p', 'text' => 'Команда библиотеки собрала постеры, короткие аннотации и тематические подборки, чтобы читатели могли быстро переходить от одного проекта к другому.'],
+                ],
+                'kk' => [
+                    ['type' => 'lead', 'text' => 'Көктемгі витрина студенттік зерттеулердің түсінікті әрі қолжетімді жария материалдарға қалай айналатынын көрсетеді.'],
+                    ['type' => 'p', 'text' => 'Кітапхана командасы постерлерді, қысқа аннотацияларды және тақырыптық жинақтарды біріктіріп, оқырмандардың бір жобадан екіншісіне тез өтуіне жағдай жасады.'],
+                ],
+                'en' => [
+                    ['type' => 'lead', 'text' => 'The spring showcase shows how student research can be turned into clear and accessible public material.'],
+                    ['type' => 'p', 'text' => 'The library team assembled posters, short abstracts, and topic bundles so readers can move quickly from one project to the next.'],
+                ],
+            ],
+            'cta' => [
+                'ru' => ['heading' => 'Смотреть коллекцию', 'body' => 'Переходите к демо-подборке материалов и изучайте новые темы в каталоге.', 'label' => 'Открыть подборку', 'href' => '/catalog'],
+                'kk' => ['heading' => 'Коллекцияны көру', 'body' => 'Демо-жинақтағы материалдарға өтіп, каталогтағы жаңа тақырыптарды зерттеңіз.', 'label' => 'Подборканы ашу', 'href' => '/catalog'],
+                'en' => ['heading' => 'View the collection', 'body' => 'Jump into the demo bundle and explore new topics in the catalog.', 'label' => 'Open the bundle', 'href' => '/catalog'],
             ],
         ],
         'eurasian-manuscripts-integration' => [
@@ -374,22 +491,22 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'Библиотека завершила базовый этап цифровой интеграции коллекции евразийских рукописей XIX века в институциональный архив KazUTB Smart Library.'],
+                    ['type' => 'lead', 'text' => 'Библиотека завершила базовый этап цифровой интеграции коллекции евразийских рукописей XIX века в институциональный архив KazUTB.'],
                     ['type' => 'p', 'text' => 'Материалы прошли проверку метаданных, получили устойчивые идентификаторы и связаны с каталогом. Читатели и преподаватели могут обращаться к коллекции через обычный академический поиск.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'Кітапхана XIX ғасырдың еуразиялық қолжазбалар жинағын KazUTB Smart Library институционалдық мұрағатына цифрлық интеграциялаудың базалық кезеңін аяқтады.'],
+                    ['type' => 'lead', 'text' => 'Кітапхана XIX ғасырдың еуразиялық қолжазбалар жинағын KazUTB институционалдық мұрағатына цифрлық интеграциялаудың базалық кезеңін аяқтады.'],
                     ['type' => 'p', 'text' => 'Материалдар метадеректер тексеруінен өтті, тұрақты идентификаторларды алды және каталогпен байланыстырылды. Оқырмандар мен оқытушылар жинаққа қалыпты академиялық іздеу арқылы өте алады.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'The library has completed the foundation stage of digital integration for the 19th-century Eurasian manuscript collection into the KazUTB Smart Library institutional archive.'],
+                    ['type' => 'lead', 'text' => 'The library has completed the foundation stage of digital integration for the 19th-century Eurasian manuscript collection into the KazUTB institutional archive.'],
                     ['type' => 'p', 'text' => 'Materials have been validated against metadata standards, assigned stable identifiers, and linked to the catalog. Readers and faculty can now reach the collection through ordinary academic search.'],
                 ],
             ],
             'cta' => [
-                'ru' => ['heading' => 'Открыть коллекцию', 'body' => 'Каталог KazUTB Smart Library содержит проиндексированные материалы — используйте тематическую навигацию по УДК.', 'label' => 'Открыть каталог', 'href' => '/catalog'],
-                'kk' => ['heading' => 'Жинақты ашу', 'body' => 'KazUTB Smart Library каталогында индекстелген материалдар бар — ӘОЖ бойынша тақырыптық навигацияны пайдаланыңыз.', 'label' => 'Каталогты ашу', 'href' => '/catalog'],
-                'en' => ['heading' => 'Open the collection', 'body' => 'The KazUTB Smart Library catalog contains the indexed materials — use UDC subject navigation to explore.', 'label' => 'Open the catalog', 'href' => '/catalog'],
+                'ru' => ['heading' => 'Открыть коллекцию', 'body' => 'Каталог KazUTB содержит проиндексированные материалы — используйте тематическую навигацию по УДК.', 'label' => 'Открыть каталог', 'href' => '/catalog'],
+                'kk' => ['heading' => 'Жинақты ашу', 'body' => 'KazUTB каталогында индекстелген материалдар бар — ӘОЖ бойынша тақырыптық навигацияны пайдаланыңыз.', 'label' => 'Каталогты ашу', 'href' => '/catalog'],
+                'en' => ['heading' => 'Open the collection', 'body' => 'The KazUTB catalog contains the indexed materials — use UDC subject navigation to explore.', 'label' => 'Open the catalog', 'href' => '/catalog'],
             ],
         ],
         'digital-access-partner-institutions' => [
@@ -426,15 +543,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'Библиотека расширила программу цифрового доступа для партнёрских университетов. Политика доступа и журнал обращений остаются под полным контролем KazUTB Smart Library.'],
+                    ['type' => 'lead', 'text' => 'Библиотека расширила программу цифрового доступа для партнёрских университетов. Политика доступа и журнал обращений остаются под полным контролем KazUTB.'],
                     ['type' => 'p', 'text' => 'Обновлённые потоки доступа поддерживают существующие уровни контроля и работают только в рамках подтверждённых академических соглашений.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'Кітапхана серіктес университеттер үшін цифрлық қолжетімділік бағдарламасын кеңейтті. Қолжетімділік саясаты мен өтініш журналы толығымен KazUTB Smart Library бақылауында қалады.'],
+                    ['type' => 'lead', 'text' => 'Кітапхана серіктес университеттер үшін цифрлық қолжетімділік бағдарламасын кеңейтті. Қолжетімділік саясаты мен өтініш журналы толығымен KazUTB бақылауында қалады.'],
                     ['type' => 'p', 'text' => 'Жаңартылған қолжетімділік ағындары қолданыстағы бақылау деңгейлерін қолдайды және тек расталған академиялық келісімдер шеңберінде жұмыс істейді.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'The library has expanded its digital-access programme for partner universities. Access policy and the request journal remain fully under KazUTB Smart Library control.'],
+                    ['type' => 'lead', 'text' => 'The library has expanded its digital-access programme for partner universities. Access policy and the request journal remain fully under KazUTB control.'],
                     ['type' => 'p', 'text' => 'Updated access flows respect existing control levels and operate only within confirmed academic agreements.'],
                 ],
             ],
@@ -478,15 +595,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'Фонд реставрационной лаборатории KazUTB Smart Library пополнился серией исторических журналов поступлений и вспомогательных карточек учёта.'],
+                    ['type' => 'lead', 'text' => 'Фонд реставрационной лаборатории KazUTB пополнился серией исторических журналов поступлений и вспомогательных карточек учёта.'],
                     ['type' => 'p', 'text' => 'Материалы проходят первичную консервацию, атрибуцию и подготовку к оцифровке. После завершения обработки описания будут связаны с публичным каталогом и новостным архивом библиотеки.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library қалпына келтіру зертханасының қоры тарихи түсім журналдары мен қосалқы есеп карточкаларымен толықты.'],
+                    ['type' => 'lead', 'text' => 'KazUTB қалпына келтіру зертханасының қоры тарихи түсім журналдары мен қосалқы есеп карточкаларымен толықты.'],
                     ['type' => 'p', 'text' => 'Материалдар бастапқы консервациядан, атрибуциядан және цифрландыруға дайындаудан өтуде. Өңдеу аяқталғаннан кейін сипаттамалар ашық каталогпен және кітапхананың жаңалықтар мұрағатымен байланысады.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'The KazUTB Smart Library restoration lab has received a set of historical acquisition ledgers and supporting catalog cards.'],
+                    ['type' => 'lead', 'text' => 'The KazUTB restoration lab has received a set of historical acquisition ledgers and supporting catalog cards.'],
                     ['type' => 'p', 'text' => 'The materials are undergoing initial conservation, attribution, and digitisation preparation. Once processed, their descriptions will be linked into the public catalog and the library news archive.'],
                 ],
             ],
@@ -530,15 +647,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library обновил регламент межбиблиотечного обмена для международных и межвузовских запросов.'],
+                    ['type' => 'lead', 'text' => 'KazUTB обновил регламент межбиблиотечного обмена для международных и межвузовских запросов.'],
                     ['type' => 'p', 'text' => 'Новая редакция фиксирует единые сроки подтверждения, перечень ответственных сотрудников и требования к сопровождению цифровых копий. Это снижает задержки и делает обслуживание предсказуемее для партнёрских учреждений.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library халықаралық және жоғары оқу орындары арасындағы сұранымдар үшін кітапханааралық алмасу регламентін жаңартты.'],
+                    ['type' => 'lead', 'text' => 'KazUTB халықаралық және жоғары оқу орындары арасындағы сұранымдар үшін кітапханааралық алмасу регламентін жаңартты.'],
                     ['type' => 'p', 'text' => 'Жаңа редакция растаудың бірыңғай мерзімдерін, жауапты қызметкерлер тізімін және цифрлық көшірмелерді сүйемелдеу талаптарын бекітеді. Бұл кідірістерді азайтып, серіктес ұйымдар үшін қызмет көрсетуді болжамды етеді.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library has updated its interlibrary loan governance for international and inter-university requests.'],
+                    ['type' => 'lead', 'text' => 'KazUTB has updated its interlibrary loan governance for international and inter-university requests.'],
                     ['type' => 'p', 'text' => 'The revised guidance defines confirmation timelines, accountable roles, and requirements for handling digital copies. This reduces delays and makes service expectations more predictable for partner institutions.'],
                 ],
             ],
@@ -582,15 +699,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library завершила весенний цикл исследований пользовательского опыта каталога.'],
+                    ['type' => 'lead', 'text' => 'KazUTB завершила весенний цикл исследований пользовательского опыта каталога.'],
                     ['type' => 'p', 'text' => 'Команда проанализировала пути поиска по ключевым исследовательским сценариям и обновила приоритеты улучшений для интерфейсов фильтрации, выдачи и перехода к связанным материалам.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library каталог пайдаланушы тәжірибесін зерттеудің көктемгі циклін аяқтады.'],
+                    ['type' => 'lead', 'text' => 'KazUTB каталог пайдаланушы тәжірибесін зерттеудің көктемгі циклін аяқтады.'],
                     ['type' => 'p', 'text' => 'Команда зерттеу сценарийлері бойынша іздеу маршруттарын талдап, сүзгілеу, нәтиже беру және байланысты материалдарға өту интерфейстерін жетілдіру басымдықтарын жаңартты.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library has completed its spring cycle of catalog user-experience research.'],
+                    ['type' => 'lead', 'text' => 'KazUTB has completed its spring cycle of catalog user-experience research.'],
                     ['type' => 'p', 'text' => 'The team analysed search journeys across core research scenarios and refreshed improvement priorities for filtering, result ranking, and related-material navigation interfaces.'],
                 ],
             ],
@@ -634,15 +751,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library начала новый цикл приёма материалов в институциональный репозиторий.'],
+                    ['type' => 'lead', 'text' => 'KazUTB начала новый цикл приёма материалов в институциональный репозиторий.'],
                     ['type' => 'p', 'text' => 'Материалы проходят проверку метаданных, правового статуса и качества описания. После модерации записи публикуются с устойчивыми идентификаторами и маршрутом к защищенному просмотру.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library институционалдық репозиторийге материал қабылдаудың жаңа циклін бастады.'],
+                    ['type' => 'lead', 'text' => 'KazUTB институционалдық репозиторийге материал қабылдаудың жаңа циклін бастады.'],
                     ['type' => 'p', 'text' => 'Материалдар метадерек, құқықтық мәртебе және сипаттама сапасы бойынша тексеріледі. Модерациядан кейін жазбалар тұрақты идентификаторлармен және қорғалған оқу маршрутымен жарияланады.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'KazUTB Smart Library has launched a new institutional repository intake cycle.'],
+                    ['type' => 'lead', 'text' => 'KazUTB has launched a new institutional repository intake cycle.'],
                     ['type' => 'p', 'text' => 'Submissions are reviewed for metadata quality, rights status, and descriptive completeness. After moderation, records are published with persistent identifiers and a controlled-reading route.'],
                 ],
             ],
@@ -708,6 +825,8 @@ $newsSeedProvider = static function (): array {
 
     $orderedSlugs = [
         'global-symposium-archival-integrity',
+        'catalog-assistance-pilot-2026',
+        'student-research-showcase-2026',
         'eurasian-manuscripts-integration',
         'digital-access-partner-institutions',
         'restoration-lab-acquisition-ledgers',
@@ -732,18 +851,18 @@ $leadershipSeedProvider = static function (): array {
     $header = [
         'ru' => [
             'eyebrow' => 'Руководство библиотеки',
-            'headline' => 'Руководство KazUTB Smart Library',
-            'lede' => 'Руководство библиотеки отвечает за институциональный фонд, электронные коллекции, научный архив и читательские сервисы KazUTB Smart Library. Контакты и маршруты обращения ведутся через официальные каналы университета.',
+            'headline' => 'Руководство KazUTB',
+            'lede' => 'Руководство библиотеки отвечает за институциональный фонд, электронные коллекции, научный архив и читательские сервисы KazUTB. Контакты и маршруты обращения ведутся через официальные каналы университета.',
         ],
         'kk' => [
             'eyebrow' => 'Кітапхана басшылығы',
-            'headline' => 'KazUTB Smart Library басшылығы',
-            'lede' => 'Кітапхана басшылығы KazUTB Smart Library-дің институционалдық қорын, электрондық жинақтарын, ғылыми мұрағатын және оқырман сервистерін үйлестіреді. Байланыс пен өтініш маршруттары университеттің ресми арналары арқылы жүргізіледі.',
+            'headline' => 'KazUTB басшылығы',
+            'lede' => 'Кітапхана басшылығы KazUTB-дің институционалдық қорын, электрондық жинақтарын, ғылыми мұрағатын және оқырман сервистерін үйлестіреді. Байланыс пен өтініш маршруттары университеттің ресми арналары арқылы жүргізіледі.',
         ],
         'en' => [
             'eyebrow' => 'Library Leadership',
-            'headline' => 'Leadership of KazUTB Smart Library',
-            'lede' => 'Library leadership stewards the institutional collection, digital materials, scholarly archive, and reader services of KazUTB Smart Library. Contact and inquiry routes are maintained through official university channels.',
+            'headline' => 'Leadership of KazUTB',
+            'lede' => 'Library leadership stewards the institutional collection, digital materials, scholarly archive, and reader services of KazUTB. Contact and inquiry routes are maintained through official university channels.',
         ],
     ];
 
@@ -860,21 +979,21 @@ $leadershipSeedProvider = static function (): array {
         'ru' => [
             'eyebrow' => 'Связаться с библиотекой',
             'heading' => 'Общие обращения и академические запросы',
-            'body' => 'Для общих вопросов, обращений преподавателей и внешних академических запросов используйте официальные контакты KazUTB Smart Library.',
+            'body' => 'Для общих вопросов, обращений преподавателей и внешних академических запросов используйте официальные контакты KazUTB.',
             'label' => 'Перейти к контактам',
             'href' => '/contacts',
         ],
         'kk' => [
             'eyebrow' => 'Кітапханамен байланысу',
             'heading' => 'Жалпы өтініштер мен академиялық сұраулар',
-            'body' => 'Жалпы сұрақтар, оқытушылардың өтініштері және сыртқы академиялық сұраулар бойынша KazUTB Smart Library-дің ресми байланыс арналарын пайдаланыңыз.',
+            'body' => 'Жалпы сұрақтар, оқытушылардың өтініштері және сыртқы академиялық сұраулар бойынша KazUTB-дің ресми байланыс арналарын пайдаланыңыз.',
             'label' => 'Байланыс бетіне өту',
             'href' => '/contacts',
         ],
         'en' => [
             'eyebrow' => 'Contact the library',
             'heading' => 'General inquiries and academic requests',
-            'body' => 'For general questions, faculty inquiries, and external academic requests, please use the official contact routes of KazUTB Smart Library.',
+            'body' => 'For general questions, faculty inquiries, and external academic requests, please use the official contact routes of KazUTB.',
             'label' => 'Open contacts',
             'href' => '/contacts',
         ],
@@ -903,7 +1022,7 @@ $rulesSeedProvider = static function (): array {
             'eyebrow' => 'Официальный документ библиотеки',
             'headline' => 'Правила пользования библиотекой',
             'subtitle_secondary_lang' => 'Library Usage Rules',
-            'preamble' => 'Настоящие правила регулируют пользование помещениями, фондами и электронными ресурсами KazUTB Smart Library. Документ обеспечивает равный доступ к коллекциям, сохранность фонда и академическую среду, пригодную для учебной и исследовательской работы.',
+            'preamble' => 'Настоящие правила регулируют пользование помещениями, фондами и электронными ресурсами KazUTB. Документ обеспечивает равный доступ к коллекциям, сохранность фонда и академическую среду, пригодную для учебной и исследовательской работы.',
             'effective_label' => 'Действует с',
             'effective_date' => '2026-04-01',
             'reviewed_label' => 'Последняя проверка',
@@ -912,7 +1031,7 @@ $rulesSeedProvider = static function (): array {
             'eyebrow' => 'Кітапхананың ресми құжаты',
             'headline' => 'Кітапхананы пайдалану ережелері',
             'subtitle_secondary_lang' => 'Library Usage Rules',
-            'preamble' => 'Осы ережелер KazUTB Smart Library ғимараттарын, қорларын және электрондық ресурстарын пайдалану тәртібін реттейді. Құжат жинаққа тең қолжетімділікті, қордың сақталуын және оқу мен ғылыми жұмысқа қолайлы академиялық ортаны қамтамасыз етеді.',
+            'preamble' => 'Осы ережелер KazUTB ғимараттарын, қорларын және электрондық ресурстарын пайдалану тәртібін реттейді. Құжат жинаққа тең қолжетімділікті, қордың сақталуын және оқу мен ғылыми жұмысқа қолайлы академиялық ортаны қамтамасыз етеді.',
             'effective_label' => 'Күшіне енген күні',
             'effective_date' => '2026-04-01',
             'reviewed_label' => 'Соңғы тексеру',
@@ -921,7 +1040,7 @@ $rulesSeedProvider = static function (): array {
             'eyebrow' => 'Official library policy document',
             'headline' => 'Library Usage Rules',
             'subtitle_secondary_lang' => 'Правила пользования библиотекой',
-            'preamble' => 'These rules govern use of the facilities, collections, and digital resources of KazUTB Smart Library. The document supports equitable access to the collection, preservation of holdings, and an academic environment suitable for study and research.',
+            'preamble' => 'These rules govern use of the facilities, collections, and digital resources of KazUTB. The document supports equitable access to the collection, preservation of holdings, and an academic environment suitable for study and research.',
             'effective_label' => 'Effective from',
             'effective_date' => '2026-04-01',
             'reviewed_label' => 'Last reviewed',
@@ -966,7 +1085,7 @@ $rulesSeedProvider = static function (): array {
             'number' => '1',
             'eyebrow' => 'Раздел 1',
             'title' => 'Общие положения',
-            'lede' => 'KazUTB Smart Library обслуживает академическое сообщество университета и обеспечивает доступ к печатным и электронным коллекциям через единые институциональные правила.',
+            'lede' => 'KazUTB обслуживает академическое сообщество университета и обеспечивает доступ к печатным и электронным коллекциям через единые институциональные правила.',
             'items' => [
                 'Библиотека обслуживает студентов, преподавателей, научных сотрудников и авторизованных исследователей KazUTB.',
                 'Действующее удостоверение университета служит основным читательским документом; использование чужого удостоверения не допускается.',
@@ -978,7 +1097,7 @@ $rulesSeedProvider = static function (): array {
             'number' => '1',
             'eyebrow' => '1-бөлім',
             'title' => 'Жалпы ережелер',
-            'lede' => 'KazUTB Smart Library университеттің академиялық қауымдастығына қызмет көрсетеді және баспа мен электрондық жинақтарға бірыңғай институционалдық ережелер арқылы қол жеткізуді қамтамасыз етеді.',
+            'lede' => 'KazUTB университеттің академиялық қауымдастығына қызмет көрсетеді және баспа мен электрондық жинақтарға бірыңғай институционалдық ережелер арқылы қол жеткізуді қамтамасыз етеді.',
             'items' => [
                 'Кітапхана KazUTB студенттеріне, оқытушыларына, ғылыми қызметкерлеріне және уәкілетті зерттеушілеріне қызмет көрсетеді.',
                 'Университеттің қолданыстағы жеке куәлігі оқырманның негізгі құжаты болып табылады; басқа адамның куәлігін пайдалануға тыйым салынады.',
@@ -990,7 +1109,7 @@ $rulesSeedProvider = static function (): array {
             'number' => '1',
             'eyebrow' => 'Section 1',
             'title' => 'General provisions',
-            'lede' => 'KazUTB Smart Library serves the university academic community and provides access to print and digital collections under a unified set of institutional rules.',
+            'lede' => 'KazUTB serves the university academic community and provides access to print and digital collections under a unified set of institutional rules.',
             'items' => [
                 'The library serves enrolled students, faculty, research staff, and authorized researchers of KazUTB.',
                 'A valid university ID serves as the primary library credential; use of another person\'s ID is not permitted.',
@@ -1325,8 +1444,111 @@ $rulesSeedProvider = static function (): array {
     ];
 };
 
-Route::get('/', function () {
-    return view('welcome');
+// Public homepage (PROJECT_CONTEXT §17).
+//
+// Supplies the data-backed homepage sections: the new-additions rail comes
+// from CatalogReadService, and the per-UDC counts shown on the faculty and
+// collection cards are read from the same service. Counts are cached because
+// they are one query per index; when the catalog schema is absent the map
+// stays empty and the cards render without a count rather than inventing one.
+Route::get('/', function (CatalogReadService $catalogReadService) {
+    $newArrivals = [];
+    $homepageNews = collect();
+    try {
+        // includeTotal is on so the service behaves the same way in every
+        // environment: without it the sqlite path skips its demo fallback and
+        // the rail silently renders empty in tests while working in the browser.
+        $result = $catalogReadService->search(
+            limit: 10,
+            sort: 'recently_added',
+            includeTotal: true,
+            includeLocations: false,
+            completeOnly: true,
+        );
+        $newArrivals = is_array($result['data'] ?? null) ? $result['data'] : [];
+    } catch (Throwable) {
+        // The homepage must render even with the catalog schema absent.
+    }
+
+    $udcCounts = Cache::remember(
+        'homepage.udc_counts',
+        now()->addMinutes(15),
+        static function () use ($catalogReadService): array {
+            $codes = collect(array_merge(
+                config('homepage_sections.faculties', []),
+                config('homepage_sections.collections', []),
+            ))->pluck('udc')->unique()->values();
+
+            $counts = [];
+            foreach ($codes as $code) {
+                try {
+                    $result = $catalogReadService->search(
+                        udc: $code,
+                        limit: 1,
+                        includeTotal: true,
+                        includeLocations: false,
+                    );
+                    $total = (int) ($result['meta']['total'] ?? 0);
+                    if ($total > 0) {
+                        $counts[$code] = $total;
+                    }
+                } catch (Throwable) {
+                    // A missing catalog means no counts at all; stop probing.
+                    return [];
+                }
+            }
+
+            return $counts;
+        },
+    );
+
+    $facultyDeskDefinitions = [
+        'econ' => 'economic_library',
+        'tech' => 'technology_library',
+        'engit' => 'college_library',
+    ];
+    $facultyBooks = [];
+    $facultyStats = [];
+    foreach ($facultyDeskDefinitions as $deskKey => $institution) {
+        try {
+            $books = $catalogReadService->popularByInstitution($institution);
+            $tones = ['sand', 'ink', 'clay', 'forest', 'sage'];
+            $facultyBooks[$deskKey] = collect($books)
+                ->values()
+                ->map(function (array $book, int $index) use ($tones): array {
+                    $book['tone'] = $tones[$index % count($tones)];
+
+                    return $book;
+                })
+                ->all();
+            $facultyStats[$deskKey] = $catalogReadService->institutionCopiesCount($institution);
+        } catch (Throwable) {
+            $facultyBooks[$deskKey] = [];
+            $facultyStats[$deskKey] = 0;
+        }
+    }
+
+    try {
+        if (Schema::hasTable('news')) {
+            $homepageNews = News::query()
+                ->published()
+                ->homepage()
+                ->language(app()->getLocale())
+                ->latest('publish_at')
+                ->limit(3)
+                ->get();
+        }
+    } catch (Throwable) {
+        // A content-store outage must not make the public homepage unavailable.
+    }
+
+    return view('welcome', [
+        'newArrivals' => $newArrivals,
+        'udcCounts' => $udcCounts,
+        'facultyBooks' => $facultyBooks,
+        'facultyStats' => $facultyStats,
+        'homepageNews' => $homepageNews,
+    ]);
 });
 
 Route::get('/catalog', function (Request $request, CatalogReadService $catalogReadService) {
@@ -1335,7 +1557,7 @@ Route::get('/catalog', function (Request $request, CatalogReadService $catalogRe
     $yearBounds = ['min' => 1950, 'max' => (int) date('Y')];
     try {
         $yearBounds = $catalogReadService->yearBounds();
-    } catch (\Throwable) {
+    } catch (Throwable) {
         // Keep the demo catalog visible even when the database schema is empty.
     }
     $apiSortMap = [
@@ -1354,10 +1576,11 @@ Route::get('/catalog', function (Request $request, CatalogReadService $catalogRe
         author: $request->filled('author') ? trim((string) $request->query('author')) : null,
         publisher: $request->filled('publisher') ? trim((string) $request->query('publisher')) : null,
         isbn: $request->filled('isbn') ? trim((string) $request->query('isbn')) : null,
+        subject: $request->filled('subject') ? trim((string) $request->query('subject')) : null,
         udc: $request->filled('udc') ? trim((string) $request->query('udc')) : null,
         language: $request->filled('language') ? (string) $request->query('language') : null,
         page: max((int) $request->query('page', 1), 1),
-        limit: 10,
+        limit: Setting::catalogPageSize(),
         sort: $apiSortMap[$uiSort] ?? 'popular',
         yearFrom: $request->filled('year_from') && is_numeric((string) $request->query('year_from')) ? (int) $request->query('year_from') : null,
         yearTo: $request->filled('year_to') && is_numeric((string) $request->query('year_to')) ? (int) $request->query('year_to') : null,
@@ -1365,6 +1588,13 @@ Route::get('/catalog', function (Request $request, CatalogReadService $catalogRe
         physicalOnly: $request->boolean('physical_only'),
         materialType: $materialType,
         institution: $request->filled('institution') ? (string) $request->query('institution') : null,
+        resourceType: $request->filled('resource_type') ? (string) $request->query('resource_type') : null,
+        fund: $request->filled('fund') ? (string) $request->query('fund') : null,
+        branch: $request->filled('branch') ? (string) $request->query('branch') : null,
+        category: $request->filled('category') ? (string) $request->query('category') : null,
+        availability: $request->filled('availability') ? (string) $request->query('availability') : null,
+        format: $request->filled('format') ? (string) $request->query('format') : null,
+        includeUdcCode: $request->user() !== null,
     );
 
     if ($uiSort === 'year_asc' && is_array($catalogBootstrap['data'] ?? null)) {
@@ -1374,14 +1604,18 @@ Route::get('/catalog', function (Request $request, CatalogReadService $catalogRe
     return view('catalog', [
         'catalogBootstrap' => $catalogBootstrap,
         'catalogYearBounds' => $yearBounds,
+        // Live filter axes: the sidebar renders only values that exist in the
+        // collection, with their real counts.
+        'catalogFacets' => $catalogReadService->facets(),
+        'catalogPageSize' => Setting::catalogPageSize(),
     ]);
 });
 
 Route::get('/book/{isbn}', function (Request $request, string $isbn, BookDetailReadService $bookDetailReadService) {
     $bookBootstrap = null;
     try {
-        $bookBootstrap = $bookDetailReadService->findByIdentifier($isbn);
-    } catch (\Throwable) {
+        $bookBootstrap = $bookDetailReadService->findByIdentifier($isbn, $request->user());
+    } catch (Throwable) {
         // Keep the detail shell renderable when the catalog schema is absent
         // (e.g. sqlite test env); the page falls back to /api/v1/book-db.
     }
@@ -1392,9 +1626,7 @@ Route::get('/book/{isbn}', function (Request $request, string $isbn, BookDetailR
     ]);
 });
 
-Route::get('/digital-viewer/{materialId}', function (Request $request, string $materialId) {
-    return view('digital-viewer', ['materialId' => $materialId]);
-});
+Route::get('/digital-viewer/{materialId}', [DigitalViewerController::class, 'show']);
 
 // Wave 1 — /account retained as a hidden backward-compatibility route only.
 // The shell (navbar/footer/login) no longer surfaces /account; canonical user
@@ -1403,13 +1635,13 @@ Route::get('/digital-viewer/{materialId}', function (Request $request, string $m
 // authenticated reader behaviour. Do NOT add new shell links to /account.
 Route::get('/account', function (Request $request) {
     $user = $request->session()->get('library.user');
-    $lang = $request->query('lang', 'ru');
-    $lang = in_array($lang, ['ru', 'kk', 'en'], true) ? $lang : 'ru';
-    $accountPath = $lang === 'ru' ? '/account' : ('/account?lang='.$lang);
+    $lang = app()->getLocale();
+    $lang = in_array($lang, ['ru', 'kk', 'en'], true) ? $lang : 'kk';
+    $accountPath = $lang === 'kk' ? '/account' : ('/account?lang='.$lang);
 
     if (! is_array($user)) {
         $loginPath = '/login?redirect='.urlencode($accountPath);
-        if ($lang !== 'ru') {
+        if ($lang !== 'kk') {
             $loginPath .= '&lang='.$lang;
         }
 
@@ -1419,84 +1651,15 @@ Route::get('/account', function (Request $request) {
     return view('account', ['sessionUser' => $user]);
 });
 
-Route::post('/login', function (Request $request) use ($postLoginDestination) {
-    $validated = $request->validate([
-        'email' => ['nullable', 'string', 'email', 'required_without:login'],
-        'login' => ['nullable', 'string', 'required_without:email'],
-        'password' => ['required', 'string'],
-        'device_name' => ['nullable', 'string', 'max:255'],
-    ]);
+Route::post('/login', [WebAuthController::class, 'login'])->middleware('throttle:login');
 
-    $loginIdentifier = trim((string) ($validated['login'] ?? $validated['email'] ?? 'unknown'));
-
-    if ((bool) config('demo_auth.enabled')) {
-        foreach (config('demo_auth.identities', []) as $slug => $identity) {
-            $demoLogin = trim((string) ($identity['login'] ?? ''));
-            $demoQuickLogin = trim((string) ($identity['quick_fill_login'] ?? ''));
-            $demoEmail = trim((string) ($identity['email'] ?? ''));
-            $demoPassword = (string) ($identity['password'] ?? '');
-
-            $identifierMatches = $loginIdentifier !== ''
-                && in_array(mb_strtolower($loginIdentifier), array_filter([
-                    $demoLogin !== '' ? mb_strtolower($demoLogin) : null,
-                    $demoQuickLogin !== '' ? mb_strtolower($demoQuickLogin) : null,
-                    $demoEmail !== '' ? mb_strtolower($demoEmail) : null,
-                ]), true);
-
-            if ($identifierMatches && $demoPassword !== '' && hash_equals($demoPassword, (string) $validated['password'])) {
-                $user = [
-                    'id' => (string) ($identity['id'] ?? ''),
-                    'name' => (string) ($identity['name'] ?? ''),
-                    'email' => (string) ($identity['email'] ?? ''),
-                    'login' => (string) ($identity['login'] ?? ''),
-                    'ad_login' => (string) ($identity['ad_login'] ?? ''),
-                    'role' => (string) ($identity['role'] ?? 'reader'),
-                    'title' => (string) ($identity['title'] ?? ''),
-                    'phone_extension' => (string) ($identity['phone_extension'] ?? ''),
-                    'profile_type' => (string) ($identity['profile_type'] ?? ''),
-                ];
-
-                $request->session()->regenerate();
-                $request->session()->put('library.crm_token', 'demo-token-' . $slug);
-                $request->session()->put('library.user', $user);
-                $request->session()->put('library.authenticated_at', now()->toIso8601String());
-                $request->session()->put('library.demo_identity', $slug);
-
-                return redirect($postLoginDestination($user));
-            }
-        }
-    }
-
-    $authApiUrl = config('services.external_auth.login_url', 'http://crm.local/api/login');
-
-    $response = Http::timeout(12)->acceptJson()->post($authApiUrl, [
-        'email' => $validated['email'] ?? null,
-        'login' => $validated['login'] ?? null,
-        'password' => $validated['password'],
-        'device_name' => $validated['device_name'] ?? 'web',
-    ]);
-
-    if ($response->successful()) {
-        $payload = $response->json();
-        $token = (string) ($payload['token'] ?? $payload['access_token'] ?? '');
-
-        if ($token === '') {
-            return back()->withErrors(['login' => 'Authentication service returned an unexpected response.']);
-        }
-
-        $rawUser = $payload['user'] ?? $payload['data']['user'] ?? [];
-        $user = is_array($rawUser) ? $rawUser : [];
-
-        $request->session()->regenerate();
-        $request->session()->put('library.crm_token', $token);
-        $request->session()->put('library.user', $user);
-        $request->session()->put('library.authenticated_at', now()->toIso8601String());
-
-        return redirect($postLoginDestination($user));
-    }
-
-    return back()->withErrors(['login' => 'Invalid credentials or authentication failed.']);
+// Forced password change after an admin reset (must_change_password flag).
+// RequirePasswordChange redirects every other authenticated page here.
+Route::middleware('auth')->group(function (): void {
+    Route::get('/password/change', [PasswordChangeController::class, 'show'])->name('password.change');
+    Route::post('/password/change', [PasswordChangeController::class, 'update'])->name('password.change.update');
 });
+Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
 
 // Session-based sign-out used by the member shell (form POST + CSRF).
 // Admin and librarian shells use `fetch('/api/v1/logout')` for their JS-driven
@@ -1504,26 +1667,35 @@ Route::post('/login', function (Request $request) use ($postLoginDestination) {
 // keeps sign-out working without JavaScript. Accepts both POST (canonical form
 // submit) and GET (safety net for accidental navigation) — always clears the
 // library session keys and redirects to /login.
-Route::match(['POST', 'GET'], '/logout', function (Request $request) {
-    $request->session()->forget([
-        'library.user',
-        'library.crm_token',
-        'library.authenticated_at',
-        'library.demo_identity',
-    ]);
-    $request->session()->invalidate();
-    $request->session()->regenerateToken();
+Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
 
-    return redirect('/login');
-})->name('logout');
+// Keep unknown browser URLs inside the web middleware stack so session/cookie
+// locale resolution also applies to the localized 404 response.
+Route::fallback(static fn () => abort(404))->name('web.fallback');
 
-Route::get('/login', function (Request $request) {
-    $lang = $request->query('lang', 'ru');
-    $lang = in_array($lang, ['ru', 'kk', 'en'], true) ? $lang : 'ru';
+// RBAC demo sign-in. Logs in a seeded account carrying a real Spatie role, so
+// role/permission middleware and policies behave exactly as they would for a
+// production user. Gated by APP_DEMO_LOGIN_ENABLED — the route 404s when the
+// flag is off, so a production deployment does not merely hide the cards but
+// removes the endpoint.
+//
+// Both authorization stacks are populated: Auth::login() drives the Spatie
+// `role:`/`permission:` middleware and the policies, while session('library.user')
+// keeps the existing shells (EnsureMemberReader, EnsureLibrarianStaff,
+// EnsureAdminStaff) and the SPA bootstrap working unchanged.
+Route::post('/login/demo/{role}', [WebAuthController::class, 'demo'])
+    ->middleware('throttle:login')
+    ->where('role', 'student|teacher|librarian|director|senior_librarian|acquisitions|cataloguer|bibliographer|admin')
+    ->name('login.demo');
+
+Route::get('/login', function (Request $request) use ($postLoginDestination) {
+    $lang = app()->getLocale();
+    $lang = in_array($lang, ['ru', 'kk', 'en'], true) ? $lang : 'kk';
 
     if (is_array($request->session()->get('library.user'))) {
-        // Wave 1: already-authenticated readers land on /dashboard, not legacy /account.
-        return redirect($lang === 'ru' ? '/dashboard' : ('/dashboard?lang='.$lang));
+        $destination = $postLoginDestination($request->session()->get('library.user'));
+
+        return redirect($lang === 'kk' ? $destination : ($destination.'?lang='.$lang));
     }
 
     $demoEnabled = (bool) config('demo_auth.enabled');
@@ -1571,8 +1743,8 @@ Route::get('/login', function (Request $request) {
 
     $copy = [
         'ru' => [
-            'title' => 'Вход — KazUTB Smart Library',
-            'brand' => 'KazUTB Smart Library',
+            'title' => 'Вход — KazUTB',
+            'brand' => 'KazUTB',
             'legacyHero' => 'Вход в библиотечную систему',
             'displayHeadline' => 'Сохраняем знания, поддерживаем исследования.',
             'lead' => 'Единая точка входа в цифровую библиотеку Казахского университета технологии и бизнеса: каталог, электронные коллекции и научный репозиторий.',
@@ -1594,7 +1766,7 @@ Route::get('/login', function (Request $request) {
             'securityNotice' => 'Несанкционированный доступ запрещён. Действия в системе фиксируются в журнале безопасности согласно политике университета.',
             'demoTitle' => 'Быстрый вход',
             'demoSub' => 'Для проверки можно использовать подготовленные демо-профили.',
-            'footerLegal' => '© ' . date('Y') . ' KazUTB Smart Library. Все права защищены.',
+            'footerLegal' => '© '.date('Y').' KazUTB. Все права защищены.',
             'footerLinks' => [
                 ['label' => 'О библиотеке', 'href' => '/about'],
                 ['label' => 'Правила библиотеки', 'href' => '/rules'],
@@ -1603,8 +1775,8 @@ Route::get('/login', function (Request $request) {
             ],
         ],
         'kk' => [
-            'title' => 'Кіру — KazUTB Smart Library',
-            'brand' => 'KazUTB Smart Library',
+            'title' => 'Кіру — KazUTB',
+            'brand' => 'KazUTB',
             'legacyHero' => 'Кітапхана жүйесіне кіру',
             'displayHeadline' => 'Білімді сақтаймыз, зерттеуді қолдаймыз.',
             'lead' => 'Қазақ технология және бизнес университетінің цифрлық кітапханасына бірыңғай кіру нүктесі: каталог, электрондық жинақтар және ғылыми репозиторий.',
@@ -1626,7 +1798,7 @@ Route::get('/login', function (Request $request) {
             'securityNotice' => 'Рұқсатсыз кіруге тыйым салынады. Жүйедегі әрекеттер университет саясатына сәйкес қауіпсіздік журналында тіркеледі.',
             'demoTitle' => 'Жедел кіру',
             'demoSub' => 'Тексеру үшін дайын демо-профильдерді қолдануға болады.',
-            'footerLegal' => '© ' . date('Y') . ' KazUTB Smart Library. Барлық құқықтар қорғалған.',
+            'footerLegal' => '© '.date('Y').' KazUTB. Барлық құқықтар қорғалған.',
             'footerLinks' => [
                 ['label' => 'Кітапхана туралы', 'href' => '/about'],
                 ['label' => 'Кітапхана ережелері', 'href' => '/rules'],
@@ -1635,8 +1807,8 @@ Route::get('/login', function (Request $request) {
             ],
         ],
         'en' => [
-            'title' => 'Sign in — KazUTB Smart Library',
-            'brand' => 'KazUTB Smart Library',
+            'title' => 'Sign in — KazUTB',
+            'brand' => 'KazUTB',
             'legacyHero' => 'Sign in to the library system',
             'displayHeadline' => 'Preserving Knowledge, Empowering Research.',
             'lead' => 'A single entry point to the digital library of the Kazakh University of Technology and Business: catalog, digital collections, and the scholarly repository.',
@@ -1658,7 +1830,7 @@ Route::get('/login', function (Request $request) {
             'securityNotice' => 'Unauthorized access is prohibited. All activity is logged for security and auditing purposes as per institutional policy.',
             'demoTitle' => 'Quick access',
             'demoSub' => 'Prepared demo identities remain available for QA and review.',
-            'footerLegal' => '© ' . date('Y') . ' KazUTB Smart Library. All rights reserved.',
+            'footerLegal' => '© '.date('Y').' KazUTB. All rights reserved.',
             'footerLinks' => [
                 ['label' => 'About the Library', 'href' => '/about'],
                 ['label' => 'Library Rules', 'href' => '/rules'],
@@ -1667,11 +1839,16 @@ Route::get('/login', function (Request $request) {
             ],
         ],
     ];
+
     return view('auth', [
         'demoEnabled' => $demoEnabled,
         'demoIdentities' => $demoIdentities,
         'copy' => $copy,
         'lang' => $lang,
+        // RBAC quick-login cards — separate from the legacy $demoIdentities
+        // block above, which posts to the session-array login path.
+        'rbacDemoEnabled' => (bool) config('demo_users.enabled'),
+        'rbacDemoIdentities' => config('demo_users.identities', []),
     ]);
 })->name('login');
 
@@ -1689,9 +1866,10 @@ Route::get('/services', fn () => redirect('/', 301));
 $eventsSeedProvider = static function (): array {
     $chrome = [
         'ru' => [
-            'title' => 'События — KazUTB Smart Library',
+            'title' => 'События — KazUTB',
+            'hero_eyebrow' => 'Публичная программа',
             'hero_title' => 'Календарь событий',
-            'hero_body' => 'Расписание симпозиумов, семинаров и книжных выставок KazUTB Smart Library. Присоединяйтесь к академическому сообществу университета.',
+            'hero_body' => 'Расписание симпозиумов, семинаров и книжных выставок KazUTB. Присоединяйтесь к академическому сообществу университета.',
             'event_details_cta' => 'Подробнее о событии',
             'page_status' => 'Страница :page из :last · всего событий: :total',
             'previous_page' => 'Предыдущая страница',
@@ -1699,9 +1877,10 @@ $eventsSeedProvider = static function (): array {
             'load_more' => 'Показать больше событий',
         ],
         'kk' => [
-            'title' => 'Іс-шаралар — KazUTB Smart Library',
+            'title' => 'Іс-шаралар — KazUTB',
+            'hero_eyebrow' => 'Көпшілік бағдарламасы',
             'hero_title' => 'Іс-шаралар күнтізбесі',
-            'hero_body' => 'KazUTB Smart Library ұйымдастыратын симпозиумдар, семинарлар мен кітап көрмелерінің кестесі. Университеттің академиялық қауымдастығына қосылыңыз.',
+            'hero_body' => 'KazUTB ұйымдастыратын симпозиумдар, семинарлар мен кітап көрмелерінің кестесі. Университеттің академиялық қауымдастығына қосылыңыз.',
             'event_details_cta' => 'Іс-шара туралы толығырақ',
             'page_status' => ':total іс-шара · :last беттің :page-беті',
             'previous_page' => 'Алдыңғы бет',
@@ -1709,9 +1888,10 @@ $eventsSeedProvider = static function (): array {
             'load_more' => 'Қосымша іс-шараларды көрсету',
         ],
         'en' => [
-            'title' => 'Events — KazUTB Smart Library',
+            'title' => 'Events — KazUTB',
+            'hero_eyebrow' => 'Public Programme',
             'hero_title' => 'Public Events Index',
-            'hero_body' => 'A curated calendar of upcoming symposiums, seminars, and book exhibits hosted by the KazUTB Smart Library. Join our academic community.',
+            'hero_body' => 'A curated calendar of upcoming symposiums, seminars, and book exhibits hosted by the KazUTB. Join our academic community.',
             'event_details_cta' => 'Event details',
             'page_status' => 'Page :page of :last · :total events total',
             'previous_page' => 'Previous page',
@@ -1977,6 +2157,326 @@ $eventsSeedProvider = static function (): array {
                 ],
             ],
         ],
+        [
+            'slug' => 'research-data-workshop-2026',
+            'featured' => false,
+            'category_slug' => 'workshop',
+            'iso_date' => '2026-09-04',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Мастер-класс',
+                    'date_month_day' => '4 сентября',
+                    'date_year_time' => '2026 · 10:30',
+                    'title' => 'Работа с исследовательскими данными и таблицами',
+                    'description' => 'Практический воркшоп по сбору, очистке и краткому описанию исследовательских данных для курсовых и магистерских проектов.',
+                    'venue' => 'Цифровая лаборатория, корпус 2',
+                ],
+                'kk' => [
+                    'category' => 'Мастер-класс',
+                    'date_month_day' => '4 қыркүйек',
+                    'date_year_time' => '2026 · 10:30',
+                    'title' => 'Зерттеу деректерімен және кестелермен жұмыс',
+                    'description' => 'Курстық және магистрлік жобалар үшін зерттеу деректерін жинау, тазалау және қысқаша сипаттау бойынша практикалық воркшоп.',
+                    'venue' => 'Цифрлық зертхана, 2-корпус',
+                ],
+                'en' => [
+                    'category' => 'Workshop',
+                    'date_month_day' => 'Sep 04',
+                    'date_year_time' => '2026 · 10:30',
+                    'title' => 'Working with Research Data and Tables',
+                    'description' => 'A practical workshop on collecting, cleaning, and summarising research data for course and master’s projects.',
+                    'venue' => 'Digital Lab, Building 2',
+                ],
+            ],
+        ],
+        [
+            'slug' => 'scholarly-communication-seminar-2026',
+            'featured' => false,
+            'category_slug' => 'seminar',
+            'iso_date' => '2026-09-18',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Семинар',
+                    'date_month_day' => '18 сентября',
+                    'date_year_time' => '2026 · 14:00',
+                    'title' => 'Семинар по академической коммуникации и публикациям',
+                    'description' => 'Разговор о структуре научной статьи, выборе журнала, подготовке аннотации и взаимодействии с редакциями.',
+                    'venue' => 'Семинарский зал A, корпус 1',
+                ],
+                'kk' => [
+                    'category' => 'Семинар',
+                    'date_month_day' => '18 қыркүйек',
+                    'date_year_time' => '2026 · 14:00',
+                    'title' => 'Академиялық коммуникация және жариялау семинары',
+                    'description' => 'Ғылыми мақаланың құрылымы, журнал таңдау, аннотация дайындау және редакциялармен жұмыс туралы әңгіме.',
+                    'venue' => 'A семинар залы, 1-корпус',
+                ],
+                'en' => [
+                    'category' => 'Seminar',
+                    'date_month_day' => 'Sep 18',
+                    'date_year_time' => '2026 · 14:00',
+                    'title' => 'Scholarly Communication and Publishing Seminar',
+                    'description' => 'A session on article structure, journal selection, abstract writing, and working with editorial teams.',
+                    'venue' => 'Seminar Hall A, Building 1',
+                ],
+            ],
+        ],
+        [
+            'slug' => 'new-semester-library-orientation-2026',
+            'featured' => false,
+            'category_slug' => 'orientation',
+            'iso_date' => '2026-10-02',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Ориентация',
+                    'date_month_day' => '2 октября',
+                    'date_year_time' => '2026 · 13:30',
+                    'title' => 'Ориентация по библиотеке в новом семестре',
+                    'description' => 'Повторная вводная встреча для студентов: сервисы, читательский кабинет, поиск книг и быстрые действия с подборками.',
+                    'venue' => 'Актовый зал библиотеки',
+                ],
+                'kk' => [
+                    'category' => 'Бейімдеу сессиясы',
+                    'date_month_day' => '2 қазан',
+                    'date_year_time' => '2026 · 13:30',
+                    'title' => 'Жаңа семестрдегі кітапханаға ориентация',
+                    'description' => 'Студенттерге арналған қайталама кіріспе кездесуі: сервистер, оқырман кабинеті, кітап іздеу және подборкамен жылдам жұмыс.',
+                    'venue' => 'Кітапхана мәжіліс залы',
+                ],
+                'en' => [
+                    'category' => 'Orientation',
+                    'date_month_day' => 'Oct 02',
+                    'date_year_time' => '2026 · 13:30',
+                    'title' => 'New Semester Library Orientation',
+                    'description' => 'A refreshed introduction for students: services, the reader dashboard, book search, and quick shortlist actions.',
+                    'venue' => 'Library Assembly Hall',
+                ],
+            ],
+        ],
+        [
+            'slug' => 'library-search-basics-2026',
+            'featured' => false,
+            'category_slug' => 'seminar',
+            'iso_date' => '2026-08-29',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Семинар',
+                    'date_month_day' => '29 августа',
+                    'date_year_time' => '2026 · 10:00',
+                    'title' => 'Базовый семинар по поиску книг и статей',
+                    'description' => 'Разбираем быстрый поиск, уточнение запросов, фильтры каталога и переход к сохранённым подборкам.',
+                    'venue' => 'Зал учебных консультаций, корпус 1',
+                ],
+                'kk' => [
+                    'category' => 'Семинар',
+                    'date_month_day' => '29 тамыз',
+                    'date_year_time' => '2026 · 10:00',
+                    'title' => 'Кітаптар мен мақалаларды іздеу бойынша базалық семинар',
+                    'description' => 'Жылдам іздеу, сұрауды нақтылау, каталог сүзгілері және сақталған подборкаларға өту қарастырылады.',
+                    'venue' => 'Оқу консультациялары залы, 1-корпус',
+                ],
+                'en' => [
+                    'category' => 'Seminar',
+                    'date_month_day' => 'Aug 29',
+                    'date_year_time' => '2026 · 10:00',
+                    'title' => 'Basic Seminar on Finding Books and Articles',
+                    'description' => 'We cover fast search, query refinement, catalog filters, and jumping to saved shortlists.',
+                    'venue' => 'Study Consultations Room, Building 1',
+                ],
+            ],
+        ],
+        [
+            'slug' => 'citation-tools-clinic-2026',
+            'featured' => false,
+            'category_slug' => 'clinic',
+            'iso_date' => '2026-09-08',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Клиника',
+                    'date_month_day' => '8 сентября',
+                    'date_year_time' => '2026 · 11:00',
+                    'title' => 'Клиника по цитированию и библиографическим стилям',
+                    'description' => 'Практика оформления ссылок, библиографий и ссылочного менеджмента для курсовых, статей и диссертаций.',
+                    'venue' => 'Исследовательская студия, зал 1/203',
+                ],
+                'kk' => [
+                    'category' => 'Клиника',
+                    'date_month_day' => '8 қыркүйек',
+                    'date_year_time' => '2026 · 11:00',
+                    'title' => 'Дәйексөз және библиографиялық стильдер клиникасы',
+                    'description' => 'Курстық, мақала және диссертациялар үшін сілтемелерді, библиографияны және reference manager құралдарын рәсімдеу практикасы.',
+                    'venue' => 'Зерттеу студиясы, 1/203 залы',
+                ],
+                'en' => [
+                    'category' => 'Clinic',
+                    'date_month_day' => 'Sep 08',
+                    'date_year_time' => '2026 · 11:00',
+                    'title' => 'Citation and Bibliographic Styles Clinic',
+                    'description' => 'Hands-on practice with references, bibliographies, and reference managers for papers, articles, and dissertations.',
+                    'venue' => 'Research Studio, Room 1/203',
+                ],
+            ],
+        ],
+        [
+            'slug' => 'repository-introduction-2026',
+            'featured' => false,
+            'category_slug' => 'workshop',
+            'iso_date' => '2026-09-19',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Мастер-класс',
+                    'date_month_day' => '19 сентября',
+                    'date_year_time' => '2026 · 14:30',
+                    'title' => 'Как отправлять материалы в научный репозиторий',
+                    'description' => 'Пошаговый мастер-класс по загрузке статей, проверке метаданных и подготовке материалов к публикации.',
+                    'venue' => 'Медиа-зал, корпус 2',
+                ],
+                'kk' => [
+                    'category' => 'Мастер-класс',
+                    'date_month_day' => '19 қыркүйек',
+                    'date_year_time' => '2026 · 14:30',
+                    'title' => 'Ғылыми репозиторийге материал жіберу жолы',
+                    'description' => 'Мақалаларды жүктеу, метадеректерді тексеру және материалды жариялауға дайындау бойынша қадамдық мастер-класс.',
+                    'venue' => 'Медиа-зал, 2-корпус',
+                ],
+                'en' => [
+                    'category' => 'Workshop',
+                    'date_month_day' => 'Sep 19',
+                    'date_year_time' => '2026 · 14:30',
+                    'title' => 'How to Submit Materials to the Scholarly Repository',
+                    'description' => 'A step-by-step workshop on uploading articles, checking metadata, and preparing items for publication.',
+                    'venue' => 'Media Hall, Building 2',
+                ],
+            ],
+        ],
+        [
+            'slug' => 'reading-club-launch-2026',
+            'featured' => false,
+            'category_slug' => 'book-exhibit',
+            'iso_date' => '2026-10-10',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Книжная выставка',
+                    'date_month_day' => '10 октября',
+                    'date_year_time' => '2026 · весь день',
+                    'title' => 'Запуск читательского клуба и тематической витрины',
+                    'description' => 'Открываем клуб чтения с подборкой новых книг, которые можно сразу добавлять в shortlist и обсуждать по темам.',
+                    'venue' => 'Главный холл библиотеки',
+                ],
+                'kk' => [
+                    'category' => 'Кітап көрмесі',
+                    'date_month_day' => '10 қазан',
+                    'date_year_time' => '2026 · толық күн',
+                    'title' => 'Оқырман клубы мен тақырыптық витринаның іске қосылуы',
+                    'description' => 'Жаңа кітаптар жинағымен оқырман клубын ашамыз, оларды бірден shortlist-ке қосып, тақырыптар бойынша талқылауға болады.',
+                    'venue' => 'Кітапхананың басты холы',
+                ],
+                'en' => [
+                    'category' => 'Book Exhibit',
+                    'date_month_day' => 'Oct 10',
+                    'date_year_time' => '2026 · All day',
+                    'title' => 'Reading Club Launch and Themed Showcase',
+                    'description' => 'We are launching a reading club with a new-book showcase that readers can instantly add to shortlist and discuss by topic.',
+                    'venue' => 'Main Library Hall',
+                ],
+            ],
+        ],
+        [
+            'slug' => 'digital-exhibitions-tour-2026',
+            'featured' => false,
+            'category_slug' => 'roundtable',
+            'iso_date' => '2026-10-24',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Круглый стол',
+                    'date_month_day' => '24 октября',
+                    'date_year_time' => '2026 · 15:00',
+                    'title' => 'Экскурсия по цифровым выставкам и архивным витринам',
+                    'description' => 'Показываем, как библиотека оформляет цифровые выставки, карточки материалов и связанные архивные подборки.',
+                    'venue' => 'Онлайн и в медиазале',
+                ],
+                'kk' => [
+                    'category' => 'Дөңгелек үстел',
+                    'date_month_day' => '24 қазан',
+                    'date_year_time' => '2026 · 15:00',
+                    'title' => 'Цифрлық көрмелер мен архивтік витриналарға шолу',
+                    'description' => 'Кітапхана цифрлық көрмелерді, материал карточкаларын және байланысты архивтік жинақтарды қалай рәсімдейтінін көрсетеді.',
+                    'venue' => 'Онлайн және медиа-залда',
+                ],
+                'en' => [
+                    'category' => 'Roundtable',
+                    'date_month_day' => 'Oct 24',
+                    'date_year_time' => '2026 · 15:00',
+                    'title' => 'Tour of Digital Exhibitions and Archive Displays',
+                    'description' => 'We show how the library prepares digital exhibitions, item cards, and linked archival bundles.',
+                    'venue' => 'Online and in the media hall',
+                ],
+            ],
+        ],
+        [
+            'slug' => 'exam-support-clinic-2026',
+            'featured' => false,
+            'category_slug' => 'clinic',
+            'iso_date' => '2026-11-05',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Клиника',
+                    'date_month_day' => '5 ноября',
+                    'date_year_time' => '2026 · 12:00',
+                    'title' => 'Клиника поддержки перед экзаменами и дедлайнами',
+                    'description' => 'Короткие консультации по поиску материалов, управлению временем и подбору источников для финальных работ.',
+                    'venue' => 'Зал консультаций, корпус 1',
+                ],
+                'kk' => [
+                    'category' => 'Клиника',
+                    'date_month_day' => '5 қараша',
+                    'date_year_time' => '2026 · 12:00',
+                    'title' => 'Емтихан және дедлайн алдында қолдау клиникасы',
+                    'description' => 'Материал іздеу, уақытты басқару және қорытынды жұмыстар үшін дереккөздерді таңдау бойынша қысқа консультациялар.',
+                    'venue' => 'Кеңес беру залы, 1-корпус',
+                ],
+                'en' => [
+                    'category' => 'Clinic',
+                    'date_month_day' => 'Nov 05',
+                    'date_year_time' => '2026 · 12:00',
+                    'title' => 'Pre-Exam and Deadline Support Clinic',
+                    'description' => 'Short consultations on finding materials, managing time, and selecting sources for final assignments.',
+                    'venue' => 'Consultation Room, Building 1',
+                ],
+            ],
+        ],
+        [
+            'slug' => 'library-innovation-lab-2026',
+            'featured' => false,
+            'category_slug' => 'roundtable',
+            'iso_date' => '2026-11-18',
+            'i18n' => [
+                'ru' => [
+                    'category' => 'Круглый стол',
+                    'date_month_day' => '18 ноября',
+                    'date_year_time' => '2026 · 14:00',
+                    'title' => 'Лаборатория библиотечных инноваций и новых сервисов',
+                    'description' => 'Обсуждаем новые сценарии работы с каталогом, shortlist и цифровыми витринами для следующего цикла улучшений.',
+                    'venue' => 'Медиа-зал, корпус 1',
+                ],
+                'kk' => [
+                    'category' => 'Дөңгелек үстел',
+                    'date_month_day' => '18 қараша',
+                    'date_year_time' => '2026 · 14:00',
+                    'title' => 'Кітапхана инновациялары мен жаңа сервистер зертханасы',
+                    'description' => 'Келесі жетілдіру циклі үшін каталог, shortlist және цифрлық витриналармен жұмыс істеудің жаңа сценарийлерін талқылаймыз.',
+                    'venue' => 'Медиа-зал, 1-корпус',
+                ],
+                'en' => [
+                    'category' => 'Roundtable',
+                    'date_month_day' => 'Nov 18',
+                    'date_year_time' => '2026 · 14:00',
+                    'title' => 'Library Innovation Lab and New Services',
+                    'description' => 'We discuss new workflows for the catalog, shortlist, and digital showcases for the next improvement cycle.',
+                    'venue' => 'Media Hall, Building 1',
+                ],
+            ],
+        ],
     ];
 
     return [
@@ -1985,8 +2485,25 @@ $eventsSeedProvider = static function (): array {
     ];
 };
 
-Route::get('/news', function (Request $request) use ($newsSeedProvider) {
+$upcomingEventsOnly = static function (array $events): array {
+    $today = Carbon::today(config('app.timezone', 'UTC'))->toDateString();
+
+    $events['items'] = array_values(array_filter(
+        $events['items'] ?? [],
+        static fn (array $event): bool => ($event['iso_date'] ?? '') >= $today,
+    ));
+
+    usort(
+        $events['items'],
+        static fn (array $left, array $right): int => strcmp((string) ($left['iso_date'] ?? ''), (string) ($right['iso_date'] ?? '')),
+    );
+
+    return $events;
+};
+
+Route::get('/news', function (Request $request) use ($newsSeedProvider, $newsModelToPublicArticle) {
     $seed = $newsSeedProvider();
+    $language = in_array(app()->getLocale(), ['ru', 'kk', 'en'], true) ? app()->getLocale() : 'ru';
     $topic = (string) $request->query('topic', 'all');
     $topic = in_array($topic, ['all', 'events', 'research'], true) ? $topic : 'all';
     $page = max(1, (int) $request->query('page', 1));
@@ -1996,11 +2513,37 @@ Route::get('/news', function (Request $request) use ($newsSeedProvider) {
         $seed['ordered']
     );
 
-    $articles = $seedArticles;
+    $databaseArticles = collect();
+    $managedNewsExists = false;
+    try {
+        if (Schema::hasTable('news')) {
+            // Once the managed table exists it is authoritative, including
+            // when it is intentionally empty.
+            $managedNewsExists = true;
+            $databaseArticles = News::query()
+                ->published()
+                ->where('language', $language)
+                ->latest('publish_at')
+                ->get()
+                ->map($newsModelToPublicArticle);
+        }
+    } catch (Throwable $exception) {
+        report($exception);
+        abort(503, 'News is temporarily unavailable.');
+    }
+
+    $articles = $managedNewsExists
+        ? collect(array_merge($seedArticles, $databaseArticles->values()->all()))
+            ->unique('slug')
+            ->values()
+            ->all()
+        : $seedArticles;
     if ($topic !== 'all') {
         $articles = array_values(array_filter(
-            $seedArticles,
-            static fn (array $article): bool => (string) ($article['topic'] ?? 'all') === $topic,
+            $articles,
+            static fn (array $article): bool => (string) ($article['topic'] ?? (
+                data_get($article, 'category.en') === 'Event' ? 'events' : 'research'
+            )) === $topic,
         ));
     }
 
@@ -2019,30 +2562,131 @@ Route::get('/news', function (Request $request) use ($newsSeedProvider) {
     ]);
 });
 
-Route::get('/news/{slug}', function (string $slug) use ($newsSeedProvider) {
+Route::get('/news/{slug}', function (Request $request, string $slug) use ($newsSeedProvider, $newsModelToPublicArticle) {
     $seed = $newsSeedProvider();
-    abort_unless(isset($seed['articles'][$slug]), 404);
+    $seedArticle = $seed['articles'][$slug] ?? null;
+    $databaseArticle = null;
+    $databaseRecord = null;
+    $managedNewsExists = false;
+    try {
+        if (Schema::hasTable('news')) {
+            // The database becomes the sole source as soon as the migration
+            // exists; deleted or unknown articles must not fall back to seeds.
+            $managedNewsExists = true;
+            $databaseRecord = News::query()->published()->where('slug', $slug)->first();
+            if ($databaseRecord !== null && $databaseRecord->language !== app()->getLocale()) {
+                return redirect()->route('news.show', [
+                    'slug' => $slug,
+                    'lang' => $databaseRecord->language,
+                ]);
+            }
+            $databaseArticle = $databaseRecord ? $newsModelToPublicArticle($databaseRecord) : null;
+        }
+    } catch (Throwable $exception) {
+        report($exception);
+        abort(503, 'News is temporarily unavailable.');
+    }
+    abort_unless($databaseArticle !== null || $seedArticle !== null, 404);
 
-    $article = $seed['articles'][$slug];
-    $related = array_values(array_filter(
-        array_map(static fn (string $relatedSlug) => $seed['articles'][$relatedSlug], $seed['ordered']),
-        static fn (array $candidate) => $candidate['slug'] !== $slug,
-    ));
+    $article = $databaseArticle ?? $seedArticle;
+    if ($managedNewsExists && $databaseRecord !== null) {
+        $related = News::query()
+            ->published()
+            ->where('language', $databaseRecord->language)
+            ->whereKeyNot($databaseRecord->getKey())
+            ->latest('publish_at')
+            ->limit(3)
+            ->get()
+            ->map($newsModelToPublicArticle)
+            ->all();
+    } else {
+        $related = array_values(array_filter(
+            array_map(static fn (string $relatedSlug) => $seed['articles'][$relatedSlug], $seed['ordered']),
+            static fn (array $candidate) => $candidate['slug'] !== $slug,
+        ));
+    }
 
     return view('news.show', [
         'activePage' => 'news',
         'article' => $article,
         'relatedArticles' => $related,
     ]);
-})->where('slug', '[a-z0-9-]+');
+})->where('slug', '[a-z0-9-]+')->name('news.show');
 
 // Phase 3 Cluster B.6 — seeded public contacts content for /contacts.
 //
 // Scoped strictly to this page; structure mirrors $rulesSeedProvider and
 // $leadershipSeedProvider so a future backend phase can replace the
-// closure with a DB-backed source. The three v1 fund rooms (1/200,
-// 1/202, 1/203) are the public wayfinding truth and MUST remain stable.
+// closure with a DB-backed source.
+//
+// NOTE: the fund-guidance section was removed from the page on request, so
+// `wayfinding_title`, `wayfinding_body`, `map_label`, `map_caption`,
+// `room_prefix` and `fund_rooms` are no longer rendered anywhere. The data is
+// kept rather than deleted because an earlier phase recorded the three v1 rooms
+// (1/200, 1/202, 1/203) as public wayfinding truth that must remain stable —
+// restoring the section should not mean re-authoring trilingual copy. Delete
+// these keys once that requirement is formally retired.
 $contactsSeedProvider = static function (): array {
+    /*
+     * Reading-room staff shown on /contacts.
+     *
+     * Personal names are deliberately NOT translated or transliterated per
+     * locale — only the job title is — so a colleague's name is spelled exactly
+     * one way across the whole site.
+     *
+     * `photo` is a path under public/. The card falls back to initials while the
+     * file is absent, so publishing a portrait is a matter of dropping the file
+     * in place — no template or data change needed.
+     */
+    $staffMembers = [
+        [
+            // Also profiled on /leadership, where the strategy remit and full
+            // description live. This card is the short "who to ask" entry; the
+            // two surfaces are kept deliberately different in depth.
+            'slug' => 'pankey-zh',
+            'name' => 'Панкей Ж.',
+            'initials' => 'ПЖ',
+            'photo' => 'images/staff/pankey-zh.jpg',
+            'role' => [
+                'ru' => 'Директор библиотеки',
+                'kk' => 'Кітапхана директоры',
+                'en' => 'Library Director',
+            ],
+        ],
+        [
+            'slug' => 'korpeshova-elmira',
+            'name' => 'Корпешова Эльмира Мауткановна',
+            'initials' => 'КЭ',
+            'photo' => 'images/staff/korpeshova-elmira.jpg',
+            'role' => [
+                'ru' => 'Ведущий библиотекарь',
+                'kk' => 'Жетекші кітапханашы',
+                'en' => 'Lead Librarian',
+            ],
+        ],
+        [
+            'slug' => 'sailaubek-aiman',
+            'name' => 'Сайлаубек Айман Бастарбекқызы',
+            'initials' => 'СА',
+            'photo' => 'images/staff/sailaubek-aiman.jpg',
+            'role' => [
+                'ru' => 'Библиотекарь зала технологического факультета',
+                'kk' => 'Технологиялық факультет залының кітапханашысы',
+                'en' => 'Librarian, Technology Faculty Reading Room',
+            ],
+        ],
+    ];
+
+    $staffFor = static function (string $lang) use ($staffMembers): array {
+        return array_map(static fn (array $member): array => [
+            'slug' => $member['slug'],
+            'name' => $member['name'],
+            'initials' => $member['initials'],
+            'photo' => $member['photo'],
+            'role' => $member['role'][$lang] ?? $member['role']['ru'],
+        ], $staffMembers);
+    };
+
     $departmentOptions = [
         'ru' => [
             'faculty' => 'Преподавателям / исследователям',
@@ -2213,9 +2857,10 @@ $contactsSeedProvider = static function (): array {
 
     return [
         'ru' => [
+            'hero_eyebrow' => 'Связаться с библиотекой',
             'hero_title_a' => 'Прямые обращения',
             'hero_title_b' => 'и академическая поддержка.',
-            'hero_body' => 'Свяжитесь с командой KazUTB Smart Library — консультации по фонду, помощь с цифровой подпиской, техническая поддержка доступа и административные вопросы.',
+            'hero_body' => 'Свяжитесь с командой KazUTB — консультации по фонду, помощь с цифровой подпиской, техническая поддержка доступа и административные вопросы.',
             'support_heading' => 'Каналы поддержки',
             'support_channels' => $supportChannels['ru'],
             'form_title' => 'Отправить запрос',
@@ -2250,11 +2895,15 @@ $contactsSeedProvider = static function (): array {
             'visit_link_rules_body' => 'Условия записи, выдачи, пользования фондом и доступа к цифровым ресурсам.',
             'visit_link_leadership_title' => 'Руководство библиотеки',
             'visit_link_leadership_body' => 'Роли и зоны ответственности — для профильных запросов и эскалации.',
+            'staff_heading' => 'Сотрудники библиотеки',
+            'staff_note' => 'Обратитесь к сотруднику зала за помощью в поиске издания, работе с каталогом и оформлением выдачи. Роли и зоны ответственности руководства — на странице «Руководство библиотеки».',
+            'staff' => $staffFor('ru'),
         ],
         'kk' => [
+            'hero_eyebrow' => 'Кітапханамен байланысу',
             'hero_title_a' => 'Тікелей сұраулар',
             'hero_title_b' => 'және академиялық қолдау.',
-            'hero_body' => 'KazUTB Smart Library командасына хабарласыңыз — қор бойынша кеңестер, цифрлық жазылыммен көмек, қолжетімділіктің техникалық қолдауы және әкімшілік сұрақтар.',
+            'hero_body' => 'KazUTB командасына хабарласыңыз — қор бойынша кеңестер, цифрлық жазылыммен көмек, қолжетімділіктің техникалық қолдауы және әкімшілік сұрақтар.',
             'support_heading' => 'Қолдау арналары',
             'support_channels' => $supportChannels['kk'],
             'form_title' => 'Сұрау жіберу',
@@ -2289,11 +2938,15 @@ $contactsSeedProvider = static function (): array {
             'visit_link_rules_body' => 'Тіркелу, беру, қорды пайдалану және цифрлық ресурстарға қолжетімділік шарттары.',
             'visit_link_leadership_title' => 'Кітапхана басшылығы',
             'visit_link_leadership_body' => 'Рөлдер мен жауапкершілік аймақтары — бағытты сұраулар мен эскалация үшін.',
+            'staff_heading' => 'Кітапхана қызметкерлері',
+            'staff_note' => 'Басылымды іздеу, каталогпен жұмыс және беруді рәсімдеу бойынша көмек алу үшін зал қызметкеріне хабарласыңыз. Басшылықтың рөлдері мен жауапкершілік аймақтары «Кітапхана басшылығы» бетінде.',
+            'staff' => $staffFor('kk'),
         ],
         'en' => [
+            'hero_eyebrow' => 'Contact the library',
             'hero_title_a' => 'Direct Inquiries',
             'hero_title_b' => '& Academic Support.',
-            'hero_body' => 'Connect with the KazUTB Smart Library team — collection consultations, digital subscription help, access troubleshooting, and administrative inquiries.',
+            'hero_body' => 'Connect with the KazUTB team — collection consultations, digital subscription help, access troubleshooting, and administrative inquiries.',
             'support_heading' => 'Support Channels',
             'support_channels' => $supportChannels['en'],
             'form_title' => 'Submit an Inquiry',
@@ -2328,6 +2981,9 @@ $contactsSeedProvider = static function (): array {
             'visit_link_rules_body' => 'Registration, loans, use of the collection, and access to digital resources.',
             'visit_link_leadership_title' => 'Library leadership',
             'visit_link_leadership_body' => 'Roles and areas of responsibility — for specialised inquiries and escalation.',
+            'staff_heading' => 'Library staff',
+            'staff_note' => 'Ask the reading-room librarian for help finding an edition, working with the catalog, and arranging a loan. Leadership roles and areas of responsibility are listed on the Library leadership page.',
+            'staff' => $staffFor('en'),
         ],
     ];
 };
@@ -2339,8 +2995,9 @@ Route::get('/about', function () {
 // Phase 3 Cluster B.6 — canonical-exact /contacts page.
 // Replaces the previous shared-view activePage='contacts' branch on
 // resources/views/about.blade.php with a standalone canonical page that
-// mirrors docs/design-exports/contacts_canonical + integrates the three
-// v1 fund rooms (1/200, 1/202, 1/203) as public wayfinding truth.
+// mirrors docs/design-exports/contacts_canonical. The fund-guidance block
+// (v1 rooms 1/200, 1/202, 1/203 + map placeholder) was removed on request;
+// see the note on $contactsSeedProvider for why its copy is retained.
 Route::get('/contacts', function () use ($contactsSeedProvider) {
     return view('contacts', [
         'activePage' => 'contacts',
@@ -2352,10 +3009,10 @@ Route::get('/contacts', function () use ($contactsSeedProvider) {
 // Mirrors docs/design-exports/events_index_canonical — header + vertical
 // event card list (1/4 date rail + 3/4 content with venue + details link)
 // + Load More. Content is driven by $eventsSeedProvider (trilingual).
-Route::get('/events', function () use ($eventsSeedProvider) {
+Route::get('/events', function () use ($eventsSeedProvider, $upcomingEventsOnly) {
     return view('events.index', [
         'activePage' => 'events',
-        'events' => $eventsSeedProvider(),
+        'events' => $upcomingEventsOnly($eventsSeedProvider()),
     ]);
 });
 
@@ -2438,7 +3095,7 @@ $eventDetailProvider = static function (): array {
                     'about' => [
                         'Симпозиум объединяет научные библиотеки и исследовательские центры вокруг практических подходов к цифровому сохранению. Сессия посвящена тому, как академическая библиотека обеспечивает целостность и доступность цифровых научных материалов в долгосрочной перспективе.',
                         'Участники рассмотрят методологии миграции форматов, политики долгосрочного хранения, работу с метаданными и этические аспекты сохранения рожденного-цифровым контента — от институциональных репозиториев до массивов научных данных.',
-                        'Также будут представлены текущие инициативы KazUTB Smart Library по выстраиванию надежного цифрового хранилища, чтобы изменчивость цифровых носителей не приводила к потере научного наследия университета.',
+                        'Также будут представлены текущие инициативы KazUTB по выстраиванию надежного цифрового хранилища, чтобы изменчивость цифровых носителей не приводила к потере научного наследия университета.',
                     ],
                     'agenda' => [
                         ['time' => '10:00', 'title' => 'Приветственное слово', 'note' => 'Руководство библиотеки KazUTB'],
@@ -2465,7 +3122,7 @@ $eventDetailProvider = static function (): array {
                     'about' => [
                         'Симпозиум ғылыми кітапханалар мен зерттеу орталықтарын цифрлық сақтаудың тәжірибелік тәсілдері төңірегінде біріктіреді. Сессия академиялық кітапхананың цифрлық ғылыми материалдардың тұтастығы мен қолжетімділігін ұзақ мерзімде қалай қамтамасыз ететініне арналған.',
                         'Қатысушылар форматтарды көшіру әдіснамасын, ұзақ мерзімді сақтау саясатын, метадеректермен жұмысты және цифрлық мазмұнды сақтаудың этикалық аспектілерін — институционалдық репозиторийлерден бастап ғылыми деректер массивтеріне дейін — қарастырады.',
-                        'Сондай-ақ KazUTB Smart Library-дің сенімді цифрлық қоймасын құру жөніндегі ағымдағы бастамалары ұсынылады, бұл цифрлық тасымалдағыштардың өзгермелілігі университеттің ғылыми мұрасын жоғалтуға әкелмеуі үшін жасалады.',
+                        'Сондай-ақ KazUTB-дің сенімді цифрлық қоймасын құру жөніндегі ағымдағы бастамалары ұсынылады, бұл цифрлық тасымалдағыштардың өзгермелілігі университеттің ғылыми мұрасын жоғалтуға әкелмеуі үшін жасалады.',
                     ],
                     'agenda' => [
                         ['time' => '10:00', 'title' => 'Сәлемдеу сөзі', 'note' => 'KazUTB кітапханасының басшылығы'],
@@ -2492,7 +3149,7 @@ $eventDetailProvider = static function (): array {
                     'about' => [
                         'This symposium brings research libraries and scholarly centres together around practical approaches to digital preservation. The session focuses on how an academic library maintains the integrity and accessibility of born-digital scholarly materials over the long term.',
                         'Participants will examine format migration methodologies, long-term retention policy, metadata workflows, and the ethical considerations of preserving born-digital content — from institutional repositories to research data sets.',
-                        'The KazUTB Smart Library will also present its ongoing initiatives to build a robust digital vault, so that the volatility of digital carriers does not lead to the loss of the university\'s scholarly record.',
+                        'The KazUTB will also present its ongoing initiatives to build a robust digital vault, so that the volatility of digital carriers does not lead to the loss of the university\'s scholarly record.',
                     ],
                     'agenda' => [
                         ['time' => '10:00', 'title' => 'Opening remarks', 'note' => 'KazUTB Library leadership'],
@@ -2533,7 +3190,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Координатор научных коммуникаций',
-                        'role' => 'Отдел научных коммуникаций · KazUTB Smart Library',
+                        'role' => 'Отдел научных коммуникаций · KazUTB',
                         'bio' => 'Курирует работу с подписными базами данных, поддержку авторов университета и политику публикационной этики.',
                     ],
                     'materials' => [
@@ -2558,7 +3215,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Ғылыми коммуникациялар үйлестірушісі',
-                        'role' => 'Ғылыми коммуникациялар бөлімі · KazUTB Smart Library',
+                        'role' => 'Ғылыми коммуникациялар бөлімі · KazUTB',
                         'bio' => 'Жазылымдық дерекқорлармен жұмысты, университет авторларына қолдауды және жариялау этикасы саясатын үйлестіреді.',
                     ],
                     'materials' => [
@@ -2583,7 +3240,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Scholarly Communications Coordinator',
-                        'role' => 'Scholarly Communications Office · KazUTB Smart Library',
+                        'role' => 'Scholarly Communications Office · KazUTB',
                         'bio' => 'Leads work with subscribed databases, author support for the university, and publication ethics policy.',
                     ],
                     'materials' => [
@@ -2614,7 +3271,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Куратор технологического фонда',
-                        'role' => 'Отдел редких изданий · KazUTB Smart Library',
+                        'role' => 'Отдел редких изданий · KazUTB',
                         'bio' => 'Сопровождает работу с редкими изданиями, реставрацию и описание научного наследия университета.',
                     ],
                     'materials' => [
@@ -2639,7 +3296,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Технологиялық қордың кураторы',
-                        'role' => 'Сирек басылымдар бөлімі · KazUTB Smart Library',
+                        'role' => 'Сирек басылымдар бөлімі · KazUTB',
                         'bio' => 'Сирек басылымдармен жұмысты, қалпына келтіруді және университет ғылыми мұрасын сипаттауды сүйемелдейді.',
                     ],
                     'materials' => [
@@ -2664,7 +3321,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Curator, Technology Fund',
-                        'role' => 'Rare Editions Department · KazUTB Smart Library',
+                        'role' => 'Rare Editions Department · KazUTB',
                         'bio' => 'Supports work with rare editions, restoration, and descriptive cataloguing of the university\'s scholarly heritage.',
                     ],
                     'materials' => [
@@ -2695,7 +3352,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Библиотекарь-методист',
-                        'role' => 'Фонд колледжа · KazUTB Smart Library',
+                        'role' => 'Фонд колледжа · KazUTB',
                         'bio' => 'Отвечает за информационную грамотность и поддержку студентов при подготовке итоговых работ.',
                     ],
                     'materials' => [
@@ -2720,7 +3377,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Кітапханашы-әдіскер',
-                        'role' => 'Колледж қоры · KazUTB Smart Library',
+                        'role' => 'Колледж қоры · KazUTB',
                         'bio' => 'Ақпараттық сауаттылыққа және қорытынды жұмыстарды дайындау кезінде студенттерді қолдауға жауапты.',
                     ],
                     'materials' => [
@@ -2745,7 +3402,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Reference and Instruction Librarian',
-                        'role' => 'College Fund · KazUTB Smart Library',
+                        'role' => 'College Fund · KazUTB',
                         'bio' => 'Responsible for information literacy and support for students preparing graduating projects.',
                     ],
                     'materials' => [
@@ -2776,7 +3433,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Координатор центра академического письма',
-                        'role' => 'KazUTB Smart Library · Исследовательская поддержка',
+                        'role' => 'KazUTB · Исследовательская поддержка',
                         'bio' => 'Консультирует авторов по подготовке рукописей, академическому стилю и публикационной стратегии.',
                     ],
                     'materials' => [
@@ -2801,7 +3458,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Академиялық жазу орталығының үйлестірушісі',
-                        'role' => 'KazUTB Smart Library · Зерттеу қолдауы',
+                        'role' => 'KazUTB · Зерттеу қолдауы',
                         'bio' => 'Авторларға қолжазба дайындау, академиялық стиль және жариялау стратегиясы бойынша кеңес береді.',
                     ],
                     'materials' => [
@@ -2826,7 +3483,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Coordinator, Academic Writing Centre',
-                        'role' => 'KazUTB Smart Library · Research Support',
+                        'role' => 'KazUTB · Research Support',
                         'bio' => 'Advises authors on manuscript preparation, academic style, and publication strategy.',
                     ],
                     'materials' => [
@@ -2857,7 +3514,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Специалист по цифровым исследовательским сервисам',
-                        'role' => 'Цифровая лаборатория · KazUTB Smart Library',
+                        'role' => 'Цифровая лаборатория · KazUTB',
                         'bio' => 'Сопровождает учебные проекты по работе с данными и исследовательскими цифровыми инструментами.',
                     ],
                     'materials' => [
@@ -2882,7 +3539,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Цифрлық зерттеу сервистері бойынша маман',
-                        'role' => 'Цифрлық зертхана · KazUTB Smart Library',
+                        'role' => 'Цифрлық зертхана · KazUTB',
                         'bio' => 'Деректермен және зерттеу цифрлық құралдарымен жұмыс істеуге арналған оқу жобаларын сүйемелдейді.',
                     ],
                     'materials' => [
@@ -2907,7 +3564,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Digital Research Services Specialist',
-                        'role' => 'Digital Lab · KazUTB Smart Library',
+                        'role' => 'Digital Lab · KazUTB',
                         'bio' => 'Supports coursework that relies on data handling and research-oriented digital tools.',
                     ],
                     'materials' => [
@@ -2938,7 +3595,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Руководитель направления цифровых коллекций',
-                        'role' => 'KazUTB Smart Library · Метаданные и интеграция',
+                        'role' => 'KazUTB · Метаданные и интеграция',
                         'bio' => 'Координирует описание редких коллекций и интеграцию библиотечных записей в цифровые сервисы университета.',
                     ],
                     'materials' => [
@@ -2963,7 +3620,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Цифрлық жинақтар бағытының жетекшісі',
-                        'role' => 'KazUTB Smart Library · Метадеректер және интеграция',
+                        'role' => 'KazUTB · Метадеректер және интеграция',
                         'bio' => 'Сирек жинақтарды сипаттауды және кітапхана жазбаларын университеттің цифрлық сервистеріне біріктіруді үйлестіреді.',
                     ],
                     'materials' => [
@@ -2988,7 +3645,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Head of Digital Collections',
-                        'role' => 'KazUTB Smart Library · Metadata & Integration',
+                        'role' => 'KazUTB · Metadata & Integration',
                         'bio' => 'Coordinates rare-collection description and the integration of library records into the university’s digital services.',
                     ],
                     'materials' => [
@@ -3019,7 +3676,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Координатор читательских сервисов',
-                        'role' => 'KazUTB Smart Library · Public Services',
+                        'role' => 'KazUTB · Public Services',
                         'bio' => 'Отвечает за публичные сервисы библиотеки, маршруты адаптации студентов и поддержку первого обращения.',
                     ],
                     'materials' => [
@@ -3044,7 +3701,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Оқырман сервистерінің үйлестірушісі',
-                        'role' => 'KazUTB Smart Library · Public Services',
+                        'role' => 'KazUTB · Public Services',
                         'bio' => 'Кітапхананың жария сервистеріне, студенттерді бейімдеу маршруттарына және алғашқы сұрауларды қолдауға жауап береді.',
                     ],
                     'materials' => [
@@ -3069,12 +3726,822 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Reader Services Coordinator',
-                        'role' => 'KazUTB Smart Library · Public Services',
+                        'role' => 'KazUTB · Public Services',
                         'bio' => 'Leads public-facing library services, student onboarding routes, and first-contact support.',
                     ],
                     'materials' => [
                         ['title' => 'Freshers guide to library services', 'meta' => 'PDF · 350 KB'],
                         ['title' => 'Map of rooms and funds', 'meta' => 'PDF · 540 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'research-data-workshop-2026' => [
+            'secondary_category_slug' => 'data-skills',
+            'date_time_range' => '10:30 – 12:00',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Практический воркшоп по сбору, очистке и описанию исследовательских данных для учебных и магистерских проектов.',
+                    'secondary_category' => 'Data Skills',
+                    'date_time_range' => '10:30 – 12:00 (Астана)',
+                    'capacity_label' => '40 мест',
+                    'capacity_note' => 'Для студентов и исследовательских групп с собственными наборами данных',
+                    'about' => [
+                        'Участники разберут простой рабочий поток: как структурировать таблицу, выбрать поля описания и подготовить данные к повторному использованию.',
+                        'Отдельный блок будет посвящён тому, как связывать данные с источниками в каталоге библиотеки и научном репозитории.',
+                    ],
+                    'agenda' => [
+                        ['time' => '10:30', 'title' => 'Подготовка данных', 'note' => 'Структура таблиц и проверка качества'],
+                        ['time' => '11:00', 'title' => 'Описательные поля', 'note' => 'Минимальный набор метаданных для набора данных'],
+                        ['time' => '11:30', 'title' => 'Практика и вопросы', 'note' => 'Разбор реального учебного кейса'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Специалист по цифровым данным',
+                        'role' => 'KazUTB · Research Support',
+                        'bio' => 'Помогает исследовательским группам упорядочивать данные, описывать их и готовить к публикации.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Шаблон описания набора данных', 'meta' => 'DOCX · 120 КБ'],
+                        ['title' => 'Пример структуры исследовательской таблицы', 'meta' => 'XLSX · 96 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Оқу және магистрлік жобаларға арналған зерттеу деректерін жинау, тазалау және сипаттау бойынша практикалық воркшоп.',
+                    'secondary_category' => 'Data Skills',
+                    'date_time_range' => '10:30 – 12:00 (Астана)',
+                    'capacity_label' => '40 орын',
+                    'capacity_note' => 'Өз деректер жиынтығы бар студенттер мен зерттеу топтарына арналған',
+                    'about' => [
+                        'Қатысушылар қарапайым жұмыс ағынын талдайды: кестені қалай құрылымдау керек, сипаттама өрістерін қалай таңдау керек және деректерді қайта пайдалануға қалай дайындау керек.',
+                        'Қосымша блок деректерді кітапхана каталогы мен ғылыми репозиториядағы дереккөздермен қалай байланыстыру керегіне арналған.',
+                    ],
+                    'agenda' => [
+                        ['time' => '10:30', 'title' => 'Деректерді дайындау', 'note' => 'Кесте құрылымы және сапаны тексеру'],
+                        ['time' => '11:00', 'title' => 'Сипаттамалық өрістер', 'note' => 'Деректер жиыны үшін минималды метадеректер'],
+                        ['time' => '11:30', 'title' => 'Тәжірибе және сұрақтар', 'note' => 'Нақты оқу кейсін талдау'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Цифрлық деректер бойынша маман',
+                        'role' => 'KazUTB · Research Support',
+                        'bio' => 'Зерттеу топтарына деректерді реттеуге, сипаттауға және жариялауға дайындауға көмектеседі.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Деректер жиынын сипаттау үлгісі', 'meta' => 'DOCX · 120 КБ'],
+                        ['title' => 'Зерттеу кестесінің құрылым үлгісі', 'meta' => 'XLSX · 96 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'A practical workshop on collecting, cleaning, and describing research data for coursework and master’s projects.',
+                    'secondary_category' => 'Data Skills',
+                    'date_time_range' => '10:30 – 12:00 (Astana)',
+                    'capacity_label' => '40 seats',
+                    'capacity_note' => 'For students and research groups bringing their own datasets',
+                    'about' => [
+                        'Participants will walk through a simple workflow: how to structure a table, choose descriptive fields, and prepare data for reuse.',
+                        'A separate block will show how to connect datasets with sources in the library catalog and scholarly repository.',
+                    ],
+                    'agenda' => [
+                        ['time' => '10:30', 'title' => 'Preparing the data', 'note' => 'Table structure and quality checks'],
+                        ['time' => '11:00', 'title' => 'Descriptive fields', 'note' => 'Minimum metadata for a dataset'],
+                        ['time' => '11:30', 'title' => 'Practice and questions', 'note' => 'Walking through a real course case'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Digital Data Specialist',
+                        'role' => 'KazUTB · Research Support',
+                        'bio' => 'Helps research groups organise, describe, and prepare data for publication.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Dataset description template', 'meta' => 'DOCX · 120 KB'],
+                        ['title' => 'Research table structure sample', 'meta' => 'XLSX · 96 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'scholarly-communication-seminar-2026' => [
+            'secondary_category_slug' => 'publishing',
+            'date_time_range' => '14:00 – 15:30',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Семинар о том, как упаковать научную работу, выбрать журнал и подготовить аннотацию без лишней бюрократии.',
+                    'secondary_category' => 'Academic Publishing',
+                    'date_time_range' => '14:00 – 15:30 (Астана)',
+                    'capacity_label' => '60 мест',
+                    'capacity_note' => 'Для магистрантов, докторантов и преподавателей',
+                    'about' => [
+                        'Семинар помогает авторам выстроить понятный путь от черновика статьи до отправки в журнал и ответа редакции.',
+                        'Участники увидят, какие элементы публикационной подготовки особенно важны для университетских и международных изданий.',
+                    ],
+                    'agenda' => [
+                        ['time' => '14:00', 'title' => 'Выбор журнала', 'note' => 'Фокус, индексирование и требования'],
+                        ['time' => '14:30', 'title' => 'Аннотация и структура', 'note' => 'Как сделать материал читаемым'],
+                        ['time' => '15:00', 'title' => 'Работа с редакцией', 'note' => 'Ответы на замечания и корректуры'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Консультант по научным публикациям',
+                        'role' => 'KazUTB · Publishing Support',
+                        'bio' => 'Сопровождает авторов в вопросах публикаций, журналов и требований к оформлению статей.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Чеклист подготовки статьи', 'meta' => 'PDF · 210 КБ'],
+                        ['title' => 'Шаблон аннотации и ключевых слов', 'meta' => 'DOCX · 84 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Ғылыми жұмысты қалай дайындау, журнал таңдау және артық бюрократиясыз аннотация әзірлеу туралы семинар.',
+                    'secondary_category' => 'Academic Publishing',
+                    'date_time_range' => '14:00 – 15:30 (Астана)',
+                    'capacity_label' => '60 орын',
+                    'capacity_note' => 'Магистранттар, докторанттар және оқытушылар үшін',
+                    'about' => [
+                        'Семинар авторларға мақаланың қара нұсқасынан журналға жіберуге дейінгі айқын жол құруға көмектеседі.',
+                        'Қатысушылар университеттік және халықаралық басылымдар үшін жарияланымды дайындаудың қай элементтері әсіресе маңызды екенін көреді.',
+                    ],
+                    'agenda' => [
+                        ['time' => '14:00', 'title' => 'Журнал таңдау', 'note' => 'Фокус, индекстелу және талаптар'],
+                        ['time' => '14:30', 'title' => 'Аннотация және құрылым', 'note' => 'Материалды оқылымды ету жолы'],
+                        ['time' => '15:00', 'title' => 'Редакциямен жұмыс', 'note' => 'Түзетулер мен ескертпелерге жауап беру'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Ғылыми жарияланымдар жөніндегі кеңесші',
+                        'role' => 'KazUTB · Publishing Support',
+                        'bio' => 'Авторларды жарияланым, журнал таңдау және мақала рәсімдеу талаптары бойынша сүйемелдейді.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Мақаланы дайындау чек-парағы', 'meta' => 'PDF · 210 КБ'],
+                        ['title' => 'Аннотация мен кілт сөздер үлгісі', 'meta' => 'DOCX · 84 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'A seminar on shaping a paper, choosing a journal, and preparing an abstract without unnecessary bureaucracy.',
+                    'secondary_category' => 'Academic Publishing',
+                    'date_time_range' => '14:00 – 15:30 (Astana)',
+                    'capacity_label' => '60 seats',
+                    'capacity_note' => 'For master’s candidates, doctoral candidates, and faculty',
+                    'about' => [
+                        'The seminar helps authors build a clear path from a manuscript draft to journal submission and editorial response.',
+                        'Participants will see which parts of publication preparation matter most for university and international journals.',
+                    ],
+                    'agenda' => [
+                        ['time' => '14:00', 'title' => 'Choosing a journal', 'note' => 'Scope, indexing, and requirements'],
+                        ['time' => '14:30', 'title' => 'Abstract and structure', 'note' => 'Making the paper readable'],
+                        ['time' => '15:00', 'title' => 'Working with editors', 'note' => 'Responding to comments and revisions'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Scholarly Publishing Consultant',
+                        'role' => 'KazUTB · Publishing Support',
+                        'bio' => 'Supports authors on publishing routes, journals, and article formatting requirements.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Paper preparation checklist', 'meta' => 'PDF · 210 KB'],
+                        ['title' => 'Abstract and keywords template', 'meta' => 'DOCX · 84 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'new-semester-library-orientation-2026' => [
+            'secondary_category_slug' => 'student-onboarding',
+            'date_time_range' => '13:30 – 15:00',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Повторная вводная встреча для студентов о сервисах, поиске книг и быстрых действиях с подборками в каталоге.',
+                    'secondary_category' => 'Student Onboarding',
+                    'date_time_range' => '13:30 – 15:00 (Астана)',
+                    'capacity_label' => '150 мест',
+                    'capacity_note' => 'Для всех студентов, кто хочет быстро освежить работу с библиотекой',
+                    'about' => [
+                        'Команда покажет, как искать книги, сохранять их в подборку и переходить к связанным материалам без лишних шагов.',
+                        'Встреча также поможет тем, кто впервые подключается к цифровым сервисам библиотеки в новом семестре.',
+                    ],
+                    'agenda' => [
+                        ['time' => '13:30', 'title' => 'Навигация по сервисам', 'note' => 'Каталог, репозиторий и электронные ресурсы'],
+                        ['time' => '14:00', 'title' => 'Подборки и быстрые действия', 'note' => 'Сохранение, избранное и обновления'],
+                        ['time' => '14:30', 'title' => 'Вопросы и помощь', 'note' => 'Куда обратиться за поддержкой'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Координатор цифровых сервисов',
+                        'role' => 'KazUTB · Public Services',
+                        'bio' => 'Показывает пользователям быстрые сценарии работы с каталогом, избранным и читательским кабинетом.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Быстрый старт: каталог и подборки', 'meta' => 'PDF · 310 КБ'],
+                        ['title' => 'Памятка по цифровым сервисам', 'meta' => 'PDF · 260 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Студенттерге арналған сервистер, кітап іздеу және каталогтағы подборкалармен жылдам жұмыс туралы қайталама кіріспе кездесу.',
+                    'secondary_category' => 'Student Onboarding',
+                    'date_time_range' => '13:30 – 15:00 (Астана)',
+                    'capacity_label' => '150 орын',
+                    'capacity_note' => 'Кітапханамен жұмысын жылдам қайталағысы келетін барлық студенттер үшін',
+                    'about' => [
+                        'Команда кітаптарды қалай іздеу, оларды подборкаға қалай сақтау және байланысты материалдарға артық қадамсыз өту керегін көрсетеді.',
+                        'Кездесу жаңа семестрде кітапхананың цифрлық сервистеріне алғаш қосылатындарға да көмектеседі.',
+                    ],
+                    'agenda' => [
+                        ['time' => '13:30', 'title' => 'Сервистер бойынша навигация', 'note' => 'Каталог, репозиторий және электрондық ресурстар'],
+                        ['time' => '14:00', 'title' => 'Подборкалар және жылдам әрекеттер', 'note' => 'Сақтау, избранное және жаңартулар'],
+                        ['time' => '14:30', 'title' => 'Сұрақтар мен көмек', 'note' => 'Қайда жүгіну керек'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Цифрлық сервистер үйлестірушісі',
+                        'role' => 'KazUTB · Public Services',
+                        'bio' => 'Пайдаланушыларға каталог, избранное және оқырман кабинетімен жұмыс істеудің жылдам сценарийлерін көрсетеді.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Жылдам бастау: каталог және подборкалар', 'meta' => 'PDF · 310 КБ'],
+                        ['title' => 'Цифрлық сервистерге арналған жадынама', 'meta' => 'PDF · 260 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'A refreshed student introduction to services, book search, and quick shortlist actions in the catalog.',
+                    'secondary_category' => 'Student Onboarding',
+                    'date_time_range' => '13:30 – 15:00 (Astana)',
+                    'capacity_label' => '150 seats',
+                    'capacity_note' => 'For any student who wants a fast refresher on using the library',
+                    'about' => [
+                        'The team will show how to find books, save them to a shortlist, and move to related materials with fewer steps.',
+                        'This session also helps those connecting to the library’s digital services for the first time in the new semester.',
+                    ],
+                    'agenda' => [
+                        ['time' => '13:30', 'title' => 'Service navigation', 'note' => 'Catalog, repository, and digital resources'],
+                        ['time' => '14:00', 'title' => 'Shortlists and quick actions', 'note' => 'Saving, favorites, and updates'],
+                        ['time' => '14:30', 'title' => 'Questions and support', 'note' => 'Where to go for help'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Digital Services Coordinator',
+                        'role' => 'KazUTB · Public Services',
+                        'bio' => 'Shows readers quick workflows for the catalog, favorites, and the reader dashboard.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Quick start: catalog and shortlists', 'meta' => 'PDF · 310 KB'],
+                        ['title' => 'Digital services handout', 'meta' => 'PDF · 260 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'library-search-basics-2026' => [
+            'secondary_category_slug' => 'research-skills',
+            'date_time_range' => '10:00 – 11:30',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Семинар по быстрому поиску книг и статей, уточнению запросов и переходу к сохранённым подборкам.',
+                    'secondary_category' => 'Research Skills',
+                    'date_time_range' => '10:00 – 11:30 (Астана)',
+                    'capacity_label' => '70 мест',
+                    'capacity_note' => 'Для студентов всех уровней',
+                    'about' => [
+                        'Участники разберут быстрый поиск, логические операторы, фильтры и переход к нужной книге за минимальное число действий.',
+                        'Отдельно покажем, как shortlist помогает собирать рабочие подборки для семинара или курсовой.',
+                    ],
+                    'agenda' => [
+                        ['time' => '10:00', 'title' => 'Поисковая стратегия', 'note' => 'Ключевые слова и уточнение запроса'],
+                        ['time' => '10:30', 'title' => 'Фильтры и выдача', 'note' => 'Как быстро сузить результаты'],
+                        ['time' => '11:00', 'title' => 'Shortlist на практике', 'note' => 'Сохранение и повторное использование'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Специалист по поисковым сервисам',
+                        'role' => 'KazUTB · Discovery',
+                        'bio' => 'Помогает читателям строить короткие и точные пути от поиска к книге.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Памятка по поиску', 'meta' => 'PDF · 180 КБ'],
+                        ['title' => 'Шпаргалка по фильтрам', 'meta' => 'PDF · 90 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Кітаптар мен мақалаларды жылдам іздеу, сұрауды нақтылау және сақталған подборкаларға өту семинары.',
+                    'secondary_category' => 'Research Skills',
+                    'date_time_range' => '10:00 – 11:30 (Астана)',
+                    'capacity_label' => '70 орын',
+                    'capacity_note' => 'Барлық деңгейдегі студенттерге арналған',
+                    'about' => [
+                        'Қатысушылар жылдам іздеу, логикалық операторлар, сүзгілер және керекті кітапқа ең аз қадаммен жету жолын талдайды.',
+                        'Shortlist семинар немесе курстық жұмыс үшін жұмыс жинақтарын қалай құруға көмектесетінін бөлек көрсетеміз.',
+                    ],
+                    'agenda' => [
+                        ['time' => '10:00', 'title' => 'Іздеу стратегиясы', 'note' => 'Кілт сөздер және сұрауды нақтылау'],
+                        ['time' => '10:30', 'title' => 'Сүзгілер және нәтиже', 'note' => 'Нәтижені қалай жылдам тарылту керек'],
+                        ['time' => '11:00', 'title' => 'Shortlist тәжірибеде', 'note' => 'Сақтау және қайта пайдалану'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Іздеу сервистері бойынша маман',
+                        'role' => 'KazUTB · Discovery',
+                        'bio' => 'Оқырмандарға іздеуден кітапқа дейін қысқа әрі нақты жол құруға көмектеседі.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Іздеу жөніндегі жадынама', 'meta' => 'PDF · 180 КБ'],
+                        ['title' => 'Сүзгілерге арналған шпаргалка', 'meta' => 'PDF · 90 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'A seminar on fast book/article search, query refinement, and moving to saved shortlists.',
+                    'secondary_category' => 'Research Skills',
+                    'date_time_range' => '10:00 – 11:30 (Astana)',
+                    'capacity_label' => '70 seats',
+                    'capacity_note' => 'Open to students at every level',
+                    'about' => [
+                        'Participants will walk through fast search, boolean operators, filters, and reaching the right book in fewer steps.',
+                        'We will also show how shortlist helps build working bundles for a seminar or course project.',
+                    ],
+                    'agenda' => [
+                        ['time' => '10:00', 'title' => 'Search strategy', 'note' => 'Keywords and query refinement'],
+                        ['time' => '10:30', 'title' => 'Filters and results', 'note' => 'How to narrow results quickly'],
+                        ['time' => '11:00', 'title' => 'Shortlist in practice', 'note' => 'Saving and reuse'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Discovery Services Specialist',
+                        'role' => 'KazUTB · Discovery',
+                        'bio' => 'Helps readers build shorter, sharper paths from search to book.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Search handout', 'meta' => 'PDF · 180 KB'],
+                        ['title' => 'Filter cheat sheet', 'meta' => 'PDF · 90 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'citation-tools-clinic-2026' => [
+            'secondary_category_slug' => 'writing-support',
+            'date_time_range' => '11:00 – 12:30',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Практика оформления ссылок, библиографий и citation tools для учебных и научных работ.',
+                    'secondary_category' => 'Writing Support',
+                    'date_time_range' => '11:00 – 12:30 (Астана)',
+                    'capacity_label' => '45 мест',
+                    'capacity_note' => 'Для студентов и магистрантов',
+                    'about' => [
+                        'Сессия посвящена стилям цитирования, сохранению источников и базовой автоматизации библиографий.',
+                        'Покажем, как быстрее собирать список литературы и не терять уже найденные материалы.',
+                    ],
+                    'agenda' => [
+                        ['time' => '11:00', 'title' => 'Цитирование без ошибок', 'note' => 'Стиль, формат и единообразие'],
+                        ['time' => '11:30', 'title' => 'Reference manager', 'note' => 'Как экономить время на библиографии'],
+                        ['time' => '12:00', 'title' => 'Разбор примеров', 'note' => 'Практика на реальных ссылках'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Библиографический консультант',
+                        'role' => 'KazUTB · Writing Support',
+                        'bio' => 'Помогает с цитированием, оформлением списков литературы и ссылочными менеджерами.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Стили цитирования: кратко', 'meta' => 'PDF · 150 КБ'],
+                        ['title' => 'Шаблон списка литературы', 'meta' => 'DOCX · 64 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Оқу және ғылыми жұмыстар үшін сілтемелерді, библиографияны және citation tools қолдануды тәжірибеде көрсету.',
+                    'secondary_category' => 'Writing Support',
+                    'date_time_range' => '11:00 – 12:30 (Астана)',
+                    'capacity_label' => '45 орын',
+                    'capacity_note' => 'Студенттер мен магистранттарға арналған',
+                    'about' => [
+                        'Сессия сілтеме стильдеріне, дереккөздерді сақтауға және библиографияны бастапқы автоматтандыруға арналған.',
+                        'Әдебиеттер тізімін қалай тез жинау және табылған материалдарды жоғалтпау керегін көрсетеміз.',
+                    ],
+                    'agenda' => [
+                        ['time' => '11:00', 'title' => 'Қателіксіз дәйексөз келтіру', 'note' => 'Стиль, формат және бірізділік'],
+                        ['time' => '11:30', 'title' => 'Reference manager', 'note' => 'Библиографияға уақыт үнемдеу'],
+                        ['time' => '12:00', 'title' => 'Мысалдарды талдау', 'note' => 'Нақты сілтемелермен жұмыс'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Библиографиялық кеңесші',
+                        'role' => 'KazUTB · Writing Support',
+                        'bio' => 'Дәйексөз келтіру, әдебиеттер тізімі және reference manager құралдары бойынша көмектеседі.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Дәйексөз стильдері: қысқаша', 'meta' => 'PDF · 150 КБ'],
+                        ['title' => 'Әдебиеттер тізімі үлгісі', 'meta' => 'DOCX · 64 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'Practical work on citations, bibliographies, and citation tools for academic assignments.',
+                    'secondary_category' => 'Writing Support',
+                    'date_time_range' => '11:00 – 12:30 (Astana)',
+                    'capacity_label' => '45 seats',
+                    'capacity_note' => 'For students and master’s candidates',
+                    'about' => [
+                        'The session focuses on citation styles, keeping sources, and basic bibliography automation.',
+                        'We will show how to assemble a reference list faster and avoid losing already found materials.',
+                    ],
+                    'agenda' => [
+                        ['time' => '11:00', 'title' => 'Citing without errors', 'note' => 'Style, format, and consistency'],
+                        ['time' => '11:30', 'title' => 'Reference manager', 'note' => 'Saving time on bibliographies'],
+                        ['time' => '12:00', 'title' => 'Example walk-throughs', 'note' => 'Practice on live references'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Bibliographic Consultant',
+                        'role' => 'KazUTB · Writing Support',
+                        'bio' => 'Helps with citations, reference lists, and reference manager tools.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Citation styles: quick guide', 'meta' => 'PDF · 150 KB'],
+                        ['title' => 'Reference list template', 'meta' => 'DOCX · 64 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'repository-introduction-2026' => [
+            'secondary_category_slug' => 'metadata-governance',
+            'date_time_range' => '14:30 – 16:00',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Пошаговый мастер-класс по загрузке материалов в научный репозиторий и проверке метаданных.',
+                    'secondary_category' => 'Metadata Governance',
+                    'date_time_range' => '14:30 – 16:00 (Астана)',
+                    'capacity_label' => '55 мест',
+                    'capacity_note' => 'Для авторов и кураторов подразделений',
+                    'about' => [
+                        'Покажем, как подготовить файл, заполнить поля описания и передать материал на модерацию.',
+                        'Участники увидят, какие метаданные влияют на видимость и корректный поиск в репозитории.',
+                    ],
+                    'agenda' => [
+                        ['time' => '14:30', 'title' => 'Подготовка файла', 'note' => 'Формат, версия, вложения'],
+                        ['time' => '15:00', 'title' => 'Метаданные записи', 'note' => 'Название, авторы, ключевые поля'],
+                        ['time' => '15:30', 'title' => 'Модерация и публикация', 'note' => 'Что происходит после отправки'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Координатор репозитория',
+                        'role' => 'KazUTB · Repository Services',
+                        'bio' => 'Сопровождает публикацию материалов в научном репозитории и следит за качеством записей.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Чеклист подачи в репозиторий', 'meta' => 'PDF · 200 КБ'],
+                        ['title' => 'Полевая схема метаданных', 'meta' => 'PDF · 110 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Ғылыми репозиторийге материал жүктеу және метадеректерді тексеру бойынша қадамдық мастер-класс.',
+                    'secondary_category' => 'Metadata Governance',
+                    'date_time_range' => '14:30 – 16:00 (Астана)',
+                    'capacity_label' => '55 орын',
+                    'capacity_note' => 'Авторлар мен бөлімше кураторларына арналған',
+                    'about' => [
+                        'Файлды қалай дайындау, сипаттама өрістерін толтыру және материалды модерацияға жіберу керегін көрсетеміз.',
+                        'Қатысушылар репозиторийдегі іздеу мен көрінуге әсер ететін метадеректерді көреді.',
+                    ],
+                    'agenda' => [
+                        ['time' => '14:30', 'title' => 'Файлды дайындау', 'note' => 'Формат, нұсқа және қосымшалар'],
+                        ['time' => '15:00', 'title' => 'Жазба метадеректері', 'note' => 'Атауы, авторлары, негізгі өрістер'],
+                        ['time' => '15:30', 'title' => 'Модерация және жариялау', 'note' => 'Жібергеннен кейін не болады'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Репозиторий үйлестірушісі',
+                        'role' => 'KazUTB · Repository Services',
+                        'bio' => 'Ғылыми репозиторийге материал жариялауды сүйемелдейді және жазбалардың сапасын бақылайды.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Репозиторийге беру чек-парағы', 'meta' => 'PDF · 200 КБ'],
+                        ['title' => 'Метадеректер өріс картасы', 'meta' => 'PDF · 110 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'A step-by-step workshop on uploading materials to the scholarly repository and checking metadata.',
+                    'secondary_category' => 'Metadata Governance',
+                    'date_time_range' => '14:30 – 16:00 (Astana)',
+                    'capacity_label' => '55 seats',
+                    'capacity_note' => 'For authors and department coordinators',
+                    'about' => [
+                        'We will show how to prepare the file, fill in description fields, and send the material for moderation.',
+                        'Participants will see which metadata fields affect visibility and accurate discovery in the repository.',
+                    ],
+                    'agenda' => [
+                        ['time' => '14:30', 'title' => 'Preparing the file', 'note' => 'Format, version, attachments'],
+                        ['time' => '15:00', 'title' => 'Record metadata', 'note' => 'Title, authors, key fields'],
+                        ['time' => '15:30', 'title' => 'Moderation and publication', 'note' => 'What happens after submission'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Repository Coordinator',
+                        'role' => 'KazUTB · Repository Services',
+                        'bio' => 'Supports publishing materials in the scholarly repository and keeps records in shape.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Repository submission checklist', 'meta' => 'PDF · 200 KB'],
+                        ['title' => 'Metadata field map', 'meta' => 'PDF · 110 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'reading-club-launch-2026' => [
+            'secondary_category_slug' => 'book-exhibits',
+            'date_time_range' => '10:00 – 17:00',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Запуск читательского клуба с новой тематической витриной и быстрым сохранением книг в shortlist.',
+                    'secondary_category' => 'Community Reading',
+                    'date_time_range' => '10:00 – 17:00 (Астана)',
+                    'capacity_label' => 'Свободный вход',
+                    'capacity_note' => 'Для всех читателей и гостей',
+                    'about' => [
+                        'Мы открываем площадку для обсуждения новых книг, которые можно сразу добавить в подборку и обсудить с кураторами.',
+                        'Витрина помогает быстро перейти от печатной книги к связанным электронным материалам.',
+                    ],
+                    'agenda' => [
+                        ['time' => '10:00', 'title' => 'Открытие витрины', 'note' => 'Знакомство с новой подборкой'],
+                        ['time' => '12:00', 'title' => 'Выбор книги', 'note' => 'Совместный просмотр и shortlist'],
+                        ['time' => '15:00', 'title' => 'Свободное обсуждение', 'note' => 'Обмен рекомендациями'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Куратор читательских программ',
+                        'role' => 'KazUTB · Community',
+                        'bio' => 'Организует тематические чтения, подборки и открытые библиотечные встречи.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Подборка клуба чтения', 'meta' => 'PDF · 240 КБ'],
+                        ['title' => 'Список рекомендуемых книг', 'meta' => 'PDF · 180 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Жаңа тақырыптық витринасы бар оқырман клубын іске қосу және кітаптарды shortlist-ке тез сақтау.',
+                    'secondary_category' => 'Community Reading',
+                    'date_time_range' => '10:00 – 17:00 (Астана)',
+                    'capacity_label' => 'Еркін кіру',
+                    'capacity_note' => 'Барлық оқырмандар мен қонақтарға',
+                    'about' => [
+                        'Жаңа кітаптарды талқылауға арналған алаң ашамыз, оларды бірден подборкаға қосуға және кураторлармен талқылауға болады.',
+                        'Витрина баспа кітабынан оған қатысты электрондық материалдарға тез өтуді жеңілдетеді.',
+                    ],
+                    'agenda' => [
+                        ['time' => '10:00', 'title' => 'Витринаны ашу', 'note' => 'Жаңа подборкамен танысу'],
+                        ['time' => '12:00', 'title' => 'Кітап таңдау', 'note' => 'Бірлескен қарау және shortlist'],
+                        ['time' => '15:00', 'title' => 'Еркін талқылау', 'note' => 'Ұсынымдармен алмасу'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Оқырман бағдарламаларының кураторы',
+                        'role' => 'KazUTB · Community',
+                        'bio' => 'Тақырыптық оқуларды, подборкаларды және ашық кітапхана кездесулерін ұйымдастырады.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Оқырман клубының подборкасы', 'meta' => 'PDF · 240 КБ'],
+                        ['title' => 'Ұсынылатын кітаптар тізімі', 'meta' => 'PDF · 180 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'Launch of a reading club with a themed showcase and quick book saving to shortlist.',
+                    'secondary_category' => 'Community Reading',
+                    'date_time_range' => '10:00 – 17:00 (Astana)',
+                    'capacity_label' => 'Open entry',
+                    'capacity_note' => 'For all readers and guests',
+                    'about' => [
+                        'We are opening a space for discussing new books that can be added to shortlist immediately and discussed with the curators.',
+                        'The showcase helps readers move quickly from a print book to related digital materials.',
+                    ],
+                    'agenda' => [
+                        ['time' => '10:00', 'title' => 'Showcase opening', 'note' => 'Meet the new bundle'],
+                        ['time' => '12:00', 'title' => 'Book selection', 'note' => 'Shared viewing and shortlist'],
+                        ['time' => '15:00', 'title' => 'Open discussion', 'note' => 'Exchange recommendations'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Reader Program Curator',
+                        'role' => 'KazUTB · Community',
+                        'bio' => 'Runs themed reading sessions, bundles, and open library meetups.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Reading club bundle', 'meta' => 'PDF · 240 KB'],
+                        ['title' => 'Recommended books list', 'meta' => 'PDF · 180 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'digital-exhibitions-tour-2026' => [
+            'secondary_category_slug' => 'heritage',
+            'date_time_range' => '15:00 – 16:30',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Обзор цифровых выставок, архивных карточек и связанных тематических подборок библиотеки.',
+                    'secondary_category' => 'Digital Heritage',
+                    'date_time_range' => '15:00 – 16:30 (Астана)',
+                    'capacity_label' => '50 мест',
+                    'capacity_note' => 'Для студентов, преподавателей и гостей',
+                    'about' => [
+                        'Участники увидят, как строится цифровая выставка от описания объекта до размещения на публичной странице.',
+                        'Покажем, как связанные карточки помогают переходить между экспонатом, каталогом и новостями.',
+                    ],
+                    'agenda' => [
+                        ['time' => '15:00', 'title' => 'Структура выставки', 'note' => 'Карточки, витрины, связи'],
+                        ['time' => '15:30', 'title' => 'Архивный маршрут', 'note' => 'От объекта к коллекции'],
+                        ['time' => '16:00', 'title' => 'Вопросы и примеры', 'note' => 'Живой обзор решений'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Куратор цифровых выставок',
+                        'role' => 'KazUTB · Exhibitions',
+                        'bio' => 'Собирает цифровые витрины и связывает их с каталогом и архивом.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Путеводитель по витрине', 'meta' => 'PDF · 170 КБ'],
+                        ['title' => 'Шаблон карточки экспоната', 'meta' => 'DOCX · 68 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Цифрлық көрмелер, архивтік карточкалар және байланысты тақырыптық подборкаларға шолу.',
+                    'secondary_category' => 'Digital Heritage',
+                    'date_time_range' => '15:00 – 16:30 (Астана)',
+                    'capacity_label' => '50 орын',
+                    'capacity_note' => 'Студенттер, оқытушылар және қонақтарға',
+                    'about' => [
+                        'Қатысушылар цифрлық көрменің зат сипаттамасынан бастап жария бетке дейін қалай құрылатынын көреді.',
+                        'Байланысты карточкалар экспонат, каталог және жаңалықтар арасында қалай өтуге көмектесетінін көрсетеміз.',
+                    ],
+                    'agenda' => [
+                        ['time' => '15:00', 'title' => 'Көрме құрылымы', 'note' => 'Карточкалар, витриналар, байланыстар'],
+                        ['time' => '15:30', 'title' => 'Архивтік маршрут', 'note' => 'Нысаннан коллекцияға дейін'],
+                        ['time' => '16:00', 'title' => 'Сұрақтар мен мысалдар', 'note' => 'Шешімдерді тікелей қарау'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Цифрлық көрмелер кураторы',
+                        'role' => 'KazUTB · Exhibitions',
+                        'bio' => 'Цифрлық витриналарды жинайды және оларды каталогпен және архивпен байланыстырады.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Витринаға жолсілтеме', 'meta' => 'PDF · 170 КБ'],
+                        ['title' => 'Экспонат карточкасы үлгісі', 'meta' => 'DOCX · 68 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'A tour of digital exhibitions, archive cards, and the related themed bundles in the library.',
+                    'secondary_category' => 'Digital Heritage',
+                    'date_time_range' => '15:00 – 16:30 (Astana)',
+                    'capacity_label' => '50 seats',
+                    'capacity_note' => 'For students, faculty, and guests',
+                    'about' => [
+                        'Participants will see how a digital exhibition is built from an object description to the public-facing page.',
+                        'We will show how related cards help users move between the exhibit, the catalog, and the news archive.',
+                    ],
+                    'agenda' => [
+                        ['time' => '15:00', 'title' => 'Exhibition structure', 'note' => 'Cards, showcases, and links'],
+                        ['time' => '15:30', 'title' => 'Archive route', 'note' => 'From object to collection'],
+                        ['time' => '16:00', 'title' => 'Questions and examples', 'note' => 'Live review of solutions'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Digital Exhibitions Curator',
+                        'role' => 'KazUTB · Exhibitions',
+                        'bio' => 'Builds digital showcases and connects them to the catalog and archive.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Showcase guide', 'meta' => 'PDF · 170 KB'],
+                        ['title' => 'Exhibit card template', 'meta' => 'DOCX · 68 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'exam-support-clinic-2026' => [
+            'secondary_category_slug' => 'student-onboarding',
+            'date_time_range' => '12:00 – 13:30',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Короткие консультации по поиску материалов, управлению временем и подбору источников перед экзаменами.',
+                    'secondary_category' => 'Student Onboarding',
+                    'date_time_range' => '12:00 – 13:30 (Астана)',
+                    'capacity_label' => '60 мест',
+                    'capacity_note' => 'Для студентов и кураторов',
+                    'about' => [
+                        'Покажем, как быстро находить материалы для финальных работ и собирать рабочие подборки без хаоса.',
+                        'Отдельный блок поможет распланировать последние недели семестра и не потерять полезные источники.',
+                    ],
+                    'agenda' => [
+                        ['time' => '12:00', 'title' => 'Фокус на задаче', 'note' => 'Что искать в первую очередь'],
+                        ['time' => '12:30', 'title' => 'План на дедлайн', 'note' => 'Расстановка приоритетов'],
+                        ['time' => '13:00', 'title' => 'Индивидуальные вопросы', 'note' => 'Быстрая консультация'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Координатор студенческой поддержки',
+                        'role' => 'KazUTB · Student Success',
+                        'bio' => 'Помогает студентам ориентироваться в библиотечных сервисах перед сессией.',
+                    ],
+                    'materials' => [
+                        ['title' => 'План подготовки к сессии', 'meta' => 'PDF · 130 КБ'],
+                        ['title' => 'Подборка полезных ресурсов', 'meta' => 'PDF · 160 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Емтихан алдында материал іздеу, уақытты басқару және дереккөз таңдау бойынша қысқа консультациялар.',
+                    'secondary_category' => 'Student Onboarding',
+                    'date_time_range' => '12:00 – 13:30 (Астана)',
+                    'capacity_label' => '60 орын',
+                    'capacity_note' => 'Студенттер мен кураторларға арналған',
+                    'about' => [
+                        'Қорытынды жұмыстар үшін материалдарды қалай тез табуға болатынын және жұмыс подборкаларын тәртіппен қалай жинауға болатынын көрсетеміз.',
+                        'Қосымша блок семестрдің соңғы апталарын жоспарлауға және пайдалы дереккөздерді жоғалтпауға көмектеседі.',
+                    ],
+                    'agenda' => [
+                        ['time' => '12:00', 'title' => 'Мәселеге фокус', 'note' => 'Алдымен нені іздеу керек'],
+                        ['time' => '12:30', 'title' => 'Дедлайн жоспары', 'note' => 'Басымдықтарды қою'],
+                        ['time' => '13:00', 'title' => 'Жеке сұрақтар', 'note' => 'Жылдам кеңес'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Студенттік қолдау үйлестірушісі',
+                        'role' => 'KazUTB · Student Success',
+                        'bio' => 'Студенттерге сессия алдында кітапхана сервистерін түсінуге көмектеседі.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Сессияға дайындық жоспары', 'meta' => 'PDF · 130 КБ'],
+                        ['title' => 'Пайдалы ресурстар жинағы', 'meta' => 'PDF · 160 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'Short consultations on finding materials, managing time, and choosing sources before exams.',
+                    'secondary_category' => 'Student Onboarding',
+                    'date_time_range' => '12:00 – 13:30 (Astana)',
+                    'capacity_label' => '60 seats',
+                    'capacity_note' => 'For students and advisers',
+                    'about' => [
+                        'We will show how to quickly find materials for final work and keep working bundles organised.',
+                        'A separate block helps plan the last weeks of the semester and avoid losing useful sources.',
+                    ],
+                    'agenda' => [
+                        ['time' => '12:00', 'title' => 'Task focus', 'note' => 'What to look for first'],
+                        ['time' => '12:30', 'title' => 'Deadline plan', 'note' => 'Setting priorities'],
+                        ['time' => '13:00', 'title' => 'Individual questions', 'note' => 'Quick consultation'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Student Support Coordinator',
+                        'role' => 'KazUTB · Student Success',
+                        'bio' => 'Helps students navigate library services before the exam period.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Exam preparation plan', 'meta' => 'PDF · 130 KB'],
+                        ['title' => 'Useful resources bundle', 'meta' => 'PDF · 160 KB'],
+                    ],
+                ],
+            ],
+        ],
+        'library-innovation-lab-2026' => [
+            'secondary_category_slug' => 'metadata-governance',
+            'date_time_range' => '14:00 – 15:30',
+            'i18n' => [
+                'ru' => [
+                    'subtitle' => 'Круглый стол о новых сценариях каталога, shortlist и цифровых витрин для следующего цикла улучшений.',
+                    'secondary_category' => 'Metadata Governance',
+                    'date_time_range' => '14:00 – 15:30 (Астана)',
+                    'capacity_label' => '40 мест',
+                    'capacity_note' => 'Для специалистов и кураторов сервисов',
+                    'about' => [
+                        'Участники обсудят, какие новые сценарии каталога стоит сделать заметнее и где shortlist помогает быстрее вернуться к материалам.',
+                        'Отдельно посмотрим на роль цифровых витрин как точки входа в библиотечные коллекции.',
+                    ],
+                    'agenda' => [
+                        ['time' => '14:00', 'title' => 'Новые сценарии', 'note' => 'Каталог, shortlist и витрины'],
+                        ['time' => '14:30', 'title' => 'Приоритеты улучшений', 'note' => 'Что делаем в следующем цикле'],
+                        ['time' => '15:00', 'title' => 'Обратная связь', 'note' => 'Идеи от команды и читателей'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Руководитель сервисных улучшений',
+                        'role' => 'KazUTB · Product & UX',
+                        'bio' => 'Координирует развитие каталога, витрин и быстрых библиотечных сценариев.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Список идей для улучшений', 'meta' => 'PDF · 95 КБ'],
+                        ['title' => 'Карта сценариев каталога', 'meta' => 'PDF · 140 КБ'],
+                    ],
+                ],
+                'kk' => [
+                    'subtitle' => 'Келесі жетілдіру циклі үшін каталог, shortlist және цифрлық витриналар туралы дөңгелек үстел.',
+                    'secondary_category' => 'Metadata Governance',
+                    'date_time_range' => '14:00 – 15:30 (Астана)',
+                    'capacity_label' => '40 орын',
+                    'capacity_note' => 'Сервис мамандары мен кураторларға арналған',
+                    'about' => [
+                        'Қатысушылар қай каталог сценарийлерін айқын ету керек екенін және shortlist материалдарға тез қайтуға қалай көмектесетінін талқылайды.',
+                        'Цифрлық витриналардың кітапхана қорларына кіреберіс ретіндегі рөліне де назар аударамыз.',
+                    ],
+                    'agenda' => [
+                        ['time' => '14:00', 'title' => 'Жаңа сценарийлер', 'note' => 'Каталог, shortlist және витриналар'],
+                        ['time' => '14:30', 'title' => 'Жетілдіру басымдықтары', 'note' => 'Келесі циклде не істейміз'],
+                        ['time' => '15:00', 'title' => 'Кері байланыс', 'note' => 'Команда мен оқырмандар идеялары'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Сервистік жетілдіру жетекшісі',
+                        'role' => 'KazUTB · Product & UX',
+                        'bio' => 'Каталог, витрина және жылдам кітапхана сценарийлерін дамытуды үйлестіреді.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Жетілдіру идеялары тізімі', 'meta' => 'PDF · 95 КБ'],
+                        ['title' => 'Каталог сценарийлерінің картасы', 'meta' => 'PDF · 140 КБ'],
+                    ],
+                ],
+                'en' => [
+                    'subtitle' => 'A roundtable on new catalog flows, shortlist, and digital showcases for the next improvement cycle.',
+                    'secondary_category' => 'Metadata Governance',
+                    'date_time_range' => '14:00 – 15:30 (Astana)',
+                    'capacity_label' => '40 seats',
+                    'capacity_note' => 'For service specialists and curators',
+                    'about' => [
+                        'Participants will discuss which catalog journeys should be more visible and where shortlist helps readers return to materials faster.',
+                        'We will also look at digital showcases as an entry point into the library collection.',
+                    ],
+                    'agenda' => [
+                        ['time' => '14:00', 'title' => 'New journeys', 'note' => 'Catalog, shortlist, and showcases'],
+                        ['time' => '14:30', 'title' => 'Improvement priorities', 'note' => 'What we tackle next'],
+                        ['time' => '15:00', 'title' => 'Feedback', 'note' => 'Ideas from the team and readers'],
+                    ],
+                    'speaker' => [
+                        'name' => 'Service Improvement Lead',
+                        'role' => 'KazUTB · Product & UX',
+                        'bio' => 'Coordinates the evolution of catalog, showcase, and fast library workflows.',
+                    ],
+                    'materials' => [
+                        ['title' => 'Improvement ideas list', 'meta' => 'PDF · 95 KB'],
+                        ['title' => 'Catalog journey map', 'meta' => 'PDF · 140 KB'],
                     ],
                 ],
             ],
@@ -3093,7 +4560,7 @@ $eventDetailProvider = static function (): array {
 // Agenda on the left; Speaker + Materials + Share on the right) +
 // Related Events bento. Content joins $eventsSeedProvider (index) and
 // $eventDetailProvider (rich body per slug). Unknown slug → 404.
-Route::get('/events/{slug}', function (string $slug) use ($eventsSeedProvider, $eventDetailProvider) {
+Route::get('/events/{slug}', function (string $slug) use ($eventsSeedProvider, $eventDetailProvider, $upcomingEventsOnly) {
     $index = $eventsSeedProvider();
     $detailSeed = $eventDetailProvider();
 
@@ -3108,8 +4575,9 @@ Route::get('/events/{slug}', function (string $slug) use ($eventsSeedProvider, $
     abort_unless(isset($detailSeed['details'][$slug]), 404);
 
     $detail = $detailSeed['details'][$slug];
+    $upcomingIndex = $upcomingEventsOnly($index);
     $related = array_values(array_filter(
-        $index['items'],
+        $upcomingIndex['items'],
         static fn (array $candidate) => $candidate['slug'] !== $slug,
     ));
 
@@ -3148,7 +4616,7 @@ Route::get('/rules', function () use ($rulesSeedProvider) {
 });
 
 Route::get('/resources', function () {
-    $externalResourceService = app(\App\Services\ExternalResourceService::class);
+    $externalResourceService = app(ExternalResourceService::class);
     $resources = $externalResourceService->list();
     $categories = $externalResourceService->categories();
 
@@ -3161,46 +4629,31 @@ Route::get('/resources', function () {
 
 Route::get('/for-teachers', fn () => redirect('/resources', 301));
 
-// Scholarly repository — canonical public surface (PROJECT_CONTEXT §30.1).
-// Guests browse published work metadata; full-text reading stays behind AD
-// authentication and the controlled viewer (§20.5). Metadata is served by
-// ScholarlyRepositoryService (config-backed, DB-replaceable).
-Route::get('/repository', function (Request $request) {
-    $repositoryService = app(\App\Services\ScholarlyRepositoryService::class);
+// Scholarly repository — canonical public surface (Master.md §20.3).
+// Guests browse published work metadata from the repository_items table; the
+// stored full text is streamed only to viewers holding repository.read_full and
+// is never published as a storage URL. Canonical detail key is the numeric id.
+Route::get('/repository', [PublicRepositoryController::class, 'index'])->name('repository.index');
+Route::get('/repository/{item}', [PublicRepositoryController::class, 'show'])
+    ->whereNumber('item')
+    ->name('repository.show');
+Route::get('/repository/{item}/download', [PublicRepositoryController::class, 'download'])
+    ->whereNumber('item')
+    ->name('repository.download');
 
-    $activeType = (string) $request->query('type', '');
-    $activeType = in_array($activeType, \App\Services\ScholarlyRepositoryService::TYPES, true) ? $activeType : null;
-
-    return view('repository.index', [
-        'activePage' => 'repository',
-        'works' => $repositoryService->list($activeType),
-        'typeCounts' => $repositoryService->typeCounts(),
-        'activeType' => $activeType,
-    ]);
-});
-
+// Compatibility branch for the retired config-backed slugs (config/repository_works.php).
+// Those works have no repository_items row, so the only honest destination is the
+// index; slugs that were never published under the old surface still 404 naturally
+// because no route matches them.
 Route::get('/repository/{slug}', function (string $slug) {
-    $repositoryService = app(\App\Services\ScholarlyRepositoryService::class);
-    $work = $repositoryService->findBySlug($slug);
+    $legacySlugs = collect(config('repository_works.works', []))->pluck('slug')->filter()->all();
 
-    abort_if($work === null, 404);
+    abort_unless(in_array($slug, $legacySlugs, true), 404);
 
-    $related = $repositoryService->list()
-        ->where('slug', '!=', $slug)
-        ->where('type', $work['type'])
-        ->take(2)
-        ->values();
+    return redirect('/repository', 301);
+})->where('slug', '[a-z][a-z0-9-]*');
 
-    return view('repository.show', [
-        'activePage' => 'repository',
-        'work' => $work,
-        'related' => $related,
-    ]);
-})->where('slug', '[a-z0-9-]+');
-
-Route::get('/discover', function () {
-    return view('discover', ['activePage' => 'discover']);
-});
+Route::get('/discover', DiscoverController::class);
 
 Route::get('/shortlist', function () {
     return view('shortlist', ['activePage' => 'shortlist']);
@@ -3229,90 +4682,401 @@ Route::prefix('internal')->middleware(['library.auth'])->group(function () use (
     // /internal/ai-chat — experimental staff AI assistant; no canonical surface in roadmap yet.
     Route::get('/review', function (Request $request) use ($internalStaffView) {
         return $internalStaffView($request, 'internal-review');
-    });
+    })->middleware('permission:data_cleanup.access');
     Route::get('/ai-chat', function (Request $request) use ($internalStaffView) {
         return $internalStaffView($request, 'internal-ai-chat');
-    });
+    })->middleware('permission:data_cleanup.access');
 });
 
-Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff'])->name('librarian.')->group(function () use ($librarianView) {
-    // Librarian Overview — canonical landing for library staff (PROJECT_CONTEXT §30).
-    Route::get('/', function (Request $request) use ($librarianView) {
-        return $librarianView($request, 'librarian.overview');
-    })->name('overview');
+// Authorization is enforced twice on purpose: `library.auth`/`librarian.staff`
+// read the legacy session array, while `operational.staff` checks the Eloquent
+// user's Spatie roles and permissions. The permission boundary also admits
+// future staff roles such as cataloguer without granting access to members.
+Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'operational.staff'])->name('librarian.')->group(function (): void {
+    Route::get('/', LibrarianDashboardController::class)->name('overview');
 
-    // Phase 1.2 — canonical librarian screens (ported from design exports).
-    Route::get('/circulation', function (Request $request) use ($librarianView) {
-        return $librarianView($request, 'librarian.circulation');
-    })->name('circulation');
+    // Cataloguing (Master.md §6-§11).
+    Route::get('/catalog', [LibrarianCatalogController::class, 'index'])
+        ->middleware('permission:catalog.search|catalog.view_full_metadata|catalog.create_record|catalog.edit_record')
+        ->name('catalog.index');
+    Route::get('/catalog/udc-search', [LibrarianCatalogController::class, 'udcSearch'])
+        ->middleware('permission:catalog.view_udc')
+        ->name('catalog.udc-search');
+    Route::get('/catalog/duplicate-check', [LibrarianCatalogController::class, 'duplicateCheck'])
+        ->middleware('permission:catalog.create_record|catalog.edit_record')
+        ->name('catalog.duplicate-check');
+    Route::get('/udc-reference', [LibrarianUdcReferenceController::class, 'index'])
+        ->middleware('permission:catalog.view_udc')
+        ->name('udc-reference.index');
+    Route::patch('/udc-reference/{udcCode}', [LibrarianUdcReferenceController::class, 'update'])
+        ->middleware('permission:catalog.edit_record')
+        ->name('udc-reference.update');
+    Route::middleware('permission:catalog.create_record')->group(function (): void {
+        Route::get('/catalog/create', [LibrarianCatalogController::class, 'create'])->name('catalog.create');
+        Route::post('/catalog', [LibrarianCatalogController::class, 'store'])->name('catalog.store');
+    });
+    Route::middleware('permission:catalog.edit_record')->group(function (): void {
+        Route::post('/catalog/bulk', [LibrarianCatalogController::class, 'bulkUpdate'])->name('catalog.bulk');
+        Route::post('/catalog/{record}/revert/{log}', [LibrarianCatalogController::class, 'revert'])->name('catalog.revert');
+        Route::get('/catalog/{record}/edit', [LibrarianCatalogController::class, 'edit'])->name('catalog.edit');
+        Route::match(['PUT', 'PATCH'], '/catalog/{record}', [LibrarianCatalogController::class, 'update'])->name('catalog.update');
 
-    Route::get('/data-cleanup', function (Request $request) use ($librarianView) {
-        return $librarianView($request, 'librarian.data-cleanup');
-    })->name('data-cleanup');
+        // Attachments edited from the same form as the metadata (§10.4, §18).
+        Route::get('/catalog/record-search', [LibrarianCatalogAttachmentController::class, 'recordSearch'])
+            ->name('catalog.record-search');
+        Route::post('/catalog/{record}/materials', [LibrarianCatalogAttachmentController::class, 'storeMaterial'])
+            ->name('catalog.materials.store');
+        Route::match(['PUT', 'PATCH'], '/catalog/{record}/materials/{material}', [LibrarianCatalogAttachmentController::class, 'updateMaterial'])
+            ->name('catalog.materials.update');
+        Route::delete('/catalog/{record}/materials/{material}', [LibrarianCatalogAttachmentController::class, 'destroyMaterial'])
+            ->name('catalog.materials.destroy');
+        Route::post('/catalog/{record}/relations', [LibrarianCatalogAttachmentController::class, 'storeRelation'])
+            ->name('catalog.relations.store');
+        Route::delete('/catalog/{record}/relations/{related}', [LibrarianCatalogAttachmentController::class, 'destroyRelation'])
+            ->name('catalog.relations.destroy');
+    });
+    Route::delete('/catalog/{record}', [LibrarianCatalogController::class, 'destroy'])
+        ->middleware('permission:catalog.delete_record')
+        ->name('catalog.destroy');
 
-    Route::get('/repository', function (Request $request) use ($librarianView) {
-        return $librarianView($request, 'librarian.repository');
-    })->name('repository');
+    // Copies / inventory (Master.md §12).
+    Route::middleware('permission:copies.create|copies.edit')->group(function (): void {
+        Route::get('/copies', [LibrarianCopyController::class, 'index'])->name('copies.index');
+        Route::get('/copies/create', [LibrarianCopyController::class, 'create'])->name('copies.create');
+        Route::post('/copies', [LibrarianCopyController::class, 'store'])->middleware('permission:copies.create')->name('copies.store');
+        Route::get('/copies/{copy}', [LibrarianCopyController::class, 'show'])->name('copies.show');
+        Route::get('/copies/{copy}/label', [LibrarianCopyController::class, 'label'])->name('copies.label');
+        Route::get('/copy-labels', [LibrarianCopyController::class, 'labels'])->middleware('permission:barcodes.print_batch')->name('copies.labels');
+        Route::get('/copies/{copy}/edit', [LibrarianCopyController::class, 'edit'])->middleware('permission:copies.edit')->name('copies.edit');
+        Route::match(['PUT', 'PATCH'], '/copies/{copy}', [LibrarianCopyController::class, 'update'])->middleware('permission:copies.edit')->name('copies.update');
+        Route::post('/copies/{copy}/status', [LibrarianCopyController::class, 'changeStatus'])->middleware('permission:copies.edit')->name('copies.status');
+    });
+
+    // Circulation desk (Master.md §14).
+    Route::middleware('permission:circulation.issue|circulation.return')->group(function (): void {
+        Route::get('/circulation', [LibrarianCirculationController::class, 'dashboard'])->name('circulation');
+        Route::get('/circulation/issue', [LibrarianCirculationController::class, 'issueForm'])->name('circulation.issue');
+        Route::post('/circulation/issue', [LibrarianCirculationController::class, 'issue'])->middleware('permission:circulation.issue')->name('circulation.issue.store');
+        Route::get('/circulation/return', [LibrarianCirculationController::class, 'returnForm'])->name('circulation.return');
+        Route::post('/circulation/return', [LibrarianCirculationController::class, 'returnCopy'])->middleware('permission:circulation.return')->name('circulation.return.store');
+        Route::post('/circulation/loans/{loan}/renew', [LibrarianCirculationController::class, 'renew'])->middleware('permission:circulation.renew')->name('circulation.renew');
+        Route::get('/circulation/reader-lookup', [LibrarianCirculationController::class, 'readerLookup'])->name('circulation.reader-lookup');
+        Route::get('/circulation/copy-lookup', [LibrarianCirculationController::class, 'copyLookup'])->name('circulation.copy-lookup');
+        Route::patch('/circulation/readers/{reader}', [LibrarianCirculationController::class, 'updateReader'])->name('circulation.reader.update');
+        // §9.4 — printable reader card with the scannable barcode.
+        Route::get('/readers/{reader}/card', [LibrarianCirculationController::class, 'readerCard'])->name('readers.card');
+    });
+    Route::get('/circulation/history', [LibrarianCirculationController::class, 'history'])
+        ->middleware('permission:circulation.view_any_history')->name('circulation.history');
+
+    Route::middleware('permission:incidents.view')->group(function (): void {
+        Route::get('/incidents', [LibrarianIncidentController::class, 'index'])->name('incidents.index');
+        Route::get('/incidents/catalog-search', [LibrarianIncidentController::class, 'catalogSearch'])->name('incidents.catalog-search');
+        Route::get('/incidents/{incident}', [LibrarianIncidentController::class, 'show'])->name('incidents.show');
+        Route::post('/incidents/{incident}/candidates', [LibrarianIncidentController::class, 'propose'])->middleware('permission:incidents.create')->name('incidents.candidates.store');
+        Route::post('/incident-candidates/{candidate}/review', [LibrarianIncidentController::class, 'review'])->middleware('permission:incidents.review')->name('incidents.candidates.review');
+        Route::post('/incident-candidates/{candidate}/decision', [LibrarianIncidentController::class, 'decide'])->middleware('permission:incidents.approve')->name('incidents.candidates.decide');
+        Route::post('/incident-candidates/{candidate}/draft-record', [LibrarianIncidentController::class, 'createDraft'])->middleware('permission:catalog.create_record')->name('incidents.candidates.draft');
+        Route::post('/incidents/{incident}/register', [LibrarianIncidentController::class, 'register'])->middleware('permission:incidents.register_replacement')->name('incidents.register');
+        Route::post('/incidents/{incident}/reopen', [LibrarianIncidentController::class, 'reopen'])->middleware('permission:incidents.resolve')->name('incidents.reopen');
+        Route::post('/incidents/{incident}/resolve', [LibrarianIncidentController::class, 'resolve'])->middleware('permission:incidents.resolve')->name('incidents.resolve');
+        Route::post('/incidents/{incident}/cancel', [LibrarianIncidentController::class, 'cancel'])->middleware('permission:incidents.resolve')->name('incidents.cancel');
+        Route::post('/incidents/{incident}/attachments', [LibrarianIncidentController::class, 'uploadAttachment'])->middleware('permission:incidents.create')->name('incidents.attachments.store');
+        Route::post('/incidents/{incident}/assign', [LibrarianIncidentController::class, 'assign'])->middleware('permission:incidents.review')->name('incidents.assign');
+    });
+
+    // Attendance (§9.4) — card scan at the entrance, independent of loans.
+    Route::middleware('permission:visits.record')->group(function (): void {
+        Route::get('/visits', [LibrarianVisitController::class, 'index'])->name('visits.index');
+        Route::get('/visits/lookup', [LibrarianVisitController::class, 'lookup'])->name('visits.lookup');
+        Route::post('/visits', [LibrarianVisitController::class, 'store'])->name('visits.store');
+    });
+
+    Route::middleware('permission:inventory.view')->group(function (): void {
+        Route::get('/inventory', [LibrarianInventoryController::class, 'index'])->name('inventory.index');
+        Route::post('/inventory', [LibrarianInventoryController::class, 'store'])->middleware('permission:inventory.create')->name('inventory.store');
+        Route::get('/inventory/{inventory}', [LibrarianInventoryController::class, 'show'])->name('inventory.show');
+        Route::post('/inventory/{inventory}/start', [LibrarianInventoryController::class, 'start'])->middleware('permission:inventory.create')->name('inventory.start');
+        Route::post('/inventory/{inventory}/scan', [LibrarianInventoryController::class, 'scan'])->middleware('permission:inventory.scan')->name('inventory.scan');
+        Route::post('/inventory/{inventory}/complete', [LibrarianInventoryController::class, 'complete'])->middleware('permission:inventory.review')->name('inventory.complete');
+        Route::post('/inventory/{inventory}/approve', [LibrarianInventoryController::class, 'approve'])->middleware('permission:inventory.approve')->name('inventory.approve');
+        Route::get('/inventory/{inventory}/export', [LibrarianInventoryController::class, 'export'])->name('inventory.export');
+    });
+
+    // Reservation queue (Master.md §13).
+    Route::middleware('permission:reservation.confirm')->group(function (): void {
+        Route::get('/reservations', [LibrarianReservationController::class, 'index'])->name('reservations.index');
+        Route::post('/reservations/{reservation}/confirm', [LibrarianReservationController::class, 'confirm'])->name('reservations.confirm');
+        Route::post('/reservations/{reservation}/ready', [LibrarianReservationController::class, 'markReady'])->name('reservations.ready');
+        // §8.3 — extend the pickup hold; the service refuses when anyone is queued.
+        Route::post('/reservations/{reservation}/extend', [LibrarianReservationController::class, 'extend'])->name('reservations.extend');
+        Route::post('/reservations/{reservation}/transfer', [LibrarianReservationController::class, 'requestTransfer'])->middleware('permission:reservation.manage_transfer')->name('reservations.transfer.request');
+        Route::post('/transfers/{transfer}/approve', [LibrarianReservationController::class, 'approveTransfer'])->middleware('permission:reservation.manage_transfer')->name('transfers.approve');
+        Route::post('/transfers/{transfer}/send', [LibrarianReservationController::class, 'sendTransfer'])->middleware('permission:reservation.manage_transfer')->name('transfers.send');
+        Route::post('/transfers/{transfer}/receive', [LibrarianReservationController::class, 'receiveTransfer'])->middleware('permission:reservation.manage_transfer')->name('transfers.receive');
+        Route::post('/transfers/{transfer}/cancel', [LibrarianReservationController::class, 'cancelTransfer'])->middleware('permission:reservation.manage_transfer')->name('transfers.cancel');
+        Route::post('/reservations/{reservation}/cancel', [LibrarianReservationController::class, 'cancel'])->middleware('permission:reservation.cancel_any')->name('reservations.cancel');
+        // §8 — releasing someone else's hold early is a cancellation in effect.
+        Route::post('/reservations/{reservation}/pass-to-next', [LibrarianReservationController::class, 'passToNext'])->middleware('permission:reservation.cancel_any')->name('reservations.pass-to-next');
+    });
+
+    // Fines and debts (Master.md §14.4-14.5).
+    Route::middleware('permission:fines.view')->group(function (): void {
+        Route::get('/fines', [LibrarianFineController::class, 'index'])->name('fines.index');
+        Route::post('/fines/{fine}/resolve', [LibrarianFineController::class, 'resolve'])->middleware('permission:fines.manage')->name('fines.resolve');
+    });
+
+    // Data quality workbench (Master.md §11).
+    // The cataloguer is the primary user of this workbench (ДИР §6) but must
+    // not reach the transitional /internal/* tools that `data_cleanup.access`
+    // also gates, so cataloguing rights admit them here directly.
+    Route::middleware('permission:data_cleanup.access|catalog.edit_record')->group(function (): void {
+        Route::get('/data-cleanup', [LibrarianDataCleanupController::class, 'index'])->name('data-cleanup');
+        // One-at-a-time retyping console for cp1251 glyph damage (ДИР §6).
+        Route::get('/data-cleanup/retype', [LibrarianDataCleanupController::class, 'retype'])
+            ->name('data-cleanup.retype');
+        Route::post('/data-cleanup/retype/{record}', [LibrarianDataCleanupController::class, 'storeRetype'])
+            ->middleware('permission:catalog.edit_record')
+            ->name('data-cleanup.retype.store');
+        Route::post('/data-cleanup/parallel/{record}', [LibrarianDataCleanupController::class, 'resolveParallel'])
+            ->middleware('permission:catalog.edit_record')
+            ->name('data-cleanup.parallel');
+    });
+
+    Route::middleware('permission:data_quality.view')->prefix('data-quality')->name('data-quality.')->group(function (): void {
+        Route::get('/', [LibrarianDataQualityController::class, 'index'])->name('index');
+        Route::get('/export.csv', [LibrarianDataQualityController::class, 'export'])->middleware('permission:data_quality.view_reports')->name('export');
+        Route::get('/exports/{type}.csv', [LibrarianDataQualityController::class, 'export'])->middleware('permission:data_quality.view_reports')->name('exports');
+        Route::post('/scans', [LibrarianDataQualityController::class, 'queueScan'])->middleware('permission:data_quality.scan')->name('scans.store');
+        Route::get('/issues/{issue}', [LibrarianDataQualityController::class, 'show'])->name('issues.show');
+        Route::post('/issues/{issue}/assign', [LibrarianDataQualityController::class, 'assign'])->middleware('permission:data_quality.assign')->name('issues.assign');
+        Route::post('/issues/{issue}/correct', [LibrarianDataQualityController::class, 'correct'])->middleware('permission:data_quality.correct')->name('issues.correct');
+        Route::post('/issues/{issue}/false-positive', [LibrarianDataQualityController::class, 'falsePositive'])->middleware('permission:data_quality.triage')->name('issues.false-positive');
+        Route::post('/issues/{issue}/ignore', [LibrarianDataQualityController::class, 'ignore'])->middleware('permission:data_quality.triage')->name('issues.ignore');
+        Route::post('/issues/{issue}/reopen', [LibrarianDataQualityController::class, 'reopen'])->middleware('permission:data_quality.triage')->name('issues.reopen');
+        Route::post('/issues/{issue}/comments', [LibrarianDataQualityController::class, 'comment'])->middleware('permission:data_quality.triage')->name('issues.comments');
+
+        Route::get('/duplicates/groups', [LibrarianDataQualityController::class, 'duplicates'])->middleware('permission:data_quality.review_duplicates')->name('duplicates');
+        Route::post('/duplicates/{group}/merge', [LibrarianDataQualityController::class, 'proposeMerge'])->middleware('permission:data_quality.merge')->name('merges.propose');
+        Route::post('/merges/{operation}/approve', [LibrarianDataQualityController::class, 'approveMerge'])->middleware('permission:data_quality.approve_merge')->name('merges.approve');
+        Route::post('/merges/{operation}/execute', [LibrarianDataQualityController::class, 'executeMerge'])->middleware('permission:data_quality.execute_merge')->name('merges.execute');
+
+        Route::post('/batches/preview', [LibrarianDataQualityController::class, 'bulkPreview'])->middleware('permission:data_quality.bulk_edit')->name('batches.preview');
+        Route::get('/batches/{batch}', [LibrarianDataQualityController::class, 'batch'])->middleware('permission:data_quality.bulk_edit')->name('batch');
+        Route::post('/batches/{batch}/approve', [LibrarianDataQualityController::class, 'bulkApprove'])->middleware('permission:data_quality.approve_bulk')->name('batches.approve');
+        Route::post('/batches/{batch}/execute', [LibrarianDataQualityController::class, 'bulkExecute'])->middleware('permission:data_quality.bulk_edit')->name('batches.execute');
+        Route::post('/batches/{batch}/rollback', [LibrarianDataQualityController::class, 'bulkRollback'])->middleware('permission:data_quality.bulk_edit')->name('batches.rollback');
+
+        Route::get('/imports/batches', [LibrarianDataQualityController::class, 'imports'])->middleware('permission:data_quality.import')->name('imports');
+        Route::post('/imports/batches', [LibrarianDataQualityController::class, 'uploadImport'])->middleware('permission:data_quality.import')->name('imports.upload');
+        Route::get('/imports/batches/{batch}', [LibrarianDataQualityController::class, 'showImport'])->middleware('permission:data_quality.import')->name('imports.show');
+        Route::post('/imports/rows/{row}/decision', [LibrarianDataQualityController::class, 'decideImportRow'])->middleware('permission:data_quality.import')->name('imports.rows.decision');
+        Route::post('/imports/batches/{batch}/approve', [LibrarianDataQualityController::class, 'approveImport'])->middleware('permission:data_quality.approve_import')->name('imports.approve');
+        Route::post('/imports/batches/{batch}/execute', [LibrarianDataQualityController::class, 'executeImport'])->middleware('permission:data_quality.import')->name('imports.execute');
+    });
+
+    // Scientific repository moderation (Master.md §20).
+    Route::middleware('permission:repository.upload|repository.approve|repository.publish')->group(function (): void {
+        Route::get('/repository', [LibrarianRepositoryController::class, 'index'])->name('repository');
+        Route::get('/repository/create', [LibrarianRepositoryController::class, 'create'])->middleware('permission:repository.upload')->name('repository.create');
+        Route::post('/repository', [LibrarianRepositoryController::class, 'store'])->middleware('permission:repository.upload')->name('repository.store');
+        Route::get('/repository/{item}/edit', [LibrarianRepositoryController::class, 'edit'])->name('repository.edit');
+        Route::match(['PUT', 'PATCH'], '/repository/{item}', [LibrarianRepositoryController::class, 'update'])
+            ->middleware('permission:repository.upload|repository.approve')
+            ->name('repository.update');
+        Route::post('/repository/{item}/transition', [LibrarianRepositoryController::class, 'transition'])->name('repository.transition');
+    });
+
+    // News desk — edit_own scope (Master.md §16, §22).
+    Route::middleware('permission:news.create|news.edit_own')->group(function (): void {
+        Route::get('/news', [LibrarianNewsController::class, 'index'])->name('news.index');
+        Route::get('/news/create', [LibrarianNewsController::class, 'create'])->middleware('permission:news.create')->name('news.create');
+        Route::post('/news', [LibrarianNewsController::class, 'store'])->middleware('permission:news.create')->name('news.store');
+        Route::get('/news/{news}/edit', [LibrarianNewsController::class, 'edit'])->name('news.edit');
+        Route::match(['PUT', 'PATCH'], '/news/{news}', [LibrarianNewsController::class, 'update'])->name('news.update');
+    });
+
+    // Operational reports (Historical §22.2) — the reports.view_ops scope.
+    Route::middleware('permission:reports.view_ops|reports.view_full')->group(function (): void {
+        Route::get('/reports', [LibrarianReportController::class, 'index'])->name('reports.index');
+        Route::get('/reports/{type}/export', [LibrarianReportController::class, 'export'])->middleware('permission:reports.export')->name('reports.export');
+    });
+
+    // Reader inquiries (Historical §5.11: view + resolve, no delete).
+    Route::middleware('permission:messages.view_all')->group(function (): void {
+        Route::get('/messages', [LibrarianMessageController::class, 'index'])->name('messages.index');
+        Route::get('/messages/{message}', [LibrarianMessageController::class, 'show'])->name('messages.show');
+        Route::patch('/messages/{message}', [LibrarianMessageController::class, 'update'])->middleware('permission:messages.resolve')->name('messages.update');
+    });
 });
 
 // Phase 2a — canonical member-facing shell for ordinary users (role='reader').
 // Librarians and admins are rejected by the `member.reader` middleware and
 // redirected to their own operational shells via the standard 403 flow.
 // The transitional /account route is retained and unchanged for now.
-Route::prefix('dashboard')->middleware(['library.auth', 'member.reader'])->name('member.')->group(function () use ($memberView) {
-    Route::get('/', function (Request $request) use ($memberView) {
-        return $memberView($request, 'member.dashboard');
-    })->name('dashboard');
+Route::prefix('dashboard')->middleware(['auth', 'library.auth', 'member.reader', 'private.response'])->name('member.')->group(function (): void {
+    // Personal cabinet (Master.md §15) — every screen is backed by the
+    // canonical circulation schema and scoped to the signed-in reader inside
+    // CabinetController, never merely by what the view chooses to render.
+    Route::get('/', [MemberCabinetController::class, 'dashboard'])->name('dashboard');
 
-    Route::get('/reservations', function (Request $request) use ($memberView) {
-        return $memberView($request, 'member.reservations');
-    })->name('reservations');
+    // §15.2 / §5.3 — materials on hand and reader-initiated renewal.
+    Route::get('/loans', [MemberCabinetController::class, 'loans'])->name('loans');
+    Route::get('/card', [MemberCabinetController::class, 'ticket'])->name('card');
+    Route::post('/card/printed', [MemberCabinetController::class, 'cardPrinted'])->middleware('throttle:20,1')->name('card.printed');
+    Route::redirect('/ticket', '/dashboard/card')->name('ticket.legacy');
+    Route::post('/loans/{loan}/renew', [MemberCabinetController::class, 'renewLoan'])->middleware('throttle:10,1')->name('loans.renew');
 
-    Route::get('/list', function (Request $request) use ($memberView) {
-        return $memberView($request, 'member.list');
-    })->name('list');
+    // §13.1, §15.3 — the reader's own reservation queue.
+    Route::get('/reservations', [MemberCabinetController::class, 'reservations'])->name('reservations');
+    Route::post('/reservations', [MemberCabinetController::class, 'storeReservation'])
+        ->middleware('permission:reservation.create')
+        ->name('reservations.store');
+    Route::post('/reservations/{reservation}/cancel', [MemberCabinetController::class, 'cancelReservation'])
+        ->name('reservations.cancel');
 
-    Route::get('/history', function (Request $request) use ($memberView) {
-        return $memberView($request, 'member.history');
-    })->name('history');
+    Route::redirect('/list', '/dashboard/collections')->name('list.legacy');
+    Route::get('/collections', [MemberCollectionController::class, 'index'])->name('collections.index');
+    Route::post('/collections', [MemberCollectionController::class, 'store'])->middleware('throttle:20,1')->name('collections.store');
+    Route::get('/collections/{collection}', [MemberCollectionController::class, 'show'])->name('collections.show');
+    Route::patch('/collections/{collection}', [MemberCollectionController::class, 'update'])->name('collections.update');
+    Route::delete('/collections/{collection}', [MemberCollectionController::class, 'destroy'])->name('collections.destroy');
+    Route::post('/collections/{collection}/items', [MemberCollectionController::class, 'add'])->name('collections.items.add');
+    Route::delete('/collections/{collection}/items/{item}', [MemberCollectionController::class, 'remove'])->name('collections.items.remove');
+    Route::patch('/collections/{collection}/order', [MemberCollectionController::class, 'reorder'])->name('collections.reorder');
+    Route::post('/collections/{collection}/follow', [MemberCollectionController::class, 'follow'])->name('collections.follow');
+    Route::post('/collections/{collection}/copy', [MemberCollectionController::class, 'copy'])->name('collections.copy');
 
-    Route::get('/notifications', function (Request $request) use ($memberView) {
-        return $memberView($request, 'member.notifications');
-    })->name('notifications');
+    // §15.4 — closed loans; §15.5 — the reader's own debts (read-only).
+    Route::get('/history', [MemberCabinetController::class, 'history'])->name('history');
+    Route::get('/fines', [MemberCabinetController::class, 'fines'])->name('fines');
+    Route::get('/incidents', [MemberIncidentController::class, 'index'])->name('incidents.index');
+    Route::get('/incidents/{incident}', [MemberIncidentController::class, 'show'])->name('incidents.show');
 
-    Route::get('/messages', function (Request $request) use ($memberView) {
-        return $memberView($request, 'member.messages');
-    })->name('messages');
+    // In-app reader notifications (Master.md §15.6) — real ReaderNotification feed.
+    Route::get('/notifications', [MemberNotificationController::class, 'index'])->name('notifications');
+    Route::post('/notifications/read-all', [MemberNotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::post('/notifications/{notification}/read', [MemberNotificationController::class, 'markRead'])->name('notifications.read');
+
+    Route::get('/digital-materials', [MemberPortalController::class, 'digitalMaterials'])->name('digital-materials');
+    Route::get('/search', [MemberPortalController::class, 'search'])->name('search');
+    Route::get('/profile', [MemberPortalController::class, 'profile'])->name('profile');
+    Route::patch('/profile', [MemberPortalController::class, 'updateProfile'])->middleware('throttle:10,1')->name('profile.update');
+    Route::get('/messages', [MemberPortalController::class, 'messages'])->name('messages');
+    Route::get('/messages/{message}', [MemberPortalController::class, 'message'])->name('messages.show');
+
+    Route::post('/messages', [ContactMessageSubmissionController::class, 'store'])
+        ->name('messages.store');
 });
 
-Route::prefix('admin')->middleware(['library.auth', 'admin.staff'])->name('admin.')->group(function () use ($adminView) {
-    Route::get('/', function (Request $request) use ($adminView) {
-        return $adminView($request, 'admin.overview');
-    })->name('overview');
+Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->name('admin.')->group(function (): void {
+    Route::get('/', AdminDashboardController::class)->name('overview');
 
-    Route::get('/users', function (Request $request) use ($adminView) {
-        return $adminView($request, 'admin.users');
-    })->name('users');
+    // Global search — no extra permission gate here: every result group is
+    // filtered inside the controller by the permission guarding its section.
+    Route::get('/search', GlobalSearchController::class)->name('search');
 
-    Route::get('/logs', function (Request $request) use ($adminView) {
-        return $adminView($request, 'admin.governance');
-    })->name('logs');
+    // CSV import (users / external resources). The controller re-checks the
+    // exact permission per type; the middleware is the coarse gate.
+    Route::middleware('permission:users.manage|external_resources.manage')->group(function (): void {
+        Route::get('/import/{type}', [ImportController::class, 'form'])
+            ->whereIn('type', ['users', 'external-resources'])
+            ->name('imports.form');
+        Route::post('/import/{type}/preview', [ImportController::class, 'preview'])
+            ->whereIn('type', ['users', 'external-resources'])
+            ->name('imports.preview');
+        Route::post('/import/{type}', [ImportController::class, 'commit'])
+            ->whereIn('type', ['users', 'external-resources'])
+            ->name('imports.commit');
+    });
 
-    Route::get('/news', function (Request $request) use ($adminView) {
-        return $adminView($request, 'admin.news');
-    })->name('news');
+    Route::middleware('permission:users.manage')->group(function (): void {
+        Route::get('/users/export', [UserController::class, 'export'])->name('users.export');
+        Route::patch('/users/{user}/active', [UserController::class, 'toggleActive'])->name('users.active');
+        Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
+        Route::post('/users/{user}/revoke-sessions', [UserController::class, 'revokeSessions'])->name('users.revoke-sessions');
+        Route::resource('users', UserController::class)->except('destroy');
+    });
 
-    Route::get('/feedback', function (Request $request) use ($adminView) {
-        return $adminView($request, 'admin.feedback');
-    })->name('feedback');
+    // Self-service profile — any signed-in admin-panel user manages their own
+    // name, email, locale, and password; no extra permission required.
+    Route::get('/profile', [AdminProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [AdminProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/password', [AdminProfileController::class, 'updatePassword'])->name('profile.password');
 
-    Route::get('/settings', function (Request $request) use ($adminView) {
-        return $adminView($request, 'admin.settings');
-    })->name('settings');
+    Route::middleware('permission:roles.manage')->group(function (): void {
+        Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+        Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
+        Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+    });
 
-    Route::get('/reports', function (Request $request) use ($adminView) {
-        return $adminView($request, 'admin.reports');
-    })->name('reports');
+    Route::middleware('permission:system.logs')->group(function (): void {
+        Route::get('/error-log', [ErrorLogController::class, 'index'])->name('error-log.index');
+        Route::get('/logs/export', [AuditLogController::class, 'export'])->name('logs.export');
+        Route::get('/logs/{activityLog}', [AuditLogController::class, 'show'])->name('logs.show');
+        Route::get('/logs', [AuditLogController::class, 'index'])->name('logs.index');
+    });
+
+    Route::get('/news/export', [AdminNewsController::class, 'export'])
+        ->middleware(['permission:reports.export', 'permission:news.edit_any'])
+        ->name('news.export');
+    Route::get('/news', [AdminNewsController::class, 'index'])->middleware('permission:news.edit_any|news.edit_own')->name('news.index');
+    Route::get('/news/create', [AdminNewsController::class, 'create'])->middleware('permission:news.create')->name('news.create');
+    Route::post('/news', [AdminNewsController::class, 'store'])->middleware('permission:news.create')->name('news.store');
+    Route::get('/news/{news}/edit', [AdminNewsController::class, 'edit'])->middleware('permission:news.edit_any|news.edit_own')->name('news.edit');
+    Route::match(['PUT', 'PATCH'], '/news/{news}', [AdminNewsController::class, 'update'])->middleware('permission:news.edit_any|news.edit_own')->name('news.update');
+    Route::delete('/news/{news}', [AdminNewsController::class, 'destroy'])->middleware('permission:news.delete')->name('news.destroy');
+
+    Route::get('/messages/export', [ContactMessageController::class, 'export'])
+        ->middleware(['permission:reports.export', 'permission:messages.view_all'])
+        ->name('messages.export');
+    Route::middleware('permission:messages.view_all')->group(function (): void {
+        Route::get('/messages/{message}/attachments/{index}', [ContactMessageController::class, 'attachment'])
+            ->whereNumber('index')
+            ->name('messages.attachments');
+        Route::get('/messages', [ContactMessageController::class, 'index'])->name('messages.index');
+        Route::get('/messages/{message}', [ContactMessageController::class, 'show'])->name('messages.show');
+        Route::get('/feedback', [ContactMessageController::class, 'index'])->name('feedback');
+    });
+    Route::patch('/messages/{message}', [ContactMessageController::class, 'update'])->middleware('permission:messages.resolve')->name('messages.update');
+    Route::delete('/messages/{message}', [ContactMessageController::class, 'destroy'])->middleware('permission:messages.delete')->name('messages.destroy');
+
+    Route::middleware('permission:reports.view_full')->group(function (): void {
+        Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('/reports/{type}', [ReportController::class, 'show'])->name('reports.show');
+    });
+    Route::get('/reports/{type}/export/{format}', [ReportController::class, 'export'])
+        ->middleware(['permission:reports.export', 'permission:reports.view_full'])
+        ->name('reports.export');
+
+    Route::middleware('permission:system.settings')->group(function (): void {
+        Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+        Route::patch('/settings', [SettingController::class, 'update'])->name('settings.update');
+        Route::patch('/settings/notifications', [SettingController::class, 'updateNotifications'])->name('settings.notifications');
+        Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
+        Route::post('/integrations/check', [IntegrationController::class, 'check'])->name('integrations.check');
+    });
+
+    Route::middleware('permission:branches.manage')->group(function (): void {
+        Route::get('/branches', [BranchController::class, 'index'])->name('branches.index');
+        Route::post('/branches', [BranchController::class, 'store'])->name('branches.store');
+        Route::patch('/branches/{branch}', [BranchController::class, 'update'])->name('branches.update');
+        Route::delete('/branches/{branch}', [BranchController::class, 'destroy'])->name('branches.destroy');
+        Route::post('/funds', [FundController::class, 'store'])->name('funds.store');
+        Route::patch('/funds/{fund}', [FundController::class, 'update'])->name('funds.update');
+        Route::delete('/funds/{fund}', [FundController::class, 'destroy'])->name('funds.destroy');
+    });
+
+    Route::resource('external-resources', AdminExternalResourceController::class)
+        ->except('show')
+        ->middleware('permission:external_resources.manage');
+
+    Route::redirect('/repository', '/librarian/repository')
+        ->middleware('permission:repository.upload|repository.approve|repository.publish|repository.remove')
+        ->name('repository');
+    Route::redirect('/data-cleanup', '/librarian/data-cleanup')
+        ->middleware('permission:data_cleanup.access')
+        ->name('data-cleanup');
 });
 
 // SPA shell — React Router handles client-side routing under /app

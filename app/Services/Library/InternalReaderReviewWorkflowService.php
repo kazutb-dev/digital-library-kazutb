@@ -36,7 +36,7 @@ class InternalReaderReviewWorkflowService
         }
 
         $builder = DB::connection('pgsql')
-            ->table(self::READER_TABLE . ' as r')
+            ->table(self::READER_TABLE.' as r')
             ->select($selectColumns)
             ->where('r.needs_review', true);
 
@@ -123,7 +123,7 @@ class InternalReaderReviewWorkflowService
     }
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      * @return array{data: array<string, mixed>, source: string}
      */
     public function resolveReaderReview(string $readerId, ?string $resolutionNote, array $context = []): array

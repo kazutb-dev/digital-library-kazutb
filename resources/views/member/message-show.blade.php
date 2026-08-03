@@ -1,0 +1,4 @@
+@extends('layouts.member', ['title' => $message->subject])
+@section('content')
+<article class="mx-auto max-w-3xl rounded-2xl bg-white p-7"><a class="text-sm text-secondary" href="{{ route('member.messages') }}">← {{ __('librarian.member.nav.messages') }}</a><h1 class="mt-4 font-headline text-3xl">{{ $message->subject }}</h1><p class="mt-2 text-xs text-slate-500">{{ __('messages.statuses.'.$message->status) }} · {{ $message->created_at?->format('d.m.Y H:i') }}</p><div class="mt-6 whitespace-pre-line text-slate-700">{{ $message->body }}</div>@if($message->resolution_comment)<section class="mt-8 rounded-xl bg-teal-50 p-5"><h2 class="font-semibold">{{ __('librarian.member.messages.official_response') }}</h2><p class="mt-2 whitespace-pre-line">{{ $message->resolution_comment }}</p></section>@endif</article>
+@endsection

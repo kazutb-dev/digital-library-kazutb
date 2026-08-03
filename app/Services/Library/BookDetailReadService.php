@@ -2,11 +2,25 @@
 
 namespace App\Services\Library;
 
-use Illuminate\Support\Facades\DB;
+use App\Models\Catalog\BibliographicRecord;
+use App\Models\Catalog\BookCopy;
+use App\Models\Catalog\Loan;
+use App\Models\Catalog\UdcCode;
+use App\Models\User;
+use App\Support\DatabaseSchema;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
+/**
+ * Book detail read model (Master.md §9.2-§9.3).
+ *
+ * Resolves a record by numeric id or ISBN from the canonical catalogue tables
+ * and returns the shape the book page and /api/v1/book-db expect. Returns null
+ * for an unknown identifier so the caller can answer 404 honestly.
+ */
 class BookDetailReadService
 {
-    public function findByIdentifier(string $identifier): ?array
+    public function findByIdentifier(string $identifier, ?User $viewer = null): ?array
     {
         $identifier = trim($identifier);
 
@@ -14,253 +28,296 @@ class BookDetailReadService
             return null;
         }
 
-        $document = DB::table('app.document_detail_v as d')
-            ->select([
-                'd.document_id',
-                'd.legacy_doc_id',
-                'd.title_display',
-                'd.title_raw',
-                'd.subtitle_raw',
-                'd.publication_year',
-                'd.language_code',
-                'd.language_raw',
-                'd.isbn_raw',
-                'd.isbn_normalized',
-                'd.isbn_is_valid',
-                'd.publisher_name',
-                'd.authors_json',
-                'd.copy_summary_json',
-                'd.document_needs_review',
-                'd.document_review_reason_codes',
-                'd.subjects_json',
-                'd.faculty_raw',
-                'd.department_raw',
-                'd.specialization_raw',
-                'd.raw_marc',
-            ])
-            ->whereRaw(
-                "d.isbn_normalized = ? or d.isbn_raw = ? or d.document_id::text = ? or d.legacy_doc_id::text = ?",
-                [$identifier, $identifier, $identifier, $identifier]
-            )
-            ->first();
-
-        if (! $document) {
+        if (! DatabaseSchema::hasTable('bibliographic_records')) {
             return null;
         }
 
-        $authors = $this->decodeJsonValue($document->authors_json);
-        $copySummary = $this->decodeJsonValue($document->copy_summary_json);
-        $locations = DB::table('app.document_availability_by_location_v')
-            ->select([
-                'institution_unit_name',
-                'institution_unit_code',
-                'campus_name',
-                'campus_code',
-                'service_point_name',
-                'service_point_code',
-                'total_copy_count',
-                'available_copy_count',
-                'unavailable_copy_count',
-                'review_copy_count',
-                'problem_copy_count',
-                'orphan_copy_count',
-            ])
-            ->where('document_id', $document->document_id)
-            ->orderByDesc('available_copy_count')
-            ->orderByDesc('total_copy_count')
-            ->get()
-            ->map(function (object $location): array {
-                return [
-                    'institutionUnit' => [
-                        'code' => (string) ($location->institution_unit_code ?? ''),
-                        'name' => (string) ($location->institution_unit_name ?? ''),
-                    ],
-                    'campus' => [
-                        'code' => (string) ($location->campus_code ?? ''),
-                        'name' => (string) ($location->campus_name ?? ''),
-                    ],
-                    'servicePoint' => [
-                        'code' => (string) ($location->service_point_code ?? ''),
-                        'name' => (string) ($location->service_point_name ?? ''),
-                    ],
-                    'copies' => [
-                        'total' => (int) ($location->total_copy_count ?? 0),
-                        'available' => (int) ($location->available_copy_count ?? 0),
-                        'unavailable' => (int) ($location->unavailable_copy_count ?? 0),
-                        'review' => (int) ($location->review_copy_count ?? 0),
-                        'problem' => (int) ($location->problem_copy_count ?? 0),
-                        'orphan' => (int) ($location->orphan_copy_count ?? 0),
-                    ],
-                ];
+        $normalizedIsbn = preg_replace('/[^0-9xX]/', '', $identifier) ?: $identifier;
+
+        $record = BibliographicRecord::query()
+            ->where(function (Builder $builder) use ($identifier, $normalizedIsbn): void {
+                $builder->where('isbn', $identifier)->orWhere('isbn', $normalizedIsbn);
+                if (ctype_digit($identifier)) {
+                    $builder->orWhere('id', (int) $identifier);
+                }
             })
-            ->all();
+            ->withCount([
+                'copies',
+                'copies as available_copies_count' => fn (Builder $copies) => $copies->where('status', 'available'),
+            ])
+            ->first();
 
-        $primaryAuthor = is_array($authors) && isset($authors[0]['name']) ? (string) $authors[0]['name'] : 'Автор не указан';
-        $publisherName = (string) ($document->publisher_name ?: 'Издатель не указан');
-        $titleDisplay = (string) ($document->title_display ?: $document->title_raw ?: 'Без названия');
-        $titleRaw = (string) ($document->title_raw ?: $document->title_display ?: 'Без названия');
-        $subtitle = (string) ($document->subtitle_raw ?: '');
-        $isbnRaw = (string) ($document->isbn_normalized ?: $document->isbn_raw ?: '');
-        $languageCode = (string) ($document->language_code ?: '');
-        $languageRaw = (string) ($document->language_raw ?: $languageCode ?: '');
-        $availableCopies = is_array($copySummary) ? (int) ($copySummary['availableCopies'] ?? 0) : 0;
-        $totalCopies = is_array($copySummary) ? (int) ($copySummary['totalCopies'] ?? 0) : 0;
-        $reviewReasonCodes = $this->normalizePgArray($document->document_review_reason_codes ?? null);
-
-        $subjects = $this->decodeJsonValue($document->subjects_json);
-        $classification = [];
-        if (is_array($subjects) && count($subjects) > 0) {
-            $classification = array_map(static fn (array $s): array => [
-                'id' => (string) ($s['id'] ?? ''),
-                'label' => (string) ($s['label'] ?? ''),
-                'sourceKind' => (string) ($s['sourceKind'] ?? ''),
-            ], $subjects);
+        if ($record === null) {
+            return null;
         }
 
+        $copies = $record->copies()
+            ->whereNotIn('status', ['written_off'])
+            ->with(['branch', 'fund'])
+            ->get();
+
+        $available = $copies->where('status', 'available')->count();
+        $total = $copies->count();
+        $readerLoan = $viewer === null
+            ? null
+            : Loan::query()
+                ->where('user_id', $viewer->getKey())
+                ->whereIn('status', ['active', 'overdue'])
+                ->whereHas('copy', fn (Builder $copy) => $copy->where('bibliographic_record_id', $record->getKey()))
+                ->latest('issued_at')
+                ->first();
+        $canViewInternalNotes = $viewer?->canAny(['catalog.edit_record', 'catalog.manage_record']) ?? false;
+        $udcCode = trim((string) ($record->udc_code ?? ''));
+        $udcReference = $udcCode === ''
+            ? null
+            : UdcCode::query()
+                ->whereRaw('? LIKE code || ?', [$udcCode, '%'])
+                ->orderByRaw('LENGTH(code) DESC')
+                ->first();
+
         return [
-            'id' => (string) ($document->document_id ?? $document->legacy_doc_id ?? ''),
+            'id' => (string) $record->getKey(),
             'title' => [
-                'display' => $titleDisplay,
-                'raw' => $titleRaw,
-                'subtitle' => $subtitle,
+                'display' => (string) $record->title,
+                'raw' => (string) $record->title,
+                'subtitle' => (string) ($record->subtitle ?? ''),
             ],
-            'primaryAuthor' => $primaryAuthor,
-            'authors' => is_array($authors) ? $authors : [],
+            'primaryAuthor' => $record->primary_author ?: __('common.catalog.author_unknown'),
+            // Unsubstituted source values. The display fields above fall back to
+            // "author/publisher not specified" labels, which are fine on screen
+            // but must never end up inside a generated bibliographic reference.
+            'primaryAuthorRaw' => (string) ($record->primary_author ?? ''),
+            'publisherRaw' => (string) ($record->publisher ?? ''),
+            'authors' => array_map(
+                static fn (string $name): array => ['name' => $name],
+                $record->allAuthors(),
+            ),
             'publisher' => [
-                'name' => $publisherName,
+                'name' => (string) ($record->publisher ?: __('common.catalog.publisher_unknown')),
             ],
-            'publicationYear' => $document->publication_year,
+            'publicationYear' => $record->publication_year,
             'language' => [
-                'code' => $languageCode,
-                'raw' => $languageRaw,
+                'code' => (string) $record->language,
+                'raw' => (string) $record->language,
             ],
             'isbn' => [
-                'raw' => $isbnRaw,
-                'isValid' => (bool) ($document->isbn_is_valid ?? false),
+                'raw' => (string) ($record->isbn ?? ''),
+                'isValid' => $this->isValidIsbn((string) ($record->isbn ?? '')),
             ],
+            'resourceType' => (string) $record->resource_type,
+            'annotation' => (string) ($record->annotation ?? ''),
+            'keywords' => (array) ($record->keywords ?? []),
+            'notes' => $canViewInternalNotes ? (string) ($record->notes ?? '') : '',
+            'coverPath' => $record->cover_path,
+            'authorMark' => (string) ($record->author_mark ?? ''),
             'copies' => [
-                'available' => $availableCopies,
-                'total' => $totalCopies,
+                'available' => $available,
+                'total' => $total,
             ],
             'availability' => [
-                'isAvailable' => $availableCopies > 0,
-                'availableCopies' => $availableCopies,
-                'totalCopies' => $totalCopies,
-                'locations' => $locations,
+                'isAvailable' => $available > 0,
+                'availableCopies' => $available,
+                'totalCopies' => $total,
+                'locations' => $this->groupLocations($copies, $viewer !== null),
+            ],
+            'viewer' => [
+                'authenticated' => $viewer !== null,
+                'canReserve' => $viewer !== null && $available > 0,
+                'activeLoan' => $readerLoan === null ? null : [
+                    'status' => (string) $readerLoan->status,
+                    'issuedAt' => $readerLoan->issued_at?->toIso8601String(),
+                    'dueAt' => $readerLoan->due_at?->toIso8601String(),
+                ],
             ],
             'quality' => [
-                'needsReview' => (bool) ($document->document_needs_review ?? false),
-                'reviewReasonCodes' => $reviewReasonCodes,
+                'needsReview' => (bool) $record->is_draft,
+                'reviewReasonCodes' => $record->missingRequiredFields(),
             ],
-            'classification' => $classification,
-            'udc' => $this->extractUdcData($document->raw_marc ?? null, $classification),
-            'source' => 'app.document_detail_v',
+            'classification' => $record->category !== null && $record->category !== ''
+                ? [['id' => $record->category, 'label' => $record->category, 'sourceKind' => 'subject']]
+                : [],
+            'udc' => [
+                'raw' => $viewer !== null ? $udcCode : '',
+                'description' => $udcReference?->localizedDescription() ?? '',
+                'display' => $viewer !== null
+                    ? trim($udcCode.($udcReference ? ' — '.$udcReference->localizedDescription() : ''))
+                    : ($udcReference?->localizedDescription() ?? ''),
+                'source' => $udcCode !== '' ? 'udc' : '',
+            ],
+            'electronicMaterials' => $record->electronicMaterials()
+                ->where('is_active', true)
+                ->get()
+                ->map(static fn ($material): array => [
+                    'id' => (string) $material->getKey(),
+                    'title' => (string) $material->title,
+                    'fileType' => (string) $material->file_type,
+                    'accessLevel' => (string) $material->access_level,
+                    'licenseTerms' => (string) ($material->license_terms ?? ''),
+                    'allowDownload' => (bool) $material->allow_download,
+                    'externalUrl' => $material->external_url,
+                ])
+                ->all(),
+            'relatedMaterials' => $record->relatedRecords()
+                ->limit(6)
+                ->get(['bibliographic_records.id', 'title', 'isbn', 'primary_author', 'publication_year'])
+                ->map(static fn (BibliographicRecord $related): array => [
+                    'id' => (string) $related->getKey(),
+                    'title' => (string) $related->title,
+                    'isbn' => (string) ($related->isbn ?? ''),
+                    'author' => (string) ($related->primary_author ?? ''),
+                    'publicationYear' => $related->publication_year,
+                ])
+                ->all(),
+            'similarMaterials' => $this->similarMaterials($record),
+            'source' => 'catalog.bibliographic_records',
         ];
     }
 
     /**
-     * @param array<int, array<string, string>> $classification
-     * @return array{raw: string, source: string}
+     * Automatic recommendations by exact UDC, then by its top-level class.
+     *
+     * @return list<array<string, mixed>>
      */
-    private function extractUdcData(mixed $rawMarc, array $classification = []): array
+    private function similarMaterials(BibliographicRecord $record): array
     {
-        if (is_string($rawMarc) && $rawMarc !== '') {
-            foreach (['080', '084'] as $tag) {
-                $value = $this->extractMarcFieldValue($rawMarc, $tag);
-                if ($value !== '') {
-                    return ['raw' => $value, 'source' => $tag];
+        $udc = trim((string) ($record->udc_code ?? ''));
+        if ($udc === '') {
+            return [];
+        }
+
+        $exact = BibliographicRecord::query()
+            ->whereKeyNot($record->getKey())
+            ->where('udc_code', $udc)
+            ->where('is_draft', false)
+            ->whereNotNull('title')
+            ->whereRaw("TRIM(title) <> ''")
+            ->where('title', 'not like', '[Без заглавия;%')
+            ->orderByDesc('publication_year')
+            ->limit(6)
+            ->get();
+
+        if ($exact->count() < 6) {
+            $fallback = BibliographicRecord::query()
+                ->whereKeyNot($record->getKey())
+                ->whereNotIn('id', $exact->pluck('id'))
+                ->where('udc_code', 'like', mb_substr($udc, 0, 1).'%')
+                ->where('is_draft', false)
+                ->whereNotNull('title')
+                ->whereRaw("TRIM(title) <> ''")
+                ->where('title', 'not like', '[Без заглавия;%')
+                ->orderByDesc('publication_year')
+                ->limit(6 - $exact->count())
+                ->get();
+            $exact = $exact->concat($fallback);
+        }
+
+        return $exact
+            ->map(static fn (BibliographicRecord $similar): array => [
+                'id' => (string) $similar->getKey(),
+                'title' => (string) $similar->title,
+                'isbn' => (string) ($similar->isbn ?? ''),
+                'author' => (string) ($similar->primary_author ?? ''),
+                'publicationYear' => $similar->publication_year,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Holdings grouped by branch + fund, richest location first.
+     *
+     * @param  Collection<int, BookCopy>  $copies
+     * @return list<array<string, mixed>>
+     */
+    private function groupLocations(Collection $copies, bool $showExactLocation): array
+    {
+        return $copies
+            ->groupBy(function (BookCopy $copy) use ($showExactLocation): string {
+                $key = ($copy->branch?->code ?? 'unassigned').'|'.($copy->fund?->code ?? '');
+
+                return $showExactLocation
+                    ? $key.'|'.($copy->storage_sigla ?? '').'|'.($copy->shelf_location ?? '')
+                    : $key;
+            })
+            ->map(function (Collection $group) use ($showExactLocation): array {
+                $first = $group->first();
+
+                return [
+                    'institutionUnit' => [
+                        'code' => (string) ($first->fund?->code ?? ''),
+                        'name' => (string) ($first->fund?->name ?? ''),
+                    ],
+                    'campus' => [
+                        'code' => $showExactLocation ? (string) ($first->branch?->code ?? '') : '',
+                        'name' => $showExactLocation ? (string) ($first->branch?->name ?? '') : '',
+                    ],
+                    'servicePoint' => [
+                        'code' => $showExactLocation ? (string) ($first->branch?->code ?? '') : '',
+                        'name' => $showExactLocation ? (string) ($first->branch?->name ?? '') : '',
+                    ],
+                    'storageSigla' => $showExactLocation ? (string) ($first->storage_sigla ?? '') : '',
+                    'address' => $showExactLocation ? (string) ($first->branch?->address ?? '') : '',
+                    'shelf' => $showExactLocation ? (string) ($first->shelf_location ?? '') : '',
+                    'exactLocationPending' => $showExactLocation
+                        && $group->where('status', 'available')->isNotEmpty()
+                        && $group->where('status', 'available')->every(
+                            static fn (BookCopy $copy): bool => blank($copy->shelf_location),
+                        ),
+                    'copies' => [
+                        'total' => $group->count(),
+                        'available' => $group->where('status', 'available')->count(),
+                        'unavailable' => $group->whereNotIn('status', ['available'])->count(),
+                        'review' => 0,
+                        'problem' => $group->whereIn('status', ['lost', 'under_repair'])->count(),
+                        'orphan' => 0,
+                    ],
+                ];
+            })
+            ->sortByDesc(fn (array $location): int => $location['copies']['available'])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * ISBN-10/13 checksum validation — the same signal the old MARC view
+     * exposed as isbn_is_valid, now computed instead of stored.
+     */
+    private function isValidIsbn(string $isbn): bool
+    {
+        $digits = strtoupper(preg_replace('/[^0-9xX]/', '', $isbn) ?? '');
+
+        if (strlen($digits) === 13) {
+            $sum = 0;
+            for ($i = 0; $i < 13; $i++) {
+                if (! ctype_digit($digits[$i])) {
+                    return false;
                 }
-            }
-        }
-
-        foreach ($classification as $item) {
-            $kind = (string) ($item['sourceKind'] ?? '');
-            $label = trim((string) ($item['label'] ?? ''));
-            if ($label !== '' && in_array($kind, ['subject', 'specialization'], true)) {
-                return ['raw' => $label, 'source' => $kind];
-            }
-        }
-
-        return ['raw' => '', 'source' => ''];
-    }
-
-    private function extractMarcFieldValue(string $rawMarc, string $tag): string
-    {
-        $pattern = sprintf('/(?:^|\x1E)%s\s{0,2}([^\x1E]+)/u', preg_quote($tag, '/'));
-        if (! preg_match($pattern, $rawMarc, $matches)) {
-            return '';
-        }
-
-        $fieldData = (string) ($matches[1] ?? '');
-        $subfields = preg_split('/\x1F/u', $fieldData) ?: [];
-        $values = [];
-
-        foreach ($subfields as $subfield) {
-            $subfield = trim($subfield);
-            if ($subfield === '') {
-                continue;
+                $sum += (int) $digits[$i] * ($i % 2 === 0 ? 1 : 3);
             }
 
-            $code = mb_substr($subfield, 0, 1);
-            $value = trim(mb_substr($subfield, 1));
-            if ($value === '') {
-                continue;
+            return $sum % 10 === 0;
+        }
+
+        if (strlen($digits) === 10) {
+            $sum = 0;
+            for ($i = 0; $i < 10; $i++) {
+                $char = $digits[$i];
+                if ($char === 'X') {
+                    if ($i !== 9) {
+                        return false;
+                    }
+                    $value = 10;
+                } elseif (ctype_digit($char)) {
+                    $value = (int) $char;
+                } else {
+                    return false;
+                }
+                $sum += $value * (10 - $i);
             }
 
-            if (in_array($code, ['a', 'x'], true)) {
-                $values[] = preg_replace('/\s+/u', ' ', $value) ?: $value;
-            }
+            return $sum % 11 === 0;
         }
 
-        if ($values !== []) {
-            return trim(implode(' · ', array_unique($values)));
-        }
-
-        $normalized = preg_replace('/[\x1F\\]+/u', ' ', $fieldData);
-
-        return trim(preg_replace('/\s+/u', ' ', $normalized ?: '') ?: '');
-    }
-
-    /**
-     * @return array<string, mixed>|array<int, mixed>|null
-     */
-    private function decodeJsonValue(mixed $value): array|null
-    {
-        if (is_array($value)) {
-            return $value;
-        }
-
-        if (! is_string($value) || $value === '') {
-            return null;
-        }
-
-        $decoded = json_decode($value, true);
-
-        return is_array($decoded) ? $decoded : null;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function normalizePgArray(mixed $value): array
-    {
-        if (is_array($value)) {
-            return array_values(array_map('strval', $value));
-        }
-
-        if (! is_string($value) || $value === '' || $value === '{}') {
-            return [];
-        }
-
-        $trimmed = trim($value, '{}');
-
-        if ($trimmed === '') {
-            return [];
-        }
-
-        return array_values(array_filter(array_map(
-            static fn (string $item): string => trim($item, ' "'),
-            explode(',', $trimmed)
-        ), static fn (string $item): bool => $item !== ''));
+        return false;
     }
 }

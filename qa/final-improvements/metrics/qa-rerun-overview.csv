@@ -1,0 +1,6 @@
+Test Suite,Executed,Passed,Failed,Errors,Risky,Skipped,Assertions,Execution Time,Status
+AdminPrivilegeNegativePathTest (Enhanced),28,28,0,0,0,0,35,"00:05.413",PASS
+ReservationMutateTest (Enhanced Integration),15,15,0,0,0,0,67,"00:04.520",PASS
+Feature Tests (Full Suite),887,733,112,36,5,1,5151,"~180s",PARTIAL
+Unit Tests (Full Suite),17,17,0,0,0,0,56,"00:00.019",PASS
+TOTALS,947,793,112,36,5,1,5309,"~190s","MIXED"

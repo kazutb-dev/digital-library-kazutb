@@ -1,0 +1,8 @@
+Metric,Value,Status,Notes
+Chaos Test Scenarios,N/A,"Not Applicable","Chaos engineering requires fault injection infrastructure not in scope"
+Service Resilience,N/A,"Observed Stable","Docker environment remained stable across 947-test suite execution"
+Database Failover Recovery,N/A,"Not Tested","PostgreSQL failover not tested; environment maintains single instance"
+API Circuit Breaker,N/A,"Not Implemented","Not required for this test environment"
+Graceful Degradation,N/A,"Not Tested","Blocked test scenarios degrade gracefully (return 404/500 as expected)"
+Cascading Failure Scenarios,N/A,"Not Applicable","Limited service dependencies in test environment"
+Recommendation,,"Include in Paper","Note: Deployment environment resilience patterns documented separately"

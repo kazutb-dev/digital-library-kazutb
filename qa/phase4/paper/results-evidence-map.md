@@ -1,0 +1,23 @@
+# Results Evidence Map
+
+Date: 2026-05-13
+
+## Purpose
+
+Define which factual datasets support each planned results subsection.
+
+## Results Subsections
+
+| Results Subsection                     | Primary Sources                                                                                                                                                                                | Core Metrics to Report                                                                          | Candidate Figure(s)                                                           | Caveats                                                    |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Baseline Inventory (baseline QA layer (Phase 1))           | qa/phase1/metrics/phase1-baseline-metrics.csv; qa/phase1/docs/phase1-final-summary.md                                                                                                          | Manual test files=25; repository test inventory; blocked coverage status                        | qa/paper-assets/figures/phase1/phase1_manual_vs_automated_inventory.png       | Coverage metrics blocked in phase1 environment             |
+| Automation and Quality Gates (automation and CI governance layer (Phase 2)) | qa/phase2/metrics/phase2-automation-coverage.csv; qa/phase2/metrics/phase2-execution-time.csv; qa/phase2/metrics/phase2-defects-vs-risk.csv; qa/phase2/metrics/phase2-quality-gate-results.csv | Weighted coverage=75.0%; defects/issues=9; runtime=154.578s; gates pass=5 fail=3 warn=1         | qa/paper-assets/figures/phase2/phase2_automation_coverage_by_module.png       | Runtime was acceptable while reliability blockers remained |
+| Intermediate Empirical Review Reassessment                   | qa/midterm/metrics/midterm-required-metrics.csv; qa/midterm/metrics/midterm-quality-gate-evaluation.csv; qa/midterm/docs/midterm-final-report.md                                               | High-risk module presence 100%; weighted checks 75.0%; new tests 8/8 passed; Intermediate Empirical Review run 24.15s | qa/paper-assets/figures/midterm/midterm_defects_vs_risk.png                   | Flaky rate not confirmed numerically                       |
+| Experimental Performance (experimental evaluation layer (Phase 3))     | qa/phase3/metrics/phase3-performance-results.csv; qa/phase3/docs/phase3-metrics-report.md                                                                                                      | Scenarios=9; pass=8; fail=1; latency range around 3.1-3.8s                                      | qa/paper-assets/figures/phase3/phase3_performance_response_times.png          | Sequential local-load baseline only                        |
+| Experimental Mutation (experimental evaluation layer (Phase 3))        | qa/phase3/metrics/phase3-mutation-score.csv; qa/phase3/metrics/phase3-mutation-results.csv                                                                                                     | Mutants=14; killed=12; survived=2; score=85.71%                                                 | qa/paper-assets/figures/phase3/phase3_mutation_score_by_module.png            | Survivors indicate assertion-depth gap                     |
+| Experimental Chaos (experimental evaluation layer (Phase 3))           | qa/phase3/metrics/phase3-chaos-metrics.csv; qa/phase3/metrics/phase3-chaos-results.csv                                                                                                         | Fault availability=50.00%; recovery availability=100.00%; mean MTTR=3391.02ms; cascading=0      | qa/paper-assets/figures/phase3/phase3_chaos_availability_by_scenario.png      | Bounded synthetic fault models                             |
+| Cross-Phase Synthesis                  | qa/phase3/metrics/phase3-observed-vs-expected.csv; qa/paper-assets/figures/summary/summary_quality_progression_source.csv                                                                      | Evolution of phase-level quality indicator                                                      | qa/paper-assets/figures/summary/summary_quality_progression_across_phases.png | Indicator is composite and phase-specific                  |
+
+---
+
+KazUTB Digital Library - research synthesis layer (Phase 4) Part 1

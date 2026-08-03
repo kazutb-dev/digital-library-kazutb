@@ -2,11 +2,11 @@
 
 namespace App\Services\Library;
 
+use App\Models\Library\CirculationAuditEvent;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use App\Models\Library\CirculationAuditEvent;
 
 class InternalCopyRetireService
 {
@@ -45,7 +45,7 @@ class InternalCopyRetireService
      *   - active loan exists → 409 copy_on_loan
      *   - copy-bound reservation in PENDING or READY status → 409 active_reservation_conflict
      *
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     public function retireCopy(string $copyId, string $reasonCode, ?string $note, array $context): array
@@ -98,7 +98,7 @@ class InternalCopyRetireService
             if ($checkReservations) {
                 $reservationBlock = DB::connection('pgsql')->selectOne(
                     'SELECT 1 FROM public."Reservation" WHERE "copyId"::text = ? AND status::text = ANY(?::text[]) LIMIT 1',
-                    [$copyId, '{' . implode(',', self::BLOCKING_RESERVATION_STATUSES) . '}']
+                    [$copyId, '{'.implode(',', self::BLOCKING_RESERVATION_STATUSES).'}']
                 );
 
                 if ($reservationBlock !== null) {
@@ -185,10 +185,10 @@ class InternalCopyRetireService
     }
 
     /**
-     * @param array<string, mixed> $previousState
-     * @param array<string, mixed> $newState
-     * @param array<string, mixed> $context
-     * @param array<string, mixed> $metadata
+     * @param  array<string, mixed>  $previousState
+     * @param  array<string, mixed>  $newState
+     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  $metadata
      */
     private function recordAudit(
         string $copyId,

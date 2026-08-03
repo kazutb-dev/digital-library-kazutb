@@ -1,0 +1,7 @@
+"module","status","count"
+"Integration Boundary Middleware","Killed","3"
+"Integration Document Management API","Killed","3"
+"Integration Document Management API","Survived","1"
+"Integration Reservations Mutate API","Killed","3"
+"Integration Reservations Mutate API","Survived","1"
+"Integration Reservations Read API","Killed","3"

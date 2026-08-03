@@ -1,0 +1,8 @@
+"module_feature","high_risk_level","expected_defects","defects_found","pass_fail"
+"Authentication","P0","Low-to-medium","0","Pass"
+"Authorization/RBAC","P1","Medium","3","Fail"
+"Catalog/Public routes","P0","Medium","1","Fail"
+"Circulation/Operations","P0","Medium","1","Fail"
+"Integration API","P1","Medium","2","Fail"
+"Admin operations","P1","Medium","1","Fail"
+"Data/Coverage readiness","P0 (R13)","Medium","1","Fail"

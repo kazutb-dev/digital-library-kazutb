@@ -22,6 +22,7 @@ class EventsDetailPageTest extends TestCase
 
         config()->set('demo_auth.enabled', true);
         $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
+        $this->withSession(['locale' => 'ru']);
     }
 
     public function test_known_slug_returns_200(): void
@@ -29,7 +30,7 @@ class EventsDetailPageTest extends TestCase
         $response = $this->get('/events/digital-preservation-symposium-2026?lang=en');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('KazUTB Library', false);
         $response->assertSee('Digital Preservation of Collections in Academic Libraries', false);
     }
 
@@ -135,11 +136,11 @@ class EventsDetailPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Related Events', false);
-        $response->assertSee('data-related-slug="open-access-publishing-seminar-2026"', false);
-        $response->assertSee('data-related-slug="rare-collections-exhibit-2026"', false);
-        $response->assertSee('data-related-slug="research-workshop-thesis-citations-2026"', false);
+        $response->assertSee('data-related-slug="freshers-library-orientation-2026"', false);
+        $response->assertSee('data-related-slug="library-search-basics-2026"', false);
+        $response->assertSee('data-related-slug="research-data-workshop-2026"', false);
         $response->assertDontSee('data-related-slug="digital-preservation-symposium-2026"', false);
-        $response->assertSee('href="/events/open-access-publishing-seminar-2026?lang=en"', false);
+        $response->assertSee('href="/events/freshers-library-orientation-2026?lang=en"', false);
         $response->assertSee('View all events', false);
     }
 
@@ -171,8 +172,8 @@ class EventsDetailPageTest extends TestCase
         $response->assertSee('Бағдарлама', false);
         $response->assertSee('Қатысты іс-шаралар', false);
         $response->assertSee('Басты оқу залы, 1-корпус', false);
-        $response->assertSee('href="/events?lang=kk"', false);
-        $response->assertSee('href="/events/open-access-publishing-seminar-2026?lang=kk"', false);
+        $response->assertSee('href="/events"', false);
+        $response->assertSee('href="/events/freshers-library-orientation-2026"', false);
     }
 
     public function test_detail_does_not_render_legacy_brand(): void
@@ -203,10 +204,10 @@ class EventsDetailPageTest extends TestCase
             'rare-collections-exhibit-2026',
             'research-workshop-thesis-citations-2026',
         ] as $slug) {
-            $response = $this->get('/events/' . $slug . '?lang=en');
+            $response = $this->get('/events/'.$slug.'?lang=en');
 
             $response->assertOk();
-            $response->assertSee('data-event-slug="' . $slug . '"', false);
+            $response->assertSee('data-event-slug="'.$slug.'"', false);
             $response->assertSee('data-section="event-detail-hero"', false);
         }
     }

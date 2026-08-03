@@ -63,8 +63,10 @@ class BookPageTest extends TestCase
             ->assertSee('locations-table', false)
             ->assertSee('Наличие по пунктам выдачи', false)
             ->assertSee('Подразделение', false)
-            ->assertSee('Кампус', false)
-            ->assertSee('Пункт выдачи', false);
+            ->assertSee('Корпус', false)
+            ->assertSee('Библиотечная точка', false)
+            ->assertSee('Зал / сигла хранения', false)
+            ->assertDontSee('Всего экземпляров', false);
     }
 
     public function test_book_page_has_catalog_back_link(): void

@@ -10,7 +10,7 @@
           $normalizedPath = '/';
       }
 
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
 
@@ -18,6 +18,14 @@
 
       return $normalizedPath . ($query ? ('?' . http_build_query($query)) : '');
   };
+
+  // Homepage sections 2-6 (see resources/views/home/*.blade.php).
+  // Copy lives in config/homepage_sections.php; $newArrivals and $udcCounts
+  // are supplied by the `/` route and default to empty so the page still
+  // renders if the route is ever simplified.
+  $sections = config('homepage_sections', []);
+  $newArrivals = $newArrivals ?? [];
+  $udcCounts = $udcCounts ?? [];
 
   $chrome = [
       'ru' => [
@@ -59,7 +67,7 @@
           'identity_brand' => 'КазТБУ Кітапханасы',
       ],
       'en' => [
-          'title'                    => 'Home — KazUTB Smart Library',
+          'title'                    => 'Home — KazUTB',
           'hero_kicker'              => 'Digital Curator',
           'hero_h1'                  => 'Discover Knowledge,',
           'hero_h1_accent'           => 'Curate Your Sources.',
@@ -75,7 +83,7 @@
           'gateway_heading'          => 'Library Navigation Hub',
           'gateway_lead'             => 'Jump to all core public sections, from catalog and repository to news, rules, leadership, and contacts.',
           'gateway_meta'             => 'Public Gateway',
-            'identity_brand' => 'KazUTB Smart Library',
+          'identity_brand' => 'KazUTB Library',
       ],
   ];
 
@@ -102,7 +110,7 @@
 
   $gatewayLinks = [
       ['label' => $lang === 'ru' ? 'Каталог' : ($lang === 'kk' ? 'Каталог' : 'Catalog'), 'href' => $withLang('/catalog')],
-      ['label' => $lang === 'ru' ? 'Открытия' : ($lang === 'kk' ? 'Ашылымдар' : 'Discover'), 'href' => $withLang('/discover')],
+      ['label' => $lang === 'ru' ? 'Каталог' : ($lang === 'kk' ? 'Каталог' : 'Catalog'), 'href' => $withLang('/catalog')],
       ['label' => $lang === 'ru' ? 'Ресурсы' : ($lang === 'kk' ? 'Ресурстар' : 'Resources'), 'href' => $withLang('/resources')],
       ['label' => $lang === 'ru' ? 'Репозиторий' : ($lang === 'kk' ? 'Репозиторий' : 'Repository'), 'href' => $withLang('/repository')],
       ['label' => $lang === 'ru' ? 'Новости' : ($lang === 'kk' ? 'Жаңалықтар' : 'News'), 'href' => $withLang('/news')],
@@ -162,7 +170,7 @@
         ],
       ][$lang];
 
-      $premium = [
+  $premium = [
         'ru' => [
           'collections_eyebrow' => 'Кураторский выбор · Выпуск 01',
           'collections_note' => 'Фонд собран вокруг академических программ университета и проверен библиотечными специалистами.',
@@ -203,7 +211,7 @@
           'read_story' => 'Материалды оқу',
           'view_agenda' => 'Күнтізбені ашу',
         ],
-        'en' => [
+      'en' => [
           'collections_eyebrow' => 'Curator selection · Edition 01',
           'collections_note' => 'The holdings follow the university curriculum and are reviewed by library specialists.',
           'collection_metrics' => [
@@ -263,6 +271,10 @@
             ['title' => 'Экономика устойчивого развития', 'author' => 'Л. К. Абдрахманова', 'year' => '2025', 'code' => '330.3', 'tone' => 'clay'],
             ['title' => 'Инженерные методы проектирования', 'author' => 'М. Т. Садыков', 'year' => '2026', 'code' => '62.001', 'tone' => 'ink'],
             ['title' => 'Сервис и управление качеством', 'author' => 'Е. Н. Ким', 'year' => '2025', 'code' => '338.4', 'tone' => 'sage'],
+            ['title' => 'Data Science Methods for Research', 'author' => 'S. Tleubayeva', 'year' => '2024', 'code' => '519.2', 'tone' => 'ink'],
+            ['title' => 'Artificial Intelligence in Higher Education', 'author' => 'A. Kurmanbayev', 'year' => '2026', 'code' => '004.8', 'tone' => 'forest'],
+            ['title' => 'Refactoring', 'author' => 'Martin Fowler', 'year' => '2018', 'code' => '005.1', 'tone' => 'clay'],
+            ['title' => 'Clean Code', 'author' => 'Robert C. Martin', 'year' => '2019', 'code' => '005.1', 'tone' => 'sage'],
           ],
           'analytics_kicker' => 'Collection intelligence',
           'analytics_title' => 'Как используется библиотека',
@@ -311,6 +323,10 @@
             ['title' => 'Тұрақты даму экономикасы', 'author' => 'Л. К. Абдрахманова', 'year' => '2025', 'code' => '330.3', 'tone' => 'clay'],
             ['title' => 'Инженерлік жобалау әдістері', 'author' => 'М. Т. Садыков', 'year' => '2026', 'code' => '62.001', 'tone' => 'ink'],
             ['title' => 'Сервис және сапаны басқару', 'author' => 'Е. Н. Ким', 'year' => '2025', 'code' => '338.4', 'tone' => 'sage'],
+            ['title' => 'Data Science Methods for Research', 'author' => 'S. Tleubayeva', 'year' => '2024', 'code' => '519.2', 'tone' => 'ink'],
+            ['title' => 'Artificial Intelligence in Higher Education', 'author' => 'A. Kurmanbayev', 'year' => '2026', 'code' => '004.8', 'tone' => 'forest'],
+            ['title' => 'Refactoring', 'author' => 'Martin Fowler', 'year' => '2018', 'code' => '005.1', 'tone' => 'clay'],
+            ['title' => 'Clean Code', 'author' => 'Robert C. Martin', 'year' => '2019', 'code' => '005.1', 'tone' => 'sage'],
           ],
           'analytics_kicker' => 'Collection intelligence',
           'analytics_title' => 'Кітапхана қалай пайдаланылады',
@@ -359,6 +375,10 @@
             ['title' => 'Economics of Sustainable Development', 'author' => 'L. K. Abdrakhmanova', 'year' => '2025', 'code' => '330.3', 'tone' => 'clay'],
             ['title' => 'Engineering Design Methods', 'author' => 'M. T. Sadykov', 'year' => '2026', 'code' => '62.001', 'tone' => 'ink'],
             ['title' => 'Service and Quality Management', 'author' => 'E. N. Kim', 'year' => '2025', 'code' => '338.4', 'tone' => 'sage'],
+            ['title' => 'Data Science Methods for Research', 'author' => 'S. Tleubayeva', 'year' => '2024', 'code' => '519.2', 'tone' => 'ink'],
+            ['title' => 'Artificial Intelligence in Higher Education', 'author' => 'A. Kurmanbayev', 'year' => '2026', 'code' => '004.8', 'tone' => 'forest'],
+            ['title' => 'Refactoring', 'author' => 'Martin Fowler', 'year' => '2018', 'code' => '005.1', 'tone' => 'clay'],
+            ['title' => 'Clean Code', 'author' => 'Robert C. Martin', 'year' => '2019', 'code' => '005.1', 'tone' => 'sage'],
           ],
           'analytics_kicker' => 'Collection intelligence',
           'analytics_title' => 'How the library is used',
@@ -377,12 +397,15 @@
 @section('body_class', 'homepage')
 
 @section('head')
+<link rel="stylesheet" href="{{ asset('css/home-sections.css') }}">
 <style>
 .homepage .page-main {
     margin-top: 0;
 }
 [data-section="homepage-canonical-page"] {
-    --homepage-gutter: clamp(18px, 3vw, 32px);
+    --homepage-gutter: var(--page-inset);
+    position: relative;
+    overflow: visible;
 }
 [data-section="homepage-canonical-page"] > section,
 [data-section="homepage-canonical-page"] > div:not(.sr-only) {
@@ -393,11 +416,12 @@
     box-sizing: border-box;
 }
 [data-section="homepage-canonical-hero"] {
-    min-height: 52vh;
-    min-height: 52svh;
+    min-height: 70vh;
+    min-height: 70svh;
     position: relative;
     isolation: isolate;
-    overflow: hidden;
+    z-index: 2;
+    overflow: visible;
     color: #fff;
     background: #0b1830;
 }
@@ -439,13 +463,13 @@
     width: 100%;
     max-width: none;
     margin: 0;
-    min-height: 52vh;
-    min-height: 52svh;
-    padding: clamp(120px, 14vh, 150px) clamp(16px, 3vw, 40px) clamp(34px, 5vh, 48px);
+    min-height: 60vh;
+    min-height: 60svh;
+    padding: clamp(108px, 12.5vh, 138px) 0 clamp(34px, 5vh, 48px);
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
     gap: clamp(24px, 4vw, 48px);
-    align-items: end;
+    align-items: center;
 }
 .homepage-hero__copy {
     max-width: 980px;
@@ -454,18 +478,16 @@
     margin-left: 0;
     border-radius: 8px;
     background: transparent;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
     box-shadow: 0 14px 40px rgba(0, 0, 0, .12);
 }
 .homepage-hero__title {
     max-width: 760px;
     margin-top: 18px;
     font-family: "Literata", serif;
-    font-size: clamp(42px, 5vw, 68px);
+    font-size: clamp(36px, 4.2vw, 58px);
     font-weight: 700;
     letter-spacing: -.045em;
-    line-height: .88;
+    line-height: .84;
     text-wrap: balance;
     text-shadow: 0 4px 40px rgba(0, 0, 0, .38);
 }
@@ -475,7 +497,7 @@
 }
 .homepage-hero__lead {
     max-width: 560px;
-    margin-top: 18px;
+    margin-top: 26px;
     color: rgba(255, 255, 255, .78);
     font-size: clamp(16px, 1.3vw, 19px);
     line-height: 1.72;
@@ -486,41 +508,72 @@
     display: flex;
     align-items: center;
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, .25);
-    background: rgba(255, 255, 255, .96);
-    box-shadow: 0 22px 60px rgba(0, 0, 0, .28);
-    transition: transform .3s ease, box-shadow .3s ease;
+    border: 1px solid rgba(255, 255, 255, .18);
+    background: rgba(255, 255, 255, .12);
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .12), 0 10px 35px rgba(0, 0, 0, .18);
+    transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease, background-color .3s ease;
 }
 .homepage-hero__search:focus-within {
     transform: translateY(-2px);
-    box-shadow: 0 28px 72px rgba(0, 0, 0, .36);
+    border-color: rgba(9, 186, 178, .9);
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, .14),
+      0 10px 35px rgba(0, 0, 0, .18),
+      0 0 0 3px rgba(9, 186, 178, .18);
 }
 .homepage-hero__search input {
     min-width: 0;
     flex: 1;
     border: 0;
     background: transparent;
-    color: #102945;
+    color: rgba(255, 255, 255, .96);
     padding: 18px 12px;
     outline: 0;
     box-shadow: none;
+    caret-color: #fff;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+}
+.homepage-hero__search input::placeholder {
+    color: rgba(255, 255, 255, .70);
+    opacity: 1;
 }
 .homepage-hero__search button {
     align-self: stretch;
     padding: 0 28px;
-    color: #102945;
-    background: linear-gradient(135deg, #f3bd46, #e8a020);
+    border: 0;
+    color: #fff;
+    background: linear-gradient(135deg, rgba(9, 186, 178, .96), rgba(7, 138, 132, .96));
     font-size: 13px;
     font-weight: 800;
     letter-spacing: .04em;
-    transition: filter .2s ease;
+    transition: filter .2s ease, background-color .2s ease, box-shadow .2s ease;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14);
+    appearance: none;
+    -webkit-appearance: none;
 }
 .homepage-hero__search button:hover {
     filter: brightness(1.08);
 }
+.homepage-hero__search button:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, .5);
+    outline-offset: -2px;
+}
+.homepage-hero__search input:focus,
+.homepage-hero__search button:focus {
+    outline: 0;
+    box-shadow: none;
+}
+.homepage-hero__search svg {
+    color: rgba(255, 255, 255, .75);
+    stroke: currentColor !important;
+}
 .homepage-hero__book {
     justify-self: end;
-    align-self: end;
+    align-self: auto;
     width: min(100%, 360px);
     aspect-ratio: 0.66 / 1;
     position: relative;
@@ -540,9 +593,9 @@
     top: 0;
     bottom: 0;
     left: 0;
-    width: 20px;
+    width: 24px;
     background:
-      linear-gradient(90deg, rgba(62, 35, 23, .98), rgba(94, 58, 42, .96) 52%, rgba(132, 83, 60, .92));
+      linear-gradient(90deg, rgba(50, 28, 18, .98), rgba(78, 48, 33, .96) 48%, rgba(116, 72, 50, .92));
     border-radius: 10px 0 0 10px;
     box-shadow:
       inset -1px 0 0 rgba(255, 233, 221, .18),
@@ -554,6 +607,12 @@
     content: "";
     position: absolute;
     inset: 0;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,.08), transparent 12%, transparent 88%, rgba(0,0,0,.06)),
+      linear-gradient(180deg, rgba(255,255,255,.06), transparent 18%, transparent 84%, rgba(0,0,0,.08)),
+      radial-gradient(circle at 18% 18%, rgba(255,255,255,.12), transparent 17%),
+      radial-gradient(circle at 72% 28%, rgba(255,255,255,.08), transparent 18%),
+      radial-gradient(circle at 68% 82%, rgba(0,0,0,.08), transparent 22%);
     border: 1px solid rgba(255, 230, 210, .18);
     border-radius: 10px;
     pointer-events: none;
@@ -561,12 +620,12 @@
 .homepage-hero__book-grain {
     position: absolute;
     inset: 0;
-    opacity: .14;
+    opacity: .22;
     mix-blend-mode: soft-light;
     background-image:
       radial-gradient(rgba(255,255,255,.22) 0.7px, transparent 0.8px),
       radial-gradient(rgba(255,255,255,.12) 0.6px, transparent 0.7px);
-    background-size: 7px 7px, 11px 11px;
+    background-size: 6px 6px, 10px 10px;
     background-position: 0 0, 3px 5px;
     pointer-events: none;
 }
@@ -577,14 +636,15 @@
     background: rgba(255, 235, 220, .18);
     box-shadow:
       -6px 0 0 rgba(255, 235, 220, .08),
-      -12px 0 0 rgba(58, 34, 22, .16);
+      -12px 0 0 rgba(58, 34, 22, .16),
+      -18px 0 0 rgba(255, 255, 255, .06);
     pointer-events: none;
 }
 .homepage-hero__book-badge {
-    width: 58px;
-    height: 58px;
+    width: 78px;
+    height: 78px;
     margin-top: 44px;
-    border-radius: 12px;
+    border-radius: 99px;
     border: 1px solid rgba(255, 240, 230, .42);
     background: rgba(255, 246, 240, .08);
     display: flex;
@@ -635,6 +695,28 @@
     border: 1px solid rgba(255, 236, 226, .1);
     border-radius: 50%;
 }
+.homepage-hero__book-badge {
+    position: relative;
+}
+.homepage-hero__book-badge::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 30% 26%, rgba(255,255,255,.22), transparent 28%),
+      linear-gradient(135deg, rgba(255,255,255,.08), transparent 36%);
+    pointer-events: none;
+}
+.homepage-hero__book-title::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 1px;
+    background: rgba(255, 236, 226, .12);
+}
+.homepage-hero__book-title {
+    position: relative;
+}
 .homepage-hero__scroll {
     position: absolute;
     z-index: 2;
@@ -654,20 +736,32 @@
 .homepage-hero__bridge {
     position: relative;
     z-index: 3;
-    margin-top: -22px;
-    margin-bottom: 16px;
-    padding: 0 32px 22px;
+    margin-top: -28px;
+    margin-bottom: 8px;
+    padding: 0 32px 12px;
 }
 .homepage-hero__bridge-inner {
     width: 100%;
     max-width: none;
     margin: 0 auto;
-    padding: 26px 24px 26px;
-    background: rgba(255, 255, 255, .92);
-    border: 1px solid rgba(16, 41, 69, .08);
-    box-shadow: 0 26px 70px rgba(11, 24, 48, .12);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    padding: 22px 24px 22px;
+    background: rgba(255, 255, 255, .98);
+    border: 1px solid rgba(16, 41, 69, .07);
+    border-top: 0;
+    box-shadow: 0 14px 34px rgba(11, 24, 48, .06);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 0 0 18px 18px;
+    position: relative;
+}
+.homepage-hero__bridge-inner::before {
+    content: "";
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(179, 139, 77, 0), rgba(179, 139, 77, .45), rgba(179, 139, 77, 0));
 }
 .homepage-hero__bridge-head {
     display: flex;
@@ -713,8 +807,15 @@
 .homepage-hero__bridge-card {
     min-height: 148px;
     padding: 18px 18px 20px;
-    background: #f8f7f2;
-    border: 1px solid rgba(16, 41, 69, .08);
+    background: #fff;
+    border: 1px solid rgba(16, 41, 69, .09);
+    box-shadow: 0 14px 34px rgba(11, 24, 48, .06);
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+.homepage-hero__bridge-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(16, 41, 69, .16);
+    box-shadow: 0 18px 42px rgba(11, 24, 48, .10);
 }
 .homepage-hero__bridge-card strong {
     display: block;
@@ -777,6 +878,9 @@
     width: 100% !important;
     max-width: none !important;
     margin-inline: auto !important;
+}
+[data-section="homepage-hero-bridge"] {
+    background: linear-gradient(180deg, rgba(245, 243, 238, .2) 0%, rgba(245, 243, 238, 1) 100%);
 }
 [data-section="homepage-canonical-gateway"] {
     padding: 132px var(--homepage-gutter) 142px !important;
@@ -959,7 +1063,7 @@
     .homepage-hero__content {
         height: auto;
         min-height: 100svh;
-        padding: 154px clamp(16px, 3vw, 40px) 80px;
+        padding: 154px 0 80px;
         grid-template-columns: 1fr;
     }
     .homepage-hero__copy {
@@ -996,7 +1100,7 @@
 }
 @media (max-width: 640px) {
     .homepage-hero__content {
-        padding: 72px clamp(16px, 3vw, 40px) 64px;
+        padding: 72px 0 64px;
         grid-template-columns: 1fr;
     }
     .homepage-hero__title {
@@ -2769,8 +2873,940 @@
 
     </div>
 
-    <a href="#homepage-navigation" class="homepage-hero__scroll">
-    </a>
   </section>
+
+  <div class="homepage-hero-stats" data-section="homepage-hero-stats">
+    <div class="homepage-hero-stats__inner">
+      <article class="homepage-hero-stats__item">
+        <span class="homepage-hero-stats__icon material-symbols-outlined" aria-hidden="true">menu_book</span>
+        <strong>250 000+</strong>
+        <span>{{ $lang === 'ru' ? 'Книг в библиотечном фонде' : ($lang === 'kk' ? 'Кітапхана қорындағы кітаптар' : 'Books in the collection') }}</span>
+      </article>
+      <article class="homepage-hero-stats__item">
+        <span class="homepage-hero-stats__icon material-symbols-outlined" aria-hidden="true">laptop_mac</span>
+        <strong>120 000+</strong>
+        <span>{{ $lang === 'ru' ? 'Электронных ресурсов' : ($lang === 'kk' ? 'Электрондық ресурстар' : 'Electronic resources') }}</span>
+      </article>
+      <article class="homepage-hero-stats__item">
+        <span class="homepage-hero-stats__icon material-symbols-outlined" aria-hidden="true">schedule</span>
+        <strong>24/7</strong>
+        <span>{{ $lang === 'ru' ? 'Удаленный доступ к электронным ресурсам' : ($lang === 'kk' ? 'Электрондық ресурстарға қашықтан қол жеткізу' : 'Remote access to electronic resources') }}</span>
+      </article>
+      <article class="homepage-hero-stats__item">
+        <span class="homepage-hero-stats__icon material-symbols-outlined" aria-hidden="true">school</span>
+        <strong>Scopus • Springer</strong>
+        <span>{{ $lang === 'ru' ? 'Мировые научные базы данных' : ($lang === 'kk' ? 'Әлемдік ғылыми дерекқорлар' : 'Global scholarly databases') }}</span>
+      </article>
+    </div>
+  </div>
+
+  @php
+    $facultyBooks = $facultyBooks ?? [];
+    $facultyStats = $facultyStats ?? [];
+    $facultyShowcase = [
+      'econ' => [
+        'title' => $lang === 'ru' ? 'Абонемент экономической литературы' : ($lang === 'kk' ? 'Экономикалық әдебиет абонементі' : 'Economics and business desk'),
+        'lead' => $lang === 'ru' ? 'Литература по финансам, управлению, маркетингу и прикладной экономике для учебы и исследовательской работы.' : ($lang === 'kk' ? 'Қаржы, басқару, маркетинг және қолданбалы экономика бойынша әдебиеттер.' : 'Finance, management, marketing, and applied economics resources for study and research.'),
+        'meta' => $lang === 'ru' ? '1/203 · первый этаж' : ($lang === 'kk' ? '1/203 · 1-қабат' : '1/203 · first floor'),
+        'stats' => (int) ($facultyStats['econ'] ?? 0),
+        'institution' => 'economic_library',
+        'books' => $facultyBooks['econ'] ?? [],
+      ],
+      'tech' => [
+        'title' => $lang === 'ru' ? 'Абонемент технической литературы' : ($lang === 'kk' ? 'Техникалық әдебиет абонементі' : 'Technology and engineering desk'),
+        'lead' => $lang === 'ru' ? 'Инженерия, программирование, материалы и прикладные технологии для практических дисциплин.' : ($lang === 'kk' ? 'Инженерия, бағдарламалау, материалдар және қолданбалы технологиялар.' : 'Engineering, programming, materials, and applied technology resources.'),
+        'meta' => $lang === 'ru' ? '1/200 · первый этаж' : ($lang === 'kk' ? '1/200 · 1-қабат' : '1/200 · first floor'),
+        'stats' => (int) ($facultyStats['tech'] ?? 0),
+        'institution' => 'technology_library',
+        'books' => $facultyBooks['tech'] ?? [],
+      ],
+      'engit' => [
+        'title' => $lang === 'ru' ? 'Абонемент ИТ и инженерии' : ($lang === 'kk' ? 'ИТ және инжиниринг абонементі' : 'Engineering and IT desk'),
+        'lead' => $lang === 'ru' ? 'Книги по разработке, архитектуре систем, данным, сетям и цифровым сервисам.' : ($lang === 'kk' ? 'Бағдарламалау, жүйе архитектурасы, деректер, желілер және цифрлық сервистер.' : 'Books on development, system architecture, data, networks, and digital services.'),
+        'meta' => $lang === 'ru' ? '1/202 · первый этаж' : ($lang === 'kk' ? '1/202 · 1-қабат' : '1/202 · first floor'),
+        'stats' => (int) ($facultyStats['engit'] ?? 0),
+        'institution' => 'college_library',
+        'books' => $facultyBooks['engit'] ?? [],
+      ],
+    ];
+  @endphp
+
+  <section class="hs hs-section hs-section--ruled hs-section--wash homepage-faculty-showcase" data-section="homepage-faculty-picks">
+    <header class="hs-head homepage-faculty-showcase__head">
+      <div class="hs-head__copy">
+        <p class="hs-kicker">{{ $lang === 'ru' ? 'Абонементы библиотеки' : ($lang === 'kk' ? 'Кітапхана абонементтері' : 'Library desks') }}</p>
+        <h2 class="hs-title">{{ $lang === 'ru' ? 'Популярные книги по абонементам' : ($lang === 'kk' ? 'Абонементтер бойынша танымал кітаптар' : 'Popular books by desk') }}</h2>
+        <p class="hs-lead">{{ $lang === 'ru' ? 'Каждая витрина показывает книги, которые чаще всего спрашивают читатели в этом абонементе.' : ($lang === 'kk' ? 'Әр витринада осы абонементте жиі сұралатын кітаптар көрсетілген.' : 'Each showcase highlights the books readers ask for most in that desk.') }}</p>
+      </div>
+      <a class="hs-link" href="{{ $withLang('/catalog') }}">
+        {{ $lang === 'ru' ? 'Открыть каталог' : ($lang === 'kk' ? 'Каталогты ашу' : 'Open catalog') }}
+        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+      </a>
+    </header>
+
+    <div class="homepage-faculty-showcase__grid">
+      @foreach($facultyShowcase as $desk)
+        <article class="homepage-faculty-showcase__desk">
+          <div class="homepage-faculty-showcase__desk-top">
+            <div class="homepage-faculty-showcase__desk-head">
+              <h3>{{ $desk['title'] }}</h3>
+              <span class="homepage-faculty-showcase__desk-meta">{{ $desk['meta'] }}</span>
+            </div>
+            <span class="homepage-faculty-showcase__desk-stat">
+              {{ number_format($desk['stats'], 0, ',', ' ') }}
+              {{ $lang === 'ru' ? 'экземпляров' : ($lang === 'kk' ? 'дана' : 'copies') }}
+            </span>
+          </div>
+          <p class="homepage-faculty-showcase__note">{{ $desk['lead'] }}</p>
+          <div class="homepage-faculty-showcase__books">
+            <p class="homepage-faculty-showcase__books-label">{{ $lang === 'ru' ? 'Популярные книги этого абонемента' : ($lang === 'kk' ? 'Осы абонементтің танымал кітаптары' : 'Popular books at this desk') }}</p>
+            @forelse($desk['books'] as $book)
+              <a class="homepage-faculty-showcase__book-row" href="{{ $withLang('/book/'.rawurlencode($book['identifier'])) }}">
+                <div
+                  class="homepage-faculty-showcase__cover homepage-faculty-showcase__cover--{{ $book['tone'] }}"
+                  @if(! empty($book['coverPath'])) style="background-image: url('{{ e($book['coverPath']) }}'); background-size: cover;" @endif
+                  aria-hidden="true"
+                >
+                  @if(empty($book['coverPath']))<span>{{ mb_substr($book['title'], 0, 2) }}</span>@endif
+                </div>
+                <div class="homepage-faculty-showcase__book-meta">
+                  <strong>{{ $book['title'] }}</strong>
+                  <span>{{ $book['author'] }}</span>
+                  <small>{{ $lang === 'ru' ? 'Доступно' : ($lang === 'kk' ? 'Қолжетімді' : 'Available') }}: {{ $book['copies'] }} {{ $lang === 'ru' ? 'экз.' : ($lang === 'kk' ? 'дана' : 'copies') }}</small>
+                </div>
+              </a>
+            @empty
+              <p class="homepage-faculty-showcase__empty">
+                {{ $lang === 'ru' ? 'Популярные книги пока не зарегистрированы.' : ($lang === 'kk' ? 'Танымал кітаптар әзірге тіркелмеген.' : 'No popular books are registered yet.') }}
+              </p>
+            @endforelse
+          </div>
+          <a href="{{ $withLang('/catalog', ['institution' => $desk['institution']]) }}">
+            {{ $lang === 'ru' ? 'Показать все книги' : ($lang === 'kk' ? 'Барлық кітаптарды көрсету' : 'Show all books') }}
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+          </a>
+        </article>
+      @endforeach
+    </div>
+  </section>
+
+  <section class="hs homepage-usage" data-section="homepage-how-to-use-library">
+    <header class="hs-head">
+      <div class="hs-head__copy">
+        <p class="hs-kicker">{{ $lang === 'ru' ? 'Как пользоваться библиотекой' : ($lang === 'kk' ? 'Кітапхананы қалай пайдалану керек' : 'How to use the library') }}</p>
+        <h2 class="hs-title">{{ $lang === 'ru' ? 'Как пользоваться библиотекой' : ($lang === 'kk' ? 'Кітапхананы қалай пайдалану керек' : 'How to use the library') }}</h2>
+        <p class="hs-lead">{{ $lang === 'ru' ? 'Получите доступ к фонду библиотеки всего за несколько простых шагов.' : ($lang === 'kk' ? 'Кітапхана қорына бірнеше қарапайым қадам арқылы қол жеткізіңіз.' : 'Get access to the library collection in just a few simple steps.') }}</p>
+      </div>
+    </header>
+
+    <div class="homepage-usage__timeline" aria-label="{{ $lang === 'ru' ? 'Маршрут читателя' : ($lang === 'kk' ? 'Оқырман маршруты' : 'Reader journey') }}">
+      @php
+        $usageSteps = [
+          [
+            'icon' => 'badge',
+            'title' => $lang === 'ru' ? 'Получите читательский билет' : ($lang === 'kk' ? 'Оқырман билетiн алыңыз' : 'Get a reader card'),
+            'lead' => $lang === 'ru' ? 'Зарегистрируйтесь и получите электронный читательский билет.' : ($lang === 'kk' ? 'Тіркеліп, электронды оқырман билетiн алыңыз.' : 'Register and receive your digital reader card.'),
+          ],
+          [
+            'icon' => 'search',
+            'title' => $lang === 'ru' ? 'Найдите литературу' : ($lang === 'kk' ? 'Әдебиетті табыңыз' : 'Find materials'),
+            'lead' => $lang === 'ru' ? 'Используйте каталог для поиска книг, журналов и научных публикаций.' : ($lang === 'kk' ? 'Каталог арқылы кітаптарды, журналдарды және ғылыми жарияланымдарды іздеңіз.' : 'Use the catalog to search for books, journals, and scholarly publications.'),
+          ],
+          [
+            'icon' => 'menu_book',
+            'title' => $lang === 'ru' ? 'Забронируйте книгу' : ($lang === 'kk' ? 'Кітапты брондаңыз' : 'Reserve a book'),
+            'lead' => $lang === 'ru' ? 'При необходимости оформите предварительное бронирование.' : ($lang === 'kk' ? 'Қажет болса, алдын ала брондау рәсімін жасаңыз.' : 'If needed, place a reservation in advance.'),
+          ],
+          [
+            'icon' => 'local_library',
+            'title' => $lang === 'ru' ? 'Получите книгу' : ($lang === 'kk' ? 'Кітапты алыңыз' : 'Pick up the book'),
+            'lead' => $lang === 'ru' ? 'Получите литературу в соответствующем абонементе или читальном зале.' : ($lang === 'kk' ? 'Әдебиетті тиісті абонементтен немесе оқу залынан алыңыз.' : 'Collect the material from the relevant desk or reading room.'),
+          ],
+          [
+            'icon' => 'event_repeat',
+            'title' => $lang === 'ru' ? 'Продлите срок пользования' : ($lang === 'kk' ? 'Пайдалану мерзімін ұзартыңыз' : 'Extend the loan'),
+            'lead' => $lang === 'ru' ? 'Продлите книгу онлайн, если на неё нет очереди.' : ($lang === 'kk' ? 'Егер кезек болмаса, кітапты онлайн ұзартуға болады.' : 'Renew online if there is no waiting queue.'),
+          ],
+          [
+            'icon' => 'undo',
+            'title' => $lang === 'ru' ? 'Верните книгу' : ($lang === 'kk' ? 'Кітапты қайтарыңыз' : 'Return the book'),
+            'lead' => $lang === 'ru' ? 'Верните литературу в установленный срок без посещения администратора.' : ($lang === 'kk' ? 'Әдебиетті белгіленген мерзімде әкімшіге бармай-ақ қайтарыңыз.' : 'Return the material on time without visiting administration.'),
+          ],
+        ];
+      @endphp
+      @foreach ($usageSteps as $step)
+        <article class="homepage-usage__step">
+          <div class="homepage-usage__step-icon" aria-hidden="true">
+            <span class="material-symbols-outlined">{{ $step['icon'] }}</span>
+          </div>
+          <div class="homepage-usage__step-body">
+            <span class="homepage-usage__step-label">{{ $lang === 'ru' ? 'Шаг' : ($lang === 'kk' ? 'Қадам' : 'Step') }} {{ $loop->iteration }}</span>
+            <h3>{{ $step['title'] }}</h3>
+            <p>{{ $step['lead'] }}</p>
+          </div>
+        </article>
+      @endforeach
+    </div>
+
+    <aside class="homepage-usage__info" aria-label="{{ $lang === 'ru' ? 'Важно знать' : ($lang === 'kk' ? 'Білу маңызды' : 'Important to know') }}">
+      <h3>{{ $lang === 'ru' ? 'Важно знать' : ($lang === 'kk' ? 'Білу маңызды' : 'Important to know') }}</h3>
+      <ul>
+        <li>{{ $lang === 'ru' ? 'Книги выдаются сроком до 14 дней.' : ($lang === 'kk' ? 'Кітаптар 14 күнге дейін беріледі.' : 'Books are issued for up to 14 days.') }}</li>
+        <li>{{ $lang === 'ru' ? 'Продление доступно при отсутствии бронирования.' : ($lang === 'kk' ? 'Ұзарту брондау болмаса қолжетімді.' : 'Renewal is available when no reservation exists.') }}</li>
+        <li>{{ $lang === 'ru' ? 'Одновременно можно забронировать до 3 книг.' : ($lang === 'kk' ? 'Бір уақытта 3 кітапқа дейін брондауға болады.' : 'You can reserve up to 3 books at once.') }}</li>
+        <li>{{ $lang === 'ru' ? 'Электронные ресурсы доступны круглосуточно.' : ($lang === 'kk' ? 'Электрондық ресурстар тәулік бойы қолжетімді.' : 'Electronic resources are available 24/7.') }}</li>
+      </ul>
+    </aside>
+
+    <style>
+      .homepage-usage {
+        padding: 132px var(--homepage-gutter) 150px;
+        background: #fff;
+        border-top: 1px solid rgba(16, 41, 69, .10);
+      }
+      .homepage-usage__timeline {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 0;
+        margin-top: 20px;
+        padding-top: 18px;
+      }
+      .homepage-usage__timeline::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 54px;
+        height: 1px;
+        background: rgba(16, 41, 69, .14);
+      }
+      .homepage-usage__step {
+        position: relative;
+        padding: 0 14px 0 0;
+      }
+      .homepage-usage__step:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        top: 54px;
+        right: -1px;
+        width: 14px;
+        height: 1px;
+        background: rgba(16, 41, 69, .14);
+      }
+      .homepage-usage__step-icon {
+        position: relative;
+        z-index: 1;
+        width: 54px;
+        height: 54px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(16, 41, 69, .14);
+        border-radius: 50%;
+        background: #fff;
+        color: #102945;
+        transition: color .2s ease, border-color .2s ease, background-color .2s ease;
+      }
+      .homepage-usage__step-icon .material-symbols-outlined {
+        font-size: 24px;
+      }
+      .homepage-usage__step-body {
+        position: relative;
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(16, 41, 69, .10);
+        transition: border-top-color .2s ease, background-color .2s ease;
+      }
+      .homepage-usage__step-label {
+        display: block;
+        margin-bottom: 8px;
+        color: rgba(16, 41, 69, .58);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+      }
+      .homepage-usage__step h3 {
+        margin: 0 0 10px;
+        color: #102945;
+        font-family: "Literata", serif;
+        font-size: 20px;
+        line-height: 1.12;
+        letter-spacing: -.03em;
+      }
+      .homepage-usage__step p {
+        margin: 0;
+        color: rgba(16, 41, 69, .70);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+      .homepage-usage__step:hover .homepage-usage__step-icon {
+        color: #09bab2;
+        border-color: rgba(9, 186, 178, .45);
+        background-color: rgba(9, 186, 178, .03);
+      }
+      .homepage-usage__step:hover .homepage-usage__step-body {
+        background: rgba(9, 186, 178, .025);
+        border-top-color: #09bab2;
+      }
+      .homepage-usage__info {
+        margin-top: 34px;
+        padding: 22px 24px;
+        border: 1px solid rgba(16, 41, 69, .10);
+        background: #fff;
+      }
+      .homepage-usage__info h3 {
+        margin: 0 0 14px;
+        color: #102945;
+        font-family: "Literata", serif;
+        font-size: 18px;
+        line-height: 1.1;
+      }
+      .homepage-usage__info ul {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 22px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .homepage-usage__info li {
+        position: relative;
+        padding-left: 16px;
+        color: rgba(16, 41, 69, .72);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+  .homepage-usage__info li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: .72em;
+        width: 6px;
+        height: 6px;
+        background: #09bab2;
+      }
+      /* These sections used to be nested inside the usage section, which had
+         no closing tag, so they inherited its content box and had to be
+         forced back to 100vw with !important. The tag is closed now and they
+         are ordinary .hs-section children of the page root, so only the rail
+         bleed — a deliberate effect — is kept, written against classes so the
+         rules no longer read as section markers. */
+      .hs-rail {
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+        margin-right: calc(50% - 50vw);
+      }
+      .hs-rail__track {
+        padding-inline: 0;
+        grid-auto-columns: clamp(190px, 18vw, 250px);
+        gap: 16px;
+      }
+      .homepage-usage {
+        border: 0;
+      }
+      @media (max-width: 1200px) {
+        .homepage-usage__timeline {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          row-gap: 28px;
+        }
+        .homepage-usage__timeline::before {
+          top: 54px;
+        }
+      }
+      @media (max-width: 760px) {
+        .homepage-usage {
+          padding: 96px 24px 108px;
+        }
+        .homepage-usage__timeline {
+          grid-template-columns: 1fr;
+          row-gap: 0;
+        }
+        .homepage-usage__timeline::before,
+        .homepage-usage__step:not(:last-child)::after {
+          display: none;
+        }
+        .homepage-usage__step {
+          padding: 0 0 18px;
+          margin-bottom: 18px;
+        }
+        .homepage-usage__step + .homepage-usage__step {
+          border-top: 1px solid rgba(16, 41, 69, .10);
+          padding-top: 18px;
+        }
+        .homepage-usage__info ul {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+
+  <style>
+  .homepage-faculty-showcase {
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  .homepage-faculty-showcase__head {
+    padding-top: clamp(14px, 2vw, 24px);
+    padding-bottom: clamp(14px, 2vw, 24px);
+    margin-bottom: clamp(28px, 3.4vw, 42px);
+    border-bottom: 0;
+  }
+  .homepage-faculty-showcase__grid {
+    display: flex;
+    gap: 18px;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .homepage-faculty-showcase__desk {
+    position: relative;
+    flex: 1 1 280px;
+    min-width: 0;
+    padding: 22px 22px 20px;
+    border: none;
+    background: linear-gradient(180deg, #fff 0%, #fcfbf8 100%);
+    box-shadow: none;
+    overflow: hidden;
+    transition: background-color .22s ease, border-color .22s ease, box-shadow .22s ease;
+  }
+  .homepage-faculty-showcase__desk::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: transparent;
+    transition: background-color .22s ease;
+  }
+  .homepage-faculty-showcase__desk::after {
+    content: "";
+    position: absolute;
+    inset: auto 18px 18px auto;
+    width: 92px;
+    height: 92px;
+    background: radial-gradient(circle at center, rgba(9, 186, 178, .07), transparent 68%);
+    opacity: .7;
+  }
+  .homepage-faculty-showcase__desk-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 14px;
+    align-items: flex-start;
+  }
+  .homepage-faculty-showcase__desk-head {
+    min-width: 0;
+  }
+  .homepage-faculty-showcase__desk-top h3 {
+    position: relative;
+    z-index: 1;
+    margin: 0 0 6px;
+    color: #102945;
+    font-family: "Literata", serif;
+    font-size: 22px;
+    line-height: 1.08;
+    letter-spacing: -.03em;
+  }
+  .homepage-faculty-showcase__desk-meta {
+    display: block;
+    color: rgba(16, 41, 69, .62);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .homepage-faculty-showcase__desk-stat {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border: 1px solid rgba(9, 186, 178, .18);
+    border-radius: 999px;
+    color: #0f403f;
+    background: rgba(9, 186, 178, .06);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .02em;
+    white-space: nowrap;
+  }
+  .homepage-faculty-showcase__note {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: rgba(16, 41, 69, .72);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .homepage-faculty-showcase__books {
+    position: relative;
+    z-index: 1;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(9, 186, 178, .14);
+  }
+  .homepage-faculty-showcase__books-label {
+    margin: 0 0 12px;
+    color: #0f403f;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .homepage-faculty-showcase__book-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    padding: 10px 0;
+  }
+  .homepage-faculty-showcase__desk a.homepage-faculty-showcase__book-row {
+    display: grid;
+    align-items: center;
+    margin-top: 0;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    letter-spacing: normal;
+    text-transform: none;
+    text-decoration: none;
+  }
+  .homepage-faculty-showcase__empty {
+    margin: 0;
+    color: rgba(16, 41, 69, .58);
+    font-size: 13px;
+  }
+  .homepage-faculty-showcase__book-row + .homepage-faculty-showcase__book-row {
+    border-top: 1px solid rgba(16, 41, 69, .08);
+  }
+  .homepage-faculty-showcase__cover {
+    width: 56px;
+    height: 82px;
+    border-radius: 6px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    padding: 8px;
+    color: #fff;
+    font-family: "Literata", serif;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: -.04em;
+    box-shadow: 0 10px 18px rgba(11, 24, 48, .14);
+  }
+  .homepage-faculty-showcase__cover--ink { background: linear-gradient(180deg, #102945, #284866); }
+  .homepage-faculty-showcase__cover--forest { background: linear-gradient(180deg, #315646, #466f59); }
+  .homepage-faculty-showcase__cover--sage { background: linear-gradient(180deg, #68836e, #93a78f); }
+  .homepage-faculty-showcase__cover--clay { background: linear-gradient(180deg, #8f6a52, #af866a); }
+  .homepage-faculty-showcase__cover--sand { background: linear-gradient(180deg, #b38b4d, #d2b277); }
+  .homepage-faculty-showcase__cover span {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .homepage-faculty-showcase__book-meta {
+    min-width: 0;
+  }
+  .homepage-faculty-showcase__book-meta strong {
+    display: block;
+    color: #102945;
+    font-size: 14px;
+    line-height: 1.25;
+  }
+  .homepage-faculty-showcase__book-meta span,
+  .homepage-faculty-showcase__book-meta small {
+    display: block;
+    margin-top: 3px;
+    color: rgba(16, 41, 69, .70);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .homepage-faculty-showcase__book-meta small {
+    color: rgba(16, 41, 69, .58);
+  }
+  .homepage-faculty-showcase__desk a {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 22px;
+    color: #0f403f;
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .homepage-faculty-showcase__desk:hover {
+    background: linear-gradient(180deg, #fff 0%, #f8fcfb 100%);
+    border-color: rgba(9, 186, 178, .24);
+    box-shadow: inset 0 2px 0 #09bab2;
+  }
+  .homepage-hero-stats {
+    position: absolute;
+    left: 50%;
+    top: calc(70svh - 66px);
+    z-index: 4;
+    width: min(calc(100vw - (var(--homepage-gutter) * 2)), 1200px);
+    margin: -40px 0 0;
+    padding: 0;
+    box-sizing: border-box;
+    transform: translateX(-50%);
+  }
+  .homepage-hero-stats__inner {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    min-height: 138px;
+    background: #fff;
+    border: 1px solid #e3e6e5;
+  }
+  .homepage-hero-stats__item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 22px 24px;
+    border-right: 1px solid #e3e6e5;
+    transition: border-top-color .2s ease, color .2s ease, background-color .2s ease;
+  }
+  .homepage-hero-stats__item:last-child {
+    border-right: 0;
+  }
+  .homepage-hero-stats__item::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: transparent;
+    transition: background-color .2s ease;
+  }
+  .homepage-hero-stats__icon {
+    color: #09bab2;
+    font-size: 22px;
+    width: fit-content;
+    transition: transform .2s ease, color .2s ease;
+  }
+  .homepage-hero-stats__item strong {
+    color: #102945;
+    font-family: "Literata", serif;
+    font-size: 41px;
+    line-height: .96;
+    font-weight: 700;
+    letter-spacing: -.04em;
+    text-wrap: balance;
+  }
+  .homepage-hero-stats__item span:last-child {
+    color: #5c6866;
+    font-family: "Google Sans", sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .homepage-hero-stats__item:hover {
+    background: rgba(9, 186, 178, .025);
+  }
+  .homepage-hero-stats__item:hover::before {
+    background: #09bab2;
+  }
+  .homepage-hero-stats__item:hover strong {
+    color: #09bab2;
+  }
+  .homepage-hero-stats__item:hover .homepage-hero-stats__icon {
+    transform: scale(1.08);
+  }
+  [data-section="homepage-faculty-picks"] {
+    margin-top: -72px;
+    padding-top: 158px !important;
+    background: var(--hs-wash);
+    position: relative;
+    z-index: 3;
+  }
+  @media (max-width: 1024px) {
+    .homepage-hero-stats__inner {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 640px) {
+    .homepage-hero-stats {
+      top: calc(70svh - 42px);
+      width: calc(100vw - 24px);
+    }
+    [data-section="homepage-faculty-picks"] {
+      margin-top: -48px;
+      padding-top: 126px !important;
+      background: var(--hs-wash);
+      z-index: 3;
+    }
+    .homepage-hero-stats__inner {
+      grid-template-columns: 1fr;
+    }
+    .homepage-hero-stats__item {
+      border-right: 0;
+      border-bottom: 1px solid #e3e6e5;
+    }
+    .homepage-hero-stats__item:last-child {
+      border-bottom: 0;
+    }
+  }
+  @media (max-width: 640px) {
+    .homepage-faculty-showcase__desk h3 { font-size: 20px; }
+    .homepage-faculty-showcase__book-row {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+    .homepage-faculty-showcase__cover {
+      width: 50px;
+      height: 74px;
+    }
+  }
+  @media (max-width: 1200px) {
+    .homepage-hero__content {
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+      gap: clamp(20px, 3vw, 34px);
+      padding-top: clamp(96px, 10vh, 124px);
+      padding-bottom: clamp(28px, 4.5vh, 42px);
+    }
+    .homepage-hero__title {
+      font-size: clamp(32px, 3.6vw, 52px);
+    }
+    .homepage-hero__book {
+      width: min(100%, 300px);
+    }
+    .homepage-hero-stats {
+      width: min(calc(100vw - (var(--homepage-gutter) * 2)), 1140px);
+    }
+    .homepage-faculty-showcase__grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .homepage-faculty-showcase__desk {
+      flex: none;
+    }
+  }
+  @media (max-width: 1024px) {
+    .homepage-hero__content {
+      grid-template-columns: minmax(0, 1.15fr) minmax(180px, .65fr);
+      gap: 20px;
+      padding-top: 118px;
+    }
+    .homepage-hero__copy {
+      padding-right: 0;
+    }
+    .homepage-hero__title {
+      font-size: clamp(30px, 4.5vw, 44px);
+    }
+    .homepage-hero__lead {
+      max-width: 44ch;
+    }
+    .homepage-hero__search {
+      width: 100%;
+    }
+    .homepage-hero__book {
+      width: min(100%, 260px);
+    }
+    .homepage-hero-stats__inner {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .homepage-hero-stats {
+      top: calc(70svh - 44px);
+    }
+    [data-section="homepage-faculty-picks"] {
+      margin-top: -56px;
+      padding-top: 140px !important;
+    }
+    .homepage-faculty-showcase__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .homepage-usage {
+      padding: 88px var(--homepage-gutter) 104px;
+    }
+    .homepage-usage__timeline {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      row-gap: 28px;
+    }
+    .homepage-usage__timeline::before {
+      top: 54px;
+    }
+  }
+  @media (max-width: 768px) {
+    .homepage-hero__content {
+      grid-template-columns: 1fr;
+      padding-top: 104px;
+      padding-bottom: 36px;
+      gap: 22px;
+    }
+    .homepage-hero__copy {
+      order: 1;
+      max-width: 100%;
+      padding: 0;
+    }
+    .homepage-hero__search {
+      width: 100%;
+      max-width: none;
+    }
+    .homepage-hero__book {
+      order: 3;
+      justify-self: center;
+      width: min(100%, 260px);
+    }
+    .homepage-hero__title {
+      font-size: clamp(30px, 8vw, 42px);
+    }
+    .homepage-hero__lead {
+      max-width: none;
+      font-size: clamp(15px, 2.2vw, 17px);
+    }
+    .homepage-hero-stats {
+      position: absolute;
+      top: calc(70svh - 38px);
+      width: calc(100vw - 24px);
+    }
+    .homepage-hero-stats__inner {
+      grid-template-columns: 1fr;
+    }
+    .homepage-faculty-showcase__grid {
+      grid-template-columns: 1fr;
+    }
+    [data-section="homepage-faculty-picks"] {
+      margin-top: -44px;
+      padding-top: 128px !important;
+    }
+    .homepage-usage {
+      padding: 72px 20px 88px;
+    }
+    .homepage-usage__timeline {
+      grid-template-columns: 1fr;
+      row-gap: 0;
+    }
+    .homepage-usage__timeline::before,
+    .homepage-usage__step:not(:last-child)::after {
+      display: none;
+    }
+    .homepage-usage__step {
+      padding: 0 0 18px;
+      margin-bottom: 18px;
+    }
+    .homepage-usage__step + .homepage-usage__step {
+      border-top: 1px solid rgba(16, 41, 69, .10);
+      padding-top: 18px;
+    }
+    .homepage-usage__info ul {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 576px) {
+    .homepage-hero__content {
+      padding-top: 88px;
+      padding-bottom: 30px;
+    }
+    .homepage-hero__book {
+      width: min(100%, 240px);
+    }
+    .homepage-hero-stats {
+      width: calc(100vw - 20px);
+    }
+    [data-section="homepage-faculty-picks"] {
+      padding-top: 120px !important;
+    }
+  }
+  @media (max-width: 480px) {
+    .homepage-hero__content {
+      padding-top: 80px;
+      padding-bottom: 28px;
+    }
+    .homepage-hero__search {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .homepage-hero__search svg {
+      display: none;
+    }
+    .homepage-hero__search input {
+      padding: 16px 18px;
+    }
+    .homepage-hero__search button {
+      width: 100%;
+      min-height: 52px;
+    }
+    .homepage-hero__book {
+      width: min(100%, 230px);
+    }
+  }
+  @media (max-width: 390px) {
+    .homepage-hero__title {
+      font-size: clamp(28px, 11vw, 38px);
+    }
+    .homepage-hero-stats {
+      width: calc(100vw - 16px);
+    }
+  }
+  </style>
+
+  <script>
+    (() => {
+      const buildInfiniteArrivalsRail = () => {
+        const track = document.getElementById('hs-arrivals-rail');
+        if (!track) return;
+
+        const baseCount = Math.floor(track.children.length / 2);
+        if (!baseCount) return;
+
+        const sourceItems = Array.from(track.children).slice(0, baseCount);
+        const baseItems = sourceItems.map((node) => node.cloneNode(true));
+        const viewportWidth = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0);
+        const targetWidth = viewportWidth * 3.5;
+        const gap = 20;
+        const cycleWidth = sourceItems.reduce((sum, item) => {
+          const width = item.getBoundingClientRect().width || item.offsetWidth || 0;
+          return sum + width;
+        }, 0) + (gap * Math.max(sourceItems.length - 1, 0));
+
+        track.innerHTML = '';
+
+        let cycleCount = 0;
+        let totalWidth = 0;
+        while (totalWidth < targetWidth || cycleCount < 2) {
+          baseItems.forEach((item, index) => {
+            const clone = item.cloneNode(true);
+            if (cycleCount > 0 || index > 0) {
+              clone.setAttribute('aria-hidden', 'true');
+              clone.tabIndex = -1;
+            }
+            track.appendChild(clone);
+          });
+
+          cycleCount += 1;
+          totalWidth = cycleWidth * cycleCount;
+          if (cycleCount > 12) break;
+        }
+
+        const duration = Math.max(24, Math.min(72, totalWidth / 90));
+        track.style.animationDuration = `${duration}s`;
+      };
+
+      let resizeTimer = null;
+      const scheduleBuild = () => {
+        window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(buildInfiniteArrivalsRail, 120);
+      };
+
+      const init = () => {
+        buildInfiniteArrivalsRail();
+        window.addEventListener('resize', scheduleBuild, { passive: true });
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init, { once: true });
+      } else {
+        init();
+      }
+    })();
+  </script>
+  </section>{{-- /homepage-how-to-use-library --}}
+  @include('home.new-arrivals')
+  @include('home.collections')
+  @include('home.stats')
+  @include('home.faq')
 </div>{{-- /homepage-canonical-page --}}
 @endsection

@@ -3,10 +3,10 @@
 @extends('layouts.public')
 
 @php
-  $lang = request()->query('lang', 'ru');
+  $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
       $qs = http_build_query(array_filter($query, static fn ($v) => $v !== null && $v !== ''));
@@ -15,10 +15,10 @@
 
   $chrome = [
       'ru' => [
-          'title'           => 'Новости и анонсы — KazUTB Smart Library',
+          'title'           => 'Новости и анонсы — KazUTB',
           'eyebrow'         => 'Институциональные обновления',
           'heading'         => 'Библиотечный вестник',
-          'lead'            => 'Последние объявления, открытия в архивах и научные инициативы KazUTB Smart Library.',
+          'lead'            => 'Последние объявления, открытия в архивах и научные инициативы KazUTB.',
           'featured_read'   => 'Читать полностью',
           'grid_heading'    => 'Последние статьи',
           'filter_all'      => 'Все темы',
@@ -26,17 +26,17 @@
           'filter_research' => 'Исследования',
           'bento_eyebrow'   => 'Мероприятия',
           'bento_heading'   => 'Открытые лекции, презентации и академические конференции',
-          'bento_body'      => 'Узнайте о ближайших событиях, симпозиумах и публичных программах KazUTB Smart Library.',
+          'bento_body'      => 'Узнайте о ближайших событиях, симпозиумах и публичных программах KazUTB.',
           'bento_cta'       => 'Смотреть мероприятия',
           'load_more'       => 'Загрузить ещё',
             'page_prev'       => 'Назад',
             'page_next'       => 'Вперёд',
       ],
       'kk' => [
-          'title'           => 'Жаңалықтар мен хабарландырулар — KazUTB Smart Library',
+          'title'           => 'Жаңалықтар мен хабарландырулар — KazUTB',
           'eyebrow'         => 'Институционалдық жаңартулар',
           'heading'         => 'Кітапхана хабаршысы',
-          'lead'            => 'KazUTB Smart Library соңғы хабарландырулары, мұрағат жаңалықтары және ғылыми бастамалары.',
+          'lead'            => 'KazUTB соңғы хабарландырулары, мұрағат жаңалықтары және ғылыми бастамалары.',
           'featured_read'   => 'Толығырақ оқу',
           'grid_heading'    => 'Соңғы мақалалар',
           'filter_all'      => 'Барлық тақырыптар',
@@ -44,17 +44,17 @@
           'filter_research' => 'Зерттеулер',
           'bento_eyebrow'   => 'Іс-шаралар',
           'bento_heading'   => 'Ашық лекциялар, презентациялар және академиялық конференциялар',
-          'bento_body'      => 'KazUTB Smart Library алдағы іс-шаралары, симпозиумдар және ашық бағдарламалар туралы біліңіз.',
+          'bento_body'      => 'KazUTB алдағы іс-шаралары, симпозиумдар және ашық бағдарламалар туралы біліңіз.',
           'bento_cta'       => 'Барлық іс-шараларды қарау',
           'load_more'       => 'Тағы жүктеу',
             'page_prev'       => 'Артқа',
             'page_next'       => 'Алға',
       ],
       'en' => [
-          'title'           => 'News and announcements — KazUTB Smart Library',
+          'title'           => 'News and announcements — KazUTB',
           'eyebrow'         => 'Institutional Updates',
           'heading'         => 'Library Dispatch',
-          'lead'            => 'The latest announcements, archival discoveries, and scholarly initiatives from the KazUTB Smart Library.',
+          'lead'            => 'The latest announcements, archival discoveries, and scholarly initiatives from the KazUTB.',
           'featured_read'   => 'Read full dispatch',
           'grid_heading'    => 'Recent Articles',
           'filter_all'      => 'All Topics',
@@ -62,7 +62,7 @@
           'filter_research' => 'Research',
           'bento_eyebrow'   => 'Library Events',
           'bento_heading'   => 'Open lectures, collection showcases, and academic symposia',
-          'bento_body'      => 'Discover upcoming events, symposia, and public programmes at KazUTB Smart Library.',
+          'bento_body'      => 'Discover upcoming events, symposia, and public programmes at KazUTB.',
           'bento_cta'       => 'View all events',
           'load_more'       => 'Load More Dispatches',
             'page_prev'       => 'Previous',
@@ -121,18 +121,27 @@
 @section('title', $chrome['title'])
 
 @section('content')
-<div class="news-canonical" data-section="news-canonical-page">
+<div class="news-canonical public-v2 news-v2" data-section="news-canonical-page">
 
   {{-- ① Page Header --}}
-  <header class="news-canonical__header" data-test-id="news-canonical-header">
-    <p class="news-canonical__eyebrow">{{ $chrome['eyebrow'] }}</p>
-    <h1 class="news-canonical__display">{{ $chrome['heading'] }}</h1>
-    <p class="news-canonical__lead">{{ $chrome['lead'] }}</p>
+  <header class="public-v2__hero news-canonical__header" data-test-id="news-canonical-header">
+    <div class="public-v2__inset public-v2__hero-grid">
+    <div>
+      <p class="public-v2__kicker">{{ $chrome['eyebrow'] }}</p>
+      <h1 class="public-v2__title">{{ $chrome['heading'] }}</h1>
+      <p class="public-v2__lead">{{ $chrome['lead'] }}</p>
+    </div>
+    <aside class="public-v2__hero-note">
+      <strong>{{ count($newsArticles) }}</strong>
+      <span>{{ $chrome['grid_heading'] }}</span>
+    </aside>
+    </div>
   </header>
 
   {{-- ② Featured Lead Story (canonical block only on the first page) --}}
   @if($showCanonicalHero && $featured)
-  <section class="news-canonical__featured" data-section="news-canonical-featured" data-test-id="news-canonical-featured">
+  <section class="public-v2__body news-canonical__featured" data-section="news-canonical-featured" data-test-id="news-canonical-featured">
+    <div class="public-v2__inset">
     <a href="{{ $routeWithLang('/news/' . $featured['slug']) }}" class="news-canonical__featured-card">
       <div class="news-canonical__featured-image">
         @if(! empty($featured['hero']['image']))
@@ -156,23 +165,32 @@
         </span>
       </div>
     </a>
+    </div>
   </section>
   @endif
 
   {{-- ③ Articles Grid --}}
-  <div data-section="news-canonical-grid">
+  <div class="public-v2__body" data-section="news-canonical-grid">
+    <div class="public-v2__inset">
 
     {{-- Filter bar / section header --}}
     <div class="news-canonical__grid-bar" data-test-id="news-canonical-filter">
-      <h3 class="news-canonical__grid-heading">{{ $chrome['grid_heading'] }}</h3>
+      <h3 class="public-v2__section-title news-canonical__grid-heading">{{ $chrome['grid_heading'] }}</h3>
       <div class="news-canonical__filter-tabs" aria-label="{{ $chrome['filter_all'] }}">
-        <button class="news-canonical__filter-tab news-canonical__filter-tab--active" type="button">{{ $chrome['filter_all'] }}</button>
-        <button class="news-canonical__filter-tab" type="button">{{ $chrome['filter_events'] }}</button>
-        <button class="news-canonical__filter-tab" type="button">{{ $chrome['filter_research'] }}</button>
+        <a class="news-canonical__filter-tab {{ request('topic', 'all') === 'all' ? 'news-canonical__filter-tab--active' : '' }}" href="{{ $routeWithLang('/news', ['topic' => 'all']) }}">{{ $chrome['filter_all'] }}</a>
+        <a class="news-canonical__filter-tab {{ request('topic') === 'events' ? 'news-canonical__filter-tab--active' : '' }}" href="{{ $routeWithLang('/news', ['topic' => 'events']) }}">{{ $chrome['filter_events'] }}</a>
+        <a class="news-canonical__filter-tab {{ request('topic') === 'research' ? 'news-canonical__filter-tab--active' : '' }}" href="{{ $routeWithLang('/news', ['topic' => 'research']) }}">{{ $chrome['filter_research'] }}</a>
       </div>
     </div>
 
     <div class="news-canonical__grid">
+      @if(empty($newsArticles))
+        <div class="public-v2__empty">
+          <span class="material-symbols-outlined" aria-hidden="true">newspaper</span>
+          <h3>{{ $chrome['grid_heading'] }}</h3>
+          <p>{{ $chrome['lead'] }}</p>
+        </div>
+      @endif
 
       @if($showCanonicalHero)
       {{-- Canonical first row: exactly the first three article cards --}}
@@ -197,25 +215,7 @@
         </article>
       @endforeach
 
-      {{-- Canonical second row left: events CTA bento spans two columns --}}
-      <article class="news-canonical__bento" data-test-id="news-canonical-bento">
-        <div>
-          <div class="news-canonical__bento-eyebrow">
-            <svg class="news-canonical__bento-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <rect x="1" y="3" width="14" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-              <path d="M1 7h14M5 1v4M11 1v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            </svg>
-            <span class="news-canonical__bento-label">{{ $chrome['bento_eyebrow'] }}</span>
-          </div>
-          <h4 class="news-canonical__bento-heading">{{ $chrome['bento_heading'] }}</h4>
-          <p class="news-canonical__bento-body">{{ $chrome['bento_body'] }}</p>
-        </div>
-        <div class="news-canonical__bento-footer">
-          <a href="{{ $routeWithLang('/events') }}" class="news-canonical__bento-cta">{{ $chrome['bento_cta'] }}</a>
-        </div>
-      </article>
-
-      {{-- Canonical second row right: remaining cards continue after the bento --}}
+      {{-- Remaining news cards continue in the regular grid. --}}
       @foreach($tailCards as $article)
         <article class="news-canonical__card" data-test-id="news-canonical-article">
           <a href="{{ $routeWithLang('/news/' . $article['slug']) }}" class="news-canonical__card-link">
@@ -260,18 +260,33 @@
       @endif
 
     </div>
-  </div>
 
-  {{-- ④ Load More --}}
-  @if($currentPage < $lastPage)
-    <div class="news-canonical__load-more">
-      <a class="news-canonical__load-more-btn" href="{{ $routeWithLang('/news', ['page' => $currentPage + 1]) }}">{{ $chrome['load_more'] }}</a>
+    @if($lastPage > 1)
+      <nav class="news-canonical__pagination" aria-label="{{ $chrome['grid_heading'] }}">
+        @foreach($pageItems as $pageItem)
+          @if($pageItem === '...')
+            <span aria-hidden="true">…</span>
+          @else
+            <a href="{{ $routeWithLang('/news', ['page' => $pageItem, 'topic' => request('topic')]) }}"
+               aria-current="{{ $pageItem === $currentPage ? 'page' : 'false' }}"
+               class="{{ $pageItem === $currentPage ? 'is-active' : '' }}">{{ $pageItem }}</a>
+          @endif
+        @endforeach
+      </nav>
+    @endif
+
+    {{-- ④ Load More --}}
+    @if($currentPage < $lastPage)
+      <div class="news-canonical__load-more">
+        <a class="news-canonical__load-more-btn" href="{{ $routeWithLang('/news', ['page' => $currentPage + 1]) }}">{{ $chrome['load_more'] }}</a>
+      </div>
+    @else
+      <div class="news-canonical__load-more">
+        <span class="news-canonical__load-more-btn news-canonical__load-more-btn--disabled" aria-disabled="true">{{ $chrome['load_more'] }}</span>
+      </div>
+      @endif
     </div>
-  @else
-    <div class="news-canonical__load-more">
-      <span class="news-canonical__load-more-btn news-canonical__load-more-btn--disabled" aria-disabled="true">{{ $chrome['load_more'] }}</span>
     </div>
-  @endif
 
 </div>
 @endsection
@@ -285,9 +300,10 @@
      ============================================================ */
 
   .news-canonical {
-    padding: 48px 24px 96px;
-    max-width: 1280px;
-    margin: 0 auto;
+    width: 100%;
+    padding: 0;
+    max-width: none;
+    margin: 0;
   }
 
   /* ── Page Header ─────────────────────────────────────────── */
@@ -686,6 +702,15 @@
     .news-canonical__featured-copy {
       width: 40%;
       padding: 48px;
+    }
+
+    /* The public-v2 shell renders the lead as a two-column grid.  Reset the
+       older flex-width rules above so the copy column can use its full grid
+       track instead of collapsing to 40% of an already-sized grid cell. */
+    .news-v2 .news-canonical__featured-image,
+    .news-v2 .news-canonical__featured-copy {
+      width: auto;
+      min-width: 0;
     }
 
     .news-canonical__grid { grid-template-columns: repeat(2, 1fr); }

@@ -1,0 +1,9 @@
+figure,svg,png
+fig-01-risk-heatmap,fig-01-risk-heatmap.svg,fig-01-risk-heatmap.png
+fig-02-coverage-vs-risk,fig-02-coverage-vs-risk.svg,fig-02-coverage-vs-risk.png
+fig-03-execution-time-comparison,fig-03-execution-time-comparison.svg,fig-03-execution-time-comparison.png
+fig-04-performance-bounds,fig-04-performance-bounds.svg,fig-04-performance-bounds.png
+fig-05-cicd-pipeline,fig-05-cicd-pipeline.svg,fig-05-cicd-pipeline.png
+fig-06-testing-architecture,fig-06-testing-architecture.svg,fig-06-testing-architecture.png
+fig-07-defect-detection-comparison,fig-07-defect-detection-comparison.svg,fig-07-defect-detection-comparison.png
+fig-08-quality-gates-summary,fig-08-quality-gates-summary.svg,fig-08-quality-gates-summary.png

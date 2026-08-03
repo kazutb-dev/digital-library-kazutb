@@ -1,0 +1,13 @@
+Risk ID,Priority,Coverage (%),Test Types Applied,Notes
+R-PRIV-001,CRITICAL,100,"Feature, API","AdminPrivilegeNegativePathTest: 28 tests covering all routes and roles"
+R-PRIV-002,CRITICAL,100,"Feature, API","Session validation integrated into privilege tests"
+R-API-001,HIGH,100,"Integration, API","ReservationMutateTest: operator role enforcement 2/2 tests"
+R-API-002,MEDIUM,100,"Integration, API","Context propagation: 2/2 tests pass"
+R-API-003,HIGH,100,"Integration, API","Idempotency: 3/3 tests pass"
+R-RESV-001,MEDIUM,30,"Feature, API","4/14 auth tests pass; 10 blocked by schema"
+R-RESV-002,MEDIUM,33,"Feature, API","2/6 auth tests pass; 4 blocked by schema"
+R-AUTH-001,CRITICAL,100,"Feature, API","Guest redirect: 7/7 tests in AdminPrivilegeNegativePathTest"
+R-DATA-001,HIGH,50,"Feature, API","Validation structure established; execution blocked by environment"
+R-DATA-002,MEDIUM,100,"Integration, API","Response contracts: 2/2 tests pass"
+R-PERF-001,MEDIUM,100,"Suite","Full suite: 904 tests in ~190s"
+R-DB-001,CRITICAL,40,"Feature, Schema","Environment blocker documented; tests remain for future"

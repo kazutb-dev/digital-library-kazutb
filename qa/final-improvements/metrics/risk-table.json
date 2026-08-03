@@ -1,0 +1,112 @@
+{
+    "risk_table": [
+        {
+            "id": "R-PRIV-001",
+            "description": "Unauthorized access to admin functions",
+            "component": "Admin Privilege",
+            "likelihood": "Low",
+            "impact": "Critical",
+            "score": 15,
+            "priority": "CRITICAL"
+        },
+        {
+            "id": "R-PRIV-002",
+            "description": "Privilege escalation via session manipulation",
+            "component": "Session Auth",
+            "likelihood": "Low",
+            "impact": "Critical",
+            "score": 15,
+            "priority": "CRITICAL"
+        },
+        {
+            "id": "R-API-001",
+            "description": "Integration endpoint mutation without proper role validation",
+            "component": "Integration API",
+            "likelihood": "Low",
+            "impact": "High",
+            "score": 12,
+            "priority": "HIGH"
+        },
+        {
+            "id": "R-API-002",
+            "description": "Context/correlation data not propagated in responses",
+            "component": "Integration API",
+            "likelihood": "Medium",
+            "impact": "Medium",
+            "score": 8,
+            "priority": "MEDIUM"
+        },
+        {
+            "id": "R-API-003",
+            "description": "Idempotency key collision handling failure",
+            "component": "Integration API",
+            "likelihood": "Low",
+            "impact": "High",
+            "score": 12,
+            "priority": "HIGH"
+        },
+        {
+            "id": "R-RESV-001",
+            "description": "Reader reservation API contract mismatch",
+            "component": "Reservation API",
+            "likelihood": "Medium",
+            "impact": "Medium",
+            "score": 8,
+            "priority": "MEDIUM"
+        },
+        {
+            "id": "R-RESV-002",
+            "description": "Account reservation filtering/pagination errors",
+            "component": "Reservation API",
+            "likelihood": "Medium",
+            "impact": "Medium",
+            "score": 8,
+            "priority": "MEDIUM"
+        },
+        {
+            "id": "R-AUTH-001",
+            "description": "Unauthenticated access to protected endpoints",
+            "component": "Authentication",
+            "likelihood": "Low",
+            "impact": "Critical",
+            "score": 15,
+            "priority": "CRITICAL"
+        },
+        {
+            "id": "R-DATA-001",
+            "description": "Data validation bypass in input handling",
+            "component": "Data Validation",
+            "likelihood": "Low",
+            "impact": "High",
+            "score": 12,
+            "priority": "HIGH"
+        },
+        {
+            "id": "R-DATA-002",
+            "description": "Missing required fields in API responses",
+            "component": "Data Contract",
+            "likelihood": "Medium",
+            "impact": "Medium",
+            "score": 8,
+            "priority": "MEDIUM"
+        },
+        {
+            "id": "R-PERF-001",
+            "description": "Performance regression in test suite execution",
+            "component": "Performance",
+            "likelihood": "Medium",
+            "impact": "Low",
+            "score": 6,
+            "priority": "MEDIUM"
+        },
+        {
+            "id": "R-DB-001",
+            "description": "Database schema incompleteness blocking tests",
+            "component": "Database",
+            "likelihood": "High",
+            "impact": "Medium",
+            "score": 18,
+            "priority": "CRITICAL"
+        }
+    ]
+}

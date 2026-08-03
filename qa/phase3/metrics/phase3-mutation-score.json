@@ -1,0 +1,62 @@
+[
+  {
+    "module": "Integration Boundary Middleware",
+    "mutant_type": "mixed",
+    "mutants_created": 3,
+    "mutants_killed": 3,
+    "mutants_survived": 0,
+    "inconclusive": 0,
+    "equivalent": 0,
+    "executed_non_equivalent": 3,
+    "mutation_score_pct": 100.0,
+    "notes": "Derived from phase3-mutation-results.csv"
+  },
+  {
+    "module": "Integration Document Management API",
+    "mutant_type": "mixed",
+    "mutants_created": 4,
+    "mutants_killed": 3,
+    "mutants_survived": 1,
+    "inconclusive": 0,
+    "equivalent": 0,
+    "executed_non_equivalent": 4,
+    "mutation_score_pct": 75.0,
+    "notes": "Derived from phase3-mutation-results.csv"
+  },
+  {
+    "module": "Integration Reservations Mutate API",
+    "mutant_type": "mixed",
+    "mutants_created": 4,
+    "mutants_killed": 3,
+    "mutants_survived": 1,
+    "inconclusive": 0,
+    "equivalent": 0,
+    "executed_non_equivalent": 4,
+    "mutation_score_pct": 75.0,
+    "notes": "Derived from phase3-mutation-results.csv"
+  },
+  {
+    "module": "Integration Reservations Read API",
+    "mutant_type": "mixed",
+    "mutants_created": 3,
+    "mutants_killed": 3,
+    "mutants_survived": 0,
+    "inconclusive": 0,
+    "equivalent": 0,
+    "executed_non_equivalent": 3,
+    "mutation_score_pct": 100.0,
+    "notes": "Derived from phase3-mutation-results.csv"
+  },
+  {
+    "module": "Overall",
+    "mutant_type": "mixed",
+    "mutants_created": 14,
+    "mutants_killed": 12,
+    "mutants_survived": 2,
+    "inconclusive": 0,
+    "equivalent": 0,
+    "executed_non_equivalent": 14,
+    "mutation_score_pct": 85.71,
+    "notes": "Overall across all selected modules"
+  }
+]

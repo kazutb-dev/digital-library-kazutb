@@ -20,7 +20,7 @@
       'support' => 'Поддержка',
       'navigation_links' => [
         ['label' => 'Каталог', 'href' => '/catalog'],
-        ['label' => 'Обзор фонда', 'href' => '/discover'],
+        ['label' => 'Обзор фонда', 'href' => '/catalog'],
         ['label' => 'Внешние ресурсы', 'href' => '/resources'],
         ['label' => 'Научный репозиторий', 'href' => '/repository'],
         ['label' => 'Моя подборка', 'href' => '/shortlist'],
@@ -56,7 +56,7 @@
       'support' => 'Қолдау',
       'navigation_links' => [
         ['label' => 'Каталог', 'href' => '/catalog'],
-        ['label' => 'Қорға шолу', 'href' => '/discover'],
+        ['label' => 'Қорға шолу', 'href' => '/catalog'],
         ['label' => 'Сыртқы ресурстар', 'href' => '/resources'],
         ['label' => 'Ғылыми репозиторий', 'href' => '/repository'],
         ['label' => 'Менің іріктемем', 'href' => '/shortlist'],
@@ -92,7 +92,7 @@
       'support' => 'Support',
       'navigation_links' => [
         ['label' => 'Catalog', 'href' => '/catalog'],
-        ['label' => 'Discover the Collection', 'href' => '/discover'],
+        ['label' => 'Discover the Collection', 'href' => '/catalog'],
         ['label' => 'External Resources', 'href' => '/resources'],
         ['label' => 'Scholarly Repository', 'href' => '/repository'],
         ['label' => 'My Shortlist', 'href' => '/shortlist'],
@@ -122,19 +122,19 @@
 
 <style>
   .university-footer {
-    --university-footer-ink: #102945;
-    --university-footer-deep: #0b2037;
-    --university-footer-surface: #f5f3ee;
-    --university-footer-paper: #fbfaf6;
+    --university-footer-ink: #f2f6fb;
+    --university-footer-deep: #c9d4e2;
+    --university-footer-surface: #091622;
+    --university-footer-paper: #0d1d2d;
     --university-footer-accent: #09bab2;
     --university-footer-warm: #b38b4d;
     position: relative;
     width: 100%;
     margin-top: 0;
-    padding: clamp(72px, 7vw, 100px) max(5vw, calc((100vw - 1440px) / 2)) 28px;
-    color: rgba(16, 41, 69, .72);
+    padding: clamp(72px, 7vw, 100px) var(--page-inset) 28px;
+    color: rgba(242, 246, 251, .74);
     background:
-      radial-gradient(circle at 12% 5%, rgba(9, 186, 178, .08), transparent 29%),
+      radial-gradient(circle at 12% 5%, rgba(9, 186, 178, .12), transparent 29%),
       radial-gradient(circle at 86% 0%, rgba(179, 139, 77, .08), transparent 26%),
       linear-gradient(180deg, var(--university-footer-surface), var(--university-footer-paper));
   }
@@ -171,9 +171,9 @@
     height: 96px;
     padding: 2px;
     object-fit: contain;
-    background: #fff;
+    background: rgba(255, 255, 255, .96);
     border-radius: 50%;
-    box-shadow: 0 12px 34px rgba(16, 41, 69, .12);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, .28);
   }
   .university-footer__brand-title {
     display: block;
@@ -188,14 +188,14 @@
   .university-footer__tagline {
     display: block;
     margin-top: 6px;
-    color: rgba(16, 41, 69, .56);
+    color: rgba(242, 246, 251, .54);
     font-size: 9px;
     font-weight: 700;
     letter-spacing: .04em;
   }
   .university-footer__address {
     margin: 0;
-    color: rgba(16, 41, 69, .72);
+    color: rgba(242, 246, 251, .76);
     font-size: 13px;
     line-height: 1.75;
   }
@@ -203,7 +203,7 @@
     display: block;
     width: fit-content;
     margin: 12px 0 0;
-    color: rgba(16, 41, 69, .68);
+    color: rgba(242, 246, 251, .7);
     font-size: 13px;
   }
   .university-footer__contact--email {
@@ -211,14 +211,14 @@
     color: var(--university-footer-accent);
   }
   .university-footer__contact:hover {
-    color: var(--university-footer-ink);
+    color: #ffffff;
   }
   .university-footer__accreditation {
     width: fit-content;
     margin-top: 25px;
     padding: 9px 12px;
-    color: rgba(16, 41, 69, .48);
-    border: 1px solid rgba(16, 41, 69, .08);
+    color: rgba(242, 246, 251, .56);
+    border: 1px solid rgba(242, 246, 251, .1);
     font-size: 9px;
     line-height: 1.55;
   }
@@ -226,7 +226,7 @@
     margin: 0 0 22px;
     padding-bottom: 14px;
     color: var(--university-footer-ink);
-    border-bottom: 1px solid rgba(16, 41, 69, .1);
+    border-bottom: 1px solid rgba(242, 246, 251, .12);
     font-family: "Literata", serif;
     font-size: 14px;
     font-weight: 700;
@@ -237,7 +237,7 @@
     display: block;
     width: fit-content;
     margin: 12px 0;
-    color: rgba(16, 41, 69, .64);
+    color: rgba(242, 246, 251, .68);
     font-size: 13px;
     line-height: 1.5;
     transition: color .25s ease, transform .25s ease;
@@ -255,8 +255,8 @@
     max-width: 1440px;
     margin: clamp(48px, 5vw, 72px) auto 0;
     padding-top: 25px;
-    color: rgba(16, 41, 69, .48);
-    border-top: 1px solid rgba(16, 41, 69, .1);
+    color: rgba(242, 246, 251, .46);
+    border-top: 1px solid rgba(242, 246, 251, .12);
     font-size: 11px;
     line-height: 1.6;
   }
@@ -270,7 +270,7 @@
   }
   @media (max-width: 700px) {
     .university-footer {
-      padding: 66px 20px 24px;
+      padding: 66px var(--page-inset) 24px;
     }
     .university-footer__grid {
       grid-template-columns: 1fr;
@@ -299,7 +299,7 @@
 <footer class="university-footer">
   <div class="university-footer__grid">
     <div class="university-footer__identity">
-      <a class="university-footer__brand" href="{{ $pageLang === 'ru' ? '/' : '/?lang=' . $pageLang }}">
+      <a class="university-footer__brand" href="{{ $pageLang === 'kk' ? '/' : '/?lang=' . $pageLang }}">
         <img class="university-footer__logo" src="{{ asset('logo.png') }}" alt="{{ $footerCopy['brand'] }}" loading="lazy" decoding="async">
         <span>
           <span class="university-footer__brand-title">{{ $footerCopy['brand'] }}</span>

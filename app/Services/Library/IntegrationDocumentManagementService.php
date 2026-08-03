@@ -34,10 +34,10 @@ class IntegrationDocumentManagementService
         $perPage = min(max($perPage, 1), 100);
 
         $queryBuilder = DB::connection('pgsql')
-            ->table(self::TABLE . ' as d');
+            ->table(self::TABLE.' as d');
 
         if ($query !== '') {
-            $q = '%' . mb_strtolower($query) . '%';
+            $q = '%'.mb_strtolower($query).'%';
             $queryBuilder->where(function ($inner) use ($q): void {
                 $inner
                     ->whereRaw("LOWER(COALESCE(d.title_raw, '')) LIKE ?", [$q])
@@ -72,7 +72,7 @@ class IntegrationDocumentManagementService
     public function findDocument(string $id): ?array
     {
         $row = DB::connection('pgsql')
-            ->table(self::TABLE . ' as d')
+            ->table(self::TABLE.' as d')
             ->select($this->detailSelectColumns())
             ->where('d.id', $id)
             ->first();
@@ -81,8 +81,8 @@ class IntegrationDocumentManagementService
     }
 
     /**
-     * @param array<string,mixed> $payload
-     * @param array<string,string> $context
+     * @param  array<string,mixed>  $payload
+     * @param  array<string,string>  $context
      * @return array<string,mixed>
      */
     public function createDocument(array $payload, array $context): array
@@ -154,8 +154,8 @@ class IntegrationDocumentManagementService
     }
 
     /**
-     * @param array<string,mixed> $payload
-     * @param array<string,string> $context
+     * @param  array<string,mixed>  $payload
+     * @param  array<string,string>  $context
      * @return array<string,mixed>
      */
     public function patchDocument(string $id, array $payload, array $context): array
@@ -197,7 +197,7 @@ class IntegrationDocumentManagementService
     }
 
     /**
-     * @param array<string,string> $context
+     * @param  array<string,string>  $context
      * @return array<string,mixed>
      */
     public function archiveDocument(string $id, array $context): array
@@ -225,7 +225,7 @@ class IntegrationDocumentManagementService
             if ($this->hasColumn('review_reason_codes')) {
                 $existingCodes = Arr::wrap($before['review_reason_codes'] ?? []);
                 $codes = array_values(array_unique(array_merge($existingCodes, ['ARCHIVED'])));
-                $update['review_reason_codes'] = '{' . implode(',', $codes) . '}';
+                $update['review_reason_codes'] = '{'.implode(',', $codes).'}';
             }
         }
 
@@ -286,7 +286,7 @@ class IntegrationDocumentManagementService
         $available = [];
         foreach ($preferred as $column) {
             if ($this->hasColumn($column)) {
-                $available[] = 'd.' . $column;
+                $available[] = 'd.'.$column;
             }
         }
 
@@ -302,7 +302,7 @@ class IntegrationDocumentManagementService
     }
 
     /**
-     * @param array<string,mixed> $row
+     * @param  array<string,mixed>  $row
      * @return array<string,mixed>
      */
     private function toDocumentShape(array $row): array
@@ -327,8 +327,8 @@ class IntegrationDocumentManagementService
     }
 
     /**
-     * @param array<string,mixed> $payload
-     * @param array<string,bool> $supported
+     * @param  array<string,mixed>  $payload
+     * @param  array<string,bool>  $supported
      * @return array<string,mixed>
      */
     private function mapPayloadToColumns(array $payload, array $supported): array
@@ -344,7 +344,7 @@ class IntegrationDocumentManagementService
                 throw new IntegrationDocumentManagementException(
                     errorCode: 'invalid_request',
                     reasonCode: 'unsupported_field_for_current_schema',
-                    message: 'Field "' . $apiField . '" is not supported by current documents schema.',
+                    message: 'Field "'.$apiField.'" is not supported by current documents schema.',
                     httpStatus: 400,
                 );
             }
@@ -394,10 +394,10 @@ class IntegrationDocumentManagementService
     }
 
     /**
-     * @param array<string,mixed>|null $previousState
-     * @param array<string,mixed> $newState
-     * @param array<string,string> $context
-     * @param array<string,mixed> $metadata
+     * @param  array<string,mixed>|null  $previousState
+     * @param  array<string,mixed>  $newState
+     * @param  array<string,string>  $context
+     * @param  array<string,mixed>  $metadata
      */
     private function recordAudit(
         string $action,

@@ -1,0 +1,6 @@
+"module_feature","number_of_test_cases","avg_execution_time_per_test_case_seconds","total_execution_time_seconds","environment","notes"
+"API smoke critical suites","10","3.844","38.435","local","from phase2-api-tests.log runner_elapsed_ms=38435.05"
+"UI smoke critical routes","11","4.989","54.885","local","from phase2-playwright.log elapsed=54.885s"
+"Targeted PHPUnit high-risk subset","41","1.494","61.258","local","from phase2-phpunit.log elapsed=61.258s"
+"Combined automation run","62","2.493","154.578","local","sum of local measured suites"
+"CI execution benchmark","n/a","n/a","not measured in current dataset","ci","proposed to capture from GitHub Actions artifacts in next iteration"

@@ -1,0 +1,6 @@
+"module","mutant_type","mutants_created","mutants_killed","mutants_survived","inconclusive","equivalent","executed_non_equivalent","mutation_score_pct","notes"
+"Integration Boundary Middleware","mixed","3","3","0","0","0","3","100","Derived from phase3-mutation-results.csv"
+"Integration Document Management API","mixed","4","3","1","0","0","4","75","Derived from phase3-mutation-results.csv"
+"Integration Reservations Mutate API","mixed","4","3","1","0","0","4","75","Derived from phase3-mutation-results.csv"
+"Integration Reservations Read API","mixed","3","3","0","0","0","3","100","Derived from phase3-mutation-results.csv"
+"Overall","mixed","14","12","2","0","0","14","85.71","Overall across all selected modules"

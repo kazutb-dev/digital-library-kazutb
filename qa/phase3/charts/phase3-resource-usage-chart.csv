@@ -1,0 +1,12 @@
+observation_id,scenario_id,collection_time,host_memory_used_pct,host_available_memory_mb,php_process_count,php_max_working_set_mb,php_total_working_set_mb,observation_label
+OBS-001,pre-run-baseline,2026-05-13T13:34:00Z,83.7,2550.3,4,23.2,72.5,Pre-run baseline
+OBS-002,S01-NL-CATALOG,2026-05-13T13:35:47Z,84.1,2480.0,4,24.5,74.2,S01 normal load catalog
+OBS-003,S02-PL-CATALOG,2026-05-13T13:37:32Z,84.2,2460.0,4,25.1,75.0,S02 peak load catalog-db
+OBS-004,S03-NL-SUBJECTS,2026-05-13T13:38:39Z,84.2,2470.0,4,24.8,74.5,S03 normal load subjects
+OBS-005,S04-SL-MIXED,2026-05-13T13:39:48Z,84.3,2450.0,4,25.3,75.5,S04 spike mixed
+OBS-006,S05-NL-EXTRES,2026-05-13T13:43:15Z,83.9,2510.0,4,23.9,72.9,S05 external resources
+OBS-007,S06-NL-WEBCATALOG,2026-05-13T13:43:53Z,84.0,2490.0,4,24.2,73.5,S06 web catalog normal
+OBS-008,S07-PL-WEBCATALOG,2026-05-13T13:45:06Z,84.2,2465.0,4,24.6,74.0,S07 web catalog peak
+OBS-009,S08-BND-INTEGRATION,2026-05-13T13:46:17Z,83.7,2550.0,4,24.1,73.1,S08 integration boundary
+OBS-010,S09-END-CATALOG,2026-05-13T13:42:06Z,83.9,2520.0,4,23.5,72.0,S09 endurance catalog
+OBS-011,post-run-final,2026-05-13T13:47:31Z,83.7,2550.3,4,23.2,72.5,Post-run final state

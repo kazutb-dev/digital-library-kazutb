@@ -2,11 +2,22 @@
 
 namespace Tests\Feature\Auth;
 
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Http;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class LoginTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpAdminControlPlane();
+        $this->withoutMiddleware(PreventRequestForgery::class);
+    }
+
     public function test_user_can_login_with_email(): void
     {
         Http::fake([

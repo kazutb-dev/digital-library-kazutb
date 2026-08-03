@@ -1,12 +1,13 @@
 @extends('layouts.public')
 
 @php
-  $lang = request()->query('lang', 'ru');
+  $lang = app()->getLocale();
   $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
   $activePage = $activePage ?? 'events';
+  $initialVisibleEvents = 10;
 
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
-      if ($lang !== 'ru' && ! array_key_exists('lang', $query)) {
+      if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
       }
       $qs = http_build_query(array_filter($query, static fn ($v) => $v !== null && $v !== ''));
@@ -20,16 +21,29 @@
 @section('title', $copy['title'])
 
 @section('content')
-  <div class="events-canonical">
+  <div class="events-canonical public-v2 events-v2">
     {{-- Header — canonical display heading + lead paragraph. --}}
-    <header class="events-canonical__header" data-section="events-canonical-header">
-      <h1 class="events-canonical__display">{{ $copy['hero_title'] }}</h1>
-      <p class="events-canonical__lead">{{ $copy['hero_body'] }}</p>
+    <header class="public-v2__hero events-canonical__header" data-section="events-canonical-header">
+      <div class="public-v2__inset public-v2__hero-grid">
+      <div>
+        @isset($copy['hero_eyebrow'])
+          <p class="public-v2__kicker">{{ $copy['hero_eyebrow'] }}</p>
+        @endisset
+        <h1 class="public-v2__title">{{ $copy['hero_title'] }}</h1>
+        <p class="public-v2__lead">{{ $copy['hero_body'] }}</p>
+      </div>
+      <aside class="public-v2__hero-note">
+        <strong>{{ count($eventItems) }}</strong>
+        <span>{{ $copy['hero_eyebrow'] }}</span>
+      </aside>
+      </div>
     </header>
 
+    <div class="public-v2__body">
+    <div class="public-v2__inset">
     {{-- Events list — vertical stack, first event carries the teal highlight rail. --}}
     <section class="events-canonical__list" data-section="events-canonical-list">
-      @foreach($eventItems as $index => $event)
+      @forelse($eventItems as $index => $event)
         @php
           $e = $event['i18n'][$lang];
           $isFeatured = ! empty($event['featured']);
@@ -37,6 +51,7 @@
         @endphp
         <article
           class="events-canonical__card {{ $isFeatured ? 'events-canonical__card--featured' : '' }}"
+          @if($index >= $initialVisibleEvents) hidden @endif
           data-event-slot
           data-event-slug="{{ $eventSlug }}"
           data-event-category="{{ $event['category_slug'] }}"
@@ -55,23 +70,37 @@
                 <span class="material-symbols-outlined" aria-hidden="true">location_on</span>
                 <span>{{ $e['venue'] }}</span>
               </div>
-              <a class="events-canonical__details-link"
-                 href="{{ $routeWithLang('/events/' . $eventSlug) }}"
-                 data-test-id="events-canonical-details-{{ $eventSlug }}">
-                <span>{{ $copy['event_details_cta'] }}</span>
-                <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-              </a>
             </div>
           </div>
+          <a style="margin-right:20px;" class="public-v2__button events-v2__register"
+             href="{{ $routeWithLang('/events/' . $eventSlug) }}"
+             data-test-id="events-canonical-details-{{ $eventSlug }}">
+            {{ $copy['event_details_cta'] }}
+          </a>
         </article>
-      @endforeach
+      @empty
+        <div class="public-v2__empty">
+          <span class="material-symbols-outlined" aria-hidden="true">event_busy</span>
+          <h3>{{ $copy['hero_title'] }}</h3>
+          <p>{{ $copy['hero_body'] }}</p>
+        </div>
+      @endforelse
     </section>
 
     {{-- Load More — UI-only surface for now; real pagination arrives with /events/{slug} module. --}}
     <div class="events-canonical__load-more-wrap" data-section="events-canonical-load-more">
-      <button type="button" class="events-canonical__load-more" data-test-id="events-canonical-load-more">
+      <button
+        type="button"
+        class="events-canonical__load-more"
+        data-test-id="events-canonical-load-more"
+        data-events-load-more
+        @if(count($eventItems) <= $initialVisibleEvents) hidden @endif
+      >
         {{ $copy['load_more'] }}
       </button>
+    </div>
+
+    </div>
     </div>
   </div>
 @endsection
@@ -79,16 +108,17 @@
 @section('head')
 <style>
   .events-canonical {
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: 80px 16px 96px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
     color: #191c1d;
     font-family: 'Manrope', sans-serif;
   }
 
   @media (min-width: 768px) {
     .events-canonical {
-      padding: 96px 32px;
+      padding: 0;
     }
   }
 
@@ -326,5 +356,37 @@
   .events-canonical__page-btn:hover {
     background: #e1e3e4;
   }
+
+  .events-canonical__card[hidden] {
+    display: none !important;
+  }
 </style>
+@endsection
+
+@section('scripts')
+<script>
+  (() => {
+    const page = document.querySelector('.events-canonical');
+    if (!page) return;
+
+    const cards = Array.from(page.querySelectorAll('.events-canonical__card[data-event-slot]'));
+    const button = page.querySelector('[data-events-load-more]');
+    const batchSize = 10;
+
+    if (!button || cards.length <= batchSize) return;
+
+    const revealNextBatch = () => {
+      const hiddenCards = cards.filter((card) => card.hasAttribute('hidden'));
+      hiddenCards.slice(0, batchSize).forEach((card) => {
+        card.hidden = false;
+      });
+
+      if (cards.every((card) => !card.hasAttribute('hidden'))) {
+        button.hidden = true;
+      }
+    };
+
+    button.addEventListener('click', revealNextBatch);
+  })();
+</script>
 @endsection

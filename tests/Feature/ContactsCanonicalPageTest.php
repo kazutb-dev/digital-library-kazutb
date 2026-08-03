@@ -9,11 +9,15 @@ use Tests\TestCase;
 /**
  * Phase 3 Cluster B.6 — canonical-exact /contacts page.
  *
- * Mirrors docs/design-exports/contacts_canonical + integrates the three
- * v1 fund rooms (1/200, 1/202, 1/203) as public wayfinding truth. The
- * previous shared-view activePage='contacts' branch on about.blade.php
- * and the B.3 contacts-location/contacts-fund-rooms/contacts-visit-notes
- * markers are retired.
+ * Mirrors docs/design-exports/contacts_canonical. The previous shared-view
+ * activePage='contacts' branch on about.blade.php and the B.3
+ * contacts-location/contacts-fund-rooms/contacts-visit-notes markers are
+ * retired.
+ *
+ * The fund-guidance block (three v1 rooms 1/200, 1/202, 1/203 plus the map
+ * placeholder) was removed from the page on request; its absence is pinned by
+ * test_contacts_page_no_longer_renders_the_fund_guidance_block so it cannot
+ * reappear unnoticed. The seeded copy is retained in $contactsSeedProvider.
  */
 class ContactsCanonicalPageTest extends TestCase
 {
@@ -43,13 +47,13 @@ class ContactsCanonicalPageTest extends TestCase
         $response = $this->get('/contacts?lang=en');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('KazUTB Library', false);
         $response->assertSee('Direct Inquiries', false);
         $response->assertSee('Academic Support', false);
         $response->assertSee('Support Channels', false);
         $response->assertSee('Submit an Inquiry', false);
         $response->assertSee('Physical Location', false);
-        $response->assertSee('Fund Guidance &amp; Wayfinding', false);
+        $response->assertSee('Library staff', false);
     }
 
     public function test_contacts_page_renders_all_canonical_sections(): void
@@ -61,7 +65,7 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertSee('data-section="contacts-canonical-support"', false);
         $response->assertSee('data-section="contacts-canonical-inquiry-form"', false);
         $response->assertSee('data-section="contacts-canonical-location"', false);
-        $response->assertSee('data-section="contacts-canonical-fund-guidance"', false);
+        $response->assertSee('data-section="contacts-canonical-staff"', false);
         $response->assertSee('data-section="contacts-canonical-visit-rules"', false);
     }
 
@@ -75,7 +79,7 @@ class ContactsCanonicalPageTest extends TestCase
             'data-section="contacts-canonical-support"',
             'data-section="contacts-canonical-inquiry-form"',
             'data-section="contacts-canonical-location"',
-            'data-section="contacts-canonical-fund-guidance"',
+            'data-section="contacts-canonical-staff"',
             'data-section="contacts-canonical-visit-rules"',
         ], false);
     }
@@ -97,22 +101,17 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertDontSee('KazUTB Digital Library', false);
     }
 
-    public function test_contacts_page_renders_three_v1_fund_rooms_in_order(): void
+    public function test_contacts_page_no_longer_renders_the_fund_guidance_block(): void
     {
         $response = $this->get('/contacts?lang=en');
 
         $response->assertOk();
-        $response->assertSee('data-room-code="1/200"', false);
-        $response->assertSee('data-room-code="1/202"', false);
-        $response->assertSee('data-room-code="1/203"', false);
-        $response->assertSeeInOrder([
-            'data-room-code="1/200"',
-            'data-room-code="1/202"',
-            'data-room-code="1/203"',
-        ], false);
-        $response->assertSee('Technology fund', false);
-        $response->assertSee('College fund', false);
-        $response->assertSee('Economics fund', false);
+        $response->assertDontSee('data-section="contacts-canonical-fund-guidance"', false);
+        $response->assertDontSee('data-fund-room-slot', false);
+        $response->assertDontSee('data-room-code="1/200"', false);
+        $response->assertDontSee('data-room-code="1/202"', false);
+        $response->assertDontSee('data-room-code="1/203"', false);
+        $response->assertDontSee('data-test-id="contacts-canonical-map"', false);
     }
 
     public function test_contacts_page_renders_both_support_channel_emails(): void
@@ -136,14 +135,13 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertSee('action="mailto:library@kazutb.edu.kz"', false);
     }
 
-    public function test_contacts_page_renders_directions_link_and_map_placeholder(): void
+    public function test_contacts_page_renders_directions_link(): void
     {
         $response = $this->get('/contacts?lang=en');
 
         $response->assertOk();
         $response->assertSee('data-test-id="contacts-canonical-directions"', false);
         $response->assertSee('https://www.google.com/maps/search/?api=1&amp;query=', false);
-        $response->assertSee('data-test-id="contacts-canonical-map"', false);
     }
 
     public function test_contacts_page_renders_cross_links_preserving_lang(): void
@@ -176,9 +174,7 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertSee('Прямые обращения', false);
         $response->assertSee('Каналы поддержки', false);
         $response->assertSee('Отправить запрос', false);
-        $response->assertSee('Технологический фонд', false);
-        $response->assertSee('Фонд колледжа', false);
-        $response->assertSee('Экономический фонд', false);
+        $response->assertSee('Сотрудники библиотеки', false);
         $response->assertSee('href="/rules"', false);
         $response->assertSee('href="/leadership"', false);
     }
@@ -190,9 +186,7 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Тікелей сұраулар', false);
         $response->assertSee('Қолдау арналары', false);
-        $response->assertSee('Технологиялық қор', false);
-        $response->assertSee('Колледж қоры', false);
-        $response->assertSee('Экономикалық қор', false);
+        $response->assertSee('Кітапхана қызметкерлері', false);
         $response->assertSee('href="/rules?lang=kk"', false);
         $response->assertSee('href="/leadership?lang=kk"', false);
     }
@@ -212,7 +206,7 @@ class ContactsCanonicalPageTest extends TestCase
         $response = $this->get('/contacts?lang=en');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Smart Library', false);
+        $response->assertSee('KazUTB Library', false);
         $response->assertSee('Sign out', false);
     }
 }

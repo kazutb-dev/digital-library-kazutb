@@ -1,0 +1,92 @@
+[
+  {
+    "testCaseId": "P2-API-AUTH-001",
+    "module": "Auth",
+    "name": "Anonymous access to /api/v1/me returns unauthorized",
+    "passed": true,
+    "statusCode": 401,
+    "elapsedMs": 3665.05,
+    "notes": "Response status code does not indicate success: 401 (Unauthorized)."
+  },
+  {
+    "testCaseId": "P2-API-AUTH-002",
+    "module": "Auth",
+    "name": "Anonymous access to /api/v1/account/reservations returns unauthorized",
+    "passed": true,
+    "statusCode": 401,
+    "elapsedMs": 3539.66,
+    "notes": "Response status code does not indicate success: 401 (Unauthorized)."
+  },
+  {
+    "testCaseId": "P2-API-AUTH-003",
+    "module": "Authorization",
+    "name": "Anonymous access to internal circulation endpoint is blocked",
+    "passed": true,
+    "statusCode": 404,
+    "elapsedMs": 3608.08,
+    "notes": "Response status code does not indicate success: 404 (Not Found)."
+  },
+  {
+    "testCaseId": "P2-API-CAT-001",
+    "module": "Catalog/Public API",
+    "name": "Landing API returns data",
+    "passed": true,
+    "statusCode": 200,
+    "elapsedMs": 3631.31,
+    "notes": "expects JSON payload"
+  },
+  {
+    "testCaseId": "P2-API-CAT-002",
+    "module": "Catalog/Public API",
+    "name": "Catalog API returns data collection",
+    "passed": true,
+    "statusCode": 200,
+    "elapsedMs": 3036.62,
+    "notes": "expects data field"
+  },
+  {
+    "testCaseId": "P2-API-CAT-003",
+    "module": "Catalog/Public API",
+    "name": "Subjects API responds successfully",
+    "passed": true,
+    "statusCode": 200,
+    "elapsedMs": 3257.42,
+    "notes": "subjects endpoint"
+  },
+  {
+    "testCaseId": "P2-API-INT-001",
+    "module": "Integration API",
+    "name": "Boundary ping endpoint responds",
+    "passed": false,
+    "statusCode": 404,
+    "elapsedMs": 4661.33,
+    "notes": "status may depend on auth policy"
+  },
+  {
+    "testCaseId": "P2-API-INT-002",
+    "module": "Integration API",
+    "name": "Reservations integration endpoint enforces policy",
+    "passed": false,
+    "statusCode": 404,
+    "elapsedMs": 3393.56,
+    "notes": "policy-enforced endpoint"
+  },
+  {
+    "testCaseId": "P2-API-OPS-001",
+    "module": "Circulation/Operations",
+    "name": "Internal review API blocked for anonymous access",
+    "passed": true,
+    "statusCode": 403,
+    "elapsedMs": 3356.91,
+    "notes": "RBAC enforcement check"
+  },
+  {
+    "testCaseId": "P2-API-OPS-002",
+    "module": "Admin Operations",
+    "name": "Admin integrations page is not publicly accessible",
+    "passed": false,
+    "statusCode": 404,
+    "elapsedMs": 3348.09,
+    "notes": "admin guard check"
+  }
+]

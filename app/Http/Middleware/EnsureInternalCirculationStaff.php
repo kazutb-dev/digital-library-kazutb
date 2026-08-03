@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\AuthSessionManager;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -9,6 +10,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureInternalCirculationStaff
 {
+    public function __construct(private readonly AuthSessionManager $sessions) {}
+
     /**
      * @param  Closure(Request): Response  $next
      */
@@ -20,9 +23,12 @@ class EnsureInternalCirculationStaff
             return $this->forbiddenResponse();
         }
 
-        $role = mb_strtolower(trim((string) ($user['role'] ?? '')));
+        $authenticatedUser = $request->user();
+        if ($authenticatedUser === null || ! $authenticatedUser->is_active) {
+            if ($authenticatedUser !== null) {
+                $this->sessions->logout($request, 'inactive_account');
+            }
 
-        if (! in_array($role, ['librarian', 'admin'], true)) {
             return $this->forbiddenResponse();
         }
 

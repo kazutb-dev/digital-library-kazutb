@@ -1,7 +1,7 @@
 @php
   $pageLang = $pageLang ?? app()->getLocale();
-  $pageLang = in_array($pageLang, ['kk', 'ru', 'en'], true) ? $pageLang : 'ru';
-  $loginRedirectUrl = $pageLang === 'ru' ? '/login' : ('/login?lang=' . $pageLang);
+  $pageLang = in_array($pageLang, ['kk', 'ru', 'en'], true) ? $pageLang : 'kk';
+  $loginRedirectUrl = '/login';
 @endphp
 <!DOCTYPE html>
 <html lang="{{ $pageLang }}">
@@ -9,12 +9,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>@yield('title', 'KazUTB Smart Library')</title>
+  <title>@yield('title', __('brand.library.name').' — '.__('brand.university.full'))</title>
+  @include('partials.favicons')
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700;800&family=Literata:opsz,wght@7..72,400..700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/fonts/fonts.css">
   <script id="tailwind-config">
     tailwind.config = {
       darkMode: 'class',
@@ -85,12 +83,15 @@
     }
   </script>
   <link rel="stylesheet" href="/css/shell.css">
+  <link rel="stylesheet" href="/css/home-sections.css">
   <style>
     body { font-family: 'Google Sans', sans-serif; }
     .serif-italic { font-family: 'Literata', serif; font-style: italic; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
   </style>
   @yield('head')
+  <link rel="stylesheet" href="/css/public-unified.css">
+  <link rel="stylesheet" href="/css/public-pages-v2.css">
 </head>
 <body class="{{ trim('site-shell ' . $__env->yieldContent('body_class')) }}">
   <a href="#main-content" class="skip-link">{{ __('ui.skip_to_main') }}</a>

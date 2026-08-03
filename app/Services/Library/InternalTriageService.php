@@ -8,8 +8,11 @@ use Illuminate\Support\Facades\Schema;
 class InternalTriageService
 {
     private const COPY_TABLE = 'app.book_copies';
+
     private const DOCUMENT_TABLE = 'app.documents';
+
     private const READER_TABLE = 'app.readers';
+
     private const QUALITY_ISSUES_TABLE = 'review.quality_issues';
 
     /**
@@ -54,7 +57,7 @@ class InternalTriageService
     }
 
     /**
-     * @param array{total: int, needsReview: int} $counts
+     * @param  array{total: int, needsReview: int}  $counts
      * @return array<string, mixed>
      */
     private function entityMetrics(array $counts): array

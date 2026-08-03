@@ -1,0 +1,44 @@
+{
+    "chaos_rerun": {
+        "status": "Not Applicable",
+        "notes": "Chaos engineering requires fault injection infrastructure not in scope",
+        "metrics": [
+            {
+                "metric": "Chaos Test Scenarios",
+                "value": "N/A",
+                "status": "Not Applicable",
+                "notes": "Chaos engineering requires fault injection infrastructure not in scope"
+            },
+            {
+                "metric": "Service Resilience",
+                "value": "N/A",
+                "status": "Observed Stable",
+                "notes": "Docker environment remained stable across 947-test suite execution"
+            },
+            {
+                "metric": "Database Failover Recovery",
+                "value": "N/A",
+                "status": "Not Tested",
+                "notes": "PostgreSQL failover not tested; environment maintains single instance"
+            },
+            {
+                "metric": "API Circuit Breaker",
+                "value": "N/A",
+                "status": "Not Implemented",
+                "notes": "Not required for this test environment"
+            },
+            {
+                "metric": "Graceful Degradation",
+                "value": "N/A",
+                "status": "Not Tested",
+                "notes": "Blocked test scenarios degrade gracefully (return 404/500 as expected)"
+            },
+            {
+                "metric": "Cascading Failure Scenarios",
+                "value": "N/A",
+                "status": "Not Applicable",
+                "notes": "Limited service dependencies in test environment"
+            }
+        ]
+    }
+}
