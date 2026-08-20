@@ -10,6 +10,7 @@ use App\Models\Catalog\Fine;
 use App\Models\Catalog\Loan;
 use App\Models\Catalog\ReaderNotification;
 use App\Models\Catalog\ReplacementCandidate;
+use App\Models\Fund;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -277,17 +278,30 @@ class IncidentCaseService
                 throw CirculationException::because('replacement_already_registered');
             }
             $candidate = $case->candidates()->where('status', 'approved')->latest('reviewed_at')->firstOrFail();
-            $recordId = $attributes['bibliographic_record_id'] ?? $candidate->bibliographic_record_id;
+            $recordId = $candidate->bibliographic_record_id;
             if ($recordId === null) {
                 throw ValidationException::withMessages(['bibliographic_record_id' => __('incidents.errors.record_required')]);
+            }
+            $requestedRecordId = $attributes['bibliographic_record_id'] ?? null;
+            if ($requestedRecordId !== null && (int) $requestedRecordId !== (int) $recordId) {
+                throw ValidationException::withMessages(['bibliographic_record_id' => __('incidents.errors.record_mismatch')]);
+            }
+
+            $branchId = $attributes['branch_id'] ?? null;
+            $fundId = $attributes['fund_id'] ?? null;
+            if ($fundId !== null && ($branchId === null || ! Fund::query()
+                ->whereKey($fundId)
+                ->where('branch_id', $branchId)
+                ->exists())) {
+                throw ValidationException::withMessages(['fund_id' => __('incidents.errors.fund_branch_mismatch')]);
             }
 
             $copy = BookCopy::query()->create([
                 'bibliographic_record_id' => $recordId,
                 'inventory_number' => $attributes['inventory_number'],
                 'barcode' => $attributes['barcode'],
-                'branch_id' => $attributes['branch_id'] ?? null,
-                'fund_id' => $attributes['fund_id'] ?? null,
+                'branch_id' => $branchId,
+                'fund_id' => $fundId,
                 'shelf_location' => $attributes['shelf_location'] ?? null,
                 'storage_sigla' => $attributes['storage_sigla'] ?? null,
                 'condition' => $attributes['condition'],
@@ -368,12 +382,32 @@ class IncidentCaseService
             }
 
             $old = $this->caseSnapshot($case);
+            $copy = $case->originalCopy;
+            $copyStatusBefore = (string) $copy->status;
             $copyStatus = match ($resolutionType) {
                 'repair' => 'under_repair',
                 'write_off' => 'written_off',
-                default => $case->originalCopy->status,
+                default => $copyStatusBefore,
             };
-            $case->originalCopy->update(['status' => $copyStatus]);
+            $copy->update(['status' => $copyStatus]);
+            $copy->recordHistory(
+                match ($resolutionType) {
+                    'repair' => 'sent_to_repair',
+                    'write_off' => 'written_off',
+                    default => 'incident_resolved',
+                },
+                $case->reader_id,
+                $actor->getKey(),
+                $case->loan_id,
+                [
+                    'incident_case_id' => $case->getKey(),
+                    'case_number' => $case->case_number,
+                    'resolution_type' => $resolutionType,
+                    'old_status' => $copyStatusBefore,
+                    'new_status' => $copyStatus,
+                    'reason' => $reason,
+                ],
+            );
 
             if ($waiveFine && $case->fine_id !== null) {
                 abort_unless($actor->can('fines.waive'), 403);

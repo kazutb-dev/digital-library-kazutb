@@ -37,11 +37,11 @@
     },
     "scripts": {
         "setup": [
-            "composer install",
-            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "@php artisan key:generate",
-            "@php artisan migrate --force",
-            "npm install",
+        "composer install",
+        "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+        "@php artisan key:generate",
+        "@php -r \"fwrite(STDOUT, 'Database migrations are a separate, explicitly approved operation.'.PHP_EOL);\"",
+        "npm install",
             "npm run build"
         ],
         "dev": [

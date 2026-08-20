@@ -2,7 +2,7 @@
 
 @php
     $lang = app()->getLocale();
-    $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+    $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
 
     $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
         if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
@@ -18,7 +18,8 @@
     $indexCopy = $indexChrome[$lang];
 @endphp
 
-@section('title', $baseI18n['title'] . ' — KazUTB')
+@section('title', $baseI18n['title'] . ' — ' . __('brand.university.full'))
+@section('meta_description', $detailI18n['subtitle'])
 
 @section('head')
 <style>

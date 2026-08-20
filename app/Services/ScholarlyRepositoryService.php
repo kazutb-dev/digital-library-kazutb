@@ -2,51 +2,43 @@
 
 namespace App\Services;
 
+use App\Models\Catalog\RepositoryItem;
 use Illuminate\Support\Collection;
 
 /**
- * Scholarly repository read service (PROJECT_CONTEXT §20).
+ * Scholarly repository read service (PROJECT_CONTEXT 20).
  *
- * Serves published scientific-work metadata for the public /repository
- * surfaces. Backed by config/repository_works.php for now; a future backend
- * phase replaces the config source with the scientific_works table while
- * keeping this API stable.
+ * Compatibility read service for code that has not yet moved to the public
+ * repository controller. The canonical source is repository_items; the old
+ * config-backed catalogue must never drift into a second public data source.
  */
 class ScholarlyRepositoryService
 {
-    public const TYPES = [
-        'bachelor_thesis',
-        'master_dissertation',
-        'phd_dissertation',
-        'article',
-        'report',
-        'journal',
-    ];
+    public const TYPES = RepositoryItem::WORK_TYPES;
 
     /**
      * Published works, newest first, optionally filtered by work type.
      */
     public function list(?string $type = null): Collection
     {
-        $works = collect(config('repository_works.works', []))
-            ->where('status', 'published');
+        $works = RepositoryItem::query()->publicMetadata();
 
-        if ($type !== null && in_array($type, self::TYPES, true)) {
-            $works = $works->where('type', $type);
+        if ($type !== null && in_array($type, RepositoryItem::acceptedWorkTypes(), true)) {
+            $works->whereIn('work_type', RepositoryItem::equivalentWorkTypes($type));
         }
 
-        return $works
-            ->sortByDesc('published_at')
-            ->values();
+        return $works->orderByDesc('published_at')->orderByDesc('id')->get();
     }
 
     public function findBySlug(string $slug): ?array
     {
-        $work = collect(config('repository_works.works', []))
-            ->where('status', 'published')
-            ->firstWhere('slug', $slug);
+        if (! ctype_digit($slug)) {
+            return null;
+        }
 
-        return is_array($work) ? $work : null;
+        $work = RepositoryItem::query()->publicMetadata()->find((int) $slug);
+
+        return $work?->toArray();
     }
 
     /**
@@ -56,9 +48,16 @@ class ScholarlyRepositoryService
      */
     public function typeCounts(): array
     {
-        return collect(config('repository_works.works', []))
-            ->where('status', 'published')
-            ->countBy('type')
-            ->all();
+        return RepositoryItem::query()
+            ->publicMetadata()
+            ->selectRaw('work_type, count(*) as total')
+            ->groupBy('work_type')
+            ->pluck('total', 'work_type')
+            ->reduce(function (array $counts, int|string $total, string $type): array {
+                $canonical = RepositoryItem::normaliseWorkType($type) ?? $type;
+                $counts[$canonical] = ($counts[$canonical] ?? 0) + (int) $total;
+
+                return $counts;
+            }, []);
     }
 }

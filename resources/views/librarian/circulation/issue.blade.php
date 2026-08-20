@@ -12,6 +12,10 @@
 
     $copyJsLabels = [
         'not_found' => __('librarian.circulation.copy_not_found_js'),
+        'isbn_found' => __('librarian.circulation.isbn_found'),
+        'isbn_requires_copy' => __('librarian.circulation.isbn_requires_copy'),
+        'available_copies' => __('librarian.circulation.isbn_available_copies'),
+        'view_copies' => __('librarian.circulation.view_edition_copies'),
         'found' => __('librarian.circulation.copy_found'),
         'inventory_number' => __('librarian.copies.fields.inventory_number'),
         'barcode' => __('librarian.copies.fields.barcode'),
@@ -395,7 +399,7 @@
                             </details>
                         @endcan
 
-                        <button class="admin-btn admin-btn-primary w-full sm:w-auto" type="submit">
+                        <button class="admin-btn admin-btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto" id="confirm-issue" type="submit">
                             <span class="material-symbols-outlined text-[19px]">task_alt</span>
                             {{ __('librarian.circulation.confirm_issue') }}
                         </button>
@@ -516,6 +520,39 @@
         return card;
     }
 
+    function buildIsbnMatches(editions) {
+        var wrap = el('div', 'space-y-3');
+
+        editions.forEach(function (edition) {
+            var card = el('div', 'rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950');
+            var heading = el('div', 'flex items-start gap-3');
+            heading.appendChild(icon('menu_book', 'mt-0.5 text-[21px]'));
+            var body = el('div', 'min-w-0 flex-1');
+            body.appendChild(el('p', 'text-xs font-bold uppercase tracking-wider', LABELS.isbn_found));
+            body.appendChild(el('p', 'mt-1 font-headline text-lg', edition.title || '—'));
+            body.appendChild(el('p', 'text-xs opacity-75', [edition.author || '—', edition.isbn || '—'].join(' · ')));
+            body.appendChild(el(
+                'p',
+                'mt-3 text-sm leading-5',
+                LABELS.isbn_requires_copy.replace(':count', String(edition.available_copies_count || 0))
+            ));
+            body.appendChild(el(
+                'p',
+                'mt-1 text-xs font-semibold',
+                LABELS.available_copies.replace(':count', String(edition.available_copies_count || 0))
+            ));
+
+            var link = el('a', 'mt-3 inline-flex items-center gap-1 text-sm font-bold underline', LABELS.view_copies);
+            link.href = edition.copies_url;
+            body.appendChild(link);
+            heading.appendChild(body);
+            card.appendChild(heading);
+            wrap.appendChild(card);
+        });
+
+        return wrap;
+    }
+
     /* Step 1 — reader lookup */
     var readerInput = document.getElementById('reader-search');
     var readerResults = document.getElementById('reader-results');
@@ -523,6 +560,7 @@
     if (readerInput && readerResults) {
         var readerTimer = null;
         var readerController = null;
+        var lastReaderRows = [];
 
         var closeResults = function () {
             readerResults.classList.add('hidden');
@@ -530,6 +568,7 @@
         };
 
         var renderReaders = function (rows) {
+            lastReaderRows = rows;
             readerResults.replaceChildren();
 
             if (rows.length === 0) {
@@ -571,13 +610,13 @@
             if (readerController) { readerController.abort(); }
             readerController = new AbortController();
 
-            fetch(READER_LOOKUP_URL + '?q=' + encodeURIComponent(term), {
+            return fetch(READER_LOOKUP_URL + '?q=' + encodeURIComponent(term), {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
                 signal: readerController.signal
             })
                 .then(function (response) { return response.ok ? response.json() : { data: [] }; })
-                .then(function (payload) { renderReaders(Array.isArray(payload.data) ? payload.data : []); })
+                .then(function (payload) { var rows = Array.isArray(payload.data) ? payload.data : []; renderReaders(rows); return rows; })
                 .catch(function () { /* aborted or offline: keep the previous state */ });
         };
 
@@ -588,6 +627,14 @@
 
         readerInput.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') { closeResults(); }
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                window.clearTimeout(readerTimer);
+                Promise.resolve(searchReaders()).then(function (rows) {
+                    rows = Array.isArray(rows) ? rows : lastReaderRows;
+                    if (rows.length === 1) { window.location.href = ISSUE_URL + '?reader=' + encodeURIComponent(rows[0].id); }
+                });
+            }
         });
 
         document.addEventListener('click', function (event) {
@@ -599,6 +646,7 @@
     /* Step 3 — copy lookup */
     var copyInput = document.getElementById('copy-code');
     var copyPreview = document.getElementById('copy-preview');
+    var confirmIssue = document.getElementById('confirm-issue');
 
     if (copyInput && copyPreview) {
         var copyTimer = null;
@@ -608,6 +656,7 @@
             var term = copyInput.value.trim();
             if (term === '') {
                 copyPreview.replaceChildren();
+                if (confirmIssue) { confirmIssue.disabled = false; }
                 return;
             }
 
@@ -621,9 +670,18 @@
             })
                 .then(function (response) { return response.ok ? response.json() : { data: null }; })
                 .then(function (payload) {
-                    copyPreview.replaceChildren(
-                        payload && payload.data ? buildCopyCard(payload.data) : emptyState(LABELS.not_found)
-                    );
+                    if (payload && payload.data) {
+                        copyPreview.replaceChildren(buildCopyCard(payload.data));
+                        if (confirmIssue) { confirmIssue.disabled = false; }
+                        return;
+                    }
+                    if (payload && payload.match_type === 'isbn' && Array.isArray(payload.editions)) {
+                        copyPreview.replaceChildren(buildIsbnMatches(payload.editions));
+                        if (confirmIssue) { confirmIssue.disabled = true; }
+                        return;
+                    }
+                    copyPreview.replaceChildren(emptyState(LABELS.not_found));
+                    if (confirmIssue) { confirmIssue.disabled = true; }
                 })
                 .catch(function () { /* aborted or offline: keep the previous state */ });
         };
@@ -631,6 +689,13 @@
         copyInput.addEventListener('input', function () {
             window.clearTimeout(copyTimer);
             copyTimer = window.setTimeout(lookupCopy, 250);
+        });
+
+        copyInput.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') { return; }
+            event.preventDefault();
+            window.clearTimeout(copyTimer);
+            lookupCopy();
         });
 
         if (copyInput.value.trim() !== '') { lookupCopy(); }

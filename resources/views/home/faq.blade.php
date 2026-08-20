@@ -1,11 +1,6 @@
 {{--
   Section 6 — FAQ.
 
-  Answers restate the actual policy rather than generic copy: loan and renewal
-  terms follow PROJECT_CONTEXT §13, reservation limits §12, digital access §19,
-  and the service-point rooms §21.7. The AI answer states plainly that the
-  feature is still in development (§34) and routes readers to the bibliographer.
-
   Native <details> keeps the accordion keyboard-accessible with no JavaScript.
 --}}
 @php $f = $sections[$lang]['faq']; @endphp

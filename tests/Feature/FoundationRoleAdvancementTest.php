@@ -98,7 +98,8 @@ class FoundationRoleAdvancementTest extends TestCase
         BookCopy::factory()->create(['bibliographic_record_id' => $record->getKey(), 'status' => 'available']);
 
         $queue = app(ReservationQueueService::class);
-        $hold = $queue->markReady($queue->create($this->reader(), $record), $this->adminUser);
+        $hold = $queue->create($this->reader(), $record, $this->adminUser);
+        $this->assertSame('ready_for_pickup', $hold->status);
 
         // Extend is allowed while nobody waits.
         $this->signInToLibraryAs($senior)
@@ -137,10 +138,7 @@ class FoundationRoleAdvancementTest extends TestCase
             ->assertForbidden();
     }
 
-    /**
-     * The banner must not keep promising work that has already shipped.
-     */
-    public function test_the_foundation_banner_states_what_each_role_already_has(): void
+    public function test_the_workspace_shows_the_localized_role_label(): void
     {
         foreach (['director' => 'reports.view_full', 'cataloguer' => 'catalog.edit_record'] as $role => $_) {
             $user = $this->makeControlPlaneUser($role);
@@ -148,19 +146,17 @@ class FoundationRoleAdvancementTest extends TestCase
             $response = $this->signInToLibraryAs($user)->get('/librarian');
 
             $response->assertOk();
-            $response->assertSee(__('roles.delivered_label'));
-            $response->assertSee(__('roles.delivered.'.$role));
+            $response->assertSee(__('brand.workspace.'.$role));
         }
     }
 
-    public function test_delivered_banner_copy_exists_in_every_locale(): void
+    public function test_workspace_role_labels_exist_in_every_locale(): void
     {
         foreach (['ru', 'kk', 'en'] as $locale) {
             app()->setLocale($locale);
-            $this->assertNotSame('roles.delivered_label', __('roles.delivered_label'), $locale);
             foreach (['director', 'senior_librarian', 'cataloguer'] as $role) {
-                $key = 'roles.delivered.'.$role;
-                $this->assertNotSame($key, __($key), "Missing {$locale} delivered copy for {$role}");
+                $key = 'brand.workspace.'.$role;
+                $this->assertNotSame($key, __($key), "Missing {$locale} role label for {$role}");
             }
         }
         app()->setLocale('ru');

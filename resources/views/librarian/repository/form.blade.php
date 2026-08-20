@@ -2,11 +2,15 @@
 
 @php
     $isEditing = $item->exists;
-    $isLocked = in_array($item->status, ['published', 'archived'], true);
+    $canEditMetadata = $isEditing
+        ? (auth()->user()?->can('edit', $item) ?? false)
+        : (auth()->user()?->can('create', \App\Models\Catalog\RepositoryItem::class) ?? false);
+    $isStateLocked = in_array($item->status, ['published', 'embargoed', 'withdrawn', 'archived'], true);
+    $isLocked = $isStateLocked || ! $canEditMetadata;
 
     $statusTone = static fn (?string $status): string => match ((string) $status) {
         'draft' => 'inactive',
-        'under_review' => 'pending',
+        'metadata_review', 'author_verification', 'rights_review', 'quality_review', 'pending_approval' => 'pending',
         'rejected' => 'failed',
         'published' => 'published',
         'archived' => 'archived',
@@ -47,7 +51,7 @@
     @if ($isLocked)
         <div role="status" class="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <span class="material-symbols-outlined text-[20px]">lock</span>
-            <span>{{ __('librarian.repository.locked_after_publish') }}</span>
+            <span>{{ $isStateLocked ? __('librarian.repository.locked_after_publish') : __('librarian.repository.approval_read_only') }}</span>
         </div>
     @endif
 
@@ -79,6 +83,15 @@
                         >
                         @error('title')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
                     </div>
+                    <div><label class="admin-label" for="repository-source">{{ __('repository.fields.source') }}</label><input class="admin-input" id="repository-source" name="source" value="{{ old('source', $item->source) }}" @disabled($isLocked)></div>
+                    <div><label class="admin-label" for="repository-rights-holder">{{ __('repository.fields.rights_holder') }}</label><input class="admin-input" id="repository-rights-holder" name="rights_holder" value="{{ old('rights_holder', $item->rights_holder) }}" @disabled($isLocked)></div>
+                    <div><label class="admin-label" for="repository-copyright">{{ __('repository.fields.copyright_status') }}</label><select class="admin-input" id="repository-copyright" name="copyright_status" @disabled($isLocked)>@foreach(['unknown','public_domain','permission_granted','university_owned','licensed','restricted'] as $status)<option value="{{ $status }}" @selected(old('copyright_status', $item->copyright_status ?: 'unknown') === $status)>{{ __('repository.copyright.'.$status) }}</option>@endforeach</select></div>
+                    <div><label class="admin-label" for="repository-licence">{{ __('repository.fields.licence_type') }}</label><input class="admin-input" id="repository-licence" name="licence_type" value="{{ old('licence_type', $item->licence_type) }}" @disabled($isLocked)></div>
+                    <div><label class="admin-label" for="repository-permission-date">{{ __('repository.fields.permission_date') }}</label><input class="admin-input" id="repository-permission-date" type="date" name="permission_date" value="{{ old('permission_date', $item->permission_date?->format('Y-m-d')) }}" @disabled($isLocked)></div>
+                    <div class="sm:col-span-2"><label class="admin-label" for="repository-licence-text">{{ __('repository.fields.licence_text') }}</label><textarea class="admin-input min-h-24" id="repository-licence-text" name="licence_text" maxlength="5000" @disabled($isLocked)>{{ old('licence_text', $item->licence_text) }}</textarea></div>
+                    <div><label class="admin-label" for="repository-access">{{ __('repository.fields.access_policy') }}</label><select class="admin-input" id="repository-access" name="access_policy" @disabled($isLocked)>@foreach(\App\Models\Catalog\RepositoryItem::ACCESS_POLICIES as $policy)<option value="{{ $policy }}" @selected(old('access_policy', $item->access_policy ?: 'metadata_only') === $policy)>{{ __('repository.access.'.$policy) }}</option>@endforeach</select></div>
+                    <div><label class="admin-label" for="repository-embargo">{{ __('repository.fields.embargo_until') }}</label><input class="admin-input" id="repository-embargo" type="date" name="embargo_until" value="{{ old('embargo_until', $item->embargo_until?->format('Y-m-d')) }}" @disabled($isLocked)></div>
+                    <div><label class="admin-label" for="repository-post-embargo-access">{{ __('repository.fields.post_embargo_access_policy') }}</label><select class="admin-input" id="repository-post-embargo-access" name="post_embargo_access_policy" @disabled($isLocked)><option value="">—</option>@foreach(\App\Models\Catalog\RepositoryItem::POST_EMBARGO_ACCESS_POLICIES as $policy)<option value="{{ $policy }}" @selected(old('post_embargo_access_policy', $item->post_embargo_access_policy) === $policy)>{{ __('repository.access.'.$policy) }}</option>@endforeach</select><p class="mt-2 text-xs leading-5 text-slate-500">{{ __('repository.post_embargo_help') }}</p></div>
 
                     <div class="sm:col-span-2">
                         <label for="repository-authors" class="admin-label">{{ __('librarian.repository.fields.authors') }}</label>
@@ -93,6 +106,7 @@
                         <p class="mt-2 text-xs leading-5 text-slate-500">{{ __('librarian.repository.fields.authors_help') }}</p>
                         @error('authors')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
                     </div>
+                    <div><label class="admin-label" for="repository-orcid">{{ __('repository.fields.primary_author_orcid') }}</label><input class="admin-input" id="repository-orcid" name="author_orcid" value="{{ old('author_orcid', $item->authorsList->first()?->orcid) }}" placeholder="0000-0000-0000-0000" @disabled($isLocked)></div>
 
                     <div>
                         <label for="repository-work-type" class="admin-label">{{ __('librarian.repository.fields.work_type') }}</label>
@@ -196,6 +210,12 @@
                             <span class="block text-xs font-bold uppercase tracking-wider text-slate-500">{{ __('librarian.repository.file_current') }}</span>
                             <strong class="mt-1 block break-all text-primary">{{ $item->file_name }}</strong>
                             <span class="mt-0.5 block text-xs text-slate-500">{{ $formatBytes($item->file_size) }}</span>
+                            @can('readFull', $item)
+                                <a class="mt-2 inline-flex items-center gap-1 text-xs font-bold text-secondary hover:underline" href="{{ route('librarian.repository.file', $item) }}">
+                                    <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                                    {{ __('librarian.repository.open_file') }}
+                                </a>
+                            @endcan
                         </span>
                     @else
                         <span class="material-symbols-outlined text-[22px] text-slate-400">upload_file</span>
@@ -215,6 +235,9 @@
                     >
                     @error('file')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
                 </div>
+                @if($isEditing && $item->file_path)
+                    <div class="mt-4"><label class="admin-label" for="repository-version-reason">{{ __('repository.fields.version_reason') }}</label><textarea class="admin-input" id="repository-version-reason" name="version_reason" maxlength="2000"></textarea>@error('version_reason')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror</div>
+                @endif
             </section>
 
             @unless ($isLocked)
@@ -248,6 +271,10 @@
                             <dd class="text-right font-semibold text-primary">{{ $item->uploadedBy?->name ?? '—' }}</dd>
                         </div>
                         <div class="flex justify-between gap-4">
+                            <dt class="text-slate-500">{{ __('librarian.repository.fields.reviewed_by') }}</dt>
+                            <dd class="text-right font-semibold text-primary">{{ $item->reviewedBy?->name ?? '—' }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4">
                             <dt class="text-slate-500">{{ __('librarian.repository.fields.approved_by') }}</dt>
                             <dd class="text-right font-semibold text-primary">{{ $item->approvedBy?->name ?? '—' }}</dd>
                         </div>
@@ -267,22 +294,84 @@
                             <p class="whitespace-pre-line rounded-xl bg-surface-container-low px-3 py-2.5 text-sm leading-6 text-slate-700">{{ $item->review_notes }}</p>
                         </div>
                     @endif
+                    @if ($item->reviews->isNotEmpty())
+                        <div class="mt-4 border-t border-slate-100 pt-4" data-section="repository-workflow-audit">
+                            <span class="admin-label">{{ __('librarian.repository.workflow_history') }}</span>
+                            <ol class="mt-2 space-y-2 text-xs leading-5 text-slate-600">
+                                @foreach($item->reviews as $review)
+                                    <li>
+                                        <strong>{{ __('librarian.repository.statuses.'.$review->decision) }}</strong>
+                                        · {{ $review->reviewer?->name ?? '—' }} · {{ $review->created_at?->format('d.m.Y H:i') }}
+                                        @if(filled($review->comment))<span class="block whitespace-pre-line">{{ $review->comment }}</span>@endif
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </div>
+                    @endif
                 </section>
 
+                @if ($item->versions->isNotEmpty())
+                    <section class="admin-card" data-section="repository-version-history">
+                        <h2 class="font-headline text-xl text-primary">{{ __('librarian.repository.version_history') }}</h2>
+                        <ol class="mt-4 space-y-3">
+                            @foreach ($item->versions as $version)
+                                <li class="rounded-xl border border-slate-100 bg-surface-container-low px-3 py-3 text-sm">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <strong class="text-primary">v{{ $version->version_number }} · {{ $version->file_name }}</strong>
+                                        @if($version->is_active)<span class="text-xs font-bold uppercase text-teal-700">{{ __('librarian.repository.version_active') }}</span>@endif
+                                    </div>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $formatBytes($version->file_size) }} · {{ $version->created_at?->format('d.m.Y H:i') }}</p>
+                                    <p class="mt-2 text-xs leading-5 text-slate-600">{{ $version->change_reason }}</p>
+                                </li>
+                            @endforeach
+                        </ol>
+                    </section>
+                @endif
+
+                @if (in_array($item->status, ['published', 'embargoed'], true) && auth()->user()?->can('manageVersions', $item))
+                    <form method="POST" action="{{ route('librarian.repository.revisions.store', $item) }}" enctype="multipart/form-data" class="admin-card space-y-4" data-section="repository-new-version">
+                        @csrf
+                        <h2 class="font-headline text-xl text-primary">{{ __('librarian.repository.new_version') }}</h2>
+                        <p class="text-xs leading-5 text-slate-500">{{ __('librarian.repository.new_version_help') }}</p>
+                        <div><label class="admin-label" for="repository-new-version-file">{{ __('librarian.repository.file') }}</label><input class="admin-input" id="repository-new-version-file" type="file" name="file" accept=".pdf,application/pdf" required></div>
+                        <div><label class="admin-label" for="repository-new-version-reason">{{ __('repository.fields.version_reason') }}</label><textarea class="admin-input" id="repository-new-version-reason" name="version_reason" minlength="5" maxlength="2000" required></textarea></div>
+                        <button class="admin-btn admin-btn-primary w-full" type="submit"><span class="material-symbols-outlined">upload_file</span>{{ __('librarian.repository.create_new_version') }}</button>
+                    </form>
+                @endif
+
                 @php
-                    $transitions = collect([
-                        ['action' => 'submit', 'icon' => 'send', 'class' => 'admin-btn-primary', 'allowed' => $item->status === 'draft' && auth()->user()?->can('repository.upload'), 'required' => false],
-                        ['action' => 'approve', 'icon' => 'task_alt', 'class' => 'admin-btn-primary', 'allowed' => $item->status === 'under_review' && auth()->user()?->can('repository.approve'), 'required' => false],
-                        ['action' => 'reject', 'icon' => 'cancel', 'class' => 'admin-btn-danger', 'allowed' => $item->status === 'under_review' && auth()->user()?->can('repository.approve'), 'required' => true],
-                        ['action' => 'publish', 'icon' => 'public', 'class' => 'admin-btn-primary', 'allowed' => $item->status === 'approved' && auth()->user()?->can('repository.publish'), 'required' => false],
-                        ['action' => 'archive', 'icon' => 'archive', 'class' => 'admin-btn-danger', 'allowed' => $item->status === 'published' && auth()->user()?->can('repository.remove'), 'required' => false],
-                    ])->filter(fn (array $transition): bool => (bool) $transition['allowed'])->values();
+                    $transitions = collect(\App\Services\Repository\RepositoryWorkflow::TRANSITIONS[$item->status] ?? [])->map(function (string $target) use ($item): array {
+                        $allowed = match ($target) {
+                            'approved' => auth()->user()?->can('approve', $item),
+                            'scheduled', 'published', 'embargoed' => auth()->user()?->can('publish', $item),
+                            'metadata_review', 'author_verification', 'quality_review', 'pending_approval', 'rejected' => auth()->user()?->can('reviewMetadata', $item),
+                            'rights_review' => auth()->user()?->can('reviewRights', $item),
+                            'changes_requested' => auth()->user()?->can('requestChanges', $item),
+                            'withdrawn', 'archived' => auth()->user()?->can('withdraw', $item),
+                            default => auth()->user()?->can('edit', $item),
+                        };
+
+                        return [
+                            'action' => $target, 'icon' => in_array($target, ['rejected','withdrawn','archived'], true) ? 'block' : 'arrow_forward',
+                            'class' => in_array($target, ['rejected','withdrawn','archived'], true) ? 'admin-btn-danger' : 'admin-btn-primary',
+                            'allowed' => $allowed,
+                            'required' => in_array($target, ['changes_requested','rejected','withdrawn'], true),
+                        ];
+                    })->filter(fn (array $transition): bool => (bool) $transition['allowed'])->values();
                 @endphp
 
                 @foreach ($transitions as $transition)
                     <form method="POST" action="{{ route('librarian.repository.transition', $item) }}" class="admin-card space-y-3">
                         @csrf
                         <input type="hidden" name="action" value="{{ $transition['action'] }}">
+
+                        @if ($transition['action'] === 'scheduled')
+                            <div>
+                                <label for="repository-scheduled-for" class="admin-label">{{ __('repository.fields.scheduled_for') }}</label>
+                                <input id="repository-scheduled-for" class="admin-input" type="datetime-local" name="scheduled_for" min="{{ now()->addMinute()->format('Y-m-d\\TH:i') }}" required>
+                                @error('scheduled_for')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                            </div>
+                        @endif
 
                         <div>
                             <label for="repository-comment-{{ $transition['action'] }}" class="admin-label">{{ __('librarian.repository.comment') }}</label>
@@ -301,7 +390,7 @@
 
                         <button type="submit" class="admin-btn {{ $transition['class'] }} w-full">
                             <span class="material-symbols-outlined text-[19px]">{{ $transition['icon'] }}</span>
-                            {{ __('librarian.repository.actions.'.$transition['action']) }}
+                            {{ __('librarian.repository.statuses.'.$transition['action']) }}
                         </button>
                     </form>
                 @endforeach

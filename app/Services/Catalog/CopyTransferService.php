@@ -8,6 +8,7 @@ use App\Models\Catalog\CopyTransfer;
 use App\Models\Catalog\Reservation;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\DataQuality\DataQualityScanner;
 use Illuminate\Support\Facades\DB;
 
 class CopyTransferService
@@ -16,6 +17,7 @@ class CopyTransferService
         private readonly ReservationStateMachine $states,
         private readonly AuditLogger $audit,
         private readonly LibraryNotificationService $notifications,
+        private readonly DataQualityScanner $scanner,
     ) {}
 
     public function request(Reservation $reservation, User $actor): CopyTransfer
@@ -69,13 +71,44 @@ class CopyTransferService
             if (! in_array($scannedCode, [$copy->barcode, $copy->inventory_number], true)) {
                 throw CirculationException::because('transfer_scan_mismatch');
             }
+            $oldTransfer = $transfer->only(['status']);
+            $locationFields = ['branch_id', 'fund_id', 'storage_sigla', 'room', 'section', 'shelf_location'];
+            $oldLocation = $copy->only($locationFields);
             $transfer->update([
                 'status' => 'received', 'received_by' => $actor->getKey(), 'received_at' => now(),
                 'actual_duration_minutes' => max(0, (int) $transfer->sent_at?->diffInMinutes(now())),
             ]);
-            $copy->update(['branch_id' => $transfer->destination_branch_id]);
+            // Receiving proves the destination branch, but not a fund, room or
+            // shelf there. Keeping the source placement would create a false
+            // cross-branch location, so leave those fields explicitly pending
+            // for physical confirmation instead of guessing a destination.
+            $copy->update([
+                'branch_id' => $transfer->destination_branch_id,
+                'fund_id' => null,
+                'storage_sigla' => null,
+                'room' => null,
+                'section' => null,
+                'shelf_location' => null,
+            ]);
+            $newLocation = $copy->fresh()->only($locationFields);
+            $copy->recordHistory('transfer_received', null, $actor->getKey(), null, [
+                'transfer_id' => $transfer->getKey(),
+                'from_branch_id' => $oldLocation['branch_id'],
+                'to_branch_id' => $transfer->destination_branch_id,
+                'old' => $oldLocation,
+                'new' => $newLocation,
+            ]);
+            $this->scanner->scanModel($copy->fresh(), 'book_copy');
             $reservations->markReady($transfer->reservation, $actor);
-            $this->audit->logRequired('transfer.received', 'copy_transfer', $transfer->getKey(), newValues: ['branch_id' => $transfer->destination_branch_id], scope: 'library', actor: $actor);
+            $this->audit->logRequired(
+                'transfer.received',
+                'copy_transfer',
+                $transfer->getKey(),
+                oldValues: $oldTransfer + $oldLocation,
+                newValues: ['status' => 'received'] + $newLocation,
+                scope: 'library',
+                actor: $actor,
+            );
 
             return $transfer;
         });
@@ -97,8 +130,18 @@ class CopyTransferService
             if ($transfer->status !== $from) {
                 throw CirculationException::because('transfer_invalid_transition');
             }
+            $old = ['status' => $transfer->status];
             $transfer->update([...$values, 'status' => $to]);
-            $this->audit->logRequired($event, 'copy_transfer', $transfer->getKey(), newValues: ['status' => $to], reason: $reason, scope: 'library', actor: $actor);
+            $this->audit->logRequired(
+                $event,
+                'copy_transfer',
+                $transfer->getKey(),
+                oldValues: $old,
+                newValues: ['status' => $to],
+                reason: $reason,
+                scope: 'library',
+                actor: $actor,
+            );
 
             return $transfer;
         });

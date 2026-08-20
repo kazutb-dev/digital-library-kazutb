@@ -13,6 +13,8 @@ return array_replace_recursive($ru, [
         'possible_duplicate' => 'Record #:id may be a duplicate. Review the existing record first.',
         'reason_required' => 'Provide a reason.',
         'record_required' => 'Select or create a bibliographic record.',
+        'record_mismatch' => 'The new copy must use the approved candidate bibliographic record.',
+        'fund_branch_mismatch' => 'The selected collection does not belong to the specified library point.',
         'resolution_disabled' => 'This resolution method is disabled in the settings.',
         'review_required' => 'Complete the criteria review first.',
     ],

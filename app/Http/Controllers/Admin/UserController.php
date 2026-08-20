@@ -40,7 +40,7 @@ class UserController extends Controller
         $direction = $filters['direction'] ?? 'desc';
 
         $users = $this->filteredQuery($filters)
-            ->with('roles')
+            ->with(['roles', 'readerProfile'])
             ->orderBy($sort, $direction)
             ->paginate(Setting::resultsPerPage())
             ->withQueryString();
@@ -55,7 +55,7 @@ class UserController extends Controller
     public function create(): View
     {
         return view('admin.users.form', [
-            'managedUser' => new User(['is_active' => true, 'auth_provider' => 'demo', 'locale' => 'kk']),
+            'managedUser' => new User(['is_active' => true, 'auth_provider' => 'demo', 'locale' => 'ru']),
             'roles' => Role::query()->where('guard_name', 'web')->orderBy('name')->get(),
         ]);
     }
@@ -164,6 +164,9 @@ class UserController extends Controller
 
             $user->update($values);
             $user->syncRoles([$role]);
+            if (! $validated['is_active']) {
+                $this->revokeAuthenticationCredentials($user);
+            }
             $user->refresh()->load('roles');
             $new = $this->auditSnapshot($user);
             $action = $old['is_active'] && ! $new['is_active']
@@ -209,6 +212,9 @@ class UserController extends Controller
                 'deactivated_at' => $nextActive ? null : now(),
                 'deactivated_by' => $nextActive ? null : $request->user()?->getKey(),
             ]);
+            if (! $nextActive) {
+                $this->revokeAuthenticationCredentials($user);
+            }
             $user->refresh()->load('roles');
 
             $audit->logRequired(
@@ -291,6 +297,19 @@ class UserController extends Controller
         );
 
         return back()->with('success', __('admin.users.sessions.revoked', ['count' => $revokedSessions]));
+    }
+
+    /** Deactivation takes effect immediately for web, remember-me and API auth. */
+    private function revokeAuthenticationCredentials(User $user): void
+    {
+        if (Schema::hasTable('sessions')) {
+            DB::table('sessions')->where('user_id', $user->getKey())->delete();
+        }
+        $user->setRememberToken(null);
+        $user->saveQuietly();
+        if (Schema::hasTable('personal_access_tokens')) {
+            $user->tokens()->delete();
+        }
     }
 
     public function export(Request $request, AuditLogger $audit): StreamedResponse

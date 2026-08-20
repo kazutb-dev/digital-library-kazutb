@@ -28,11 +28,17 @@
         $eventIcon = static fn (string $event): string => match ($event) {
             'created' => 'add_circle',
             'updated' => 'edit_note',
+            'location_changed', 'physical_location_corrected' => 'location_on',
+            'physical_presence_confirmed' => 'where_to_vote',
+            'transfer_received' => 'move_down',
             'issued' => 'logout',
             'returned' => 'login',
             'reserved' => 'bookmark',
             'status_change' => 'swap_horiz',
             'repair' => 'build',
+            'repair_returned' => 'construction',
+            'write_off' => 'inventory_2',
+            'lost' => 'search_off',
             'incident' => 'report',
             default => 'history',
         };
@@ -75,10 +81,14 @@
             <span class="material-symbols-outlined text-[19px]">arrow_back</span>
             {{ __('common.actions.back') }}
         </a>
-        <a class="admin-btn admin-btn-secondary" href="{{ route('librarian.copies.label', $copy) }}" target="_blank" rel="noopener">
-            <span class="material-symbols-outlined text-[19px]">print</span>
-            {{ __('librarian.copies.print_label') }}
-        </a>
+        @if($copy->barcode)
+            @can('barcodes.print')
+                <a class="admin-btn admin-btn-secondary" href="{{ route('librarian.copies.label', $copy) }}" target="_blank" rel="noopener">
+                    <span class="material-symbols-outlined text-[19px]">print</span>
+                    {{ __('librarian.copies.print_label') }}
+                </a>
+            @endcan
+        @endif
         @can('copies.edit')
             <a class="admin-btn admin-btn-primary" href="{{ route('librarian.copies.edit', $copy) }}">
                 <span class="material-symbols-outlined text-[19px]">edit</span>
@@ -97,6 +107,49 @@
             {{ __('librarian.copies.fields.issue_count') }}: {{ number_format((int) $copy->issue_count, 0, ',', ' ') }}
         </span>
     </div>
+
+    <section class="admin-card mb-6 border-l-4 {{ $qualityIssues->isEmpty() ? 'border-l-emerald-500' : 'border-l-amber-500' }}">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div><h2 class="font-headline text-2xl text-primary">{{ __('data_quality.title') }}</h2><p class="mt-1 text-sm text-slate-600">{{ $qualityIssues->isEmpty() ? __('data_quality.record.clean') : trans_choice('data_quality.record.issue_count', $qualityIssues->count(), ['count' => $qualityIssues->count()]) }}</p></div>
+            <a class="admin-btn admin-btn-secondary" href="{{ route('librarian.data-quality.index', ['q' => $copy->inventory_number]) }}">{{ __('data_quality.record.open_issues') }}</a>
+        </div>
+        @if($qualityIssues->isNotEmpty())<div class="mt-4 flex flex-wrap gap-2">@foreach($qualityIssues as $qualityIssue)<a class="rounded-lg border px-3 py-2 text-sm hover:border-secondary" href="{{ route('librarian.data-quality.issues.show', $qualityIssue) }}">{{ __('data_quality.rules.'.$qualityIssue->rule_code) }} · {{ __('data_quality.severity.'.$qualityIssue->severity) }}</a>@endforeach</div>@endif
+    </section>
+
+    <section class="admin-card mb-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <p class="admin-label">{{ __('librarian.copies.marking.title') }}</p>
+                <h2 class="mt-1 font-headline text-2xl text-primary">{{ __('librarian.copies.marking.states.'.$markingState) }}</h2>
+                <p class="mt-1 text-sm text-slate-600">{{ $copy->barcode ? $copy->barcode : __('librarian.copies.marking.not_assigned') }}</p>
+            </div>
+            @if($copy->barcode)
+                <span class="rounded-full bg-emerald-50 px-3 py-1.5 font-mono text-sm font-semibold text-emerald-800">{{ $copy->barcode }}</span>
+            @endif
+        </div>
+
+        @can('copies.edit')
+            @if(blank($copy->barcode))
+                <form class="mt-5 grid gap-4 border-t border-slate-100 pt-5 lg:grid-cols-[180px_minmax(0,1fr)_auto]" method="POST" action="{{ route('librarian.copies.barcode.assign', $copy) }}">
+                    @csrf
+                    <label><span class="admin-label">{{ __('librarian.copies.marking.assignment_mode') }}</span><select class="admin-input" name="mode" data-barcode-mode><option value="generate">{{ __('librarian.copies.marking.generate') }}</option><option value="existing">{{ __('librarian.copies.marking.scan_existing') }}</option></select></label>
+                    <label><span class="admin-label">{{ __('librarian.copies.fields.barcode') }}</span><input class="admin-input font-mono" name="barcode" maxlength="64" autocomplete="off" placeholder="{{ __('librarian.copies.marking.scan_placeholder') }}" data-barcode-value disabled>@error('barcode')<span class="mt-1 block text-xs text-red-700">{{ $message }}</span>@enderror</label>
+                    <div class="flex flex-col justify-end gap-2"><label><span class="admin-label">{{ __('librarian.copies.marking.confirm_inventory') }}</span><input class="admin-input font-mono" name="inventory_number_confirmation" autocomplete="off" required></label><label class="flex items-start gap-2 text-xs text-slate-600"><input class="mt-0.5" type="checkbox" name="confirmed" value="1" required><span>{{ __('librarian.copies.marking.assignment_confirmation', ['inventory' => $copy->inventory_number]) }}</span></label><button class="admin-btn admin-btn-primary" type="submit">{{ __('librarian.copies.marking.assign') }}</button></div>
+                </form>
+            @else
+                <div class="mt-5 grid gap-4 border-t border-slate-100 pt-5 lg:grid-cols-2">
+                    @can('barcodes.print')
+                        <div><p class="text-sm text-slate-600">{{ __('librarian.copies.marking.print_hint') }}</p><div class="mt-3 flex flex-wrap gap-2"><a class="admin-btn admin-btn-secondary" href="{{ route('librarian.copies.label', $copy) }}" target="_blank" rel="noopener">{{ __('librarian.copies.print_label') }}</a><form method="POST" action="{{ route('librarian.copies.barcode.printed', $copy) }}">@csrf<button class="admin-btn admin-btn-secondary" type="submit">{{ __('librarian.copies.marking.mark_printed') }}</button></form></div></div>
+                    @endcan
+                    <form method="POST" action="{{ route('librarian.copies.barcode.confirm', $copy) }}">
+                        @csrf
+                        <label><span class="admin-label">{{ __('librarian.copies.marking.confirm_scan') }}</span><input class="admin-input font-mono" name="scanned_barcode" maxlength="64" autocomplete="off" required autofocus placeholder="{{ __('librarian.copies.marking.scan_placeholder') }}">@error('scanned_barcode')<span class="mt-1 block text-xs text-red-700">{{ $message }}</span>@enderror</label>
+                        <button class="admin-btn admin-btn-primary mt-3" type="submit">{{ __('librarian.copies.marking.confirm') }}</button>
+                    </form>
+                </div>
+            @endif
+        @endcan
+    </section>
 
     <div class="grid gap-6 xl:grid-cols-3">
         <div class="space-y-6 xl:col-span-2">
@@ -125,6 +178,14 @@
                     <div>
                         <dt class="admin-label">{{ __('librarian.copies.fields.storage_sigla') }}</dt>
                         <dd class="text-sm text-slate-700">{{ $copy->storage_sigla ?: '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="admin-label">{{ __('librarian.copies.fields.room') }}</dt>
+                        <dd class="text-sm text-slate-700">{{ $copy->room ?: '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="admin-label">{{ __('librarian.copies.fields.section') }}</dt>
+                        <dd class="text-sm text-slate-700">{{ $copy->section ?: '—' }}</dd>
                     </div>
                     <div>
                         <dt class="admin-label">{{ __('librarian.copies.fields.shelf_location') }}</dt>
@@ -337,7 +398,11 @@
                     </div>
                     <div>
                         <dt class="admin-label">{{ __('librarian.copies.fields.acquisition_source') }}</dt>
-                        <dd class="text-sm text-slate-700">{{ $copy->acquisition_source ?: '—' }}</dd>
+                        <dd class="text-sm text-slate-700">
+                            {{ $copy->acquisition_source && trans()->has('librarian.copies.acquisition_sources.'.$copy->acquisition_source)
+                                ? __('librarian.copies.acquisition_sources.'.$copy->acquisition_source)
+                                : ($copy->acquisition_source ?: '—') }}
+                        </dd>
                     </div>
                     <div>
                         <dt class="admin-label">{{ __('librarian.copies.fields.supplier_name') }}</dt>
@@ -568,4 +633,18 @@
             @endcan
         </div>
     </div>
+
+    @if(blank($copy->barcode))
+        @push('scripts')
+            <script>
+                (() => {
+                    const mode = document.querySelector('[data-barcode-mode]');
+                    const value = document.querySelector('[data-barcode-value]');
+                    if (!mode || !value) return;
+                    const sync = () => { value.disabled = mode.value !== 'existing'; value.required = mode.value === 'existing'; if (!value.disabled) value.focus(); };
+                    mode.addEventListener('change', sync); sync();
+                })();
+            </script>
+        @endpush
+    @endif
 @endsection

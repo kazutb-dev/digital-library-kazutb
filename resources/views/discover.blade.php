@@ -15,7 +15,7 @@
   //      with tag chips naming top departments and each card linking into
   //      /catalog via the real faculty secondary-axis query.
   //   3. UDC Knowledge Pathways — 4 cards showing primary UDC axes with real
-  //      KazUTB catalog coverage (004, 33, 62, 50), each linking into
+  //      Kazakh University of Technology and Business named after K. Kulazhanov catalog coverage (004, 33, 62, 50), each linking into
   //      /catalog?udc=XXX as the primary discovery mode.
   //
   // UDC-first discovery remains the primary pathway; faculty/department cards are
@@ -25,7 +25,7 @@
   // contract is never hidden).
 
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
   $activePage = $activePage ?? 'discover';
 
   $withLang = static function (string $path, array $query = []) use ($lang): string {
@@ -41,7 +41,7 @@
   // and projected per-locale through $facultyLabels / $udcLabels below.
   $copy = [
       'ru' => [
-          'title' => 'Центр академического поиска — KazUTB',
+          'title' => 'Центр академического поиска — Казахский университет технологии и бизнеса имени К. Кулажанова',
           'hero_title' => 'Центр академического поиска',
           'hero_body' => 'Навигация по совокупному институциональному знанию. Исследуйте профильные факультеты, углубляйтесь в Универсальную десятичную классификацию (УДК) или открывайте кураторский каталог.',
           'faculties_title' => 'Факультеты и кафедры',
@@ -50,7 +50,7 @@
           'udc_view_all' => 'Открыть полное дерево УДК',
       ],
       'kk' => [
-          'title' => 'Академиялық ізденіс орталығы — KazUTB',
+          'title' => 'Академиялық ізденіс орталығы — Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
           'hero_title' => 'Академиялық ізденіс орталығы',
           'hero_body' => 'Институционалдық білімнің жиынтығы бойынша навигация. Профильдік факультеттерді зерттеңіз, Әмбебап ондық жіктеуге (ӘОЖ) тереңдеңіз немесе кураторлық каталогты ашыңыз.',
           'faculties_title' => 'Факультеттер мен кафедралар',
@@ -59,7 +59,7 @@
           'udc_view_all' => 'ӘОЖ толық ағашын ашу',
       ],
       'en' => [
-          'title' => 'Academic Discovery Hub — KazUTB',
+          'title' => 'Academic Discovery Hub — Kazakh University of Technology and Business named after K. Kulazhanov',
           'hero_title' => 'Academic Discovery Hub',
           'hero_body' => 'Navigate the sum of our institutional knowledge. Explore specialized faculties, deep-dive into the Universal Decimal Classification (UDC), or search the curated catalog.',
           'faculties_title' => 'Faculties & Departments',
@@ -69,7 +69,7 @@
       ],
   ][$lang];
 
-  // Faculty axis (secondary discovery). Each entry matches the real KazUTB
+  // Faculty axis (secondary discovery). Each entry matches the real Kazakh University of Technology and Business named after K. Kulazhanov
   // institutional structure already used in /catalog seed data. The `span`
   // property drives the canonical 2+1+1+2 bento pattern. Tags expose the
   // primary department names associated with the faculty, not decorative copy.
@@ -104,7 +104,7 @@
       ['slug' => 'military',     'udc' => '355', 'udc_label' => 'UDC 355',      'span' => 2],
   ];
 
-  // UDC primary axis — real top-level KazUTB coverage areas. Icons mirror the
+  // UDC primary axis — real top-level Kazakh University of Technology and Business named after K. Kulazhanov coverage areas. Icons mirror the
   // canonical library_books / account_balance / science / palette rhythm but
   // swap to palette/biotech tokens that match the domain content.
   $udcLabels = [
@@ -139,6 +139,7 @@
 @endphp
 
 @section('title', $copy['title'])
+@section('meta_description', $copy['hero_body'])
 
 @section('content')
   {{-- Cluster E — canonical-led rebuild of /discover per academic_discovery_hub_canonical.

@@ -3,19 +3,28 @@
 namespace App\Services\DataQuality;
 
 use App\Models\Catalog\BibliographicRecord;
+use App\Models\Catalog\BibliographicRecordTranslation;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\Fine;
 use App\Models\Catalog\Loan;
 use App\Models\Catalog\ReaderProfile;
 use App\Models\Catalog\Reservation;
-use App\Models\Catalog\UdcCode;
 use App\Models\Setting;
 use App\Services\Library\IsbnService;
 use Illuminate\Database\Eloquent\Model;
 
 class DataQualityRuleRegistry
 {
-    public const VERSION = '2026.07.31.1';
+    public const VERSION = '2026.08.14.1';
+
+    /** ISO 639 values found in the verified MARC import. */
+    public const LEGACY_LANGUAGE_CODES = [
+        'kaz' => 'kk',
+        'rus' => 'ru',
+        'eng' => 'en',
+        'ger' => 'other',
+        'chi' => 'other',
+    ];
 
     public function __construct(
         private readonly IsbnService $isbn,
@@ -28,37 +37,58 @@ class DataQualityRuleRegistry
     public function catalogue(): array
     {
         return [
-            'bib.title.missing' => $this->definition('bibliographic_record', 'completeness', 'critical'),
-            'bib.title.suspicious' => $this->definition('bibliographic_record', 'validity', 'high'),
-            'bib.title.spacing' => $this->definition('bibliographic_record', 'normalization', 'low', true),
-            'bib.author.missing' => $this->definition('bibliographic_record', 'completeness', 'high'),
-            'bib.author.suspicious' => $this->definition('bibliographic_record', 'validity', 'medium'),
-            'bib.year.missing' => $this->definition('bibliographic_record', 'completeness', 'medium'),
-            'bib.year.invalid' => $this->definition('bibliographic_record', 'validity', 'high'),
-            'bib.isbn.invalid' => $this->definition('bibliographic_record', 'identifier', 'high'),
-            'bib.isbn.not_normalized' => $this->definition('bibliographic_record', 'normalization', 'low', true),
-            'bib.udc.missing' => $this->definition('bibliographic_record', 'classification', 'high'),
-            'bib.udc.unknown' => $this->definition('bibliographic_record', 'classification', 'medium'),
-            'bib.language.invalid' => $this->definition('bibliographic_record', 'classification', 'medium'),
-            'copy.inventory.missing' => $this->definition('book_copy', 'identifier', 'critical'),
-            'copy.barcode.missing' => $this->definition('book_copy', 'identifier', 'high'),
-            'copy.status.invalid' => $this->definition('book_copy', 'integrity', 'critical'),
-            'copy.location.missing' => $this->definition('book_copy', 'completeness', 'medium'),
-            'copy.loan_state.conflict' => $this->definition('book_copy', 'process', 'critical'),
-            'copy.reservation_state.conflict' => $this->definition('book_copy', 'process', 'high'),
-            'copy.price.negative' => $this->definition('book_copy', 'validity', 'high'),
+            'bib.title.missing' => $this->definition('bibliographic_record', 'required_fields', 'critical', false, 'error'),
+            'bib.title.suspicious' => $this->definition('bibliographic_record', 'title', 'high'),
+            'bib.title.truncated' => $this->definition('bibliographic_record', 'title', 'medium'),
+            'bib.title.spacing' => $this->definition('bibliographic_record', 'title', 'low', true, 'recommendation'),
+            'bib.author.missing' => $this->definition('bibliographic_record', 'author', 'medium'),
+            'bib.author.suspicious' => $this->definition('bibliographic_record', 'author', 'medium'),
+            'bib.author.spacing' => $this->definition('bibliographic_record', 'author', 'low', true, 'recommendation'),
+            'bib.year.missing' => $this->definition('bibliographic_record', 'year', 'medium'),
+            'bib.year.invalid' => $this->definition('bibliographic_record', 'year', 'high', false, 'error'),
+            'bib.isbn.invalid' => $this->definition('bibliographic_record', 'isbn', 'high', false, 'error'),
+            'bib.isbn.not_normalized' => $this->definition('bibliographic_record', 'isbn', 'low', true, 'recommendation'),
+            'bib.udc.missing' => $this->definition('bibliographic_record', 'udc', 'medium'),
+            'bib.udc.invalid_format' => $this->definition('bibliographic_record', 'udc', 'medium'),
+            'bib.author_mark.missing' => $this->definition('bibliographic_record', 'udc', 'low', false, 'recommendation'),
+            'bib.language.invalid' => $this->definition('bibliographic_record', 'language', 'high', false, 'error'),
+            'bib.language.legacy_code' => $this->definition('bibliographic_record', 'language', 'low', false, 'recommendation'),
+            'bib.language.possible_mismatch' => $this->definition('bibliographic_record', 'language', 'medium'),
+            'bib.resource_type.invalid' => $this->definition('bibliographic_record', 'required_fields', 'high', false, 'error'),
+            'bib.physical.no_copies' => $this->definition('bibliographic_record', 'relations', 'high'),
+            'bib.duplicate.exact' => $this->definition('bibliographic_record', 'duplicates', 'high'),
+            'bib.duplicate.probable' => $this->definition('bibliographic_record', 'duplicates', 'medium'),
+            'bib.duplicate.possible' => $this->definition('bibliographic_record', 'duplicates', 'low'),
+            'bib.translation.locale_invalid' => $this->definition('bibliographic_record', 'language', 'high', false, 'error'),
+            'bib.translation.title_empty' => $this->definition('bibliographic_record', 'required_fields', 'high', false, 'error'),
+            'bib.translation.identical' => $this->definition('bibliographic_record', 'language', 'low'),
+            'bib.translation.needs_review' => $this->definition('bibliographic_record', 'language', 'medium'),
+            'bib.translation.encoding' => $this->definition('bibliographic_record', 'encoding', 'high', false, 'error'),
+            'copy.inventory.missing' => $this->definition('book_copy', 'copies', 'critical', false, 'error'),
+            'copy.barcode.missing' => $this->definition('book_copy', 'copies', 'low', false, 'recommendation'),
+            'copy.status.invalid' => $this->definition('book_copy', 'copies', 'critical', false, 'error'),
+            'copy.condition.invalid' => $this->definition('book_copy', 'copies', 'high', false, 'error'),
+            'copy.record.missing' => $this->definition('book_copy', 'relations', 'critical', false, 'error'),
+            'copy.location.missing' => $this->definition('book_copy', 'locations', 'medium'),
+            'copy.location.inactive' => $this->definition('book_copy', 'locations', 'high', false, 'error'),
+            'copy.location.fund_branch_conflict' => $this->definition('book_copy', 'locations', 'high', false, 'error'),
+            'copy.loan_state.conflict' => $this->definition('book_copy', 'copies', 'critical', false, 'error'),
+            'copy.reservation_state.conflict' => $this->definition('book_copy', 'copies', 'high', false, 'error'),
+            'copy.price.negative' => $this->definition('book_copy', 'copies', 'high', false, 'error'),
             'reader.profile.invalid' => $this->definition('reader_profile', 'completeness', 'high'),
             'reader.block.invalid' => $this->definition('reader_profile', 'process', 'high'),
             'loan.dates.invalid' => $this->definition('loan', 'process', 'critical'),
             'fine.state.invalid' => $this->definition('fine', 'process', 'high'),
             'reservation.state.invalid' => $this->definition('reservation', 'process', 'high'),
-            'encoding.replacement_character' => $this->definition('bibliographic_record', 'encoding', 'high'),
-            'encoding.null_byte' => $this->definition('bibliographic_record', 'encoding', 'high'),
+            'encoding.replacement_character' => $this->definition('bibliographic_record', 'encoding', 'high', false, 'error'),
+            'encoding.null_byte' => $this->definition('bibliographic_record', 'encoding', 'high', false, 'error'),
             'encoding.control_character' => $this->definition('bibliographic_record', 'encoding', 'medium', true),
             'encoding.non_breaking_space' => $this->definition('bibliographic_record', 'encoding', 'low', true),
-            'encoding.mojibake' => $this->definition('bibliographic_record', 'encoding', 'high'),
+            'encoding.mojibake' => $this->definition('bibliographic_record', 'encoding', 'high', false, 'error'),
+            'encoding.html_entity' => $this->definition('bibliographic_record', 'encoding', 'medium'),
+            'encoding.question_replacement' => $this->definition('bibliographic_record', 'encoding', 'high', false, 'error'),
             'encoding.mixed_alphabet' => $this->definition('bibliographic_record', 'encoding', 'low'),
-            'encoding.legacy_kazakh_glyph' => $this->definition('bibliographic_record', 'encoding', 'medium'),
+            'encoding.legacy_kazakh_glyph' => $this->definition('bibliographic_record', 'encoding', 'high', false, 'error'),
         ];
     }
 
@@ -89,8 +119,14 @@ class DataQualityRuleRegistry
 
         if ($title === '') {
             $issues[] = $this->violation('bib.title.missing', 'title', $record->title, 'A non-empty descriptive title');
-        } elseif (mb_strlen($title) === 1 || preg_match('/^\d+$/u', $title) || preg_match('/^(?:unknown|untitled|test|без названия|нет данных)$/iu', $title)) {
+        } elseif (mb_strlen($title) === 1
+            || preg_match('/^\d+$/u', $title)
+            || preg_match('/^(?:unknown|untitled|test|без названия|нет данных)$/iu', $title)
+            || preg_match('/^(.)\1{5,}$/u', $title)) {
             $issues[] = $this->violation('bib.title.suspicious', 'title', $record->title, 'A meaningful source-backed title');
+        }
+        if (mb_strlen($title) === 250 && preg_match('/[\pL\pN]$/u', $title)) {
+            $issues[] = $this->violation('bib.title.truncated', 'title', $record->title, 'The complete title verified against MARC or the physical item');
         }
         if (preg_match('/\s{2,}/u', (string) $record->title)) {
             $issues[] = $this->violation('bib.title.spacing', 'title', $record->title, 'Single spaces', preg_replace('/\s+/u', ' ', trim((string) $record->title)));
@@ -99,6 +135,9 @@ class DataQualityRuleRegistry
             $issues[] = $this->violation('bib.author.missing', 'primary_author', null, 'Personal or corporate author');
         } elseif ($record->primary_author && (preg_match('/^\d+$/', trim($record->primary_author)) || mb_strlen(trim($record->primary_author)) < 3)) {
             $issues[] = $this->violation('bib.author.suspicious', 'primary_author', $record->primary_author, 'A source-backed author name');
+        }
+        if (preg_match('/\s{2,}/u', (string) $record->primary_author)) {
+            $issues[] = $this->violation('bib.author.spacing', 'primary_author', $record->primary_author, 'Single spaces', preg_replace('/\s+/u', ' ', trim((string) $record->primary_author)));
         }
 
         $minimumYear = (int) Setting::valueFor('data_quality_min_publication_year', 1450);
@@ -119,12 +158,70 @@ class DataQualityRuleRegistry
         }
 
         if (! $record->udc_code) {
-            $issues[] = $this->violation('bib.udc.missing', 'udc_code', null, 'A code from the UDC dictionary');
-        } elseif (! UdcCode::query()->where('code', $record->udc_code)->exists()) {
-            $issues[] = $this->violation('bib.udc.unknown', 'udc_code', $record->udc_code, 'A code from the UDC dictionary');
+            $issues[] = $this->violation('bib.udc.missing', 'udc_code', null, 'A source-backed UDC code when classification is expected');
+        } elseif (! preg_match('/^[0-9A-Za-zА-Яа-яӘәҒғҚқҢңӨөҰұҮүҺһІі.:+()\/=\[\]\'" -]+$/u', trim((string) $record->udc_code))) {
+            $issues[] = $this->violation('bib.udc.invalid_format', 'udc_code', $record->udc_code, 'A structurally valid source-backed UDC code');
         }
-        if (! in_array($record->language, BibliographicRecord::LANGUAGES, true)) {
-            $issues[] = $this->violation('bib.language.invalid', 'language', $record->language, implode(', ', BibliographicRecord::LANGUAGES));
+        if (! $record->author_mark) {
+            $issues[] = $this->violation('bib.author_mark.missing', 'author_mark', null, 'Author mark where the local classification workflow requires it');
+        }
+
+        $knownLanguages = [...BibliographicRecord::LANGUAGES, ...array_keys(self::LEGACY_LANGUAGE_CODES)];
+        if (! in_array($record->language, $knownLanguages, true)) {
+            $issues[] = $this->violation('bib.language.invalid', 'language', $record->language, implode(', ', $knownLanguages));
+        } elseif (isset(self::LEGACY_LANGUAGE_CODES[$record->language])) {
+            $issues[] = $this->violation(
+                'bib.language.legacy_code',
+                'language',
+                $record->language,
+                self::LEGACY_LANGUAGE_CODES[$record->language],
+                self::LEGACY_LANGUAGE_CODES[$record->language],
+            );
+        }
+        if (in_array($record->language, ['ru', 'rus', 'en', 'eng'], true) && $this->containsKazakhLetters($title)) {
+            $issues[] = $this->violation(
+                'bib.language.possible_mismatch',
+                'language',
+                $record->language,
+                'Language verified against the title and the MARC source',
+                null,
+                ['title_confidence' => $record->kazakhTitleConfidence()],
+            );
+        }
+        if (! in_array($record->resource_type, BibliographicRecord::RESOURCE_TYPES, true)) {
+            $issues[] = $this->violation('bib.resource_type.invalid', 'resource_type', $record->resource_type, implode(', ', BibliographicRecord::RESOURCE_TYPES));
+        }
+        if (! in_array($record->resource_type, ['ebook', 'digital_document', 'article'], true)) {
+            $copyCount = array_key_exists('copies_count', $record->getAttributes())
+                ? (int) $record->getAttribute('copies_count')
+                : $record->copies()->count();
+            if ($copyCount === 0) {
+                $issues[] = $this->violation('bib.physical.no_copies', 'copies', 0, 'At least one linked physical copy, or a corrected resource type');
+            }
+        }
+
+        $translations = $record->relationLoaded('translations') ? $record->translations : $record->translations()->get();
+        foreach ($translations as $translation) {
+            $field = 'translations.'.$translation->locale;
+            if (! in_array($translation->locale, BibliographicRecordTranslation::LOCALES, true)) {
+                $issues[] = $this->violation('bib.translation.locale_invalid', $field, $translation->locale, 'kk, ru or en');
+            }
+            if (trim((string) $translation->title) === '') {
+                $issues[] = $this->violation('bib.translation.title_empty', $field.'.title', $translation->title, 'A non-empty translated title');
+            }
+            if ($translation->locale !== $record->language
+                && mb_strtolower(trim((string) $translation->title)) === mb_strtolower(trim((string) $record->title))) {
+                $issues[] = $this->violation('bib.translation.identical', $field.'.title', $translation->title, 'Human review of an intentionally identical title');
+            }
+            if ($translation->translation_status === 'needs_review') {
+                $issues[] = $this->violation('bib.translation.needs_review', $field, $translation->translation_status, 'Reviewed editorial metadata');
+            }
+            foreach (['title', 'annotation'] as $translationField) {
+                $value = (string) ($translation->{$translationField} ?? '');
+                if ($value !== '' && ! mb_check_encoding($value, 'UTF-8')) {
+                    $issues[] = $this->violation('bib.translation.encoding', $field.'.'.$translationField, $value, 'Valid UTF-8 text');
+                }
+            }
         }
 
         foreach (['title', 'subtitle', 'primary_author', 'publisher', 'annotation'] as $field) {
@@ -153,22 +250,44 @@ class DataQualityRuleRegistry
             $issues[] = $this->violation('copy.inventory.missing', 'inventory_number', $copy->inventory_number, 'Unique inventory number');
         }
         if (trim((string) $copy->barcode) === '') {
-            $issues[] = $this->violation('copy.barcode.missing', 'barcode', $copy->barcode, 'Unique scannable barcode');
+            $issues[] = $this->violation('copy.barcode.missing', 'barcode', $copy->barcode, 'A barcode when this legacy copy is next handled or inventoried');
         }
         if (! in_array($copy->status, BookCopy::STATUSES, true)) {
             $issues[] = $this->violation('copy.status.invalid', 'status', $copy->status, implode(', ', BookCopy::STATUSES));
         }
-        if ($copy->branch_id === null || $copy->fund_id === null || trim((string) $copy->shelf_location) === '') {
-            $issues[] = $this->violation('copy.location.missing', 'location', json_encode($copy->only(['branch_id', 'fund_id', 'shelf_location'])), 'Branch, fund and shelf');
+        if (! in_array($copy->condition, BookCopy::CONDITIONS, true)) {
+            $issues[] = $this->violation('copy.condition.invalid', 'condition', $copy->condition, implode(', ', BookCopy::CONDITIONS));
+        }
+        $recordExists = array_key_exists('dq_record_exists', $copy->getAttributes())
+            ? (bool) $copy->getAttribute('dq_record_exists')
+            : $copy->bibliographicRecord()->exists();
+        if (! $recordExists) {
+            $issues[] = $this->violation('copy.record.missing', 'bibliographic_record_id', $copy->bibliographic_record_id, 'A valid linked bibliographic record');
+        }
+        $hasStoragePosition = trim((string) $copy->shelf_location) !== '' || trim((string) $copy->storage_sigla) !== '';
+        if ($copy->branch_id === null || (! $hasStoragePosition && $copy->fund_id === null)) {
+            $issues[] = $this->violation('copy.location.missing', 'location', json_encode($copy->only(['branch_id', 'fund_id', 'storage_sigla', 'shelf_location'])), 'Library point and a fund, storage sigla or shelf position');
+        }
+        $branch = $copy->relationLoaded('branch') ? $copy->branch : $copy->branch()->first();
+        $fund = $copy->relationLoaded('fund') ? $copy->fund : $copy->fund()->first();
+        if (($branch && (! $branch->is_active || $branch->trashed())) || ($fund && (! $fund->is_active || $fund->trashed()))) {
+            $issues[] = $this->violation('copy.location.inactive', 'location', json_encode($copy->only(['branch_id', 'fund_id'])), 'An active library point and fund');
+        }
+        if ($branch && $fund && $fund->branch_id !== null && (int) $fund->branch_id !== (int) $branch->getKey()) {
+            $issues[] = $this->violation('copy.location.fund_branch_conflict', 'location', json_encode($copy->only(['branch_id', 'fund_id'])), 'The fund must belong to the selected library point');
         }
         if ($copy->price !== null && (float) $copy->price < 0) {
             $issues[] = $this->violation('copy.price.negative', 'price', $copy->price, 'A non-negative price');
         }
-        $hasLoan = $copy->loans()->whereIn('status', ['active', 'overdue'])->whereNull('returned_at')->exists();
+        $hasLoan = array_key_exists('dq_has_active_loan', $copy->getAttributes())
+            ? (bool) $copy->getAttribute('dq_has_active_loan')
+            : $copy->loans()->whereIn('status', ['active', 'overdue'])->whereNull('returned_at')->exists();
         if (($copy->status === 'issued') !== $hasLoan || (in_array($copy->status, ['lost', 'written_off'], true) && $hasLoan)) {
             $issues[] = $this->violation('copy.loan_state.conflict', 'status', $copy->status, 'Copy status consistent with its open loan');
         }
-        $hasReservation = $copy->reservations()->whereIn('status', ['confirmed', 'ready_for_pickup'])->exists();
+        $hasReservation = array_key_exists('dq_has_active_reservation', $copy->getAttributes())
+            ? (bool) $copy->getAttribute('dq_has_active_reservation')
+            : $copy->reservations()->whereIn('status', ['confirmed', 'ready_for_pickup'])->exists();
         if ($copy->status === 'reserved' && ! $hasReservation) {
             $issues[] = $this->violation('copy.reservation_state.conflict', 'status', $copy->status, 'An active reservation for a reserved copy');
         }
@@ -221,10 +340,36 @@ class DataQualityRuleRegistry
             : [];
     }
 
-    /** @return array{entity:string,category:string,severity:string,auto_fixable:bool} */
-    private function definition(string $entity, string $category, string $severity, bool $autoFixable = false): array
+    /** @return array{entity:string,category:string,severity:string,auto_fixable:bool,type:string} */
+    private function definition(string $entity, string $category, string $severity, bool $autoFixable = false, string $type = 'warning'): array
     {
-        return compact('entity', 'category', 'severity') + ['auto_fixable' => $autoFixable];
+        return compact('entity', 'category', 'severity', 'type') + ['auto_fixable' => $autoFixable];
+    }
+
+    /** @param array{record:BibliographicRecord,score:float,level:string,details:array<string,mixed>} $match */
+    public function duplicateViolation(array $match): array
+    {
+        $code = 'bib.duplicate.'.($match['level'] === 'exact' ? 'exact' : ($match['level'] === 'probable' ? 'probable' : 'possible'));
+
+        return $this->violation(
+            $code,
+            'duplicate_candidate',
+            (string) $match['record']->getKey(),
+            'A librarian decision after side-by-side comparison',
+            null,
+            [
+                'candidate_id' => $match['record']->getKey(),
+                'candidate_title' => $match['record']->title,
+                'score' => $match['score'],
+                'match_level' => $match['level'],
+                'match_details' => $match['details'],
+            ],
+        );
+    }
+
+    private function containsKazakhLetters(string $value): bool
+    {
+        return preg_match('/['.preg_quote(implode('', BibliographicRecord::KAZAKH_ONLY_LETTERS), '/').']/u', $value) === 1;
     }
 
     /** @return array<string,mixed> */

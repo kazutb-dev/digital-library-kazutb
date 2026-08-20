@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Partner library</title>
+  <rect width="96" height="96" rx="20" fill="#e7f5f3"/>
+  <path d="M20 30 48 17l28 13-28 13-28-13Zm8 11v22c11 0 17 3 20 8V46L28 41Zm40 0v22c-11 0-17 3-20 8V46l20-5Z" fill="#006a6a"/>
+  <path d="M18 76h60" fill="none" stroke="#b77b57" stroke-width="5" stroke-linecap="round"/>
+</svg>

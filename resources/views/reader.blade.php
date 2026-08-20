@@ -340,7 +340,7 @@
 </head>
 <body>
     <div class="header-info">
-        <button class="close-btn" id="closeBtn" title="{{ ['ru' => 'Закрыть', 'kk' => 'Жабу', 'en' => 'Close'][$lang] }}">✕</button>
+        <button class="close-btn" id="closeBtn" title="{{ ['ru' => 'Закрыть', 'kk' => 'Жабу', 'en' => 'Close'][$lang] }}"></button>
         <button class="cabinet-btn" id="cabinetBtn" title="{{ ['ru' => 'Личный кабинет', 'kk' => 'Жеке кабинет', 'en' => 'Account'][$lang] }}">{{ ['ru' => 'Личный кабинет', 'kk' => 'Жеке кабинет', 'en' => 'Account'][$lang] }}</button>
     </div>
 
@@ -364,7 +364,7 @@
 
         <div class="controls">
             <button id="prevBtn" type="button">{{ ['ru' => '← Назад', 'kk' => '← Артқа', 'en' => '← Back'][$lang] }}</button>
-            <button id="nextBtn" type="button">{{ ['ru' => 'Вперёд →', 'kk' => 'Алға →', 'en' => 'Next →'][$lang] }}</button>
+            <button id="nextBtn" type="button">{{ ['ru' => 'Вперёд —', 'kk' => 'Алға —', 'en' => 'Next —'][$lang] }}</button>
         </div>
 
     </div>
@@ -456,7 +456,7 @@
 
         function withLang(path) {
             const url = new URL(path, window.location.origin);
-            if (READER_LANG !== 'ru' && !url.searchParams.has('lang')) {
+            if (READER_LANG !== 'kk' && !url.searchParams.has('lang')) {
                 url.searchParams.set('lang', READER_LANG);
             }
             return `${url.pathname}${url.search}`;

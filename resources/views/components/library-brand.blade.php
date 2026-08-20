@@ -27,7 +27,7 @@
     .library-brand--print{color:#000}
     .library-brand--print .library-brand__logo{width:3.5rem;height:3.5rem;filter:grayscale(1)}
     @media(max-width:1180px){.library-brand--cabinet .library-brand__university{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
-    @media(max-width:520px){.library-brand--cabinet .library-brand__logo{width:2.5rem;height:2.5rem}.library-brand--cabinet .library-brand__library{max-width:8.75rem;font-size:.82rem}}
+    @media(max-width:520px){.library-brand--cabinet .library-brand__logo{width:2.5rem;height:2.5rem}.library-brand--cabinet .library-brand__library{max-width:8.75rem;font-size:.82rem}.library-brand--compact .library-brand__copy{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
 </style>
 @endonce
 

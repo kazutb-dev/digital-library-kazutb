@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KazUTB Admin Overview</title>
+    <title>Kazakh University of Technology and Business named after K. Kulazhanov Admin Overview</title>
     <style>
         :root {
             --bg: #f6f7f8;
@@ -673,7 +673,7 @@
                         <blockquote>
                             “A digital library is not just a repository; it is a curated operational system where oversight, stewardship, and reader trust must stay in balance.”
                         </blockquote>
-                        <p>— KazUTB Digital Library, internal admin context</p>
+                        <p>— Kazakh University of Technology and Business named after K. Kulazhanov Digital Library, internal admin context</p>
                     </article>
 
                     <article class="panel">
@@ -828,7 +828,7 @@
                     note: `Enrichable records currently visible: ${formatNumber(enrichmentData.enrichableByIsbn)}.`,
                 },
                 {
-                    icon: '✓',
+                    icon: '',
                     title: 'Reader-support posture updated',
                     note: `Profiles needing review: ${formatNumber(readerData.needsReviewCount)}. Valid email coverage: ${formatNumber(contactData.readersWithValidEmail)}. Open tasks: ${formatNumber(reviewTasks.open)}.`,
                 },

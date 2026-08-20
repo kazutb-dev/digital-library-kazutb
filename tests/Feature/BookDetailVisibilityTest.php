@@ -52,12 +52,14 @@ class BookDetailVisibilityTest extends TestCase
         $this->assertSame('', $guest['availability']['locations'][0]['shelf']);
         $this->assertSame('', $guest['notes']);
         $this->assertNull($guest['viewer']['activeLoan']);
+        $this->assertArrayNotHasKey('quality', $guest);
 
         $this->assertTrue($authenticated['viewer']['authenticated']);
         $this->assertSame('SECRET-SIGLA-NB', $authenticated['availability']['locations'][0]['storageSigla']);
         $this->assertSame('SECRET-SHELF-7B', $authenticated['availability']['locations'][0]['shelf']);
         $this->assertSame($loan->due_at->toIso8601String(), $authenticated['viewer']['activeLoan']['dueAt']);
         $this->assertSame('', $authenticated['notes'], 'Internal notes are not reader-visible.');
+        $this->assertArrayNotHasKey('quality', $authenticated);
     }
 
     public function test_book_page_embeds_exact_location_and_due_date_only_for_authenticated_reader(): void
@@ -122,6 +124,7 @@ class BookDetailVisibilityTest extends TestCase
             'access_level' => 'public',
             'license_terms' => 'University subscription',
             'is_active' => true,
+            'workflow_status' => 'published',
         ]);
 
         $this->getJson('/api/v1/documents/'.$record->getKey().'/digital-materials')
@@ -130,6 +133,29 @@ class BookDetailVisibilityTest extends TestCase
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.licenseTerms', 'University subscription')
             ->assertJsonPath('data.0.viewerUrl', 'https://example.test/library/item');
+    }
+
+    public function test_active_workflow_draft_is_hidden_from_detail_and_reader_api(): void
+    {
+        $record = BibliographicRecord::factory()->create(['is_draft' => false]);
+        $material = ElectronicMaterial::query()->create([
+            'bibliographic_record_id' => $record->getKey(),
+            'title' => 'Unreviewed edition',
+            'external_url' => 'https://example.test/library/draft',
+            'file_type' => 'pdf',
+            'access_level' => 'public',
+            'is_active' => true,
+            'workflow_status' => 'metadata_review',
+        ]);
+
+        $detail = app(BookDetailReadService::class)->findByIdentifier((string) $record->getKey());
+
+        $this->assertSame([], $detail['electronicMaterials']);
+        $this->getJson('/api/v1/documents/'.$record->getKey().'/digital-materials')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 0);
+        $this->getJson('/api/v1/digital-materials/'.$material->getKey().'/stream')
+            ->assertNotFound();
     }
 
     public function test_guest_sees_udc_description_while_reader_sees_full_code_and_description(): void
@@ -149,9 +175,24 @@ class BookDetailVisibilityTest extends TestCase
         $authenticated = $service->findByIdentifier((string) $record->getKey(), $reader);
 
         $this->assertSame('', $guest['udc']['raw']);
-        $this->assertSame('Искусственный интеллект', $guest['udc']['display']);
+        $this->assertSame('Жасанды интеллект', $guest['udc']['display']);
         $this->assertSame('004.8', $authenticated['udc']['raw']);
-        $this->assertSame('004.8 — Искусственный интеллект', $authenticated['udc']['display']);
+        $this->assertSame('004.8 — Жасанды интеллект', $authenticated['udc']['display']);
+    }
+
+    public function test_only_catalog_staff_receive_internal_quality_signals(): void
+    {
+        $record = BibliographicRecord::factory()->draft()->create([
+            'title' => 'Internal review record',
+        ]);
+        $service = app(BookDetailReadService::class);
+
+        $guest = $service->findByIdentifier((string) $record->getKey());
+        $staff = $service->findByIdentifier((string) $record->getKey(), $this->adminUser);
+
+        $this->assertArrayNotHasKey('quality', $guest);
+        $this->assertTrue($staff['quality']['needsReview']);
+        $this->assertIsArray($staff['quality']['reviewReasonCodes']);
     }
 
     public function test_detail_recommends_other_materials_in_the_same_udc_section(): void

@@ -57,7 +57,7 @@ class SettingsSeeder extends Seeder
                 'group' => 'circulation',
                 'description' => 'Срок выдачи справочных материалов в днях.',
             ],
-            // ДИР §9.3 — срок выдачи зависит от количества экземпляров записи.
+            // ДИР 9.3 — срок выдачи зависит от количества экземпляров записи.
             // Значения ступеней — предложенная эвристика внутри диапазона 3–7,
             // библиотека корректирует их через /admin/settings.
             [
@@ -160,7 +160,7 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'key' => 'default_ui_language',
-                'value' => 'kk',
+                'value' => 'ru',
                 'type' => 'string',
                 'group' => 'localization',
                 'description' => 'Язык интерфейса по умолчанию.',
@@ -193,6 +193,27 @@ class SettingsSeeder extends Seeder
             ['key' => 'data_quality_bulk_approval_required', 'value' => true, 'type' => 'boolean', 'group' => 'data_quality', 'description' => 'Требовать независимое подтверждение массовых исправлений.'],
             ['key' => 'data_quality_merge_approval_required', 'value' => true, 'type' => 'boolean', 'group' => 'data_quality', 'description' => 'Требовать независимое подтверждение слияния.'],
             ['key' => 'data_quality_import_encodings', 'value' => ['UTF-8', 'Windows-1251'], 'type' => 'array', 'group' => 'data_quality', 'description' => 'Разрешённые кодировки импорта; legacy-кодировки добавляются только по образцу.'],
+            ['key' => 'library_feedback_recipient_name', 'value' => 'Жанерке Панкейқызы', 'type' => 'string', 'group' => 'messages', 'description' => 'Публично указанное ответственное лицо за обращения.'],
+            ['key' => 'library_feedback_recipient_position', 'value' => 'Директор научной библиотеки', 'type' => 'string', 'group' => 'messages', 'description' => 'Должность ответственного лица.'],
+            ['key' => 'library_feedback_recipient_email', 'value' => 'zhanerke.pankey@mail.ru', 'type' => 'string', 'group' => 'messages', 'description' => 'Адрес для подтверждённых почтовых уведомлений.'],
+            ['key' => 'library_feedback_email_enabled', 'value' => false, 'type' => 'boolean', 'group' => 'messages', 'description' => 'Почта отключена до подтверждения SMTP; in-app уведомления работают.'],
+            ['key' => 'library_feedback_auto_assignment', 'value' => true, 'type' => 'boolean', 'group' => 'messages', 'description' => 'Автоматически назначать исполнителя по правилам маршрутизации.'],
+            ['key' => 'library_feedback_fallback_role', 'value' => 'director', 'type' => 'string', 'group' => 'messages', 'description' => 'Роль для безопасной резервной маршрутизации.'],
+            ['key' => 'library_feedback_max_attachments', 'value' => 5, 'type' => 'integer', 'group' => 'messages', 'description' => 'Максимум вложений на одну операцию.'],
+            ['key' => 'library_feedback_max_attachment_kb', 'value' => 10240, 'type' => 'integer', 'group' => 'messages', 'description' => 'Максимальный размер одного вложения в КБ.'],
+            ['key' => 'library_feedback_allowed_mimes', 'value' => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], 'type' => 'array', 'group' => 'messages', 'description' => 'Проверяемый allowlist MIME вложений.'],
+            ['key' => 'library_feedback_sla_request_hours', 'value' => 72, 'type' => 'integer', 'group' => 'messages', 'description' => 'SLA запроса, часы.'],
+            ['key' => 'library_feedback_sla_complaint_hours', 'value' => 48, 'type' => 'integer', 'group' => 'messages', 'description' => 'SLA жалобы, часы.'],
+            ['key' => 'library_feedback_sla_suggestion_hours', 'value' => 120, 'type' => 'integer', 'group' => 'messages', 'description' => 'SLA предложения, часы.'],
+            ['key' => 'library_feedback_sla_question_hours', 'value' => 72, 'type' => 'integer', 'group' => 'messages', 'description' => 'SLA вопроса, часы.'],
+            ['key' => 'library_feedback_sla_high_hours', 'value' => 24, 'type' => 'integer', 'group' => 'messages', 'description' => 'Предельный SLA высокого приоритета.'],
+            ['key' => 'library_feedback_sla_critical_hours', 'value' => 8, 'type' => 'integer', 'group' => 'messages', 'description' => 'Предельный SLA критического приоритета.'],
+            ['key' => 'library_feedback_first_response_hours', 'value' => 24, 'type' => 'integer', 'group' => 'messages', 'description' => 'SLA первого ответа.'],
+            ['key' => 'library_feedback_sla_reminder_hours', 'value' => 24, 'type' => 'integer', 'group' => 'messages', 'description' => 'За сколько часов отправлять напоминание.'],
+            ['key' => 'library_feedback_pause_sla_waiting_user', 'value' => true, 'type' => 'boolean', 'group' => 'messages', 'description' => 'Приостанавливать SLA при ожидании пользователя.'],
+            ['key' => 'library_feedback_reopen_days', 'value' => 14, 'type' => 'integer', 'group' => 'messages', 'description' => 'Срок повторного открытия решённого обращения.'],
+            ['key' => 'library_feedback_satisfaction_enabled', 'value' => true, 'type' => 'boolean', 'group' => 'messages', 'description' => 'Разрешить оценку официального ответа.'],
+            ['key' => 'library_feedback_retention_days', 'value' => 1095, 'type' => 'integer', 'group' => 'messages', 'description' => 'Предлагаемый срок хранения истории; автоматическое удаление не выполняется.'],
         ];
 
         foreach ($settings as $setting) {

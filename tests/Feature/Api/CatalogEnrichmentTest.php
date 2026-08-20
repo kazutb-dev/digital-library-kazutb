@@ -14,6 +14,9 @@ class CatalogEnrichmentTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // This suite exercises ISBN/enrichment behavior. Authorization is
+        // covered separately by the privilege negative-path suites.
+        $this->withoutMiddleware();
 
         if ($this->canUseLivePgsql()) {
             $this->useLivePgsql = true;
@@ -26,6 +29,7 @@ class CatalogEnrichmentTest extends TestCase
     {
         try {
             DB::connection('pgsql')->getPdo();
+
             return true;
         } catch (\Throwable) {
             return false;
@@ -55,7 +59,7 @@ class CatalogEnrichmentTest extends TestCase
 
     public function test_isbn13_valid_checksum(): void
     {
-        $svc = new IsbnService();
+        $svc = new IsbnService;
         $result = $svc->validate('978-3-16-148410-0');
         $this->assertTrue($result['valid']);
         $this->assertEquals('ISBN-13', $result['format']);
@@ -64,7 +68,7 @@ class CatalogEnrichmentTest extends TestCase
 
     public function test_isbn13_invalid_checksum(): void
     {
-        $svc = new IsbnService();
+        $svc = new IsbnService;
         $result = $svc->validate('978-3-16-148410-9');
         $this->assertFalse($result['valid']);
         $this->assertEquals('ISBN-13', $result['format']);
@@ -73,7 +77,7 @@ class CatalogEnrichmentTest extends TestCase
 
     public function test_isbn10_valid_checksum(): void
     {
-        $svc = new IsbnService();
+        $svc = new IsbnService;
         $result = $svc->validate('0-306-40615-2');
         $this->assertTrue($result['valid']);
         $this->assertEquals('ISBN-10', $result['format']);
@@ -82,7 +86,7 @@ class CatalogEnrichmentTest extends TestCase
 
     public function test_isbn10_with_x_check_digit(): void
     {
-        $svc = new IsbnService();
+        $svc = new IsbnService;
         $result = $svc->validate('0-8044-2957-X');
         $this->assertTrue($result['valid']);
         $this->assertEquals('ISBN-10', $result['format']);
@@ -90,14 +94,14 @@ class CatalogEnrichmentTest extends TestCase
 
     public function test_isbn10_invalid_checksum(): void
     {
-        $svc = new IsbnService();
+        $svc = new IsbnService;
         $result = $svc->validate('0-306-40615-3');
         $this->assertFalse($result['valid']);
     }
 
     public function test_isbn_wrong_length(): void
     {
-        $svc = new IsbnService();
+        $svc = new IsbnService;
         $result = $svc->validate('12345');
         $this->assertFalse($result['valid']);
         $this->assertNull($result['format']);
@@ -106,7 +110,7 @@ class CatalogEnrichmentTest extends TestCase
 
     public function test_isbn10_to_isbn13_conversion(): void
     {
-        $svc = new IsbnService();
+        $svc = new IsbnService;
         $isbn13 = $svc->isbn10to13('0-306-40615-2');
         $this->assertEquals('9780306406157', $isbn13);
 
@@ -116,7 +120,7 @@ class CatalogEnrichmentTest extends TestCase
 
     public function test_isbn_normalize(): void
     {
-        $svc = new IsbnService();
+        $svc = new IsbnService;
         $this->assertEquals('9783161484100', $svc->normalize('978-3-16-148410-0'));
         $this->assertEquals('080442957X', $svc->normalize('0-8044-2957-x'));
     }

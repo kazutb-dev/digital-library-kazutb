@@ -1,5 +1,5 @@
 @php
-    $pageLang = in_array(app()->getLocale(), ['kk', 'ru', 'en'], true) ? app()->getLocale() : 'kk';
+    $pageLang = in_array(app()->getLocale(), ['kk', 'ru', 'en'], true) ? app()->getLocale() : 'ru';
     $eloquentAdmin = auth()->user();
     $legacyAdmin = is_array(session('library.user')) ? session('library.user') : [];
     $userName = trim((string) ($eloquentAdmin?->name ?? $legacyAdmin['name'] ?? __('roles.names.admin'))) ?: __('roles.names.admin');
@@ -10,9 +10,10 @@
         ['label' => __('roles.title'), 'icon' => 'shield_person', 'href' => route('admin.roles.index'), 'active' => request()->routeIs('admin.roles.*'), 'permissions' => ['roles.manage']],
         ['label' => __('admin.nav.audit_logs'), 'icon' => 'gavel', 'href' => route('admin.logs.index'), 'active' => request()->routeIs('admin.logs.*'), 'permissions' => ['system.logs']],
         ['label' => __('admin.nav.news'), 'icon' => 'campaign', 'href' => route('admin.news.index'), 'active' => request()->routeIs('admin.news.*'), 'permissions' => ['news.edit_any', 'news.edit_own']],
-        ['label' => __('admin.nav.feedback'), 'icon' => 'inbox', 'href' => route('admin.messages.index'), 'active' => request()->routeIs('admin.messages.*', 'admin.feedback'), 'permissions' => ['messages.view_all']],
+        ['label' => __('admin.nav.feedback'), 'icon' => 'inbox', 'href' => route('admin.messages.index'), 'active' => request()->routeIs('admin.messages.*', 'admin.feedback'), 'permissions' => ['messages.view_assigned']],
         ['label' => __('admin.nav.reports'), 'icon' => 'analytics', 'href' => route('admin.reports.index'), 'active' => request()->routeIs('admin.reports.*'), 'permissions' => ['reports.view_full']],
-        ['label' => __('admin.nav.integrations'), 'icon' => 'hub', 'href' => route('admin.integrations.index'), 'active' => request()->routeIs('admin.integrations.*'), 'permissions' => ['system.settings']],
+        ['label' => __('admin.nav.integrations'), 'icon' => 'hub', 'href' => route('admin.integrations.index'), 'active' => request()->routeIs('admin.integrations.*'), 'permissions' => ['integrations.view']],
+        ['label' => match($pageLang) { 'ru' => 'Система и резервные копии', 'en' => 'System & backups', default => 'Жүйе және сақтық көшірмелер' }, 'icon' => 'monitor_heart', 'href' => route('admin.system.index'), 'active' => request()->routeIs('admin.system.*'), 'permissions' => ['system.settings']],
         ['label' => __('admin.nav.branches_funds'), 'icon' => 'account_balance', 'href' => route('admin.branches.index'), 'active' => request()->routeIs('admin.branches.*', 'admin.funds.*'), 'permissions' => ['branches.manage']],
         ['label' => __('admin.nav.external_resources'), 'icon' => 'language', 'href' => route('admin.external-resources.index'), 'active' => request()->routeIs('admin.external-resources.*'), 'permissions' => ['external_resources.manage']],
         ['label' => __('admin.nav.settings'), 'icon' => 'settings_suggest', 'href' => route('admin.settings.index'), 'active' => request()->routeIs('admin.settings.*'), 'permissions' => ['system.settings']],

@@ -6,11 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Services\Library\AccountSummaryReadService;
 use App\Services\Library\CirculationLoanReadService;
 use App\Services\Library\CirculationLoanWriteService;
+use App\Services\Library\CirculationWriteException;
 use App\Services\Library\ReaderReservationException;
 use App\Services\Library\ReaderReservationService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class AccountController extends Controller
 {
@@ -113,7 +117,7 @@ class AccountController extends Controller
                     'actorType' => 'reader_self_service',
                 ],
             );
-        } catch (\App\Services\Library\CirculationWriteException $exception) {
+        } catch (CirculationWriteException $exception) {
             return response()->json([
                 'error' => $exception->errorCode(),
                 'message' => $exception->getMessage(),
@@ -141,32 +145,53 @@ class AccountController extends Controller
 
         $status = $request->query('status');
         $allowedStatuses = ['PENDING', 'READY', 'FULFILLED', 'CANCELLED', 'EXPIRED'];
-        $status = in_array($status, $allowedStatuses, true) ? $status : null;
-
-        $query = DB::connection('pgsql')
-            ->table('public.Reservation as r')
-            ->leftJoin('public.Book as b', 'b.id', '=', 'r.bookId')
-            ->where('r.userId', $crmUserId)
-            ->select([
-                'r.id',
-                'r.status',
-                'r.reservedAt',
-                'r.expiresAt',
-                'r.processedAt',
-                'r.notes',
-                'r.copyId',
-                'r.createdAt',
-                'b.title as bookTitle',
-                'b.isbn as bookIsbn',
-                'b.publishYear as bookPublishYear',
-            ])
-            ->orderByDesc('r.reservedAt');
-
-        if ($status !== null) {
-            $query->where('r.status', $status);
+        if ($status !== null && ! in_array($status, $allowedStatuses, true)) {
+            return response()->json([
+                'message' => 'The selected status is invalid.',
+                'errors' => ['status' => ['The selected status is invalid.']],
+            ], 422);
         }
 
-        $reservations = $query->limit(100)->get()->map(function (object $row): array {
+        try {
+            $query = DB::connection('pgsql')
+                ->table('public.Reservation as r')
+                ->leftJoin('public.Book as b', 'b.id', '=', 'r.bookId')
+                ->where('r.userId', $crmUserId)
+                ->select([
+                    'r.id',
+                    'r.status',
+                    'r.reservedAt',
+                    'r.expiresAt',
+                    'r.processedAt',
+                    'r.notes',
+                    'r.copyId',
+                    'r.createdAt',
+                    'b.title as bookTitle',
+                    'b.isbn as bookIsbn',
+                    'b.publishYear as bookPublishYear',
+                ])
+                ->orderByDesc('r.reservedAt');
+
+            if ($status !== null) {
+                $query->where('r.status', $status);
+            }
+
+            $rows = $query->limit(100)->get();
+        } catch (QueryException $exception) {
+            $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+            if (! in_array($sqlState, ['08006', '08001', '42P01'], true)) {
+                throw $exception;
+            }
+
+            return response()->json([
+                'authenticated' => true,
+                'data' => [],
+                'meta' => ['crmUserId' => $crmUserId, 'total' => 0],
+                'message' => 'The legacy reservation source is currently unavailable.',
+            ]);
+        }
+
+        $reservations = $rows->map(function (object $row): array {
             $notes = null;
             if (! empty($row->notes)) {
                 $decoded = json_decode($row->notes, true);
@@ -326,7 +351,7 @@ class AccountController extends Controller
         // schema/connection detail), and creates an unnecessary runtime dependency.
         // This approach is already used by the web route resolver and is consistent
         // with how the rest of the application trusts session-resident identity.
-        if ($sessionId !== '' && \Illuminate\Support\Str::isUuid($sessionId)) {
+        if ($sessionId !== '' && Str::isUuid($sessionId)) {
             return $sessionId;
         }
 
@@ -335,6 +360,10 @@ class AccountController extends Controller
 
     private function resolveReaderId(array $sessionUser): ?string
     {
+        if (DB::connection()->getDriverName() !== 'pgsql' || ! Schema::hasTable('app.readers')) {
+            return null;
+        }
+
         $email = mb_strtolower(trim((string) ($sessionUser['email'] ?? '')));
         $adLogin = mb_strtolower(trim((string) ($sessionUser['ad_login'] ?? '')));
 

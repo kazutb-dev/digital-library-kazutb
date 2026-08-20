@@ -121,8 +121,8 @@ class FullReaderCabinetTest extends TestCase
     public function test_digital_page_uses_controlled_viewer_and_hides_restricted_material(): void
     {
         $record = BibliographicRecord::factory()->create();
-        $allowed = ElectronicMaterial::query()->create(['bibliographic_record_id' => $record->getKey(), 'title' => 'Allowed PDF', 'file_path' => 'digital/allowed.pdf', 'file_type' => 'pdf', 'access_level' => 'authenticated', 'allow_download' => false, 'is_active' => true]);
-        ElectronicMaterial::query()->create(['bibliographic_record_id' => $record->getKey(), 'title' => 'Staff only', 'file_path' => 'digital/private.pdf', 'file_type' => 'pdf', 'access_level' => 'restricted', 'allow_download' => false, 'is_active' => true]);
+        $allowed = ElectronicMaterial::query()->create(['bibliographic_record_id' => $record->getKey(), 'title' => 'Allowed PDF', 'file_path' => 'digital/allowed.pdf', 'file_type' => 'pdf', 'access_level' => 'authenticated', 'allow_download' => false, 'is_active' => true, 'workflow_status' => 'published']);
+        ElectronicMaterial::query()->create(['bibliographic_record_id' => $record->getKey(), 'title' => 'Staff only', 'file_path' => 'digital/private.pdf', 'file_type' => 'pdf', 'access_level' => 'restricted', 'allow_download' => false, 'is_active' => true, 'workflow_status' => 'published']);
 
         $this->signInToLibraryAs($this->reader)->get('/dashboard/digital-materials')
             ->assertOk()->assertSee('Allowed PDF')->assertDontSee('Staff only')->assertSee('/digital-viewer/'.$allowed->getKey(), false)->assertDontSee('/storage/', false);

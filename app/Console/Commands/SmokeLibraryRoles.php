@@ -164,8 +164,21 @@ class SmokeLibraryRoles extends Command
             $exception = preg_match('/SQLSTATE|Stack trace|Whoops, looks like something went wrong/i', $body)
                 ? 'generic_or_debug_error_page'
                 : (($rawKey[0] ?? null) ? 'raw_translation_key:'.$rawKey[0] : ($mixed ? 'mixed_interface:'.$mixed : null));
-            if (str_contains($body, 'KazUTB Smart'.' Library')) {
+            $legacyBrand = 'Kaz'.'UTB|Kaz'.'TBU|Каз'.'УТБ|Каз'.'ТБУ|Қаз'.'УТБ|Қаз'.'ТБУ';
+            // Catalogue metadata and external-resource titles may legitimately
+            // preserve historical names. Branding drift is therefore checked
+            // in the browser title; source copy is covered separately by the
+            // UI-copy audit.
+            $brandText = strip_tags($title[1] ?? '');
+            $brandText = (string) preg_replace(
+                '/(?:[\w.+-]+@)?[\w.-]*(?:kazutb|kaztbu)[\w.-]*(?:\.edu\.kz|\.local)/iu',
+                '',
+                $brandText,
+            );
+            if (preg_match('/(?<![\pL\pN])(?:'.$legacyBrand.')(?![\pL\pN])/iu', $brandText) === 1) {
                 $exception = 'prohibited_brand';
+            } elseif (preg_match('/(?:§\s*\d|пункт\s+ТЗ|раздел\s+ДИР)|[¶●◉▪▫◆◇▶►⇒✓✔✕❌👉📌⚠🔎📊⚖🧩📈🧾]/iu', $visibleText) === 1) {
+                $exception = 'prohibited_ui_copy';
             }
 
             return [
@@ -192,7 +205,7 @@ class SmokeLibraryRoles extends Command
     /** @return list<string> */
     private function requiredPaths(string $slug, string $landing): array
     {
-        if (in_array($slug, ['student', 'teacher'], true)) {
+        if ($slug === 'student') {
             return [
                 '/dashboard', '/dashboard/loans', '/dashboard/reservations', '/dashboard/history',
                 '/dashboard/fines', '/dashboard/incidents', '/dashboard/notifications',

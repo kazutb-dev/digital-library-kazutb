@@ -2,31 +2,29 @@
 
 namespace Tests\Feature;
 
+use Database\Seeders\MessageCategorySeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class MemberMessagesPageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
     protected function setUp(): void
     {
         parent::setUp();
-
-        config()->set('demo_auth.enabled', true);
+        $this->setUpAdminControlPlane();
+        (require base_path('database/migrations/2026_08_06_000000_build_message_appeals_workflow.php'))->up();
+        app(MessageCategorySeeder::class)->run();
         $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
     }
 
     private function loginAs(string $identitySlug): void
     {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
-        ]);
+        $role = in_array($identitySlug, ['student', 'teacher'], true) ? 'member' : $identitySlug;
+        $this->signInToLibraryAs($this->makeControlPlaneUser($role));
     }
 
     public function test_guest_is_redirected_to_login(): void
@@ -44,13 +42,12 @@ class MemberMessagesPageTest extends TestCase
         $response = $this->get('/dashboard/messages');
 
         $response->assertOk();
-        $response->assertSee('Messages', false);
-        $response->assertSee('Draft a new message', false);
-        $response->assertSee('Correspondence ledger', false);
-        $response->assertSee('Request', false);
-        $response->assertSee('Complaint', false);
-        $response->assertSee('Improvement', false);
-        $response->assertSee('Question', false);
+        $response->assertSee('Входящие обращения', false);
+        $response->assertSee('Новое обращение', false);
+        $response->assertSee('Запрос', false);
+        $response->assertSee('Жалоба', false);
+        $response->assertSee('Предложение', false);
+        $response->assertSee('Вопрос', false);
     }
 
     public function test_teacher_can_view_messages(): void
@@ -60,7 +57,7 @@ class MemberMessagesPageTest extends TestCase
         $response = $this->get('/dashboard/messages');
 
         $response->assertOk();
-        $response->assertSee('Draft a new message', false);
+        $response->assertSee('Новое обращение', false);
     }
 
     public function test_librarian_is_forbidden(): void
@@ -69,7 +66,7 @@ class MemberMessagesPageTest extends TestCase
 
         $response = $this->get('/dashboard/messages');
 
-        $response->assertForbidden();
+        $response->assertRedirect();
     }
 
     public function test_admin_is_forbidden(): void
@@ -78,6 +75,6 @@ class MemberMessagesPageTest extends TestCase
 
         $response = $this->get('/dashboard/messages');
 
-        $response->assertForbidden();
+        $response->assertRedirect();
     }
 }

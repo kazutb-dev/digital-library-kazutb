@@ -19,7 +19,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
- * Reservation queue management (Master.md §13.5, ДИР §8): confirm, assign a
+ * Reservation queue management (Master.md 13.5, ДИР 8): confirm, assign a
  * specific copy, prepare for pickup, extend the hold, hand it to the next
  * reader, cancel, and monitor the waiting line across branches.
  */
@@ -74,7 +74,7 @@ class ReservationController extends Controller
             }
         });
 
-        // §8: queue depth and the availability forecast are per-edition, so
+        // 8: queue depth and the availability forecast are per-edition, so
         // they are resolved once for the page instead of per row.
         $recordIds = $reservations->pluck('bibliographic_record_id')->all();
         $copyCounts = $this->insights->circulatingCopyCounts($recordIds);
@@ -103,7 +103,7 @@ class ReservationController extends Controller
                 $reservation->getKey() => $this->insights->hasWaitingQueue($reservation),
             ]),
             'pickupHoldDays' => (int) Setting::valueFor('reservation_lifespan_days', 3),
-            // §9.3 — the forecast explanation must quote the period this
+            // 9.3 — the forecast explanation must quote the period this
             // edition actually gets, not a flat library-wide number.
             'loanPeriodDays' => $copyCounts->mapWithKeys(fn (int $copies, int $recordId): array => [
                 $recordId => $this->loanPeriods->daysForCopyCount($copies),
@@ -143,7 +143,7 @@ class ReservationController extends Controller
     }
 
     /**
-     * §8.3 — extend the pickup hold, but only while the queue is empty.
+     * 8.3 — extend the pickup hold, but only while the queue is empty.
      */
     public function extend(Request $request, Reservation $reservation): RedirectResponse
     {
@@ -159,7 +159,7 @@ class ReservationController extends Controller
     }
 
     /**
-     * §8 — release the current hold early and hand the copy to the next reader.
+     * 8 — release the current hold early and hand the copy to the next reader.
      */
     public function passToNext(Request $request, Reservation $reservation): RedirectResponse
     {

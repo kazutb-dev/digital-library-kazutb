@@ -2,92 +2,72 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use App\Models\Catalog\ReaderProfile;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class MemberDashboardPageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
     protected function setUp(): void
     {
         parent::setUp();
-
-        config()->set('demo_auth.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
-    }
-
-    private function loginAs(string $identitySlug): void
-    {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
-        ]);
+        $this->setUpAdminControlPlane();
     }
 
     public function test_guest_is_redirected_to_login(): void
     {
-        $response = $this->get('/dashboard');
-
-        $response->assertStatus(302);
-        $response->assertRedirectContains('/login');
+        $this->get('/dashboard')->assertRedirectContains('/login');
     }
 
-    public function test_student_can_view_dashboard(): void
+    public function test_member_can_view_the_current_reader_dashboard(): void
     {
-        $this->loginAs('student');
+        $member = $this->makeControlPlaneUser('member', ['locale' => 'ru']);
+        ReaderProfile::forUser($member);
 
-        $response = $this->get('/dashboard');
-
-        $response->assertOk();
-        $response->assertSee('KazUTB Library', false);
-        $response->assertSee('Member dashboard', false);
-        $response->assertSee('Priority action', false);
-        $response->assertSee('Research nodes', false);
-        $response->assertSee('From your shortlist', false);
+        $this->signInToLibraryAs($member)
+            ->get('/dashboard?lang=ru')
+            ->assertOk()
+            ->assertSee(__('librarian.member.common.eyebrow'), false)
+            ->assertSee(__('librarian.member.dashboard.subtitle'), false)
+            ->assertSee(__('librarian.member.dashboard.ticket_card'), false)
+            ->assertDontSee('Member dashboard', false)
+            ->assertDontSee('Research nodes', false);
     }
 
-    public function test_teacher_can_view_dashboard(): void
+    public function test_a_second_member_uses_the_same_reader_workspace_contract(): void
     {
-        $this->loginAs('teacher');
+        $member = $this->makeControlPlaneUser('member', ['locale' => 'kk']);
+        ReaderProfile::forUser($member);
 
-        $response = $this->get('/dashboard');
-
-        $response->assertOk();
-        $response->assertSee('Welcome back', false);
+        $this->signInToLibraryAs($member)
+            ->get('/dashboard?lang=kk')
+            ->assertOk()
+            ->assertSee(__('librarian.member.dashboard.services.catalog'), false);
     }
 
-    public function test_librarian_is_forbidden(): void
+    public function test_staff_and_admin_do_not_use_the_reader_dashboard_as_their_workspace(): void
     {
-        $this->loginAs('librarian');
+        $this->signInToLibraryAs($this->makeControlPlaneUser('librarian'))
+            ->get('/dashboard')
+            ->assertRedirect('/librarian');
 
-        $response = $this->get('/dashboard');
-
-        $response->assertForbidden();
-    }
-
-    public function test_admin_is_forbidden(): void
-    {
-        $this->loginAs('admin');
-
-        $response = $this->get('/dashboard');
-
-        $response->assertForbidden();
+        $this->signInToLibraryAs($this->adminUser)
+            ->get('/dashboard')
+            ->assertRedirect('/admin');
     }
 
     public function test_sidebar_links_to_canonical_member_routes(): void
     {
-        $this->loginAs('student');
+        $member = $this->makeControlPlaneUser('member', ['locale' => 'ru']);
+        ReaderProfile::forUser($member);
 
-        $response = $this->get('/dashboard');
-
-        $response->assertOk();
-        $response->assertSee(route('member.dashboard'), false);
-        $response->assertSee(route('member.reservations'), false);
-        $response->assertSee(route('member.list'), false);
+        $this->signInToLibraryAs($member)
+            ->get('/dashboard?lang=ru')
+            ->assertOk()
+            ->assertSee(route('member.dashboard'), false)
+            ->assertSee(route('member.reservations'), false)
+            ->assertSee(route('member.collections.index'), false);
     }
 }

@@ -33,27 +33,13 @@ class AdminPrivilegeNegativePathTest extends TestCase
         }
     }
 
-    public function test_librarian_only_reaches_the_sections_granted_by_exact_permissions(): void
+    public function test_librarian_is_forbidden_from_the_administrative_control_plane(): void
     {
         $librarian = $this->makeControlPlaneUser('librarian');
 
-        $this->signInToLibraryAs($librarian)->get('/admin')->assertOk();
-        $this->signInToLibraryAs($librarian)->get('/admin/feedback')->assertOk();
-
-        foreach ([
-            '/admin/users',
-            '/admin/roles',
-            '/admin/logs',
-            '/admin/reports',
-            '/admin/settings',
-            '/admin/integrations',
-            '/admin/branches',
-            '/admin/external-resources',
-        ] as $uri) {
+        foreach ($this->protectedPages() as $uri) {
             $this->signInToLibraryAs($librarian)->get($uri)->assertForbidden();
         }
-
-        $this->signInToLibraryAs($librarian)->get('/admin/news')->assertOk();
     }
 
     public function test_custom_role_can_enter_only_its_delegated_control_plane_scope(): void
@@ -85,8 +71,8 @@ class AdminPrivilegeNegativePathTest extends TestCase
         $this->signInToLibraryAs($reviewer)
             ->get('/admin')
             ->assertOk()
-            ->assertSee('Управление, журналы и мониторинг', false)
-            ->assertDontSee('Управление пользователями', false)
+            ->assertSee(__('admin.audit.title'), false)
+            ->assertDontSee(__('admin.nav.users'), false)
             ->assertSee('visible-operational-event', false)
             ->assertDontSee('hidden-security-event', false);
 

@@ -1,6 +1,6 @@
 @php
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
 
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
       $normalizedPath = '/' . ltrim($path, '/');
@@ -28,7 +28,7 @@
   $compatRoleBadge = match (true) {
       $role === 'admin' => '🛡️ Администратор',
       $role === 'librarian' => '📖 Библиотекарь',
-      $profileType === 'teacher' => '📚 Преподаватель',
+      $profileType === 'teacher' => ' Преподаватель',
       $profileType === 'student' => '🎓 Студент',
       default => null,
   };
@@ -249,7 +249,7 @@
   <header class="w-full sticky top-0 z-40 backdrop-blur-md bg-opacity-90 bg-[#F8F9FA]">
     <div class="flex justify-between items-center px-8 lg:px-12 py-6 max-w-[1440px] mx-auto gap-4">
       <div class="flex items-center gap-8 lg:gap-12">
-        <h1 class="text-2xl font-serif font-bold text-[#001F3F] leading-none">KazUTB Digital<br/>Library</h1>
+        <h1 class="text-2xl font-serif font-bold text-[#001F3F] leading-none">Kazakh University of Technology and Business named after K. Kulazhanov Digital<br/>Library</h1>
         <nav class="hidden md:flex items-center gap-6 lg:gap-8">
           <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/catalog') }}">Catalog</a>
           <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/resources') }}">Resources</a>
@@ -294,6 +294,16 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
       <div class="lg:col-span-8 space-y-16">
+        <section data-member-dashboard-loans>
+          <div class="flex items-center justify-between mb-8">
+            <h3 class="serif-text text-2xl font-bold text-primary">Current loans</h3>
+            <span class="text-xs font-bold text-on-surface-variant tracking-widest uppercase">Library account</span>
+          </div>
+          <div id="loan-list" class="space-y-4" aria-live="polite">
+            <p class="text-sm text-on-surface-variant">Loan information is loading.</p>
+          </div>
+        </section>
+
         <section data-member-dashboard-reservations>
           <div class="flex items-center justify-between mb-8">
             <h3 class="serif-text text-2xl font-bold text-primary">Current Reservations</h3>
@@ -387,7 +397,7 @@
   <footer class="w-full mt-20 pb-12 bg-[#F8F9FA]">
     <div class="max-w-7xl mx-auto px-8 lg:px-12 flex flex-col md:flex-row justify-between items-center gap-8">
       <p class="font-sans text-xs uppercase tracking-widest opacity-50 text-[#001F3F]">
-        © 2024 KazUTB Digital Library. The Digital Curator System.
+         2024 Kazakh University of Technology and Business named after K. Kulazhanov Digital Library. The Digital Curator System.
       </p>
       <div class="flex items-center gap-6 lg:gap-10">
         <a class="font-sans text-xs uppercase tracking-widest opacity-50 text-[#001F3F] hover:underline transition-opacity" href="{{ $routeWithLang('/login') }}">Institutional Access</a>
@@ -397,6 +407,18 @@
     </div>
   </footer>
 </main>
+
+<div id="confirm-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+  <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+    <h2 id="confirm-modal-title" class="serif-text text-2xl font-bold text-primary">Renew this loan?</h2>
+    <p class="mt-2 text-sm text-on-surface-variant">The due date will be extended according to the current circulation policy.</p>
+    <p id="renew-result" class="mt-3 hidden text-sm" role="status" aria-live="polite"></p>
+    <div class="mt-6 flex justify-end gap-3">
+      <button type="button" class="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold" data-renew-cancel>Cancel</button>
+      <button type="button" class="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white" data-renew-confirm>Renew</button>
+    </div>
+  </div>
+</div>
 
 <script>
   const ACCOUNT_SUMMARY_ENDPOINT = '/api/v1/account/summary';
@@ -443,6 +465,63 @@
       EXPIRED: { label: 'Pending', cls: 'bg-surface-container-high text-on-surface-variant opacity-60' },
     };
     return map[normalized] || map.PENDING;
+  }
+
+  function renderLoans(items) {
+    const list = document.getElementById('loan-list');
+    if (!list) return;
+    if (!Array.isArray(items) || items.length === 0) {
+      list.innerHTML = '<p class="text-sm text-on-surface-variant">No current loans.</p>';
+      return;
+    }
+
+    list.innerHTML = items.slice(0, 10).map((loan) => {
+      const id = loan.id || loan.loanId || loan.uuid;
+      const title = loan.title || loan.bookTitle || loan.book?.title || 'Library item';
+      const due = loan.dueAt || loan.due_at || '';
+      const status = String(loan.status || '').toLowerCase();
+      const canRenew = Boolean(id) && status === 'active' && Number(loan.renewCount ?? loan.renew_count ?? 0) < 3;
+
+      return `<article class="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-surface-container-low p-5">
+        <div><h4 class="font-bold text-primary">${escapeHtml(title)}</h4><p class="mt-1 text-xs text-on-surface-variant">${due ? `Due: ${escapeHtml(due)}` : escapeHtml(status)}</p></div>
+        ${canRenew ? `<button id="renew-btn-${escapeHtml(id)}" data-renew-loan="${escapeHtml(id)}" type="button" class="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white">Renew</button>` : ''}
+      </article>`;
+    }).join('');
+    list.querySelectorAll('[data-renew-loan]').forEach((button) => {
+      button.addEventListener('click', () => readerRenew(button.dataset.renewLoan));
+    });
+  }
+
+  function readerRenew(loanId) {
+    const modal = document.getElementById('confirm-modal');
+    const confirmButton = modal?.querySelector('[data-renew-confirm]');
+    const cancelButton = modal?.querySelector('[data-renew-cancel]');
+    const result = document.getElementById('renew-result');
+    if (!modal || !confirmButton || !cancelButton || !loanId) return;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    result?.classList.add('hidden');
+    const close = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+    cancelButton.onclick = close;
+    confirmButton.onclick = async () => {
+      confirmButton.disabled = true;
+      try {
+        const response = await fetch(`${ACCOUNT_LOANS_ENDPOINT}/${encodeURIComponent(loanId)}/renew`, {
+          method: 'POST',
+          headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''},
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || payload.error || 'Renewal failed');
+        close();
+        await loadMemberDashboard();
+      } catch (error) {
+        if (result) { result.textContent = error.message || 'Renewal failed'; result.classList.remove('hidden'); }
+      } finally {
+        confirmButton.disabled = false;
+      }
+    };
+    confirmButton.focus();
   }
 
   function renderReservations(items) {
@@ -529,6 +608,7 @@
       metricValue('collections', shortlistCount, 'Saved in Shortlist');
       metricValue('access', activeAccess, 'Active Digital Access');
       metricValue('arrivals', readyCount, 'Ready for Pickup');
+      renderLoans(Array.isArray(loans?.data) ? loans.data : []);
 
       if (reservationItems) {
         renderReservations(reservationItems);

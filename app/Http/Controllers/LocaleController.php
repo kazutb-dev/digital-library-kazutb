@@ -84,6 +84,13 @@ class LocaleController extends Controller
             return $fallback;
         }
 
-        return $path.(isset($parts['query']) ? '?'.$parts['query'] : '');
+        if (! isset($parts['query'])) {
+            return $path;
+        }
+
+        parse_str($parts['query'], $query);
+        unset($query['lang']);
+
+        return $path.($query !== [] ? '?'.http_build_query($query) : '');
     }
 }

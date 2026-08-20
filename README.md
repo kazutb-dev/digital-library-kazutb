@@ -126,7 +126,8 @@ docker compose exec frontend-dev npm install
 
 ### 4. Database setup
 
-Run migrations:
+For a newly provisioned, non-production database, migrations are an explicit
+operator action:
 
 ```bash
 php artisan migrate
@@ -134,12 +135,21 @@ php artisan migrate
 
 Notes:
 
-- In Docker app container, migrations are also executed by docker/entrypoint.sh at container start.
-- For a clean reset with seed data (if your evaluation requires it):
+- The application entrypoint never applies migrations. It checks for pending
+  migrations and fails closed when code and schema are incompatible.
+- Production migration requires a verified backup restore, clone validation,
+  an approved rollback plan, and a separate deployment operation.
+- Never use a destructive Artisan command against a development or production
+  database. Canonical PostgreSQL tests must use the guarded runner and a
+  database name ending in `_test`:
 
 ```bash
-php artisan migrate:fresh --seed
+TEST_DB_DATABASE=digital_library_test ./scripts/dev/test-postgres.sh
 ```
+
+The runner uses an isolated Laravel config-cache path, verifies the effective
+runtime database, and refuses to continue when the shell and Laravel settings
+do not match.
 
 ## Running the Application
 

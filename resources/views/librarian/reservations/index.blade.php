@@ -44,7 +44,7 @@
         @endcan
     </x-admin.page-header>
 
-    {{-- §8.3: the librarian must not have to guess the hold period — the live
+    {{-- 8.3: the librarian must not have to guess the hold period — the live
          setting value is stated on the screen itself. --}}
     <p class="mb-6 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         <span class="material-symbols-outlined mt-px text-[18px] text-slate-400">schedule</span>
@@ -155,7 +155,7 @@
                             $someoneWaiting = (bool) ($queueWaiting[$reservation->id] ?? false);
                             $logistics = $reservation->logisticsState();
 
-                            // §8.3: a hold may only be stretched while nobody is next in line.
+                            // 8.3: a hold may only be stretched while nobody is next in line.
                             $canExtend = $reservation->status === 'ready_for_pickup';
                             $canPassToNext = in_array($reservation->status, ['confirmed', 'ready_for_pickup'], true)
                                 && $copy !== null
@@ -209,7 +209,7 @@
                                     @if ($waitingCount > 0)
                                         <span class="mt-0.5 block text-xs text-slate-500">{{ __('librarian.reservations.queue_depth', ['count' => $waitingCount]) }}</span>
                                     @endif
-                                    {{-- §8: rough estimate only, never presented as a promised date. --}}
+                                    {{-- 8: rough estimate only, never presented as a promised date. --}}
                                     @if ($forecastDays !== null)
                                         <span
                                             class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800"
@@ -245,7 +245,7 @@
                                     @if ($reservation->status === 'pending')
                                         <form method="POST" action="{{ route('librarian.reservations.confirm', $reservation) }}" class="w-full">
                                             @csrf
-                                            {{-- §8 action "assign a copy": with more than one candidate the
+                                            {{-- 8 action "assign a copy": with more than one candidate the
                                                  librarian picks; a single option needs no choice. --}}
                                             @if ($pickable->count() > 1)
                                                 <label class="mb-1.5 block text-left">
@@ -355,7 +355,7 @@
                             </td>
                         </tr>
 
-                        {{-- §8 "what the librarian must see": contacts, reader status, ISBN,
+                        {{-- 8 "what the librarian must see": contacts, reader status, ISBN,
                              dates, logistics, and the notification log for this one hold. --}}
                         <tr class="border-t-0">
                             <td colspan="7" class="pt-0!">
@@ -425,7 +425,7 @@
                                                 @if(!$transfer && $reservation->status==='confirmed' && $reservation->pickup_branch_id && $copy?->branch_id !== $reservation->pickup_branch_id)
                                                     <form method="POST" action="{{ route('librarian.reservations.transfer.request',$reservation) }}">@csrf<button class="admin-btn admin-btn-secondary px-3 py-1.5 text-xs" type="submit">{{ __('librarian.reservations.transfer_request') }}</button></form>
                                                 @elseif($transfer)
-                                                    <p class="text-xs text-slate-500">{{ $transfer->transfer_number }} · {{ $transfer->sourceBranch?->name }} → {{ $transfer->destinationBranch?->name }}</p>
+                                                    <p class="text-xs text-slate-500">{{ $transfer->transfer_number }} · {{ $transfer->sourceBranch?->name }} — {{ $transfer->destinationBranch?->name }}</p>
                                                     @if($transfer->status==='requested')<form method="POST" action="{{ route('librarian.transfers.approve',$transfer) }}">@csrf<button class="admin-btn admin-btn-secondary px-3 py-1.5 text-xs" type="submit">{{ __('librarian.reservations.transfer_approve') }}</button></form>@endif
                                                     @if($transfer->status==='approved')<form method="POST" action="{{ route('librarian.transfers.send',$transfer) }}">@csrf<button class="admin-btn admin-btn-secondary px-3 py-1.5 text-xs" type="submit">{{ __('librarian.reservations.transfer_send') }}</button></form>@endif
                                                     @if($transfer->status==='in_transit')<form method="POST" action="{{ route('librarian.transfers.receive',$transfer) }}" class="space-y-2">@csrf<input class="admin-input py-1.5 text-xs" name="scanned_code" autocomplete="off" placeholder="{{ __('librarian.reservations.transfer_scan') }}" required><button class="admin-btn admin-btn-primary px-3 py-1.5 text-xs" type="submit">{{ __('librarian.reservations.transfer_receive') }}</button></form>@endif

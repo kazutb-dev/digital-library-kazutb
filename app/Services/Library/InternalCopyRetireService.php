@@ -40,10 +40,10 @@ class InternalCopyRetireService
      * Retire a copy with an explicit reason code and optional note.
      *
      * Hard-blocks:
-     *   - copy does not exist → 404
-     *   - already retired → 409 already_retired
-     *   - active loan exists → 409 copy_on_loan
-     *   - copy-bound reservation in PENDING or READY status → 409 active_reservation_conflict
+     *   - copy does not exist — 404
+     *   - already retired — 409 already_retired
+     *   - active loan exists — 409 copy_on_loan
+     *   - copy-bound reservation in PENDING or READY status — 409 active_reservation_conflict
      *
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>

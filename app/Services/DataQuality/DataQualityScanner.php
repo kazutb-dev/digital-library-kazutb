@@ -22,6 +22,8 @@ use Throwable;
 
 class DataQualityScanner
 {
+    /** @var null|array<int,\Illuminate\Support\Collection> */
+    private ?array $bulkDuplicateMatches = null;
     /** @var array<string,class-string<Model>> */
     public const SCOPES = [
         'bibliographic_records' => BibliographicRecord::class,
@@ -43,6 +45,7 @@ class DataQualityScanner
 
     public function __construct(
         private readonly DataQualityRuleRegistry $rules,
+        private readonly DuplicateDetectionService $duplicates,
         private readonly AuditLogger $audit,
         private readonly DataQualityNotificationService $notifications,
     ) {}
@@ -103,6 +106,17 @@ class DataQualityScanner
             $entityType = self::ENTITY_TYPES[$scope];
             /** @var Builder $query */
             $query = $modelClass::query()->orderBy((new $modelClass)->getQualifiedKeyName());
+            if ($modelClass === BibliographicRecord::class) {
+                $query->with('translations')->withCount('copies');
+                $this->bulkDuplicateMatches = $this->duplicates->bulkCandidates();
+            } elseif ($modelClass === BookCopy::class) {
+                $query->with(['branch', 'fund', 'bibliographicRecord'])
+                    ->withExists([
+                        'bibliographicRecord as dq_record_exists',
+                        'loans as dq_has_active_loan' => fn (Builder $loan) => $loan->whereIn('status', ['active', 'overdue'])->whereNull('returned_at'),
+                        'reservations as dq_has_active_reservation' => fn (Builder $reservation) => $reservation->whereIn('status', ['queued', 'ready']),
+                    ]);
+            }
             $query->chunkById($this->chunkSize(), function ($models) use ($run, $entityType, &$counters, &$errors): bool {
                 foreach ($models as $model) {
                     if ($run->fresh()->status === 'cancelled') {
@@ -125,6 +139,9 @@ class DataQualityScanner
 
             if ($run->fresh()->status === 'cancelled') {
                 break;
+            }
+            if ($modelClass === BibliographicRecord::class) {
+                $this->bulkDuplicateMatches = null;
             }
         }
 
@@ -158,6 +175,18 @@ class DataQualityScanner
     {
         return DB::transaction(function () use ($model, $entityType, $run): array {
             $violations = $this->rules->inspect($model);
+            if ($model instanceof BibliographicRecord) {
+                $matches = $this->bulkDuplicateMatches === null
+                    ? $this->duplicates->candidates($model, $model->getKey())
+                    : ($this->bulkDuplicateMatches[(int) $model->getKey()] ?? collect());
+                if ($strongest = $matches->first()) {
+                    $violation = $this->rules->duplicateViolation($strongest);
+                    $violation['context']['candidate_ids'] = $matches->take(10)
+                        ->pluck('record.id')->map(fn ($id) => (int) $id)->values()->all();
+                    $violations[] = $violation;
+                }
+                $this->duplicates->storeMatches($model, $matches);
+            }
             $seen = [];
             $created = 0;
             $reopened = 0;
@@ -198,17 +227,30 @@ class DataQualityScanner
                         actor: $run?->starter,
                     );
                 } else {
-                    $wasClosed = in_array($issue->status, ['resolved', 'ignored', 'false_positive'], true)
+                    $currentValue = $this->stringValue($violation['value']);
+                    $suppressed = $issue->status === 'false_positive'
+                        && data_get($issue->context, 'suppression.rules_version') === DataQualityRuleRegistry::VERSION
+                        && data_get($issue->context, 'suppression.current_value') === $currentValue;
+                    $wasClosed = ! $suppressed && in_array($issue->status, ['resolved', 'ignored', 'false_positive'], true)
                         && ! ($issue->status === 'ignored' && $issue->ignored_until?->isFuture());
+                    $context = $violation['context'] ?: [];
+                    if ($suppressed) {
+                        $context['suppression'] = data_get($issue->context, 'suppression');
+                    }
                     $issue->update([
                         'status' => $wasClosed ? 'reopened' : $issue->status,
-                        'current_value' => $this->stringValue($violation['value']),
+                        'category' => $violation['category'],
+                        'severity' => $this->severityFor($violation['code'], $violation['severity']),
+                        'current_value' => $currentValue,
+                        'expected_format' => $violation['expected'],
+                        'description' => $violation['description'],
+                        'suggested_action' => $violation['suggested_action'],
                         'last_detected_at' => now(),
                         'occurrence_count' => $issue->occurrence_count + 1,
                         'scan_run_id' => $run?->getKey(),
                         'resolved_at' => $wasClosed ? null : $issue->resolved_at,
                         'resolved_by' => $wasClosed ? null : $issue->resolved_by,
-                        'context' => $violation['context'] ?: null,
+                        'context' => $context ?: null,
                     ]);
                     if ($wasClosed) {
                         $reopened++;

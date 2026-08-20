@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\ElectronicMaterial;
 use App\Services\AuditLogger;
+use App\Services\Digital\DigitalMaterialWorkflow;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -16,8 +17,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Attachments of a bibliographic record that the cataloguing form edits
- * alongside the metadata: electronic materials (Master.md §18) and links to
- * other records (§10.4). Kept out of CatalogController because each of these
+ * alongside the metadata: electronic materials (Master.md 18) and links to
+ * other records (10.4). Kept out of CatalogController because each of these
  * is its own resource with its own audit trail — the metadata form itself
  * stays a single PATCH.
  */
@@ -88,15 +89,19 @@ class CatalogAttachmentController extends Controller
         return response()->json(['data' => $records]);
     }
 
-    public function storeMaterial(Request $request, BibliographicRecord $record, AuditLogger $audit): RedirectResponse
-    {
+    public function storeMaterial(
+        Request $request,
+        BibliographicRecord $record,
+        AuditLogger $audit,
+        DigitalMaterialWorkflow $workflow,
+    ): RedirectResponse {
         $validated = $this->validatedMaterial($request, required: true);
 
-        DB::transaction(function () use ($request, $record, $validated, $audit): void {
+        DB::transaction(function () use ($request, $record, $validated, $audit, $workflow): void {
             $material = new ElectronicMaterial($validated);
             $material->bibliographic_record_id = $record->getKey();
             $material->uploaded_by = $request->user()->getKey();
-            $this->applyUpload($request, $material);
+            $this->prepareWorkflowDefaults($material);
             $material->save();
 
             $audit->logRequired(
@@ -106,6 +111,15 @@ class CatalogAttachmentController extends Controller
                 newValues: $this->materialSnapshot($material),
                 scope: 'library',
             );
+
+            if ($request->hasFile('file')) {
+                $workflow->attachFile(
+                    $material,
+                    $request->file('file'),
+                    $request->user(),
+                    (string) $request->input('version_reason', __('digital.version.initial_upload')),
+                );
+            }
         });
 
         return redirect()
@@ -118,6 +132,7 @@ class CatalogAttachmentController extends Controller
         BibliographicRecord $record,
         ElectronicMaterial $material,
         AuditLogger $audit,
+        DigitalMaterialWorkflow $workflow,
     ): RedirectResponse {
         $this->assertBelongsTo($material, $record);
 
@@ -125,12 +140,11 @@ class CatalogAttachmentController extends Controller
         // is required — only that the material still ends up with one.
         $validated = $this->validatedMaterial($request, required: false);
 
-        DB::transaction(function () use ($request, $material, $validated, $audit): void {
+        DB::transaction(function () use ($request, $material, $validated, $audit, $workflow): void {
             $old = $this->materialSnapshot($material);
             $material->fill($validated);
-            $this->applyUpload($request, $material);
 
-            if ((string) $material->file_path === '' && (string) $material->external_url === '') {
+            if (! $request->hasFile('file') && (string) $material->file_path === '' && (string) $material->external_url === '') {
                 throw ValidationException::withMessages([
                     'external_url' => __('librarian.catalog.materials.source_required'),
                 ]);
@@ -146,6 +160,15 @@ class CatalogAttachmentController extends Controller
                 newValues: $this->materialSnapshot($material),
                 scope: 'library',
             );
+
+            if ($request->hasFile('file')) {
+                $workflow->attachFile(
+                    $material,
+                    $request->file('file'),
+                    $request->user(),
+                    (string) $request->input('version_reason', __('digital.version.replacement')),
+                );
+            }
         });
 
         return redirect()
@@ -252,6 +275,7 @@ class CatalogAttachmentController extends Controller
             'license_terms' => ['nullable', 'string', 'max:2000'],
             'allow_download' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
+            'version_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
         if ($required && ! $request->hasFile('file') && trim((string) ($validated['external_url'] ?? '')) === '') {
@@ -280,23 +304,26 @@ class CatalogAttachmentController extends Controller
         }
 
         $validated['allow_download'] = $request->boolean('allow_download');
-        $validated['is_active'] = $request->boolean('is_active');
-        unset($validated['file']);
+        unset($validated['file'], $validated['version_reason'], $validated['is_active']);
 
         return $validated;
     }
 
-    private function applyUpload(Request $request, ElectronicMaterial $material): void
+    private function prepareWorkflowDefaults(ElectronicMaterial $material): void
     {
-        if (! $request->hasFile('file')) {
-            return;
-        }
-
-        $file = $request->file('file');
-        // Non-public disk: the download route re-checks access_level before
-        // streaming, so the file must never be reachable by URL guessing.
-        $material->file_path = $file->store('electronic-materials', 'local');
-        $material->file_size = $file->getSize();
+        $material->material_type = match ($material->file_type) {
+            'pdf' => 'book_pdf',
+            'image' => 'image_collection',
+            'presentation' => 'presentation',
+            default => 'methodological_material',
+        };
+        $material->workflow_status = 'uploaded';
+        $material->copyright_status = 'unknown';
+        $material->preview_policy = 'none';
+        $material->download_policy = 'disabled';
+        $material->print_policy = 'disabled';
+        $material->copy_policy = 'disabled';
+        $material->is_active = false;
     }
 
     private function assertBelongsTo(ElectronicMaterial $material, BibliographicRecord $record): void

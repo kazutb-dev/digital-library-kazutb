@@ -8,6 +8,7 @@ use App\Models\Catalog\ElectronicMaterial;
 use App\Models\Catalog\ReaderProfile;
 use App\Models\ContactMessage;
 use App\Models\LiteratureCollection;
+use App\Models\MessageCategory;
 use App\Services\AuditLogger;
 use App\Services\Library\CatalogReadService;
 use App\Services\Library\DigitalAccessService;
@@ -61,7 +62,7 @@ class PortalController extends Controller
 
     public function digitalMaterials(Request $request, DigitalAccessService $access): View
     {
-        $materials = ElectronicMaterial::query()->where('is_active', true)
+        $materials = ElectronicMaterial::query()->published()
             ->with('bibliographicRecord')->latest()->paginate(12)->through(function (ElectronicMaterial $material) use ($access, $request): ?array {
                 $resolved = $access->resolve((string) $material->getKey());
                 if ($resolved === null || ! $access->canAccess($resolved, $request)) {
@@ -110,15 +111,26 @@ class PortalController extends Controller
 
     public function messages(Request $request): View
     {
+        $query = ContactMessage::query()
+            ->where(fn ($builder) => $builder->where('user_id', $request->user()->getKey())->orWhere('sender_id', $request->user()->getKey()))
+            ->with(['messageCategory', 'assignee'])
+            ->withCount('messageAttachments');
+        if ($request->filled('status') && in_array($request->string('status')->toString(), ContactMessage::STATUSES, true)) {
+            $query->where('status', $request->string('status')->toString());
+        }
+
         return view('member.messages', [
-            'memberMessages' => ContactMessage::query()->where('sender_id', $request->user()->getKey())->latest()->paginate(10),
-            'messageCategories' => ContactMessage::CATEGORIES,
+            'memberMessages' => $query->latest()->paginate(10)->withQueryString(),
+            'messageCategories' => MessageCategory::query()->active()->orderBy('message_type')->orderBy('sort_order')->get(),
+            'messageTypes' => ContactMessage::TYPES,
         ]);
     }
 
     public function message(Request $request, ContactMessage $message): View
     {
-        abort_unless((int) $message->sender_id === (int) $request->user()->getKey(), 404);
+        abort_unless((int) ($message->user_id ?: $message->sender_id) === (int) $request->user()->getKey(), 404);
+
+        $message->load(['messageCategory', 'publicThreadEntries.author', 'messageAttachments' => fn ($query) => $query->where('visibility', 'public')]);
 
         return view('member.message-show', ['message' => $message]);
     }

@@ -229,9 +229,9 @@ class IncidentReplacementWorkflowTest extends TestCase
             ->assertSee($case->case_number);
 
         $this->signInToLibraryAs($this->adminUser)
-            ->get(route('librarian.reports.index'))
+            ->get(route('librarian.reports.index', ['report' => 'incidents']))
             ->assertOk()
-            ->assertSee(__('incidents.report.title'));
+            ->assertSee(__('analytics.reports.incidents.short'));
 
         $this->signInToLibraryAs($this->adminUser)
             ->get(route('librarian.reports.export', ['type' => 'incidents']))

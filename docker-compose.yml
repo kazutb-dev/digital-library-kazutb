@@ -42,7 +42,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     ports:
-      - "0.0.0.0:${POSTGRES_PORT:-5433}:5432"
+      # PostgreSQL is an implementation detail of this single-host dev stack.
+      # Bind it to loopback unless an operator explicitly opts into exposure.
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5433}:5432"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-library_user} -d ${POSTGRES_DB:-digital_library}" ]
       interval: 10s
@@ -78,16 +85,24 @@ services:
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: "5432"
-      DB_DATABASE: "${POSTGRES_DB:-digital_library}"
-      DB_USERNAME: "${POSTGRES_USER:-library_user}"
-      DB_PASSWORD: "${POSTGRES_PASSWORD}"
-      SESSION_DRIVER: "${SESSION_DRIVER:-database}"
+      DB_DATABASE: "${DB_DATABASE:-digital_library}"
+      # Runtime credentials are deliberately separate from the PostgreSQL
+      # bootstrap/admin and deployment-only migration identities.
+      DB_USERNAME: "${DB_USERNAME:?Set the least-privilege runtime DB_USERNAME}"
+      DB_PASSWORD: "${DB_PASSWORD:?Set the least-privilege runtime DB_PASSWORD}"
+      SESSION_DRIVER: "${SESSION_DRIVER:-file}"
       SESSION_LIFETIME: "${SESSION_LIFETIME:-120}"
-      CACHE_STORE: "${CACHE_STORE:-database}"
+      CACHE_STORE: "${CACHE_STORE:-file}"
       EXTERNAL_AUTH_LOGIN_URL: "${EXTERNAL_AUTH_LOGIN_URL:-http://crm.local/api/login}"
       EXTERNAL_AUTH_DEVICE_NAME: "${EXTERNAL_AUTH_DEVICE_NAME:-web}"
     ports:
       - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     volumes:
       - ./:/app:cached
     healthcheck:
@@ -105,6 +120,30 @@ services:
           cpus: '0.75'
           memory: 384M
 
+  # Deployment-only database identity. This profile is never part of the
+  # long-running web/worker stack and carries no PostgreSQL admin credential.
+  migrator:
+    image: library-app
+    profiles: ["maintenance"]
+    working_dir: /app
+    entrypoint: ["php"]
+    environment:
+      APP_ENV: production
+      APP_KEY: "${APP_KEY}"
+      APP_DEBUG: "false"
+      APP_CONFIG_CACHE: /tmp/library-migrator-config.php
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: "${DB_DATABASE:-digital_library}"
+      DB_USERNAME: "${MIGRATION_DB_USERNAME:?Set MIGRATION_DB_USERNAME}"
+      DB_PASSWORD: "${MIGRATION_DB_PASSWORD:?Set MIGRATION_DB_PASSWORD}"
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+    volumes:
+      - ./:/app:cached
+
   frontend-dev:
     image: node:22
     working_dir: /app
@@ -120,6 +159,11 @@ services:
       sh -lc "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then npm install; fi && npm run dev -- --host 0.0.0.0 --port 5173"
     ports:
       - "0.0.0.0:5173:5173"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - ./:/app:cached
       - frontend_node_modules:/app/node_modules

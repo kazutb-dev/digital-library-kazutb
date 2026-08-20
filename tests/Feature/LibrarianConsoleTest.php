@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\Fine;
+use App\Models\Catalog\Loan;
 use App\Models\Catalog\ReaderProfile;
 use App\Models\Catalog\UdcCode;
 use App\Models\User;
@@ -435,6 +436,55 @@ class LibrarianConsoleTest extends TestCase
             ->json();
         $this->assertNotEmpty($readerPayload['data']);
         $this->assertSame('Лукпанова Асель', $readerPayload['data'][0]['name']);
+    }
+
+    public function test_isbn_lookup_explains_that_a_specific_physical_copy_is_required(): void
+    {
+        $record = BibliographicRecord::factory()->create([
+            'title' => 'Русско-казахский словарь',
+            'isbn' => '9965-17-469-5',
+        ]);
+        BookCopy::factory()->count(2)->create([
+            'bibliographic_record_id' => $record->getKey(),
+            'status' => 'available',
+            'barcode' => null,
+        ]);
+
+        $payload = $this->signInToLibraryAs($this->librarian)
+            ->getJson(route('librarian.circulation.copy-lookup', ['q' => '9965174695']))
+            ->assertOk()
+            ->json();
+
+        $this->assertNull($payload['data']);
+        $this->assertSame('isbn', $payload['match_type']);
+        $this->assertSame($record->getKey(), $payload['editions'][0]['id']);
+        $this->assertSame(2, $payload['editions'][0]['available_copies_count']);
+
+        $this->signInToLibraryAs($this->librarian)
+            ->get('/librarian/copies?search=9965-17-469-5&lang=ru')
+            ->assertOk()
+            ->assertSee('Русско-казахский словарь');
+    }
+
+    public function test_issue_post_never_chooses_an_arbitrary_copy_from_an_isbn(): void
+    {
+        $record = BibliographicRecord::factory()->create(['isbn' => '9965-17-469-5']);
+        BookCopy::factory()->count(2)->create([
+            'bibliographic_record_id' => $record->getKey(),
+            'status' => 'available',
+        ]);
+        $reader = $this->makeControlPlaneUser('member');
+        ReaderProfile::forUser($reader);
+
+        $this->signInToLibraryAs($this->librarian)
+            ->withoutMiddleware(PreventRequestForgery::class)
+            ->post(route('librarian.circulation.issue.store'), [
+                'reader_id' => $reader->getKey(),
+                'copy_code' => '9965-17-469-5',
+            ])
+            ->assertSessionHasErrors('copy_code');
+
+        $this->assertSame(0, Loan::query()->count());
     }
 
     public function test_unknown_copy_lookup_returns_null_rather_than_an_error(): void

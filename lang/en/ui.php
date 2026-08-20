@@ -3,7 +3,7 @@
 return [
     'skip_to_main' => 'Skip to main content',
     'brand' => [
-        'title' => 'KazUTB Library',
+        'title' => 'Kazakh University of Technology and Business named after K. Kulazhanov Library',
         'subtitle' => 'Since 2003',
         'home_aria' => 'Go to the Digital Library home page',
     ],

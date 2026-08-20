@@ -78,7 +78,7 @@
                     </div>
                     <div>
                         <dt class="admin-label">{{ __('admin.users.fields.locale') }}</dt>
-                        <dd class="text-sm text-slate-700">{{ __('common.languages.'.($managedUser->locale ?: 'kk')) }}</dd>
+                        <dd class="text-sm text-slate-700">{{ __('common.languages.'.($managedUser->locale ?: 'ru')) }}</dd>
                     </div>
                     <div>
                         <dt class="admin-label">{{ __('admin.users.fields.registered_at') }}</dt>

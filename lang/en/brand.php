@@ -5,7 +5,7 @@ return [
         'name' => 'Scientific Library',
     ],
     'university' => [
-        'full' => 'K. Kulazhanov Kazakh University of Technology and Business',
+        'full' => 'Kazakh University of Technology and Business named after K. Kulazhanov',
     ],
     'compact' => 'Scientific Library',
     'workspace' => [
@@ -18,8 +18,8 @@ return [
         'acquisitions' => 'Acquisitions Librarian',
         'cataloguer' => 'Cataloguer',
         'bibliographer' => 'Bibliographer',
-        'admin' => 'Administrator',
+        'admin' => 'Full administrator',
     ],
-    'logo_alt' => 'Official KazUTB Scientific Library logo',
+    'logo_alt' => 'Official Kazakh University of Technology and Business named after K. Kulazhanov Scientific Library logo',
     'home_aria' => 'Scientific Library home page',
 ];

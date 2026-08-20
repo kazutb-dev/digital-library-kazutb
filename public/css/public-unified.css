@@ -93,24 +93,14 @@ body:not(.homepage) :is(h1, h2, h3, h4, .font-headline) {
 }
 
 body:not(.homepage) :is(
-  .resources-canonical,
   .catalog-export,
-  .contacts-canonical,
-  .repository-canonical,
-  .news-canonical,
-  .events-canonical,
-  .rules-canonical,
-  .leadership-canonical,
-  .about-canonical,
-  .discover-canonical,
   .catalog-canonical
 ) {
-  width: min(100% - clamp(32px, 6vw, 80px), 1360px);
+  width: min(
+    calc(100% - (2 * var(--page-pad))),
+    calc(var(--page-max) - (2 * var(--page-pad)))
+  );
   margin-inline: auto;
-}
-
-body:not(.homepage) .repository-canonical {
-  width: min(100% - clamp(32px, 6vw, 80px), 1440px);
 }
 
 body:not(.homepage) :is(p, li, label, input, select, textarea, button):not(.material-symbols-outlined) {
@@ -247,7 +237,7 @@ body:not(.homepage) :is(
 /* ── Shape, elevation, controls ───────────────────────────── */
 
 body:not(.homepage) :is(
-  .btn, button, [type="submit"], input, select, textarea,
+  .btn, button:not(.locale-switcher__option), [type="submit"]:not(.locale-switcher__option), input, select, textarea,
   [class$="__card"], [class*="__card "], [class$="__panel"],
   [class$="__chip"], [class*="__chip "], [class$="__tag"], [class$="__badge"]
 ) {
@@ -257,7 +247,7 @@ body:not(.homepage) :is(
 
 body:not(.homepage) :is(
   input:not([type="checkbox"]):not([type="radio"]),
-  select,
+  select:not(.sr-only),
   textarea
 ) {
   min-height: 48px;
@@ -333,39 +323,7 @@ body:not(.homepage) :is(
   transform: none;
 }
 
-@media (max-width: 1024px) {
-  body:not(.homepage) :is(
-    .resources-canonical,
-    .contacts-canonical,
-    .repository-canonical,
-    .news-canonical,
-    .events-canonical,
-    .rules-canonical,
-    .leadership-canonical,
-    .about-canonical,
-    .discover-canonical,
-    .catalog-canonical
-  ) {
-    width: min(100% - 48px, 1360px);
-  }
-}
-
 @media (max-width: 640px) {
-  body:not(.homepage) :is(
-    .resources-canonical,
-    .contacts-canonical,
-    .repository-canonical,
-    .news-canonical,
-    .events-canonical,
-    .rules-canonical,
-    .leadership-canonical,
-    .about-canonical,
-    .discover-canonical,
-    .catalog-canonical
-  ) {
-    width: min(100% - 32px, 1360px);
-  }
-
   body:not(.homepage) .hs-section {
     padding-block: clamp(48px, 7vw, 88px);
   }
@@ -552,7 +510,7 @@ body:not(.homepage) :is(
 }
 
 /* Primary submit buttons. */
-body:not(.homepage) :is(.btn-primary, [type="submit"], [class$="__cta-btn"]) {
+body:not(.homepage) :is(.btn-primary, [type="submit"]:not(.locale-switcher__option), [class$="__cta-btn"]) {
   padding: 13px 20px;
   color: #fff;
   background: var(--public-accent-deep);
@@ -567,7 +525,7 @@ body:not(.homepage) :is(.btn-primary, [type="submit"], [class$="__cta-btn"]) {
   transition: color 250ms ease, background-color 250ms ease, border-color 250ms ease;
 }
 
-body:not(.homepage) :is(.btn-primary, [type="submit"], [class$="__cta-btn"]):hover {
+body:not(.homepage) :is(.btn-primary, [type="submit"]:not(.locale-switcher__option), [class$="__cta-btn"]):hover {
   color: var(--public-ink);
   background: var(--public-accent);
   border-color: var(--public-accent);

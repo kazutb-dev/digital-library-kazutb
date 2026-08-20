@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Ensures the request comes from a librarian or administrator.
  *
  * Librarian surfaces live under /librarian/*. Admins inherit librarian
- * operational access by policy (PROJECT_CONTEXT §5). Ordinary members and
+ * operational access by policy (PROJECT_CONTEXT 5). Ordinary members and
  * guests are denied.
  */
 class EnsureLibrarianStaff

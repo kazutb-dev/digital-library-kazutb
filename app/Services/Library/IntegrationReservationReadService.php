@@ -96,7 +96,7 @@ class IntegrationReservationReadService
     {
         // All three tables live in the public schema (CRM/legacy side).
         // Column names are camelCase — Laravel's PostgreSQL grammar quotes identifiers
-        // from dotted notation correctly, e.g. r.reservedAt → "r"."reservedAt".
+        // from dotted notation correctly, e.g. r.reservedAt — "r"."reservedAt".
         return DB::connection('pgsql')
             ->table(DB::raw('"Reservation" as r'))
             ->leftJoin(DB::raw('"User" as u'), 'u.id', '=', 'r.userId')

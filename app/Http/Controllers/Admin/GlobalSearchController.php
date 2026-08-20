@@ -14,6 +14,7 @@ use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 /**
@@ -98,8 +99,17 @@ class GlobalSearchController extends Controller
             $this->pushGroup($groups, 'news', $items);
         }
 
-        if ($user?->can('messages.view_all')) {
+        if ($user?->can('messages.view_assigned')) {
             $items = ContactMessage::query()
+                ->where(function (Builder $builder) use ($user): void {
+                    $builder->where('assigned_to', $user->getKey());
+                    if (Schema::hasTable('message_watchers')) {
+                        $builder->orWhereHas('watchers', fn (Builder $watchers) => $watchers->whereKey($user->getKey()));
+                    }
+                    if (Schema::hasTable('message_categories')) {
+                        $builder->orWhereHas('messageCategory', fn (Builder $category) => $category->where('default_assignee_role', 'admin'));
+                    }
+                })
                 ->search($query)
                 ->orderByDesc('created_at')
                 ->limit(self::PER_GROUP)

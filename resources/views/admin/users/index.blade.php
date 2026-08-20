@@ -174,7 +174,16 @@
                             <td>
                                 <x-admin.status-badge status="role" :label="$roleLabel" />
                             </td>
-                            <td>{{ __('admin.users.providers.'.$managedUser->auth_provider) }}</td>
+                            <td>
+                                <strong class="block text-sm">{{ __('admin.users.providers.'.$managedUser->auth_provider) }}</strong>
+                                <span class="mt-1 block text-xs text-slate-500">{{ $managedUser->auth_source ?: '—' }}</span>
+                                @if($managedUser->ad_samaccountname || $managedUser->ad_login)
+                                    <span class="mt-1 block font-mono text-[11px] text-slate-500">{{ $managedUser->ad_samaccountname ?: $managedUser->ad_login }}</span>
+                                @endif
+                                @if($managedUser->readerProfile)
+                                    <span class="mt-1 block text-[11px] text-slate-500">{{ $managedUser->readerProfile->category }} · {{ $managedUser->readerProfile->status }}</span>
+                                @endif
+                            </td>
                             <td class="whitespace-nowrap text-slate-600">
                                 {{ $managedUser->created_at?->utc()->format('Y-m-d H:i') ?? '—' }}
                             </td>

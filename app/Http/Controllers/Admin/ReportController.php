@@ -5,7 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Branch;
+use App\Models\Catalog\DigitalMaterialAccessLog;
+use App\Models\Catalog\ElectronicMaterial;
+use App\Models\Catalog\RepositoryItem;
 use App\Models\ContactMessage;
+use App\Models\ExternalResourceEvent;
 use App\Models\Fund;
 use App\Models\News;
 use App\Models\User;
@@ -18,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
 use Symfony\Component\HttpFoundation\Response;
@@ -171,6 +176,19 @@ class ReportController extends Controller
             ->get()
             ->map(fn ($row): array => ['role' => $row->actor_role, 'events' => (int) $row->aggregate]);
 
+        $digitalByStatus = DatabaseSchema::hasTable('electronic_materials') && Schema::hasColumn('electronic_materials', 'workflow_status')
+            ? ElectronicMaterial::query()->selectRaw('workflow_status as status, count(*) as aggregate')->groupBy('workflow_status')->get()->map(fn ($row): array => ['status' => $row->status, 'total' => (int) $row->aggregate])
+            : collect();
+        if (DatabaseSchema::hasTable('digital_material_access_logs')) {
+            $digitalByStatus = $digitalByStatus->concat(DigitalMaterialAccessLog::query()->selectRaw("action || ':' || CASE WHEN allowed THEN 'allowed' ELSE 'denied' END as status, count(*) as aggregate")->groupBy('action', 'allowed')->get()->map(fn ($row): array => ['status' => $row->status, 'total' => (int) $row->aggregate]));
+        }
+        $repositoryByStatus = DatabaseSchema::hasTable('repository_items')
+            ? RepositoryItem::query()->selectRaw('status, count(*) as aggregate')->groupBy('status')->get()->map(fn ($row): array => ['status' => $row->status, 'total' => (int) $row->aggregate])
+            : collect();
+        $externalUsage = DatabaseSchema::hasTable('external_resource_events')
+            ? ExternalResourceEvent::query()->join('external_resources', 'external_resources.id', '=', 'external_resource_events.external_resource_id')->selectRaw('external_resources.title, external_resource_events.event_type, count(*) as aggregate')->groupBy('external_resources.title', 'external_resource_events.event_type')->get()->map(fn ($row): array => ['title' => $row->title, 'event' => $row->event_type, 'total' => (int) $row->aggregate])
+            : collect();
+
         $crmUrl = trim((string) config('services.external_auth.login_url', ''));
         $integrationStatuses = collect([
             [
@@ -198,6 +216,9 @@ class ReportController extends Controller
             'resolutionRate' => $resolutionRate,
             'averageResolutionHours' => $averageResolutionHours,
             'integrationStatuses' => $integrationStatuses,
+            'digitalByStatus' => $digitalByStatus,
+            'repositoryByStatus' => $repositoryByStatus,
+            'externalUsage' => $externalUsage,
             'branchCount' => Branch::query()->count(),
             'fundCount' => Fund::query()->count(),
             'circulationAvailable' => DatabaseSchema::hasTable('app.circulation_loans'),
@@ -253,6 +274,9 @@ class ReportController extends Controller
                     'total' => DB::table('app.documents')->count(),
                 ]])
                 : collect(),
+            'digital-materials' => collect($data['digitalByStatus']),
+            'external-resources' => collect($data['externalUsage']),
+            'repository' => collect($data['repositoryByStatus']),
             default => collect(),
         };
     }
@@ -262,7 +286,7 @@ class ReportController extends Controller
      */
     private function types(): array
     {
-        return ['user-activity', 'roles', 'news', 'messages', 'integrations', 'branches-funds', 'circulation', 'catalog'];
+        return ['user-activity', 'roles', 'news', 'messages', 'digital-materials', 'external-resources', 'repository', 'integrations', 'branches-funds', 'circulation', 'catalog'];
     }
 
     private function typeLabel(string $type): string
@@ -272,6 +296,9 @@ class ReportController extends Controller
             'roles' => __('reports.sections.role_distribution'),
             'news' => __('reports.sections.news_statistics'),
             'messages' => __('reports.sections.message_volume'),
+            'digital-materials' => __('reports.sections.digital_materials'),
+            'external-resources' => __('reports.sections.external_resources'),
+            'repository' => __('reports.sections.repository'),
             'integrations' => __('reports.sections.integration_status'),
             'branches-funds' => __('reports.sections.funds'),
             'circulation' => __('reports.sections.circulation'),

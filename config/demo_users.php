@@ -41,19 +41,6 @@ return [
             'landing' => '/dashboard',
         ],
 
-        'teacher' => [
-            'email' => 'demo-teacher@kazutb.local',
-            'name' => 'Демо-преподаватель',
-            'role' => 'member',
-            'legacy_role' => 'reader',
-            'profile_type' => 'teacher',
-            'ad_login' => 'demo_teacher',
-            'label' => 'Преподаватель',
-            'description' => 'Силлабус, подборка литературы, рабочий стол',
-            'icon' => '📚',
-            'landing' => '/dashboard',
-        ],
-
         'librarian' => [
             'email' => 'demo-librarian@kazutb.local',
             'name' => 'Демо-библиотекарь',

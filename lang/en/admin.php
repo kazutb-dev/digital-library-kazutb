@@ -30,7 +30,7 @@ return [
     'dashboard' => [
         'eyebrow' => 'System governance',
         'title' => 'Governance Overview',
-        'subtitle' => 'Current operational data for the KazUTB digital and physical library services.',
+        'subtitle' => 'Current operational data for the Kazakh University of Technology and Business named after K. Kulazhanov digital and physical library services.',
         'export' => 'Export dashboard data',
         'metrics' => [
             'active_users' => 'Active users',
@@ -522,6 +522,7 @@ return [
         'types' => [
             'licensed' => 'Licensed resource',
             'open' => 'Open-access resource',
+            'open_access' => 'Open-access resource',
             'partner' => 'Partner resource',
             'internal' => 'Internal resource',
         ],
@@ -585,7 +586,7 @@ return [
             'demo_login_disabled' => 'Demo sign-in disabled',
             'demo_login_disabled_hint' => 'Demo sign-in with fixed passwords is enabled — disable APP_DEMO_LOGIN_ENABLED before production.',
             'debug_disabled' => 'Debug mode disabled',
-            'debug_disabled_hint' => 'APP_DEBUG is on: stack traces and configuration may be exposed to visitors.',
+            'debug_disabled_hint' => 'APP_DEBUG is on: technical error details and configuration may be exposed to visitors.',
             'backup_provider' => 'Backups configured',
             'backup_provider_hint' => 'No backup provider is set in the server environment.',
             'ldap_configured' => 'LDAP directory connected',

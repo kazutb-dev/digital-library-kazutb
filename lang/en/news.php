@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'preview_warning' => 'Internal preview. This item is not published and the link expires shortly.',
     'title' => 'News & Announcements',
     'subtitle' => 'Create, schedule, publish, and archive institutional library updates.',
     'ledger' => 'Publication Ledger',
@@ -24,6 +25,7 @@ return [
         'published_at' => 'Published',
         'created_at' => 'Created',
         'updated_at' => 'Last edited',
+        'type' => 'Publication type', 'excerpt' => 'Summary', 'image_alt' => 'Image alt text', 'audience' => 'Target audience', 'annual_plan' => 'Annual plan item', 'repository_work' => 'Linked scholarly work', 'starts_at' => 'Starts', 'ends_at' => 'Ends', 'venue' => 'Venue', 'online_url' => 'Online URL', 'organizer' => 'Organizer', 'contact_name' => 'Contact person', 'contact_email' => 'Contact email', 'contact_phone' => 'Phone', 'registration_url' => 'Registration URL', 'capacity' => 'Capacity', 'expires_at' => 'Expires at', 'homepage_until' => 'Show on homepage until', 'source' => 'Update source', 'importance' => 'Importance', 'visibility' => 'Visibility', 'homepage_priority' => 'Homepage priority', 'is_featured' => 'Featured item', 'comment' => 'Comment',
     ],
     'categories' => [
         'event' => 'Event',
@@ -36,6 +38,7 @@ return [
         'scheduled' => 'Scheduled',
         'published' => 'Published',
         'archived' => 'Archived',
+        'pending_review' => 'Pending review', 'changes_requested' => 'Changes requested', 'approved' => 'Approved', 'cancelled' => 'Cancelled',
     ],
     'languages' => [
         'ru' => 'Russian',
@@ -48,6 +51,8 @@ return [
         'schedule' => 'Schedule publication',
         'unpublish' => 'Withdraw from publication',
         'archive' => 'Archive',
+        'pending_review' => 'Submit for review', 'changes_requested' => 'Request changes', 'approved' => 'Approve', 'published' => 'Publish', 'scheduled' => 'Schedule', 'archived' => 'Archive', 'cancelled' => 'Cancel', 'draft' => 'Return to draft',
+        'register' => 'Register',
         'feature' => 'Feature on homepage',
         'remove_feature' => 'Remove from homepage',
         'replace_cover' => 'Replace cover',
@@ -56,6 +61,7 @@ return [
     'messages' => [
         'created' => 'News post has been created.',
         'updated' => 'News post has been updated.',
+        'transitioned' => 'Publication status updated.',
         'published' => 'News post has been published.',
         'scheduled' => 'News post is scheduled for :date.',
         'unpublished' => 'News post has been withdrawn to draft.',
@@ -82,5 +88,14 @@ return [
     'validation' => [
         'schedule_future' => 'A scheduled publication date must be in the future.',
         'published_not_future' => 'A published news post cannot have a future publication date.',
+        'invalid_transition' => 'Transition from :from to :to is not allowed.', 'review_comment_required' => 'A comment is required when requesting changes.', 'reason_required' => 'Provide a reason for this action.', 'emergency_reason' => 'Provide a meaningful emergency publication reason.', 'schedule_required' => 'Provide the scheduled publication time.', 'self_approval' => 'Authors cannot approve their own publication.', 'approval_required' => 'Director approval is required before publication.', 'required_for_review' => 'This field is required before review.', 'required_for_event' => 'This field is required for an event.', 'required_for_announcement' => 'This field is required for an announcement.', 'required_for_update' => 'Provide the update source.', 'category_type' => 'The category does not support this publication type.', 'event_end' => 'The end must be after the start.', 'venue_or_online' => 'Provide a venue or a safe online URL.', 'immutable_published' => 'Published content can only be changed through a new revision.', 'repository_not_public' => 'A news item may only link to an approved public repository record.', 'image_mime' => 'Only JPEG, PNG, and WebP are allowed.', 'image_invalid' => 'The file is not a valid image.', 'fix_errors' => 'Correct the form errors.',
     ],
+    'types' => ['event' => 'Event', 'announcement' => 'Announcement', 'update' => 'News update', 'schedule' => 'Schedule / Meeting'], 'importance' => ['normal' => 'Normal', 'important' => 'Important', 'critical' => 'Critical'], 'visibility' => ['public' => 'Public', 'members' => 'Members only', 'staff' => 'Staff only'], 'filters' => ['all_statuses' => 'All statuses', 'all_types' => 'All types', 'from' => 'From date', 'to' => 'To date'],
+    'editor' => ['eyebrow' => 'Editorial workflow', 'help' => 'Save a draft, complete the Kazakh version, and submit it for director approval.', 'translations' => 'KK / RU / EN copy', 'rich_text_hint' => 'Safe headings, paragraphs, lists, links, quotes, and tables are supported.', 'event_details' => 'Date, venue, and contacts', 'settings' => 'Publication settings', 'repository_help' => 'Optional link to an already approved public record; news and scholarly works remain separate entities.', 'workflow' => 'Review and publication', 'review_history' => 'Review history', 'no_reviews' => 'No review activity yet.', 'autosave_local' => 'Loss protection is enabled.', 'autosaved_local' => 'Draft saved in this browser.', 'autosaved_server' => 'Draft and revision saved on the server.', 'autosave_failed' => 'Server autosave failed; the local recovery copy is preserved.'],
+    'week' => ['public' => 'Public items this week', 'tasks' => 'Editorial tasks', 'empty_public' => 'No public events this week.', 'empty_tasks' => 'No editorial tasks.'], 'calendar' => ['title' => 'Editorial calendar', 'eyebrow' => 'Plan and publications'],
+    'public' => ['online' => 'Online'],
+    'categories_admin' => ['title' => 'Publication categories', 'help' => 'A managed trilingual directory. Categories in use are archived rather than deleted.', 'create' => 'Create category', 'active' => 'Active', 'created' => 'Category created.', 'updated' => 'Category updated.'],
+    'analytics' => ['title' => 'Publication analytics', 'help' => 'Aggregate metrics without personal clickstream collection.', 'total' => 'Total items', 'published' => 'Published', 'review_time' => 'Average review', 'popular' => 'Popular publications'],
+    'plan' => ['title' => 'Annual content plan', 'help' => 'Plan library events, announce them, and record completion separately.', 'create' => 'Create plan', 'created' => 'Plan created.', 'updated' => 'Plan status updated.', 'item_created' => 'Plan item added.', 'item_completed' => 'Completion recorded.', 'year' => 'Year', 'name' => 'Name', 'notes' => 'Notes', 'empty' => 'No plans yet.', 'planned' => 'Annual plan item', 'workflow' => 'Plan approval', 'add_item' => 'Add item', 'expected_result' => 'Expected result', 'publication' => 'Open publication', 'completion_report' => 'Completion report', 'complete' => 'Mark complete', 'statuses' => ['draft' => 'Draft', 'pending_approval' => 'Pending approval', 'approved' => 'Approved', 'active' => 'Active', 'completed' => 'Completed', 'archived' => 'Archived', 'planned' => 'Planned', 'preparing' => 'Preparing', 'announced' => 'Announced', 'postponed' => 'Postponed', 'cancelled' => 'Cancelled'], 'actions' => ['pending_approval' => 'Submit for approval', 'approved' => 'Approve', 'active' => 'Activate', 'completed' => 'Complete plan', 'archived' => 'Archive']],
+    'notifications' => ['pending_review' => ['title' => 'Publication submitted for review', 'body' => '“:title” awaits the director’s decision.'], 'approved' => ['title' => 'Publication approved', 'body' => '“:title” was approved by the director.'], 'changes_requested' => ['title' => 'Changes requested', 'body' => '“:title” was returned for revision.'], 'scheduled' => ['title' => 'Publication scheduled', 'body' => 'A publication time was set for “:title”.'], 'published' => ['title' => 'Publication published', 'body' => '“:title” is now available to readers.'], 'archived' => ['title' => 'Publication archived', 'body' => '“:title” was moved to the archive.'], 'cancelled' => ['title' => 'Event cancelled', 'body' => '“:title” was cancelled.'], 'draft' => ['title' => 'Publication returned to draft', 'body' => 'Work can continue on “:title”.'], 'emergency' => ['title' => 'Emergency publication', 'body' => '“:title” was published as an emergency. Reason: :reason']],
 ];

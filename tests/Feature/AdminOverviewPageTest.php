@@ -38,7 +38,7 @@ class AdminOverviewPageTest extends TestCase
 
         foreach ($pages as $uri => $title) {
             $this->signInToLibraryAs($this->adminUser)
-                ->get($uri)
+                ->get($uri.'?lang=ru')
                 ->assertOk()
                 ->assertSee('lang="ru"', false)
                 ->assertSee($title, false);
@@ -48,11 +48,11 @@ class AdminOverviewPageTest extends TestCase
     public function test_dashboard_uses_real_aggregates_and_not_legacy_mock_numbers(): void
     {
         $this->signInToLibraryAs($this->adminUser)
-            ->get('/admin')
+            ->get('/admin?lang=ru')
             ->assertOk()
             ->assertSee('Активные пользователи', false)
             ->assertSee('Активные выдачи', false)
-            ->assertSee('Данные появятся после подключения модуля книговыдачи.', false)
+            ->assertSee('Все показатели рассчитаны по актуальным записям базы данных.', false)
             ->assertDontSee('12,450', false)
             ->assertDontSee('8,291', false)
             ->assertDontSee('142', false);
@@ -61,13 +61,13 @@ class AdminOverviewPageTest extends TestCase
     public function test_real_configuration_and_seeded_structure_are_visible(): void
     {
         $this->signInToLibraryAs($this->adminUser)
-            ->get('/admin/settings')
+            ->get('/admin/settings?lang=ru')
             ->assertOk()
             ->assertSee('Максимум активных бронирований', false)
             ->assertSee('Управляется APP_DEMO_LOGIN_ENABLED в серверном окружении и не может быть включён через базу данных.', false);
 
         $this->signInToLibraryAs($this->adminUser)
-            ->get('/admin/branches')
+            ->get('/admin/branches?lang=ru')
             ->assertOk()
             ->assertSee('Научная библиотека', false)
             ->assertSee('Основной фонд', false);

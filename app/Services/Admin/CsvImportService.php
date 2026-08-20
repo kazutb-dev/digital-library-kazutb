@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\ExternalResource;
 use App\Models\User;
+use App\Services\ExternalResources\ExternalResourceWorkflow;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -21,6 +22,10 @@ class CsvImportService
     public const TYPES = ['users', 'external-resources'];
 
     private const MAX_ROWS = 1000;
+
+    public function __construct(
+        private readonly ExternalResourceWorkflow $workflow,
+    ) {}
 
     /**
      * @return array{rows: list<array<string, mixed>>, error: ?string}
@@ -95,7 +100,7 @@ class CsvImportService
             $email = mb_strtolower($record['email'] ?? '');
             $name = $record['name'] ?? '';
             $role = mb_strtolower($record['role'] ?? '');
-            $locale = mb_strtolower($record['locale'] ?? '') ?: 'kk';
+            $locale = mb_strtolower($record['locale'] ?? '') ?: 'ru';
             $adLogin = mb_strtolower($record['ad_login'] ?? '') ?: null;
             $department = ($record['department'] ?? '') ?: null;
 
@@ -158,7 +163,10 @@ class CsvImportService
      */
     private function planExternalResources(array $rows): array
     {
-        $validRoles = ['guest', ...Role::query()->where('guard_name', 'web')->pluck('name')->all()];
+        $validRoles = array_values(array_unique([
+            ...ExternalResource::AUDIENCES,
+            ...Role::query()->where('guard_name', 'web')->pluck('name')->all(),
+        ]));
         $seenSlugs = [];
         $planned = [];
 
@@ -169,20 +177,22 @@ class CsvImportService
             $title = $record['title'] ?? '';
             $url = $record['url'] ?? '';
             $resourceType = mb_strtolower($record['resource_type'] ?? '');
+            if ($resourceType === 'open') {
+                $resourceType = 'open_access';
+            }
             $description = $record['description'] ?? '';
             $slug = mb_strtolower($record['slug'] ?? '') ?: Str::slug($title);
             $licenseExpiresAt = ($record['license_expires_at'] ?? '') ?: null;
-            $isActiveRaw = mb_strtolower($record['is_active'] ?? '');
 
             if ($title === '' || mb_strlen($title) > 255) {
                 $errors[] = __('admin.imports.row_errors.invalid_title');
             }
 
-            if ($url === '' || ! preg_match('/^https?:\/\//i', $url) || filter_var($url, FILTER_VALIDATE_URL) === false) {
+            if ($url === '' || ! ExternalResource::isSafeDestination($url, $resourceType)) {
                 $errors[] = __('admin.imports.row_errors.invalid_url');
             }
 
-            if (! in_array($resourceType, ['licensed', 'open', 'partner', 'internal'], true)) {
+            if (! in_array($resourceType, ExternalResource::TYPES, true)) {
                 $errors[] = __('admin.imports.row_errors.invalid_resource_type', ['type' => $resourceType !== '' ? $resourceType : '—']);
             }
 
@@ -232,7 +242,7 @@ class CsvImportService
                     'access_instructions' => ($record['access_instructions'] ?? '') ?: null,
                     'license_expires_at' => $licenseExpiresAt,
                     'available_roles' => $availableRoles,
-                    'is_active' => $isActiveRaw === '' || in_array($isActiveRaw, ['1', 'true', 'yes', 'да'], true),
+                    'is_active' => false,
                 ],
             ];
         }
@@ -297,13 +307,20 @@ class CsvImportService
         $attributes = $row['attributes'];
 
         if ($row['action'] === 'update') {
-            ExternalResource::query()
+            $resource = ExternalResource::query()
                 ->whereKey($row['target_id'])
                 ->lockForUpdate()
-                ->firstOrFail()
-                ->update($attributes);
+                ->firstOrFail();
+            $resource->fill($attributes);
+            $this->workflow->applyContentUpdateState($resource);
+            $resource->save();
         } else {
-            ExternalResource::query()->create($attributes);
+            ExternalResource::query()->create([
+                ...$attributes,
+                'publication_status' => 'draft',
+                'published_at' => null,
+                'is_active' => false,
+            ]);
         }
     }
 }

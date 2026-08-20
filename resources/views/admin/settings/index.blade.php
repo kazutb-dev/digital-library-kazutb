@@ -55,7 +55,7 @@
                         <p class="mt-1 text-xs leading-5 text-slate-500">{{ __('settings.circulation.fine_per_overdue_day_help') }}</p>
                     </div>
                 </div>
-                {{-- ДИР §9.3 — динамический срок выдачи по числу экземпляров.
+                {{-- ДИР 9.3 — динамический срок выдачи по числу экземпляров.
                      Ступени и пороги настраиваются здесь, в коде их нет. --}}
                 <div class="mt-7 border-t border-slate-100 pt-6">
                     <h3 class="font-headline text-2xl text-primary">{{ __('settings.circulation.loan_scale_title') }}</h3>
@@ -251,7 +251,7 @@
                     <label class="admin-label" for="setting-language">{{ __('settings.localization.default_ui_language') }}</label>
                     <select class="admin-input" id="setting-language" name="default_ui_language" required>
                         @foreach (['ru', 'kk', 'en'] as $locale)
-                            <option value="{{ $locale }}" @selected($value('default_ui_language', 'kk') === $locale)>{{ __('common.languages.'.$locale) }}</option>
+                            <option value="{{ $locale }}" @selected($value('default_ui_language', 'ru') === $locale)>{{ __('common.languages.'.$locale) }}</option>
                         @endforeach
                     </select>
                     <p class="mt-1 text-xs text-slate-500">{{ __('settings.localization.default_ui_language_help') }}</p>

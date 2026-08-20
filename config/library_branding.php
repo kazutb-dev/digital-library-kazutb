@@ -4,7 +4,7 @@ return [
     'university' => [
         'kk' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
         'ru' => 'Казахский университет технологии и бизнеса имени К. Кулажанова',
-        'en' => 'K. Kulazhanov Kazakh University of Technology and Business',
+        'en' => 'Kazakh University of Technology and Business named after K. Kulazhanov',
     ],
     'library' => [
         'full' => [

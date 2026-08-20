@@ -165,5 +165,7 @@ class AdminCsvImportTest extends TestCase
         $this->assertSame('licensed', $resource->resource_type);
         $this->assertSame('2027-06-30', $resource->license_expires_at?->toDateString());
         $this->assertSame(['member', 'librarian', 'admin'], $resource->available_roles);
+        $this->assertSame('draft', $resource->publication_status);
+        $this->assertFalse($resource->is_active);
     }
 }

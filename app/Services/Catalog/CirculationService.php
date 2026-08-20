@@ -17,14 +17,14 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Issue / return / renewal workflow (Master.md §14, reference scenario §31.2).
+ * Issue / return / renewal workflow (Master.md 14, reference scenario 31.2).
  * All limits come from the admin-managed settings; per-reader overrides live
  * on the reader profile. Every mutation is wrapped in a transaction, writes
  * copy history, and lands in the audit log.
  */
 class CirculationService
 {
-    /** Renewals per loan (Historical §13.1: once, unless overridden). */
+    /** Renewals per loan (Historical 13.1: once, unless overridden). */
     public const MAX_RENEWALS = 1;
 
     public function __construct(
@@ -37,7 +37,7 @@ class CirculationService
 
     /**
      * Pre-flight snapshot for the issue screen: limits, open loans, debts,
-     * blocks — everything §14.1 asks the librarian to check before scanning.
+     * blocks — everything 14.1 asks the librarian to check before scanning.
      *
      * @return array<string, mixed>
      */
@@ -79,6 +79,7 @@ class CirculationService
     ): Loan {
         return DB::transaction(function () use ($reader, $copy, $staff, $override, $overrideReason, $manualDueAt, $dueDateReason): Loan {
             $copy = BookCopy::query()->whereKey($copy->getKey())->lockForUpdate()->firstOrFail();
+            $copyBefore = $copy->only(['status', 'condition', 'issue_count']);
             $profile = ReaderProfile::forUser($reader);
 
             if ($profile->status !== 'active') {
@@ -111,7 +112,7 @@ class CirculationService
                 if (! $staff->can('circulation.override_limits')) {
                     throw CirculationException::because('override_not_permitted');
                 }
-                // §14.3 manual correction — a separate, always-reasoned audit trail.
+                // 14.3 manual correction — a separate, always-reasoned audit trail.
                 $this->audit->logRequired(
                     actionType: 'circulation.override_limits',
                     entityType: 'loan',
@@ -123,7 +124,7 @@ class CirculationService
                 );
             }
 
-            // §13.3: a copy held for another reader can never be issued past
+            // 13.3: a copy held for another reader can never be issued past
             // the queue.
             $reservation = $copy->activeReservation;
             if ($reservation !== null && (int) $reservation->user_id !== (int) $reader->getKey()) {
@@ -140,7 +141,7 @@ class CirculationService
                 throw CirculationException::because('reading_room_home_issue_forbidden');
             }
 
-            // §9.3 — the period now scales with how many copies the library
+            // 9.3 — the period now scales with how many copies the library
             // holds of this edition; reading-room stock keeps its own rule.
             $periodDays = $this->loanPeriods->daysForCopy($copy);
             $calculatedDueAt = now()->addDays(max(1, $periodDays))->endOfDay();
@@ -190,13 +191,29 @@ class CirculationService
                 actionType: 'circulation.issue',
                 entityType: 'loan',
                 entityId: $loan->getKey(),
+                oldValues: [
+                    'copy' => $copyBefore,
+                    'reader' => [
+                        'id' => $reader->getKey(),
+                        'open_loans' => $openLoans->count(),
+                    ],
+                ],
                 newValues: [
-                    'reader_id' => $reader->getKey(),
-                    'copy_id' => $copy->getKey(),
-                    'inventory_number' => $copy->inventory_number,
-                    'due_at' => $loan->due_at?->toIso8601String(),
-                    // The period is derived, not fixed — record what drove it.
-                    'loan_period_days' => $periodDays,
+                    'loan' => [
+                        'status' => $loan->status,
+                        'reader_id' => $reader->getKey(),
+                        'copy_id' => $copy->getKey(),
+                        'inventory_number' => $copy->inventory_number,
+                        'issued_at' => $loan->issued_at?->toIso8601String(),
+                        'due_at' => $loan->due_at?->toIso8601String(),
+                        // The period is derived, not fixed — record what drove it.
+                        'loan_period_days' => $periodDays,
+                    ],
+                    'copy' => $copy->only(['status', 'condition', 'issue_count']),
+                    'reader' => [
+                        'id' => $reader->getKey(),
+                        'open_loans' => $openLoans->count() + 1,
+                    ],
                 ],
                 scope: 'library',
                 actor: $staff,
@@ -207,7 +224,7 @@ class CirculationService
     }
 
     /**
-     * §14.2 return flow. $incident: none | damaged | lost. A fine is charged
+     * 14.2 return flow. $incident: none | damaged | lost. A fine is charged
      * for overdue days automatically and for damage/loss when an amount is
      * given by the librarian.
      */
@@ -228,6 +245,9 @@ class CirculationService
                 throw CirculationException::because('no_open_loan');
             }
 
+            $loanBefore = $loan->only(['status', 'returned_at', 'condition_on_return']);
+            $copyBefore = $copy->only(['status', 'condition', 'defect_description']);
+            $conditionBefore = $copy->condition;
             $overdueDays = $loan->overdueDays();
 
             $loan->update([
@@ -324,7 +344,7 @@ class CirculationService
                     $staff,
                     $incident,
                     $incidentFine,
-                    [...$incidentData, 'notes' => $notes],
+                    [...$incidentData, 'condition_before' => $conditionBefore, 'notes' => $notes],
                 );
             }
 
@@ -332,7 +352,13 @@ class CirculationService
                 actionType: 'circulation.return',
                 entityType: 'loan',
                 entityId: $loan->getKey(),
+                oldValues: [
+                    'loan' => $loanBefore,
+                    'copy' => $copyBefore,
+                ],
                 newValues: [
+                    'loan' => $loan->only(['status', 'returned_at', 'condition_on_return']),
+                    'copy' => $copy->only(['status', 'condition', 'defect_description']),
                     'reader_id' => $loan->user_id,
                     'copy_id' => $copy->getKey(),
                     'incident' => $incident,
@@ -348,8 +374,8 @@ class CirculationService
     }
 
     /**
-     * §5.3 renewal: once per loan, blocked when overdue or when someone is
-     * waiting for this edition (Historical §13.1).
+     * 5.3 renewal: once per loan, blocked when overdue or when someone is
+     * waiting for this edition (Historical 13.1).
      */
     public function renew(Loan $loan, User $actor, bool $byStaff = false, ?string $expectedDueAt = null): Loan
     {
@@ -449,9 +475,26 @@ class CirculationService
             ->chunkById(100, function ($loans) use (&$markedOverdue): void {
                 foreach ($loans as $loan) {
                     DB::transaction(function () use ($loan, &$markedOverdue): void {
+                        $oldValues = [
+                            'loan' => $loan->only(['status', 'due_at', 'returned_at']),
+                            'copy' => $loan->copy?->only(['status', 'condition']),
+                        ];
                         $loan->update(['status' => 'overdue']);
                         $loan->copy?->update(['status' => 'overdue']);
                         $markedOverdue++;
+
+                        $this->audit->logRequired(
+                            actionType: 'circulation.overdue_marked',
+                            entityType: 'loan',
+                            entityId: $loan->getKey(),
+                            oldValues: $oldValues,
+                            newValues: [
+                                'loan' => $loan->fresh()->only(['status', 'due_at', 'returned_at']),
+                                'copy' => $loan->copy?->fresh()?->only(['status', 'condition']),
+                            ],
+                            scope: 'library',
+                            actor: ['name' => 'Scheduler', 'role' => 'system'],
+                        );
 
                         if ($loan->reader !== null) {
                             $this->notifications->sendLocalized(
@@ -501,10 +544,11 @@ class CirculationService
         }
 
         if ($markedOverdue > 0) {
-            $this->audit->log(
+            $this->audit->logRequired(
                 actionType: 'circulation.overdue_sweep',
                 entityType: 'loan',
                 entityId: 'sweep',
+                oldValues: ['marked_overdue' => 0],
                 newValues: ['marked_overdue' => $markedOverdue],
                 scope: 'library',
                 actor: ['name' => 'Scheduler', 'role' => 'system'],

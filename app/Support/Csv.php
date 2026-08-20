@@ -23,6 +23,6 @@ final class Csv
                     : $value;
             },
             $values,
-        ));
+        ), ',', '"', '');
     }
 }

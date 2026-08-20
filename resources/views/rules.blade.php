@@ -2,7 +2,7 @@
 
 @php
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
   $activePage = $activePage ?? 'rules';
 
   $routeWithLang = static function (string $path) use ($lang): string {
@@ -20,7 +20,8 @@
   $lastReviewedAt = $rules['last_reviewed_at'];
 @endphp
 
-@section('title', $header['headline'] . ' — KazUTB')
+@section('title', $header['headline'] . ' — ' . __('brand.university.full'))
+@section('meta_description', $header['preamble'])
 
 @section('content')
   <div class="rules-canonical public-v2 rules-v2">
@@ -28,22 +29,25 @@
       <div class="public-v2__inset public-v2__hero-grid">
         <div>
           <p class="public-v2__kicker">{{ $header['eyebrow'] }}</p>
-          <h1 class="public-v2__title">
-            {{ $header['headline'] }}
-            <span>({{ $header['subtitle_secondary_lang'] }})</span>
-          </h1>
+          <h1 class="public-v2__title">{{ $header['headline'] }}</h1>
           <p class="public-v2__lead">{{ $header['preamble'] }}</p>
         </div>
-        <dl class="rules-canonical__doc-meta public-v2__hero-note">
-          <div data-test-id="rules-effective-date">
-            <dt>{{ $header['effective_label'] }}</dt>
-            <dd><time datetime="{{ $header['effective_date'] }}">{{ $header['effective_date'] }}</time></dd>
-          </div>
-          <div data-test-id="rules-last-reviewed">
-            <dt>{{ $header['reviewed_label'] }}</dt>
-            <dd><time datetime="{{ $lastReviewedAt }}">{{ $lastReviewedAt }}</time></dd>
-          </div>
-        </dl>
+        @if(!empty($header['effective_date']) || !empty($lastReviewedAt))
+          <dl class="rules-canonical__doc-meta public-v2__hero-note">
+            @if(!empty($header['effective_date']))
+              <div data-test-id="rules-effective-date">
+                <dt>{{ $header['effective_label'] }}</dt>
+                <dd><time datetime="{{ $header['effective_date'] }}">{{ $header['effective_date'] }}</time></dd>
+              </div>
+            @endif
+            @if(!empty($lastReviewedAt))
+              <div data-test-id="rules-last-reviewed">
+                <dt>{{ $header['reviewed_label'] }}</dt>
+                <dd><time datetime="{{ $lastReviewedAt }}">{{ $lastReviewedAt }}</time></dd>
+              </div>
+            @endif
+          </dl>
+        @endif
       </div>
     </header>
 
@@ -137,18 +141,20 @@
           </ul>
         </div>
 
-        <h3 class="rules-canonical__subheading">{{ $penalties['suspension_ladder_label'] }}</h3>
-        <ol class="rules-canonical__ladder">
-          @foreach($penalties['suspension_ladder'] as $step)
-            <li>
-              <span class="rules-canonical__ladder-step">{{ $loop->iteration }}</span>
-              <div>
-                <strong>{{ $step['level'] }}</strong>
-                <p>{{ $step['detail'] }}</p>
-              </div>
-            </li>
-          @endforeach
-        </ol>
+        @if(!empty($penalties['suspension_ladder']))
+          <h3 class="rules-canonical__subheading">{{ $penalties['suspension_ladder_label'] }}</h3>
+          <ol class="rules-canonical__ladder">
+            @foreach($penalties['suspension_ladder'] as $step)
+              <li>
+                <span class="rules-canonical__ladder-step">{{ $loop->iteration }}</span>
+                <div>
+                  <strong>{{ $step['level'] }}</strong>
+                  <p>{{ $step['detail'] }}</p>
+                </div>
+              </li>
+            @endforeach
+          </ol>
+        @endif
 
         <div class="rules-canonical__callout">
           <span class="material-symbols-outlined" aria-hidden="true">balance</span>
@@ -173,7 +179,9 @@
             {{ $footerMeta['leadership_label'] }}
           </a>
         </div>
-        <p class="rules-canonical__version">{{ $footerMeta['version_label'] }}: {{ $footerMeta['version_value'] }}</p>
+        @if(!empty($footerMeta['version_value']))
+          <p class="rules-canonical__version">{{ $footerMeta['version_label'] }}: {{ $footerMeta['version_value'] }}</p>
+        @endif
       </section>
     </article>
     </div>

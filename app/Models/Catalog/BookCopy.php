@@ -27,12 +27,17 @@ class BookCopy extends Model
 
     public const ACCESS_RESTRICTIONS = ['free', 'reading_room', 'limited'];
 
+    /** Canonical sources used by acquisitions accounting and KSU reports. */
+    public const ACQUISITION_SOURCES = [
+        'purchase', 'donation', 'subscription', 'exchange', 'reader_replacement', 'other',
+    ];
+
     /** Statuses in which a copy can be handed to a reader. */
     public const ISSUABLE_STATUSES = ['available', 'reserved'];
 
     protected $fillable = [
         'bibliographic_record_id', 'inventory_number', 'barcode', 'accounting_type',
-        'ksu_number', 'storage_sigla', 'branch_id', 'fund_id', 'shelf_location',
+        'ksu_number', 'storage_sigla', 'branch_id', 'fund_id', 'room', 'section', 'shelf_location',
         'price', 'acquisition_source', 'supplier_name', 'acquisition_date', 'registration_date',
         'condition', 'defect_description', 'status', 'access_restriction', 'issue_count',
     ];

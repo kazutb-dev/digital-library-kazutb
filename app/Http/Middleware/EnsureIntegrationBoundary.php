@@ -58,7 +58,7 @@ class EnsureIntegrationBoundary
                     status: 400,
                     errorCode: 'invalid_request',
                     reasonCode: 'missing_required_header',
-                    message: 'Missing required header: ' . $header,
+                    message: 'Missing required header: '.$header,
                 );
             }
         }
@@ -77,7 +77,7 @@ class EnsureIntegrationBoundary
         $requestId = trim((string) $request->header('X-Request-Id'));
         $correlationId = trim((string) $request->header('X-Correlation-Id'));
 
-        $request->attributes->set('integration.authenticated_client_ref', 'token:' . substr(hash('sha256', $token), 0, 16));
+        $request->attributes->set('integration.authenticated_client_ref', 'token:'.substr(hash('sha256', $token), 0, 16));
         $request->attributes->set('integration.source_system', $sourceSystem);
         $request->attributes->set('integration.request_id', $requestId);
         $request->attributes->set('integration.correlation_id', $correlationId);
@@ -151,21 +151,14 @@ class EnsureIntegrationBoundary
         return $roles;
     }
 
-    /**
-     * Validate bearer token against configured allowlist.
-     * If INTEGRATION_ALLOWED_TOKENS is empty, any non-empty token is accepted (legacy/development mode).
-     * In production, set the env var to a comma-separated list of valid tokens.
-     */
+    /** Validate the bearer token against the mandatory configured allowlist. */
     private function isTokenAllowed(string $token): bool
     {
         $raw = (string) config('services.integration.allowed_tokens', '');
+        $allowed = array_values(array_filter(array_map('trim', explode(',', $raw))));
 
-        if (trim($raw) === '') {
-            return true; // allowlist not configured — accept any token (legacy mode)
-        }
-
-        $allowed = array_filter(array_map('trim', explode(',', $raw)));
-
-        return in_array($token, $allowed, true);
+        return collect($allowed)->contains(
+            static fn (string $candidate): bool => hash_equals($candidate, $token)
+        );
     }
 }

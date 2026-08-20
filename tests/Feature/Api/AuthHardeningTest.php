@@ -324,6 +324,29 @@ class AuthHardeningTest extends TestCase
         $this->assertSame('login', data_get($event->metadata, 'limiter'));
     }
 
+    public function test_login_rate_limit_recovers_after_the_window(): void
+    {
+        Http::fake([
+            '*' => Http::response(['message' => 'Invalid credentials'], 401),
+        ]);
+
+        foreach (range(1, 5) as $_) {
+            $this->withoutMiddleware(PreventRequestForgery::class)
+                ->postJson('/api/login', ['login' => 'recovery-user', 'password' => 'wrong-pass'])
+                ->assertUnauthorized();
+        }
+
+        $this->withoutMiddleware(PreventRequestForgery::class)
+            ->postJson('/api/login', ['login' => 'recovery-user', 'password' => 'wrong-pass'])
+            ->assertTooManyRequests();
+
+        $this->travel(61)->seconds();
+
+        $this->withoutMiddleware(PreventRequestForgery::class)
+            ->postJson('/api/login', ['login' => 'recovery-user', 'password' => 'wrong-pass'])
+            ->assertUnauthorized();
+    }
+
     public function test_login_validation_rejects_blank_credentials(): void
     {
         $response = $this
@@ -383,7 +406,7 @@ class AuthHardeningTest extends TestCase
         $response->assertOk()->assertJsonPath('ok', true);
     }
 
-    public function test_integration_accepts_any_token_when_allowlist_not_configured(): void
+    public function test_integration_fails_closed_when_allowlist_not_configured(): void
     {
         Config::set('services.integration.allowed_tokens', '');
 
@@ -399,7 +422,9 @@ class AuthHardeningTest extends TestCase
             ])
             ->getJson('/api/integration/v1/_boundary/ping');
 
-        $response->assertOk()->assertJsonPath('ok', true);
+        $response
+            ->assertUnauthorized()
+            ->assertJsonPath('error.reason_code', 'invalid_bearer_token');
     }
 
     // ──────────────────────────────────────────────────

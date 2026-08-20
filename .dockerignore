@@ -1,6 +1,8 @@
 # Database dumps (large files, not needed in image)
 *.dump
 *.sql
+*.bak
+DBfrom*/
 
 # Node modules
 node_modules/
@@ -15,15 +17,59 @@ vendor/
 
 # Development files
 *.log
+.env
+.env.*
 .env.example
 README.md
 
 # Tests
 tests/
+test-results/
+playwright-report/
 
 # Storage runtime data (mounted as volume in production)
 storage/framework/cache/
 storage/framework/sessions/
+storage/framework/testing/
 storage/framework/views/
 storage/logs/
+storage/app/private/
+storage/app/public/
+storage/app/recovery/
+bootstrap/cache/*.php
+public/hot
+public/storage
 
+
+# Ensure Laravel public and runtime files are included in image
+!public/
+!public/index.php
+!bootstrap/
+!config/
+!routes/
+!app/
+!resources/
+!database/
+!lang/
+!vendor/
+.env
+.env.*
+!.env.example
+*.dump
+*.backup
+*.sql
+*.sql.gz
+*.bak
+storage/app/private
+storage/app/backups
+storage/app/recovery
+storage/framework/testing
+test-results
+playwright-report
+
+# Backup payloads and their metadata must never enter an application image.
+# Keep these final so later include rules cannot re-admit nested artifacts.
+storage/backups/
+storage/app/backups/
+**/*.dump
+**/*.dump.*

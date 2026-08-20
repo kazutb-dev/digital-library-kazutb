@@ -3,7 +3,7 @@
 @php
     $statusTone = static fn (?string $status): string => match ((string) $status) {
         'draft' => 'inactive',
-        'under_review' => 'pending',
+        'metadata_review', 'author_verification', 'rights_review', 'quality_review', 'pending_approval' => 'pending',
         'rejected' => 'failed',
         'published' => 'published',
         'archived' => 'archived',
@@ -28,13 +28,30 @@
         :title="__('librarian.repository.title')"
         :subtitle="__('librarian.repository.subtitle')"
     >
-        @can('repository.upload')
+        @can('create', \App\Models\Catalog\RepositoryItem::class)
             <a class="admin-btn admin-btn-primary" href="{{ route('librarian.repository.create') }}">
                 <span class="material-symbols-outlined text-[19px]">upload_file</span>
                 {{ __('librarian.repository.create') }}
             </a>
         @endcan
     </x-admin.page-header>
+
+    <section class="admin-card mb-6" aria-labelledby="repository-process-title">
+        <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div class="max-w-xs">
+                <p class="admin-label mb-2">{{ __('librarian.repository.eyebrow') }}</p>
+                <h2 id="repository-process-title" class="font-headline text-2xl text-primary">{{ __('librarian.repository.process_title') }}</h2>
+            </div>
+            <ol class="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                @foreach(__('librarian.repository.process_steps') as $step)
+                    <li class="flex gap-3 rounded-xl bg-surface-container-low p-4 text-sm leading-6 text-slate-700">
+                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-container text-xs font-bold text-white">{{ $loop->iteration }}</span>
+                        <span>{{ $step }}</span>
+                    </li>
+                @endforeach
+            </ol>
+        </div>
+    </section>
 
     <div class="mb-6 flex flex-wrap gap-2">
         <a

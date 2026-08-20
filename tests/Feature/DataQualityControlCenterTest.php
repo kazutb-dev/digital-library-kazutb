@@ -11,6 +11,7 @@ use App\Services\DataQuality\DataQualityScanner;
 use App\Services\DataQuality\DuplicateDetectionService;
 use App\Services\DataQuality\EncodingInspector;
 use App\Services\DataQuality\ImportStagingService;
+use App\Services\DataQuality\IssueWorkflowService;
 use App\Services\DataQuality\RecordMergeService;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -104,6 +105,123 @@ class DataQualityControlCenterTest extends TestCase
         $inspection = app(EncodingInspector::class)->inspect('ќала', 'title');
         $this->assertSame('қала', collect($inspection)->firstWhere('code', 'encoding.legacy_kazakh_glyph')['suggestion']);
         $this->assertSame('Әліппе: қазақ тілі', mb_convert_encoding('Әліппе: қазақ тілі', 'UTF-8', 'UTF-8'));
+    }
+
+    public function test_russian_text_is_not_mojibake_and_legacy_marc_language_is_a_recommendation(): void
+    {
+        $inspection = app(EncodingInspector::class)->inspect('Русская литература и современная проза', 'title');
+        $this->assertNull(collect($inspection)->firstWhere('code', 'encoding.mojibake'));
+
+        $record = BibliographicRecord::factory()->create([
+            'title' => 'Русская литература',
+            'language' => 'rus',
+        ]);
+        app(DataQualityScanner::class)->scanModel($record, 'bibliographic_record');
+
+        $this->assertDatabaseHas('data_quality_issues', [
+            'entity_type' => 'bibliographic_record',
+            'entity_id' => (string) $record->id,
+            'rule_code' => 'bib.language.legacy_code',
+            'severity' => 'low',
+        ]);
+        $this->assertSame(
+            'recommendation',
+            app(\App\Services\DataQuality\DataQualityRuleRegistry::class)->catalogue()['bib.language.legacy_code']['type'],
+        );
+    }
+
+    public function test_historical_missing_barcode_is_not_reported_as_a_critical_error(): void
+    {
+        $record = BibliographicRecord::factory()->create();
+        $copy = BookCopy::factory()->create([
+            'bibliographic_record_id' => $record->id,
+            'barcode' => null,
+        ]);
+        app(DataQualityScanner::class)->scanModel($copy, 'book_copy');
+
+        $this->assertDatabaseHas('data_quality_issues', [
+            'entity_type' => 'book_copy',
+            'entity_id' => (string) $copy->id,
+            'rule_code' => 'copy.barcode.missing',
+            'severity' => 'low',
+        ]);
+    }
+
+    public function test_dashboard_does_not_claim_one_hundred_percent_before_a_full_scan(): void
+    {
+        BibliographicRecord::factory()->create();
+
+        $this->signInAs($this->actor)->get(route('librarian.data-quality.index'))
+            ->assertOk()
+            ->assertSee(trans('data_quality.coverage.not_scanned'))
+            ->assertSee('0 / 1');
+    }
+
+    public function test_librarian_correction_is_audited_and_resolved_by_revalidation(): void
+    {
+        $record = BibliographicRecord::factory()->create(['title' => 'Название   с пробелами']);
+        app(DataQualityScanner::class)->scanModel($record, 'bibliographic_record');
+        $issue = DataQualityIssue::query()->where('entity_type', 'bibliographic_record')
+            ->where('entity_id', (string) $record->id)->where('rule_code', 'bib.title.spacing')->firstOrFail();
+
+        app(IssueWorkflowService::class)->correct(
+            $issue,
+            ['title' => 'Название с пробелами'],
+            'Проверено по физическому экземпляру',
+            $this->actor,
+        );
+
+        $this->assertSame('Название с пробелами', $record->fresh()->title);
+        $this->assertSame('resolved', $issue->fresh()->status);
+        $this->assertDatabaseHas('activity_logs', [
+            'action_type' => 'data_quality.issue_corrected',
+            'entity_type' => 'bibliographic_record',
+            'entity_id' => (string) $record->id,
+            'actor_id' => $this->actor->id,
+        ]);
+    }
+
+    public function test_daily_inbox_aggregates_findings_by_library_object(): void
+    {
+        $record = BibliographicRecord::factory()->create([
+            'title' => 'Агрегированная запись',
+            'primary_author' => null,
+            'udc_code' => null,
+        ]);
+        app(DataQualityScanner::class)->scanModel($record, 'bibliographic_record');
+
+        $response = $this->signInAs($this->actor)->get(route('librarian.data-quality.index'));
+
+        $response->assertOk()
+            ->assertSee('data-testid="quality-object-inbox"', false)
+            ->assertSee('Агрегированная запись')
+            ->assertSee(trans('data_quality.inbox.objects_note'));
+        $this->assertGreaterThan(1, DataQualityIssue::query()->where('entity_type', 'bibliographic_record')->where('entity_id', (string) $record->id)->count());
+        // One logical object is rendered once in each responsive presentation:
+        // a desktop table row and a mobile card. It must not fan out by finding.
+        $this->assertSame([1, 1], [
+            substr_count($response->getContent(), 'data-testid="quality-object-row"'),
+            substr_count($response->getContent(), 'data-testid="quality-object-card"'),
+        ]);
+    }
+
+    public function test_false_positive_stays_suppressed_until_value_or_rule_changes(): void
+    {
+        $record = BibliographicRecord::factory()->create(['title' => 'Текст   с пробелами']);
+        $scanner = app(DataQualityScanner::class);
+        $scanner->scanModel($record, 'bibliographic_record');
+        $issue = DataQualityIssue::query()->where('entity_type', 'bibliographic_record')
+            ->where('entity_id', (string) $record->id)->where('rule_code', 'bib.title.spacing')->firstOrFail();
+
+        app(IssueWorkflowService::class)->falsePositive($issue, 'Сверено с официальным источником', $this->actor);
+        $scanner->scanModel($record->fresh(), 'bibliographic_record');
+
+        $this->assertSame('false_positive', $issue->fresh()->status);
+        $this->assertSame($issue->current_value, data_get($issue->fresh()->context, 'suppression.current_value'));
+
+        $record->update(['title' => 'Изменённый   текст']);
+        $scanner->scanModel($record->fresh(), 'bibliographic_record');
+        $this->assertSame('reopened', $issue->fresh()->status);
     }
 
     public function test_duplicate_score_is_advisory_and_distinguishes_volumes(): void

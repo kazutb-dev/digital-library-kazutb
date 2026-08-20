@@ -2,7 +2,7 @@
 
 return [
     'incidents' => [
-        'title' => 'Loss and damage', 'description' => 'Configurable §9.3 workflow assumptions; authorized staff make final decisions.',
+        'title' => 'Loss and damage', 'description' => 'Configurable 9.3 workflow assumptions; authorized staff make final decisions.',
         'incident_resolution_days' => 'Resolution period, days', 'incident_resolution_days_help' => 'Proposed value, configurable by the library.',
         'replacement_year_tolerance' => 'Publication year tolerance', 'replacement_year_tolerance_help' => 'Proposed 5-year tolerance; advisory only.',
         'replacement_requires_senior_approval' => 'Require senior librarian approval', 'replacement_exception_requires_director' => 'Director must approve exceptions', 'monetary_compensation_allowed' => 'Allow monetary compensation', 'incident_blocks_issues' => 'Block new loans while a case is open', 'replacement_required_severe' => 'Suggest replacement for severe damage', 'replacement_required_irreparable' => 'Suggest replacement for irreparable damage', 'resolution_types' => 'Available resolutions',
@@ -29,7 +29,7 @@ return [
         'max_active_loans_help' => 'Maximum number of materials a reader may have on loan at one time.',
         'standard_loan_period_days' => 'Base loan period (days)',
         'standard_loan_period_days_help' => 'Used by external integrations and as a fallback. Desk issuing is computed from the copy-count scale below.',
-        'loan_scale_title' => 'Loan period by copy count (§9.3)',
+        'loan_scale_title' => 'Loan period by copy count (9.3)',
         'loan_scale_description' => 'The fewer copies an edition has, the shorter the loan: a scarce title returns to the next reader sooner. Reading-room stock is exempt and keeps its own period above.',
         'loan_period_scarce_max_copies' => 'Scarce edition: up to N copies',
         'loan_period_scarce_max_copies_help' => 'Editions with this many copies or fewer count as scarce.',
@@ -42,7 +42,7 @@ return [
         'loan_period_abundant_days' => 'Period for many copies (days)',
         'loan_period_abundant_days_help' => 'Applies to every edition above the ordinary tier.',
         'loan_scale_current' => 'Scale in force:',
-        'loan_scale_row' => ':range copies → :days day(s)',
+        'loan_scale_row' => ':range copies — :days day(s)',
         'loan_scale_note' => 'The interview specifies only the range "3 to 7 days". The tiers above are a proposed heuristic and can be retuned freely here.',
         'reference_loan_period_days' => 'Reference-material loan period (days)',
         'reference_loan_period_days_help' => 'Restricted loan period for reference and reading-room materials.',
@@ -89,6 +89,8 @@ return [
             'loan_overdue' => 'Loan overdue',
             'loan_renewed' => 'Loan renewed',
             'digital_access_granted' => 'Digital resource access granted',
+            'external_resource_licence' => 'External-resource expiry reminder',
+            'external_resource_health' => 'External-resource availability outage',
             'repository_status_changed' => 'Repository work status changed',
             'repository_published' => 'Repository work published',
             'news_published' => 'News published',

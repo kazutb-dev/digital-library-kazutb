@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Directory\ActiveDirectoryProvisioner;
+use App\Directory\ActiveDirectoryService;
+use App\Exceptions\ActiveDirectoryException;
 use App\Exceptions\LibraryAuthenticationException;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -16,6 +19,8 @@ class LibraryAuthenticator
     public function __construct(
         private readonly AuthSessionManager $sessions,
         private readonly AuditLogger $audit,
+        private readonly ActiveDirectoryService $activeDirectory,
+        private readonly ActiveDirectoryProvisioner $activeDirectoryProvisioner,
     ) {}
 
     /**
@@ -28,26 +33,8 @@ class LibraryAuthenticator
         string $deviceName = 'web',
     ): array {
         $identifier = trim($identifier);
-        $localUser = $this->findLocalUser($identifier);
-
-        if ($localUser !== null && $localUser->auth_provider === 'demo') {
-            if (! (bool) config('demo_users.enabled') && $this->isPublishedDemoIdentity($localUser)) {
-                $this->failed($identifier, 'demo_login_disabled', $request);
-                throw new LibraryAuthenticationException(__('auth.demo_login_disabled'), 403);
-            }
-
-            if (! Hash::check($password, $localUser->password)) {
-                $this->failed($identifier, 'invalid_credentials', $request);
-                throw new LibraryAuthenticationException(__('auth.invalid_credentials'));
-            }
-
-            $sessionUser = $this->sessions->login($request, $localUser);
-
-            return [
-                'user' => $localUser,
-                'session_user' => $sessionUser,
-                'landing' => $this->sessions->landing($localUser),
-            ];
+        if ((bool) config('active_directory.enabled')) {
+            return $this->authenticateWithActiveDirectory($request, $identifier, $password);
         }
 
         $authApiUrl = trim((string) config('services.external_auth.login_url', ''));
@@ -106,16 +93,24 @@ class LibraryAuthenticator
         ];
     }
 
-    private function findLocalUser(string $identifier): ?User
+    /** @return array{user: User, session_user: array<string,mixed>, landing: string} */
+    private function authenticateWithActiveDirectory(Request $request, string $identifier, string $password): array
     {
-        $normalized = mb_strtolower($identifier);
+        try {
+            $identity = $this->activeDirectory->authenticate($identifier, $password);
+            $user = $this->activeDirectoryProvisioner->provision($identity, $request);
+            $sessionUser = $this->sessions->login($request, $user);
 
-        return User::query()
-            ->where(function ($query) use ($normalized): void {
-                $query->whereRaw('LOWER(email) = ?', [$normalized])
-                    ->orWhereRaw('LOWER(COALESCE(ad_login, \'\')) = ?', [$normalized]);
-            })
-            ->first();
+            return ['user' => $user, 'session_user' => $sessionUser, 'landing' => $this->sessions->landing($user)];
+        } catch (ActiveDirectoryException $exception) {
+            $invalid = $exception->category === 'invalid_credentials';
+            $reason = $invalid ? 'invalid_credentials' : 'provider_unavailable';
+            $this->failed($identifier, $reason, $request, ['provider' => 'active_directory', 'category' => $exception->category]);
+            throw new LibraryAuthenticationException(
+                $invalid ? __('auth.invalid_credentials') : __('auth.provider_unavailable'),
+                $invalid ? 401 : 503,
+            );
+        }
     }
 
     /**
@@ -167,7 +162,7 @@ class LibraryAuthenticator
             $old = $isNew ? null : $this->identitySnapshot($user->load('roles'));
             $canonicalRole = $this->canonicalRole((string) ($rawUser['role'] ?? 'member'));
             $effectiveRole = ! $isNew && $user->role_source === 'manual'
-                ? (string) ($user->getRoleNames()->first() ?: $canonicalRole)
+                ? $user->effectiveRole()
                 : $canonicalRole;
 
             if (
@@ -194,7 +189,7 @@ class LibraryAuthenticator
                 },
                 'locale' => in_array(($rawUser['locale'] ?? null), ['ru', 'kk', 'en'], true)
                     ? $rawUser['locale']
-                    : ($user->locale ?: 'kk'),
+                    : ($user->locale ?: 'ru'),
             ]);
 
             if ($isNew) {
@@ -246,23 +241,6 @@ class LibraryAuthenticator
             ->where('guard_name', 'web')
             ->whereRaw('LOWER(name) = ?', [$normalized])
             ->value('name') ?: 'member');
-    }
-
-    private function isPublishedDemoIdentity(User $user): bool
-    {
-        $email = mb_strtolower((string) $user->email);
-        $login = mb_strtolower((string) $user->ad_login);
-
-        return collect(config('demo_users.identities', []))->contains(
-            static fn (mixed $identity): bool => is_array($identity)
-                && (
-                    mb_strtolower((string) ($identity['email'] ?? '')) === $email
-                    || (
-                        $login !== ''
-                        && mb_strtolower((string) ($identity['ad_login'] ?? '')) === $login
-                    )
-                )
-        );
     }
 
     /**

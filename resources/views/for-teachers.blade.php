@@ -1,13 +1,13 @@
 @extends('layouts.public')
 
-@section('title', 'Преподавателям — Digital Library')
+@section('title', 'Преподавателям — Научная библиотека')
 
 @section('content')
   <section class="page-hero">
     <div class="container">
       <div class="eyebrow eyebrow--violet">Преподавателям</div>
       <h1>Инструменты для подготовки силлабуса и работы с литературой</h1>
-      <p>Подберите литературу, соберите подборку для дисциплины, получите доступ к научным базам — всё в одном месте.</p>
+      <p>Подберите литературу, соберите подборку для дисциплины и проверьте опубликованные библиотекой электронные ресурсы.</p>
     </div>
   </section>
 
@@ -31,16 +31,16 @@
           </div>
           <div class="action-links">
             <a href="/shortlist" class="btn btn-primary">Открыть подборку</a>
-            <a href="/account" class="action-link">Мой кабинет →</a>
+            <a href="/account" class="action-link">Мой кабинет —</a>
           </div>
         </div>
 
         <div class="action-group">
           <div class="action-group-header">
-            <div class="action-icon">🔎</div>
+            <div class="action-icon"></div>
             <div>
               <h3>Поиск и подбор литературы</h3>
-              <p>Ищите по каталогу (50 000+ единиц), по направлениям подготовки или по ключевым словам.</p>
+              <p>Ищите по каталогу по направлениям подготовки или по ключевым словам.</p>
             </div>
           </div>
           <div class="action-links">
@@ -54,7 +54,7 @@
             <div class="action-icon">🌐</div>
             <div>
               <h3>Электронные ресурсы и научные базы</h3>
-              <p>Лицензированные библиотеки, Scopus, Web of Science, РИНЦ, открытые коллекции — доступ из кампуса и удалённо.</p>
+              <p>Просматривайте опубликованные библиотекой внешние ресурсы и указанные для них условия доступа.</p>
             </div>
           </div>
           <div class="action-links">
@@ -103,7 +103,7 @@
         <div class="step-card">
           <div class="step-number">3</div>
           <h3>Проверьте электронные ресурсы</h3>
-          <p>Изучите <a href="/resources">электронные ресурсы</a> — подписные базы и открытые коллекции могут дополнить или заменить печатные издания.</p>
+          <p>Изучите <a href="/resources">электронные ресурсы</a>, опубликованные библиотекой: они могут дополнить печатные издания.</p>
         </div>
 
         <div class="step-card">
@@ -121,7 +121,7 @@
         <div class="step-card">
           <div class="step-number">6</div>
           <h3>Обратитесь к библиографу</h3>
-          <p>Для углублённого подбора и проверки обеспеченности обратитесь в <a href="/contacts">информационно-библиографический отдел</a>. Специалисты помогут подготовить справку.</p>
+          <p>Для углублённого подбора и проверки обеспеченности обратитесь в <a href="/contacts">библиотеку</a>.</p>
         </div>
       </div>
     </div>
@@ -132,8 +132,8 @@
       <div class="section-head section-head-centered">
         <div>
           <div class="eyebrow eyebrow--cyan">Электронные ресурсы</div>
-          <h2>Ключевые базы для преподавателей</h2>
-          <p>Электронные ресурсы, доступные преподавателям и сотрудникам университета.</p>
+          <h2>Электронные ресурсы для преподавателей</h2>
+          <p>Ресурсы, опубликованные библиотекой на портале.</p>
         </div>
       </div>
 
@@ -167,14 +167,14 @@
         <details class="faq-item">
           <summary class="faq-question">Какие электронные ресурсы доступны?</summary>
           <div class="faq-answer">
-            <p>Преподавателям доступны все подписные электронные ресурсы университета, включая IPR SMART, открытые научные коллекции и международные базы данных. Полный перечень — на странице <a href="/resources">Электронные ресурсы</a>.</p>
+            <p>Актуальный перечень и условия доступа приведены на странице <a href="/resources">«Электронные ресурсы»</a>.</p>
           </div>
         </details>
 
         <details class="faq-item">
           <summary class="faq-question">Можно ли заказать литературу, которой нет в фонде?</summary>
           <div class="faq-answer">
-            <p>Да. Подайте заявку через отдел комплектования. Обратитесь по <a href="/contacts">контактам библиотеки</a> для оформления.</p>
+            <p>Обратитесь по <a href="/contacts">контактам библиотеки</a>, чтобы уточнить возможность пополнения фонда.</p>
           </div>
         </details>
       </div>
@@ -468,10 +468,10 @@
         `;
       }).join('') + `
         <div class="card resource-highlight-card" style="display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
-          <div style="font-size:36px; margin-bottom:12px;">📚</div>
+          <div style="font-size:36px; margin-bottom:12px;"></div>
           <h3>Все внешние ресурсы</h3>
-          <p class="text-body" style="margin: 0 0 12px;">Полный перечень подписных баз, открытых коллекций и аналитических ресурсов.</p>
-          <a href="/resources" class="feature-link">Открыть все ресурсы →</a>
+          <p class="text-body" style="margin: 0 0 12px;">Перечень ресурсов, опубликованных библиотекой на портале.</p>
+          <a href="/resources" class="feature-link">Открыть все ресурсы —</a>
         </div>
       `;
     } catch (e) {
@@ -479,8 +479,8 @@
         <div class="card resource-highlight-card">
           <div class="eyebrow eyebrow--blue">Электронные ресурсы</div>
           <h3>Внешние платформы</h3>
-          <p class="text-body" style="margin: 0 0 12px;">Подписные электронные библиотеки, научные базы данных и открытые образовательные ресурсы.</p>
-          <a href="/resources" class="feature-link">Перейти к ресурсам →</a>
+          <p class="text-body" style="margin: 0 0 12px;">Актуальный перечень и условия доступа размещены на странице ресурсов.</p>
+          <a href="/resources" class="feature-link">Перейти к ресурсам —</a>
         </div>
       `;
     }

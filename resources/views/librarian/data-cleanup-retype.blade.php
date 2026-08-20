@@ -38,7 +38,7 @@
                 {{-- The damaged strings, with every corrupted glyph marked so the
                      operator never has to hunt for it. Substitution candidates are
                      shown as a hint only — "Делµз" is Deleuze, where µ means ё, so
-                     applying the usual µ→ө automatically would be wrong. --}}
+                     applying the usual µ—ө automatically would be wrong. --}}
                 @foreach ([['label' => 'title', 'segments' => $titleSegments], ['label' => 'primary_author', 'segments' => $authorSegments]] as $field)
                     @if (collect($field['segments'])->contains('glyph', true))
                         <div class="mb-5">
@@ -48,7 +48,7 @@
                                     @if ($segment['glyph'])
                                         <span
                                             class="rounded bg-red-500 px-1 font-bold text-white"
-                                            title="{{ $segment['text'] }} → {{ implode(' / ', $segment['options']) }}?"
+                                            title="{{ $segment['text'] }} — {{ implode(' / ', $segment['options']) }}?"
                                         >{{ $segment['text'] }}</span><sup class="ml-0.5 text-[10px] font-bold text-red-700">{{ implode('/', $segment['options']) }}</sup>@else{{ $segment['text'] }}@endif
                                 @endforeach
                             </p>
@@ -63,7 +63,7 @@
                     </div>
                     <div class="flex flex-wrap gap-x-4 gap-y-1 font-mono">
                         @foreach ($substitutions as $glyph => $options)
-                            <span><strong class="text-red-700">{{ $glyph }}</strong> → {{ implode(' / ', $options) }}</span>
+                            <span><strong class="text-red-700">{{ $glyph }}</strong> — {{ implode(' / ', $options) }}</span>
                         @endforeach
                     </div>
                     <p class="mt-2 font-sans">{{ __('librarian.data_cleanup.retype.legend_warning') }}</p>

@@ -6,6 +6,7 @@ use App\Models\User;
 use Database\Seeders\DemoUserSeeder;
 use Database\Seeders\ExternalResourceSeeder;
 use Database\Seeders\LibraryStructureSeeder;
+use Database\Seeders\MessageCategorySeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingsSeeder;
@@ -21,8 +22,8 @@ trait BuildsAdminControlPlane
     protected function setUpAdminControlPlane(): void
     {
         config([
-            'app.locale' => 'ru',
-            'app.fallback_locale' => 'ru',
+            'app.locale' => 'kk',
+            'app.fallback_locale' => 'kk',
             'cache.default' => 'array',
             'database.default' => 'sqlite',
             'database.connections.sqlite.database' => ':memory:',
@@ -45,6 +46,7 @@ trait BuildsAdminControlPlane
             SettingsSeeder::class,
             LibraryStructureSeeder::class,
             ExternalResourceSeeder::class,
+            MessageCategorySeeder::class,
             UdcCodeSeeder::class,
         ] as $seeder) {
             app($seeder)->run();
@@ -72,7 +74,7 @@ trait BuildsAdminControlPlane
             'auth_provider' => 'demo',
             'role_source' => 'manual',
             'is_active' => true,
-            'locale' => 'ru',
+            'locale' => 'kk',
             'email_verified_at' => now(),
         ], $attributes));
 
@@ -83,7 +85,7 @@ trait BuildsAdminControlPlane
 
     protected function signInToLibraryAs(User $user): static
     {
-        $role = (string) ($user->getRoleNames()->first() ?: $user->role);
+        $role = $user->effectiveRole();
         $legacyRole = match ($role) {
             'admin' => 'admin',
             'member' => 'reader',
@@ -103,7 +105,9 @@ trait BuildsAdminControlPlane
             ],
             'library.crm_token' => 'test-control-plane-token',
             'library.authenticated_at' => now()->toIso8601String(),
-            'locale' => 'ru',
+            'locale' => in_array($user->locale, ['kk', 'ru', 'en'], true)
+                ? $user->locale
+                : (string) config('app.locale', 'kk'),
         ]);
 
         return $this;
@@ -153,8 +157,22 @@ trait BuildsAdminControlPlane
             'database/migrations/2026_07_30_160000_create_library_visits_table.php',
             // ДИР §9.3: circulation now persists lost/damaged obligations.
             'database/migrations/2026_07_30_170000_create_circulation_incident_workflow.php',
+            'database/migrations/2026_07_31_090000_create_data_quality_control_center.php',
             'database/migrations/2026_08_03_000000_create_production_circulation_workflows.php',
             'database/migrations/2026_08_04_000000_build_full_reader_cabinet.php',
+            'database/migrations/2026_08_06_000000_build_message_appeals_workflow.php',
+            // Unified digital services also completes the scholarly repository
+            // and supplies the access-event tables used by the four canonical
+            // library reports.
+            'database/migrations/2026_08_07_000000_unify_digital_library_services.php',
+            'database/migrations/2026_08_11_100000_make_scholarly_repository_public_by_default.php',
+            'database/migrations/2026_08_12_140000_allow_incomplete_external_resources.php',
+            'database/migrations/2026_08_12_220000_harden_external_resource_operations.php',
+            'database/migrations/2026_08_13_010000_create_librarian_workspace_operations.php',
+            'database/migrations/2026_08_13_020000_add_active_directory_identity_to_users.php',
+            'database/migrations/2026_08_13_030000_create_integration_hub.php',
+            'database/migrations/2026_08_13_040000_add_multilingual_catalogue_and_executive_controls.php',
+            'database/migrations/2026_08_19_000000_extend_inventory_physical_verification.php',
         ];
     }
 }

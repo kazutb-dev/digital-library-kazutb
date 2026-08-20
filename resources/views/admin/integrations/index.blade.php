@@ -9,11 +9,31 @@
         </a>
     </x-admin.page-header>
 
+    <section class="mb-9" data-integration-hub>
+        <div class="mb-5"><h2 class="font-headline text-3xl text-primary">{{ __('integration_hub.title') }}</h2><p class="mt-1 text-sm text-slate-500">{{ __('integration_hub.subtitle') }}</p></div>
+        <dl class="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+            @foreach($hubMetrics as $metric => $value)
+                <div class="rounded-xl border border-slate-100 bg-white p-3"><dt class="text-xs text-slate-500">{{ __('integration_hub.metrics.'.$metric) }}</dt><dd class="mt-1 text-xl font-bold text-primary">{{ $value }}</dd></div>
+            @endforeach
+        </dl>
+        <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            @foreach($hubIntegrations as $hub)
+                <article class="admin-card flex flex-col">
+                    <div class="flex items-start justify-between gap-3"><div><p class="text-xs font-bold uppercase tracking-wider text-secondary">{{ __('integration_hub.types.'.$hub->type) }}</p><h3 class="mt-1 text-xl font-bold">{{ $hub->name }}</h3></div><x-admin.status-badge :status="$hub->health_status" :label="__('integration_hub.statuses.'.$hub->health_status)" /></div>
+                    <p class="mt-3 text-xs text-slate-500">{{ $hub->transport }} · {{ $hub->direction }} · {{ $hub->sync_mode }}</p>
+                    @unless($hub->enabled)<p class="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{{ __('integration_hub.not_connected') }}</p>@endunless
+                    <dl class="mt-4 grid grid-cols-3 gap-2 text-center text-xs"><div class="rounded-lg bg-surface-low p-2"><dt>{{ __('integration_hub.pending') }}</dt><dd class="mt-1 font-bold">{{ $hub->pending_queue_count }}</dd></div><div class="rounded-lg bg-surface-low p-2"><dt>{{ __('integration_hub.dlq') }}</dt><dd class="mt-1 font-bold">{{ $hub->dlq_count }}</dd></div><div class="rounded-lg bg-surface-low p-2"><dt>{{ __('integration_hub.conflicts') }}</dt><dd class="mt-1 font-bold">{{ $hub->conflicts_count }}</dd></div></dl>
+                    <a class="admin-btn admin-btn-secondary mt-5" href="{{ route('admin.integrations.show', $hub) }}">{{ __('integration_hub.open') }}</a>
+                </article>
+            @endforeach
+        </div>
+    </section>
+
     @if (session('integration_check'))
         @php
             $check = session('integration_check');
             $checkName = match ($check['key']) {
-                'crm' => __('admin.integrations.ldap'),
+                'active_directory' => 'Active Directory',
                 'database' => __('admin.integrations.database'),
                 'storage' => __('admin.integrations.storage'),
                 default => $check['key'],
@@ -38,7 +58,7 @@
             @foreach ($integrations as $integration)
                 @php
                     $name = match ($integration['key']) {
-                        'crm' => __('admin.integrations.ldap'),
+                        'active_directory' => 'Active Directory',
                         'database' => __('admin.integrations.database'),
                         'storage' => __('admin.integrations.storage'),
                         default => $integration['name'],
@@ -47,7 +67,7 @@
                 <article class="admin-card flex flex-col">
                     <div class="mb-5 flex items-start justify-between gap-3">
                         <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-low text-secondary">
-                            <span class="material-symbols-outlined">{{ match ($integration['key']) { 'crm' => 'badge', 'database' => 'database', default => 'hard_drive' } }}</span>
+                            <span class="material-symbols-outlined">{{ match ($integration['key']) { 'active_directory' => 'badge', 'database' => 'database', default => 'hard_drive' } }}</span>
                         </span>
                         <x-admin.status-badge
                             :status="$integration['configured'] ? 'configured' : 'not_configured'"
@@ -73,6 +93,45 @@
                 </article>
             @endforeach
         </div>
+    </section>
+
+    @php
+        $adCopy = match(app()->getLocale()) {
+            'ru' => ['title' => 'Active Directory', 'subtitle' => 'Корпоративная аутентификация и безопасный поиск пользователей', 'search' => 'Найти пользователя в Active Directory', 'placeholder' => 'Логин, ФИО или корпоративный email', 'enabled' => 'Включено', 'ssl' => 'Защищённое соединение', 'cert' => 'Проверка сертификата', 'base' => 'Base DN', 'login' => 'Поле входа', 'last' => 'Последняя проверка', 'none' => 'Пользователи не найдены'],
+            'en' => ['title' => 'Active Directory', 'subtitle' => 'Corporate authentication and privacy-safe user lookup', 'search' => 'Find a user in Active Directory', 'placeholder' => 'Login, name, or corporate email', 'enabled' => 'Enabled', 'ssl' => 'Secure connection', 'cert' => 'Certificate verification', 'base' => 'Base DN', 'login' => 'Login field', 'last' => 'Last health check', 'none' => 'No users found'],
+            default => ['title' => 'Active Directory', 'subtitle' => 'Корпоративтік аутентификация және қауіпсіз пайдаланушы іздеуі', 'search' => 'Active Directory ішінен пайдаланушыны табу', 'placeholder' => 'Логин, аты-жөні немесе корпоративтік email', 'enabled' => 'Қосылған', 'ssl' => 'Қауіпсіз байланыс', 'cert' => 'Сертификатты тексеру', 'base' => 'Base DN', 'login' => 'Кіру өрісі', 'last' => 'Соңғы тексеріс', 'none' => 'Пайдаланушылар табылмады'],
+        };
+    @endphp
+    <section class="admin-card mb-9" data-active-directory-panel>
+        <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+            <div><h2 class="font-headline text-3xl text-primary">{{ $adCopy['title'] }}</h2><p class="mt-1 text-sm text-slate-500">{{ $adCopy['subtitle'] }}</p></div>
+            <span class="material-symbols-outlined text-3xl text-secondary">domain</span>
+        </div>
+        <dl class="grid grid-cols-2 gap-3 lg:grid-cols-6">
+            @foreach ([
+                $adCopy['enabled'] => $activeDirectory['enabled'],
+                $adCopy['ssl'] => $activeDirectory['ssl'],
+                $adCopy['cert'] => $activeDirectory['certificate_verification'],
+                $adCopy['base'] => $activeDirectory['base_dn_configured'],
+            ] as $label => $state)
+                <div class="rounded-xl bg-surface-low p-4"><dt class="text-xs text-slate-500">{{ $label }}</dt><dd class="mt-1 font-semibold">{{ $state ? __('common.status.enabled') : __('common.status.disabled') }}</dd></div>
+            @endforeach
+            <div class="rounded-xl bg-surface-low p-4"><dt class="text-xs text-slate-500">{{ $adCopy['login'] }}</dt><dd class="mt-1 font-mono text-xs">{{ $activeDirectory['login_field'] }}</dd></div>
+            <div class="rounded-xl bg-surface-low p-4"><dt class="text-xs text-slate-500">{{ $adCopy['last'] }}</dt><dd class="mt-1 text-xs">{{ data_get($activeDirectory, 'last_health.checked_at', '—') }}</dd></div>
+        </dl>
+        <form method="GET" action="{{ route('admin.integrations.index') }}" class="mt-6 flex gap-3" role="search">
+            <label class="sr-only" for="directory_q">{{ $adCopy['search'] }}</label>
+            <input id="directory_q" class="admin-input" name="directory_q" value="{{ $directoryQuery }}" minlength="2" maxlength="100" placeholder="{{ $adCopy['placeholder'] }}">
+            <button class="admin-btn admin-btn-primary" type="submit"><span class="material-symbols-outlined">search</span>{{ $adCopy['search'] }}</button>
+        </form>
+        @if($directoryError)<p class="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800">{{ __('auth.provider_unavailable') }}</p>@endif
+        @if($directoryQuery !== '' && !$directoryError)
+            <div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>{{ __('common.fields.name') }}</th><th>Login</th><th>Email</th><th>Department</th><th>Status</th></tr></thead><tbody>
+                @forelse($directoryUsers as $directoryUser)
+                    <tr><td>{{ $directoryUser->displayName }}</td><td>{{ $directoryUser->samAccountName }}</td><td>{{ $directoryUser->mail }}</td><td>{{ $directoryUser->department }}</td><td>{{ $directoryUser->enabled ? __('common.status.active') : __('common.status.disabled') }}</td></tr>
+                @empty<tr><td colspan="5" class="text-center text-slate-500">{{ $adCopy['none'] }}</td></tr>@endforelse
+            </tbody></table></div>
+        @endif
     </section>
 
     @php

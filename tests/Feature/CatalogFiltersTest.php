@@ -149,9 +149,9 @@ class CatalogFiltersTest extends TestCase
         $authenticated = $this->catalog->search(includeUdcCode: true)['data'][0]['udc'];
 
         $this->assertSame('', $guest['raw']);
-        $this->assertSame('Искусственный интеллект', $guest['display']);
+        $this->assertSame('Жасанды интеллект', $guest['display']);
         $this->assertSame('004.8', $authenticated['raw']);
-        $this->assertSame('004.8 — Искусственный интеллект', $authenticated['display']);
+        $this->assertSame('004.8 — Жасанды интеллект', $authenticated['display']);
     }
 
     public function test_homepage_desk_popularity_uses_real_copies_and_issue_counts(): void
@@ -177,6 +177,34 @@ class CatalogFiltersTest extends TestCase
         $this->assertSame('Реальная популярная книга', $popular[0]['title']);
         $this->assertSame(25, $popular[0]['issueCount']);
         $this->assertSame('Реальная книга номер два', $popular[1]['title']);
+    }
+
+    public function test_public_popular_sort_uses_issue_count_with_stable_ties(): void
+    {
+        $mostIssued = $this->record(['title' => 'Z — Most issued']);
+        $this->copy($mostIssued, ['issue_count' => 25]);
+
+        $firstTie = $this->record(['title' => 'Same popularity']);
+        $this->copy($firstTie, ['issue_count' => 5]);
+        $secondTie = $this->record(['title' => 'Same popularity']);
+        $this->copy($secondTie, ['issue_count' => 5]);
+
+        $manyAvailable = $this->record(['title' => 'A — Many available']);
+        for ($copy = 0; $copy < 3; $copy++) {
+            $this->copy($manyAvailable, ['issue_count' => 0]);
+        }
+        $noHoldings = $this->record(['title' => '0 — Metadata only']);
+
+        $expected = [
+            (string) $mostIssued->getKey(),
+            (string) $firstTie->getKey(),
+            (string) $secondTie->getKey(),
+            (string) $manyAvailable->getKey(),
+            (string) $noHoldings->getKey(),
+        ];
+
+        $this->assertSame($expected, array_column($this->catalog->search(sort: 'popular')['data'], 'id'));
+        $this->assertSame($expected, array_column($this->catalog->search(sort: 'unknown')['data'], 'id'));
     }
 
     public function test_general_search_covers_bibliographic_metadata_beyond_title_and_author(): void
@@ -234,6 +262,7 @@ class CatalogFiltersTest extends TestCase
             'file_type' => 'pdf',
             'access_level' => 'authenticated',
             'is_active' => true,
+            'workflow_status' => 'published',
         ]);
 
         $this->assertSame(1, $this->catalog->search(availability: 'available')['meta']['total']);
@@ -265,6 +294,7 @@ class CatalogFiltersTest extends TestCase
             'file_type' => 'pdf',
             'access_level' => 'public',
             'is_active' => true,
+            'workflow_status' => 'published',
         ]);
 
         $hybrid = $this->record();
@@ -275,11 +305,46 @@ class CatalogFiltersTest extends TestCase
             'file_type' => 'pdf',
             'access_level' => 'authenticated',
             'is_active' => true,
+            'workflow_status' => 'published',
         ]);
 
         $this->assertSame(1, $this->catalog->search(format: 'print')['meta']['total']);
         $this->assertSame(1, $this->catalog->search(format: 'electronic')['meta']['total']);
         $this->assertSame(1, $this->catalog->search(format: 'hybrid')['meta']['total']);
+    }
+
+    public function test_active_but_unpublished_digital_material_is_not_a_public_holding(): void
+    {
+        $published = $this->record(['title' => 'Published digital']);
+        ElectronicMaterial::query()->create([
+            'bibliographic_record_id' => $published->getKey(),
+            'title' => 'Public PDF',
+            'file_type' => 'pdf',
+            'access_level' => 'public',
+            'is_active' => true,
+            'workflow_status' => 'published',
+        ]);
+
+        $draft = $this->record(['title' => 'Workflow draft']);
+        ElectronicMaterial::query()->create([
+            'bibliographic_record_id' => $draft->getKey(),
+            'title' => 'Unreviewed PDF',
+            'file_type' => 'pdf',
+            'access_level' => 'public',
+            'is_active' => true,
+            'workflow_status' => 'metadata_review',
+        ]);
+
+        $this->assertSame(1, $this->catalog->search(format: 'electronic')['meta']['total']);
+        $this->assertSame(1, $this->catalog->search(availability: 'electronic_only')['meta']['total']);
+        $this->assertSame(1, $this->catalog->search(availability: 'no_holdings')['meta']['total']);
+
+        $items = collect($this->catalog->search(limit: 10)['data'])
+            ->keyBy(fn (array $item): string => $item['title']['display']);
+        $this->assertSame('electronic', $items['Published digital']['indicators']['format']);
+        $this->assertSame('electronic_only', $items['Published digital']['indicators']['availability']);
+        $this->assertSame('metadata_only', $items['Workflow draft']['indicators']['format']);
+        $this->assertSame('no_holdings', $items['Workflow draft']['indicators']['availability']);
     }
 
     public function test_incomplete_records_remain_visible_in_the_public_catalogue(): void
@@ -353,6 +418,49 @@ class CatalogFiltersTest extends TestCase
         $this->assertSame('in_processing', $items['in_processing']['indicators']['availability']);
         $this->assertSame('under_repair', $items['under_repair']['indicators']['availability']);
         $this->assertSame('no_holdings', $items['no_holdings']['indicators']['availability']);
+        $this->assertSame('metadata_only', $items['no_holdings']['indicators']['format']);
+    }
+
+    public function test_noncirculating_live_copy_is_unavailable_not_no_holdings(): void
+    {
+        $record = $this->record(['title' => 'Reserved stock']);
+        $this->copy($record, ['status' => 'reserved_stock']);
+
+        $item = $this->catalog->search()['data'][0];
+
+        $this->assertSame(1, $item['copies']['total']);
+        $this->assertSame('unavailable', $item['indicators']['availability']);
+        $this->assertSame('print', $item['indicators']['format']);
+        $this->assertSame(0, $this->catalog->search(availability: 'no_holdings')['meta']['total']);
+    }
+
+    public function test_lost_and_written_off_copies_do_not_affect_public_indicators_or_sums(): void
+    {
+        $record = $this->record(['title' => 'Truthful holding totals']);
+        $this->copy($record, [
+            'issue_count' => 2,
+            'registration_date' => now()->subMonths(2)->toDateString(),
+            'access_restriction' => 'free',
+        ]);
+        $this->copy($record, [
+            'status' => 'lost',
+            'issue_count' => 500,
+            'registration_date' => now()->toDateString(),
+            'access_restriction' => 'limited',
+        ]);
+        $this->copy($record, [
+            'status' => 'written_off',
+            'issue_count' => 400,
+            'registration_date' => now()->toDateString(),
+            'access_restriction' => 'reading_room',
+        ]);
+
+        $item = $this->catalog->search()['data'][0];
+
+        $this->assertSame(1, $item['copies']['total']);
+        $this->assertSame(2, $item['indicators']['issueCount']);
+        $this->assertSame('free', $item['indicators']['accessRestriction']);
+        $this->assertFalse($item['indicators']['newArrival']);
     }
 
     public function test_facets_report_only_values_present_in_the_collection(): void
@@ -373,7 +481,7 @@ class CatalogFiltersTest extends TestCase
 
         // The UDC facet rolls subdivisions up to their top-level class.
         $this->assertSame('004', $facets['udc'][0]['value']);
-        $this->assertStringContainsString('Информационные технологии', $facets['udc'][0]['label']);
+        $this->assertStringContainsString('Ақпараттық технологиялар', $facets['udc'][0]['label']);
     }
 
     public function test_language_facet_always_lists_every_interface_language(): void

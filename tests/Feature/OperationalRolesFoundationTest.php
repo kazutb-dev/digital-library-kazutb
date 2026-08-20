@@ -6,8 +6,8 @@ use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\Loan;
 use App\Models\ContactMessage;
+use App\Models\MessageCategory;
 use App\Models\User;
-use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Spatie\Permission\Models\Role;
@@ -51,12 +51,12 @@ class OperationalRolesFoundationTest extends TestCase
             $this->assertSame($permissions, $actual, "Unexpected matrix for {$roleName}");
         }
 
-        // Admin holds the whole catalogue, so this tracks PermissionSeeder
-        // rather than a literal that has to be bumped on every addition.
-        $this->assertCount(count(PermissionSeeder::PERMISSIONS), Role::findByName('admin')->permissions);
+        // Administrator capabilities are explicit: approval of official
+        // reader-facing responses remains outside the technical role.
+        $this->assertCount(count(RoleSeeder::ADMIN), Role::findByName('admin')->permissions);
     }
 
-    public function test_each_new_demo_identity_logs_in_and_lands_in_operational_workspace(): void
+    public function test_operational_roles_are_not_exposed_through_demo_login_routes(): void
     {
         foreach ([
             'director',
@@ -65,15 +65,12 @@ class OperationalRolesFoundationTest extends TestCase
             'cataloguer',
             'bibliographer',
         ] as $slug) {
-            $this->app['auth']->forgetGuards();
-
             $this->withoutMiddleware(PreventRequestForgery::class)
                 ->withSession([])
                 ->post("/login/demo/{$slug}")
-                ->assertRedirect('/librarian');
+                ->assertStatus(405);
 
-            $this->assertAuthenticated();
-            $this->assertSame($slug, auth()->user()->getRoleNames()->first());
+            $this->assertGuest();
         }
     }
 
@@ -147,7 +144,9 @@ class OperationalRolesFoundationTest extends TestCase
             ->assertSee(route('librarian.catalog.index'), false)
             ->assertSee(route('librarian.copies.index'), false)
             ->assertDontSee(route('librarian.circulation'), false)
-            ->assertSee(__('roles.upcoming.acquisitions'));
+            ->assertSee('data-section="acquisitions-operational-dashboard"', false)
+            ->assertSee(__('librarian.overview.roles.acquisitions.title'))
+            ->assertSee(__('librarian.overview.roles.acquisitions.subtitle'));
 
         $this->signInToLibraryAs($acquisitions)
             ->get('/librarian/catalog/create')
@@ -268,6 +267,7 @@ class OperationalRolesFoundationTest extends TestCase
                 ->withoutMiddleware(PreventRequestForgery::class)
                 ->post(route('librarian.circulation.return.store'), [
                     'copy_code' => $issuedCopy->barcode,
+                    'condition_on_return' => 'unchanged',
                     'incident' => 'none',
                 ])
                 ->assertForbidden();
@@ -295,6 +295,7 @@ class OperationalRolesFoundationTest extends TestCase
             ->withoutMiddleware(PreventRequestForgery::class)
             ->post(route('librarian.circulation.return.store'), [
                 'copy_code' => $seniorCopy->barcode,
+                'condition_on_return' => 'unchanged',
                 'incident' => 'none',
             ])
             ->assertRedirect();
@@ -328,24 +329,26 @@ class OperationalRolesFoundationTest extends TestCase
         }
     }
 
-    public function test_bibliographer_sees_only_bibliographic_requests_and_cannot_process_them(): void
+    public function test_bibliographer_sees_assigned_bibliographic_requests_but_cannot_approve_them(): void
     {
         $bibliographer = $this->makeControlPlaneUser('bibliographer');
+        $requestCategory = MessageCategory::query()->where('slug', 'bibliographic-reference')->firstOrFail();
+        $complaintCategory = MessageCategory::query()->where('slug', 'complaint-other')->firstOrFail();
         $requestMessage = ContactMessage::query()->create([
-            'category' => 'request',
+            'category' => 'request', 'type' => 'request', 'category_id' => $requestCategory->getKey(),
             'subject' => 'Подберите литературу по экономике',
             'body' => 'Нужен библиографический список.',
             'sender_email' => 'reader-request@example.test',
             'status' => 'open',
-            'priority' => 'normal',
+            'priority' => 'medium', 'assigned_to' => $bibliographer->getKey(),
         ]);
         $complaint = ContactMessage::query()->create([
-            'category' => 'complaint',
+            'category' => 'complaint', 'type' => 'complaint', 'category_id' => $complaintCategory->getKey(),
             'subject' => 'Жалоба на обслуживание',
             'body' => 'Это обращение не относится к библиографическому поиску.',
             'sender_email' => 'reader-complaint@example.test',
             'status' => 'open',
-            'priority' => 'normal',
+            'priority' => 'medium', 'assigned_to' => $bibliographer->getKey(),
         ]);
 
         $this->signInToLibraryAs($bibliographer)
@@ -357,14 +360,11 @@ class OperationalRolesFoundationTest extends TestCase
 
         $this->signInToLibraryAs($bibliographer)
             ->get(route('librarian.messages.show', $complaint))
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->signInToLibraryAs($bibliographer)
             ->withoutMiddleware(PreventRequestForgery::class)
-            ->patch(route('librarian.messages.update', $requestMessage), [
-                'status' => 'resolved',
-                'resolution_comment' => 'Попытка закрытия.',
-            ])
+            ->post(route('librarian.messages.approve', $requestMessage))
             ->assertForbidden();
 
         $this->assertSame('open', $requestMessage->refresh()->status);
@@ -377,11 +377,11 @@ class OperationalRolesFoundationTest extends TestCase
         $response->assertOk();
 
         foreach ([
-            'director' => 5,
-            'senior_librarian' => 45,
-            'acquisitions' => 6,
-            'cataloguer' => 6,
-            'bibliographer' => 8,
+            'director' => count(RoleSeeder::DIRECTOR),
+            'senior_librarian' => count(array_unique([...RoleSeeder::MEMBER, ...RoleSeeder::LIBRARIAN_EXTRA, ...RoleSeeder::SENIOR_LIBRARIAN_EXTRA])),
+            'acquisitions' => count(RoleSeeder::ACQUISITIONS),
+            'cataloguer' => count(RoleSeeder::CATALOGUER),
+            'bibliographer' => count(RoleSeeder::BIBLIOGRAPHER),
         ] as $role => $count) {
             $response
                 ->assertSee(__('roles.names.'.$role))

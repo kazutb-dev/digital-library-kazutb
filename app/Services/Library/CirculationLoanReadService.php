@@ -160,7 +160,7 @@ class CirculationLoanReadService
     }
 
     /**
-     * Resolve book metadata from copy_id via app.book_copies → app.documents.
+     * Resolve book metadata from copy_id via app.book_copies — app.documents.
      *
      * @return array{title: string|null, isbn: string|null, author: string|null, inventoryNumber: string|null}
      */

@@ -67,6 +67,10 @@ return [
 
     'timezone' => 'UTC',
 
+    // Operational timestamps stay in UTC in the database, while report
+    // presets follow the library's local calendar day.
+    'library_timezone' => env('LIBRARY_TIMEZONE', 'Asia/Almaty'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

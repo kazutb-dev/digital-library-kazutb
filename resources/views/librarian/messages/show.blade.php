@@ -1,194 +1,29 @@
 @extends('layouts.librarian')
-
-@section('title', $message->subject.' — '.__('librarian.messages.title'))
-
+@section('title', $message->ticket_number.' — '.$message->subject)
 @section('content')
-    <x-admin.flash />
+<x-admin.flash />
+@if($errors->any())<div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900"><ul class="list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+<x-admin.page-header :eyebrow="$message->ticket_number" :title="$message->subject" :subtitle="$message->messageCategory?->localizedName()"><a class="admin-btn admin-btn-secondary" href="{{ route('librarian.messages.index') }}">← {{ __('common.actions.back') }}</a></x-admin.page-header>
 
-    @php
-        $attachments = is_array($message->attachments) ? $message->attachments : [];
-        $canDownloadAttachments = auth()->user()?->can('messages.view_all')
-            && ! auth()->user()?->hasRole('bibliographer')
-            && \Illuminate\Support\Facades\Route::has('admin.messages.attachments');
-        $processStatuses = ['open', 'in_review', 'resolved'];
-    @endphp
+<div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+<main class="space-y-6">
+    <section class="admin-card"><div class="flex flex-wrap justify-between gap-3"><div><strong>{{ $message->sender_name_snapshot ?: $message->sender?->name }}</strong><p class="text-sm text-slate-500">{{ $message->sender_email_snapshot }} · {{ $message->reader_ticket_snapshot }}</p></div><div class="flex gap-2"><x-admin.status-badge :status="$message->status" :label="__('messages.statuses.'.$message->status)" /><x-admin.status-badge :status="$message->priority" :label="__('messages.priorities.'.$message->priority)" /></div></div><p class="mt-5 whitespace-pre-line leading-7 text-slate-700">{{ $message->body }}</p></section>
+    <section class="admin-card"><h2 class="font-headline text-2xl text-primary">{{ __('messages.history.title') }}</h2><div class="mt-5 space-y-4">@foreach($thread as $entry)<article class="rounded-xl border p-4 {{ $entry->visibility === 'public' ? 'border-slate-200' : ($entry->visibility === 'director_only' ? 'border-purple-200 bg-purple-50' : 'border-amber-200 bg-amber-50') }}"><div class="flex justify-between gap-3 text-xs text-slate-500"><strong>{{ $entry->author?->name ?? __('messages.system.library') }}</strong><span>{{ $entry->visibility }} · {{ $entry->created_at?->format('d.m.Y H:i') }}</span></div>@if($entry->body)<p class="mt-3 whitespace-pre-line text-sm leading-6">{{ $entry->body }}</p>@endif</article>@endforeach</div></section>
+    @if($message->messageAttachments->isNotEmpty())<section class="admin-card"><h2 class="font-headline text-2xl">{{ __('messages.fields.attachments') }}</h2><div class="mt-4 flex flex-wrap gap-2">@foreach($message->messageAttachments as $attachment)<a class="admin-btn admin-btn-secondary" href="{{ route('librarian.messages.attachments.show',[$message,$attachment]) }}"><span class="material-symbols-outlined">download</span>{{ $attachment->original_name }}</a>@endforeach</div></section>@endif
+</main>
 
-    <x-admin.page-header
-        :eyebrow="__('librarian.messages.eyebrow')"
-        :title="$message->subject"
-        :subtitle="__('librarian.messages.subtitle')"
-    >
-        <a href="{{ route('librarian.messages.index') }}" class="admin-btn admin-btn-secondary">
-            <span class="material-symbols-outlined text-[19px]">arrow_back</span>
-            {{ __('common.actions.back') }}
-        </a>
-    </x-admin.page-header>
-
-    <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div class="space-y-6">
-            <section class="admin-card">
-                <div class="mb-6 flex flex-col justify-between gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-start">
-                    <div class="min-w-0">
-                        <p class="admin-label mb-1">{{ __('librarian.messages.sender') }}</p>
-                        <p class="text-sm font-semibold text-primary">{{ $message->sender?->name ?? $message->sender_email ?? '—' }}</p>
-                        @if ($message->sender_email)
-                            <a class="mt-1 block break-all text-sm text-secondary hover:underline" href="mailto:{{ $message->sender_email }}">{{ $message->sender_email }}</a>
-                        @endif
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <x-admin.status-badge :status="$message->status" :label="__('messages.statuses.'.$message->status)" />
-                        <x-admin.status-badge :status="$message->priority" :label="__('messages.priorities.'.$message->priority)" />
-                    </div>
-                </div>
-
-                <dl class="mb-6 grid gap-4 rounded-xl bg-surface-container-low p-4 sm:grid-cols-3">
-                    <div>
-                        <dt class="admin-label">{{ __('messages.fields.category') }}</dt>
-                        <dd class="text-sm font-semibold text-primary">
-                            {{ \Illuminate\Support\Facades\Lang::has('messages.categories.'.$message->category)
-                                ? __('messages.categories.'.$message->category)
-                                : $message->category }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="admin-label">{{ __('librarian.messages.received') }}</dt>
-                        <dd class="text-sm text-slate-600">
-                            <time datetime="{{ $message->created_at?->toIso8601String() }}">
-                                {{ $message->created_at?->format('d.m.Y H:i') ?? '—' }}
-                            </time>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="admin-label">{{ __('messages.fields.assigned_to') }}</dt>
-                        <dd class="text-sm font-semibold text-primary">{{ $message->assignee?->name ?? __('messages.messages.unassigned') }}</dd>
-                    </div>
-                </dl>
-
-                <h2 class="admin-label">{{ __('messages.fields.body') }}</h2>
-                <div class="whitespace-pre-line break-words text-[15px] leading-7 text-slate-700">{{ $message->body }}</div>
-            </section>
-
-            <section class="admin-card">
-                <h2 class="mb-4 font-headline text-2xl text-primary">{{ __('messages.fields.attachments') }}</h2>
-                @if ($attachments !== [])
-                    <ul class="grid gap-3 sm:grid-cols-2">
-                        @foreach ($attachments as $index => $attachment)
-                            @php
-                                $attachmentName = is_array($attachment)
-                                    ? ($attachment['name'] ?? basename((string) ($attachment['path'] ?? '')))
-                                    : basename((string) $attachment);
-                                $attachmentName = $attachmentName !== '' ? $attachmentName : '—';
-                            @endphp
-                            <li>
-                                @if ($canDownloadAttachments)
-                                    <a
-                                        href="{{ route('admin.messages.attachments', [$message, $index]) }}"
-                                        class="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-semibold text-primary hover:border-secondary hover:text-secondary"
-                                        title="{{ __('messages.actions.download_attachment') }}"
-                                    >
-                                        <span class="material-symbols-outlined text-[20px]">attach_file</span>
-                                        <span class="min-w-0 flex-1 truncate">{{ $attachmentName }}</span>
-                                        <span class="material-symbols-outlined text-[19px]">download</span>
-                                    </a>
-                                @else
-                                    <span class="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-semibold text-slate-600">
-                                        <span class="material-symbols-outlined text-[20px] text-slate-400">attach_file</span>
-                                        <span class="min-w-0 flex-1 truncate">{{ $attachmentName }}</span>
-                                    </span>
-                                @endif
-                            </li>
-                        @endforeach
-                    </ul>
-                @else
-                    <p class="text-sm text-slate-500">{{ __('messages.messages.no_attachments') }}</p>
-                @endif
-            </section>
-
-            @if ($message->resolution_comment || $message->resolved_at)
-                <section class="admin-card border-l-4 border-l-secondary">
-                    <h2 class="mb-3 font-headline text-2xl text-primary">{{ __('librarian.messages.resolution_comment') }}</h2>
-                    @if ($message->resolution_comment)
-                        <p class="whitespace-pre-line break-words text-sm leading-6 text-slate-700">{{ $message->resolution_comment }}</p>
-                    @endif
-                    @if ($message->resolved_at)
-                        <p class="mt-4 text-xs font-semibold text-secondary">
-                            {{ __('messages.fields.resolved_at') }}:
-                            <time datetime="{{ $message->resolved_at->toIso8601String() }}">{{ $message->resolved_at->format('d.m.Y H:i') }}</time>
-                        </p>
-                    @endif
-                    @if ($message->assignee)
-                        <p class="mt-1 text-xs text-slate-500">
-                            {{ __('messages.fields.assigned_to') }}: {{ $message->assignee->name }}
-                        </p>
-                    @endif
-                </section>
-            @endif
-        </div>
-
-        <aside>
-            @can('messages.resolve')
-                <form method="POST" action="{{ route('librarian.messages.update', $message) }}" class="admin-card xl:sticky xl:top-24">
-                    @csrf
-                    @method('PATCH')
-
-                    <h2 class="mb-5 font-headline text-2xl text-primary">{{ __('librarian.messages.process') }}</h2>
-
-                    <div class="space-y-5">
-                        <div>
-                            <label for="librarian-message-status" class="admin-label">{{ __('messages.fields.status') }}</label>
-                            <select id="librarian-message-status" class="admin-input" name="status" required>
-                                @foreach ($processStatuses as $status)
-                                    <option value="{{ $status }}" @selected(old('status', $message->status) === $status)>{{ __('messages.statuses.'.$status) }}</option>
-                                @endforeach
-                            </select>
-                            @error('status')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
-                        </div>
-
-                        <div>
-                            <label for="librarian-message-resolution" class="admin-label">{{ __('librarian.messages.resolution_comment') }}</label>
-                            <textarea
-                                id="librarian-message-resolution"
-                                class="admin-input min-h-36 resize-y"
-                                name="resolution_comment"
-                                maxlength="5000"
-                            >{{ old('resolution_comment', $message->resolution_comment) }}</textarea>
-                            <p id="librarian-message-resolution-hint" class="mt-2 hidden text-xs leading-5 text-slate-500">
-                                {{ __('messages.messages.resolution_required') }}
-                            </p>
-                            @error('resolution_comment')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
-                        </div>
-
-                        <button type="submit" class="admin-btn admin-btn-primary w-full">
-                            <span class="material-symbols-outlined text-[19px]">save</span>
-                            {{ __('common.actions.save_changes') }}
-                        </button>
-                    </div>
-                </form>
-
-                @push('scripts')
-                    <script>
-                      (function () {
-                        const statusSelect = document.getElementById('librarian-message-status');
-                        const comment = document.getElementById('librarian-message-resolution');
-                        const hint = document.getElementById('librarian-message-resolution-hint');
-
-                        if (!statusSelect || !comment) {
-                          return;
-                        }
-
-                        const sync = () => {
-                          const required = statusSelect.value === 'resolved';
-                          comment.required = required;
-                          comment.setAttribute('aria-required', required ? 'true' : 'false');
-                          hint?.classList.toggle('hidden', !required);
-                        };
-
-                        statusSelect.addEventListener('change', sync);
-                        sync();
-                      })();
-                    </script>
-                @endpush
-            @endcan
-        </aside>
-    </div>
+<aside class="space-y-4">
+    @if($message->status === 'open')<form method="POST" action="{{ route('librarian.messages.take',$message) }}" class="admin-card">@csrf<button class="admin-btn admin-btn-primary w-full">{{ __('messages.actions.start_review') }}</button></form>@endif
+    @canany(['messages.assign','messages.reassign'])<form method="POST" action="{{ route('librarian.messages.assign',$message) }}" class="admin-card">@csrf @method('PATCH')<label class="admin-label">{{ __('messages.fields.assigned_to') }}</label><select class="admin-input" name="assigned_to"><option value="">{{ __('messages.messages.unassigned') }}</option>@foreach($staff as $person)<option value="{{ $person->id }}" @selected($message->assigned_to === $person->id)>{{ $person->name }} ({{ $person->active_message_load }})</option>@endforeach</select><textarea class="admin-input mt-3" name="reason" required minlength="5" placeholder="{{ __('common.fields.reason') }}"></textarea><button class="admin-btn admin-btn-secondary mt-3 w-full">{{ __('messages.actions.assign') }}</button></form>@endcanany
+    @can('messages.prepare_response')@if(!in_array($message->status, ['resolved','rejected','closed'], true))<form method="POST" enctype="multipart/form-data" action="{{ route('librarian.messages.reply',$message) }}" class="admin-card">@csrf<label class="admin-label">{{ __('messages.actions.reply') }}</label><textarea class="admin-input min-h-28" name="body" required></textarea><input class="admin-input mt-3" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.webp,.pdf,.docx"><button class="admin-btn admin-btn-secondary mt-3 w-full">{{ __('messages.actions.reply') }}</button></form>@endif
+    @if($message->status === 'in_review')<form method="POST" action="{{ route('librarian.messages.prepare',$message) }}" class="admin-card">@csrf<label class="admin-label">{{ __('messages.actions.prepare_response') }}</label><textarea class="admin-input min-h-32" name="body" required minlength="5"></textarea><button class="admin-btn admin-btn-primary mt-3 w-full">{{ __('messages.actions.prepare_response') }}</button></form>@endif @endcan
+    @can('messages.request_clarification')@if($message->status === 'in_review')<form method="POST" action="{{ route('librarian.messages.clarification',$message) }}" class="admin-card">@csrf<label class="admin-label">{{ __('messages.actions.request_clarification') }}</label><textarea class="admin-input" name="body" required minlength="2"></textarea><button class="admin-btn admin-btn-secondary mt-3 w-full">{{ __('messages.actions.request_clarification') }}</button></form>@endif @endcan
+    @can('messages.add_internal_note')<form method="POST" action="{{ route('librarian.messages.notes',$message) }}" class="admin-card">@csrf<label class="admin-label">{{ __('messages.actions.internal_note') }}</label><textarea class="admin-input" name="body" required></textarea><select class="admin-input mt-2" name="visibility"><option value="internal">internal</option><option value="director_only">director_only</option></select><button class="admin-btn admin-btn-secondary mt-3">{{ __('common.actions.add') }}</button></form>@endcan
+    @if($message->status === 'response_prepared')@can('messages.approve_response')<form method="POST" action="{{ route('librarian.messages.approve',$message) }}" class="admin-card">@csrf<button class="admin-btn admin-btn-primary w-full">{{ __('messages.actions.approve_response') }}</button></form><form method="POST" action="{{ route('librarian.messages.return-response',$message) }}" class="admin-card">@csrf<textarea class="admin-input" name="reason" required minlength="5"></textarea><button class="admin-btn admin-btn-secondary mt-3 w-full">{{ __('messages.actions.return_response') }}</button></form>@endcan@endif
+    @can('messages.change_priority')<form method="POST" action="{{ route('librarian.messages.priority',$message) }}" class="admin-card">@csrf @method('PATCH')<label class="admin-label">{{ __('messages.fields.priority') }}</label><select class="admin-input" name="priority">@foreach(\App\Models\ContactMessage::PRIORITIES as $priority)<option value="{{ $priority }}" @selected($message->priority === $priority)>{{ __('messages.priorities.'.$priority) }}</option>@endforeach</select><textarea class="admin-input mt-3" name="reason" required minlength="5" placeholder="{{ __('common.fields.reason') }}"></textarea><button class="admin-btn admin-btn-secondary mt-3 w-full">{{ __('common.actions.save_changes') }}</button></form>@endcan
+    @can('messages.reject')@if(in_array($message->status, ['open','in_review'], true))<form method="POST" action="{{ route('librarian.messages.reject',$message) }}" class="admin-card">@csrf<textarea class="admin-input" name="reason" required minlength="5" placeholder="{{ __('common.fields.reason') }}"></textarea><button class="admin-btn admin-btn-danger mt-3 w-full">{{ __('messages.actions.reject') }}</button></form>@endif @endcan
+    @can('messages.close')@if($message->status === 'resolved')<form method="POST" action="{{ route('librarian.messages.close',$message) }}" class="admin-card">@csrf<button class="admin-btn admin-btn-secondary w-full">{{ __('messages.actions.close') }}</button></form>@endif @endcan
+    @can('messages.reopen')@if(in_array($message->status, ['resolved','rejected'], true))<form method="POST" action="{{ route('librarian.messages.reopen',$message) }}" class="admin-card">@csrf<textarea class="admin-input" name="reason" required minlength="5" placeholder="{{ __('common.fields.reason') }}"></textarea><button class="admin-btn admin-btn-secondary mt-3 w-full">{{ __('messages.actions.reopen') }}</button></form>@endif @endcan
+</aside>
+</div>
 @endsection

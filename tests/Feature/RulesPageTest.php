@@ -10,8 +10,9 @@ use Tests\TestCase;
  * Phase 3 Cluster B.2 — Public Library Rules page (/rules).
  *
  * /rules renders resources/views/rules.blade.php extending layouts.public.
- * Content is driven by the $rulesSeedProvider closure in routes/web.php
- * with trilingual ru/kk/en parity.
+ * Content is driven by the $rulesPublicProvider closure in routes/web.php.
+ * It publishes general guidance while omitting dates, fixed limits,
+ * penalties, and other terms that have no approved policy source.
  *
  * Section order and anchor IDs (#general, #borrowing, #digital, #conduct,
  * #penalties) are frozen per Cluster B Content Contract §2 and are a
@@ -46,15 +47,15 @@ class RulesPageTest extends TestCase
 
     public function test_guest_can_access_rules_page(): void
     {
-        $response = $this->get('/rules');
+        $response = $this->get('/rules?lang=kk');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Library', false);
+        $response->assertSee('Кітапхананы пайдалану ережелері', false);
     }
 
     public function test_rules_page_renders_all_frozen_section_markers(): void
     {
-        $response = $this->get('/rules');
+        $response = $this->get('/rules?lang=ru');
 
         $response->assertOk();
         // Frozen section markers per Cluster B Content Contract §2.
@@ -87,20 +88,20 @@ class RulesPageTest extends TestCase
         $response->assertSee('href="#penalties"', false);
     }
 
-    public function test_rules_header_renders_effective_and_last_reviewed_dates(): void
+    public function test_rules_header_does_not_invent_effective_or_review_dates(): void
     {
         $response = $this->get('/rules');
 
         $response->assertOk();
-        $response->assertSee('data-test-id="rules-effective-date"', false);
-        $response->assertSee('data-test-id="rules-last-reviewed"', false);
-        $response->assertSee('2026-04-01', false);
-        $response->assertSee('2026-04-22', false);
+        $response->assertDontSee('data-test-id="rules-effective-date"', false);
+        $response->assertDontSee('data-test-id="rules-last-reviewed"', false);
+        $response->assertDontSee('2026-04-01', false);
+        $response->assertDontSee('2026-04-22', false);
     }
 
-    public function test_rules_page_renders_russian_locale_by_default(): void
+    public function test_rules_page_renders_russian_locale_variant(): void
     {
-        $response = $this->get('/rules');
+        $response = $this->get('/rules?lang=ru');
 
         $response->assertOk();
         $response->assertSee('Правила пользования библиотекой', false);
@@ -109,11 +110,12 @@ class RulesPageTest extends TestCase
         $response->assertSee('Выдача и возврат', false);
         $response->assertSee('Электронный доступ', false);
         $response->assertSee('Правила поведения', false);
-        $response->assertSee('Нарушения и взыскания', false);
-        // Core policy signals
-        $response->assertSee('удостоверение университета', false);
-        $response->assertSee('контролируемом просмотрщике', false);
-        $response->assertSee('Шкала приостановки доступа', false);
+        $response->assertSee('Вопросы и поддержка', false);
+        $response->assertSee('Срок возврата', false);
+        $response->assertSee('В личном кабинете', false);
+        $response->assertSee('Если действие доступно', false);
+        $response->assertDontSee('Нарушения и взыскания', false);
+        $response->assertDontSee('Шкала приостановки доступа', false);
     }
 
     public function test_rules_page_renders_kazakh_locale_variant(): void
@@ -126,8 +128,10 @@ class RulesPageTest extends TestCase
         $response->assertSee('Беру және қайтару', false);
         $response->assertSee('Электрондық қолжетімділік', false);
         $response->assertSee('Мінез-құлық ережелері', false);
-        $response->assertSee('Бұзушылықтар мен шаралар', false);
-        $response->assertSee('бақыланатын қарау құралында', false);
+        $response->assertSee('Сұрақтар мен қолдау', false);
+        $response->assertSee('Қайтару мерзімі', false);
+        $response->assertSee('Жеке кабинетте', false);
+        $response->assertDontSee('Бұзушылықтар мен шаралар', false);
     }
 
     public function test_rules_page_renders_english_locale_variant(): void
@@ -140,25 +144,32 @@ class RulesPageTest extends TestCase
         $response->assertSee('Borrowing and returns', false);
         $response->assertSee('Digital access', false);
         $response->assertSee('Code of conduct', false);
-        $response->assertSee('Violations and penalties', false);
-        $response->assertSee('controlled viewer with no download path', false);
-        $response->assertSee('Access suspension ladder', false);
-        $response->assertSee('Right of appeal', false);
+        $response->assertSee('Questions and support', false);
+        $response->assertSee('Current loan', false);
+        $response->assertSee('In the reader account', false);
+        $response->assertSee('When the action is available', false);
+        $response->assertSee('Based on current availability', false);
+        $response->assertSee('Feedback', false);
+        $response->assertDontSee('Violations and penalties', false);
+        $response->assertDontSee('controlled viewer with no download path', false);
+        $response->assertDontSee('Access suspension ladder', false);
+        $response->assertDontSee('Right of appeal', false);
     }
 
-    public function test_borrowing_section_presents_each_audience_group(): void
+    public function test_borrowing_section_shows_only_current_loan_facts_without_fixed_audience_limits(): void
     {
         $response = $this->get('/rules?lang=en');
 
         $response->assertOk();
-        $response->assertSee('Undergraduate students', false);
-        $response->assertSee('doctoral students', false);
-        $response->assertSee('Faculty and research staff', false);
-        // At least three audience cards on the page.
-        $this->assertGreaterThanOrEqual(
-            3,
+        $response->assertSee('Current loan', false);
+        $response->assertSee('Due date', false);
+        $response->assertDontSee('Undergraduate students', false);
+        $response->assertDontSee('doctoral students', false);
+        $response->assertDontSee('Faculty and research staff', false);
+        $this->assertSame(
+            1,
             substr_count($response->getContent(), 'data-audience-slot'),
-            'Expected at least 3 borrowing-audience cards.'
+            'Only the source-backed current-loan card should be published.'
         );
     }
 
@@ -173,15 +184,15 @@ class RulesPageTest extends TestCase
         $enResponse->assertSee('href="/leadership?lang=en"', false);
 
         // Russian default must keep bare paths (no ?lang=ru suffix).
-        $ruResponse = $this->get('/rules');
+        $ruResponse = $this->get('/rules?lang=ru');
         $ruResponse->assertOk();
-        $ruResponse->assertSee('href="/contacts"', false);
-        $ruResponse->assertSee('href="/leadership"', false);
+        $ruResponse->assertSee('href="/contacts?lang=ru"', false);
+        $ruResponse->assertSee('href="/leadership?lang=ru"', false);
     }
 
     public function test_footer_exposes_rules_link_in_all_locales(): void
     {
-        $this->get('/rules')
+        $this->get('/rules?lang=ru')
             ->assertOk()
             ->assertSee('Правила библиотеки', false);
 
@@ -220,9 +231,11 @@ class RulesPageTest extends TestCase
 
     public function test_authenticated_reader_can_view_rules_page(): void
     {
-        $this->loginAs('student');
-
-        $response = $this->get('/rules?lang=en');
+        $response = $this->withSession(['library.user' => [
+            'id' => 'qa-reader-001',
+            'name' => 'QA Reader',
+            'role' => 'reader',
+        ]])->get('/rules?lang=en');
 
         $response->assertOk();
         $response->assertSee('Library Usage Rules', false);

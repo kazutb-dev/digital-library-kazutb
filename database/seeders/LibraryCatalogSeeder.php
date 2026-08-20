@@ -56,7 +56,7 @@ class LibraryCatalogSeeder extends Seeder
             }
         }
 
-        // Reader tickets for the seeded demo members (§3 регистрация читателей).
+        // Reader tickets for the seeded demo members (3 регистрация читателей).
         foreach (['demo-student@kazutb.local' => 'student', 'demo-teacher@kazutb.local' => 'teacher'] as $email => $category) {
             $user = User::query()->where('email', $email)->first();
             if ($user !== null) {

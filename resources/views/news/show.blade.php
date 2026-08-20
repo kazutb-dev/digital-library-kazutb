@@ -4,7 +4,7 @@
 
 @php
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
       if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
@@ -15,65 +15,60 @@
 
   $chrome = [
       'ru' => [
-          'title_suffix'       => 'KazUTB',
+          'title_suffix'       => 'Казахский университет технологии и бизнеса имени К. Кулажанова',
           'back'               => 'Вернуться к новостям',
-          'read_time'          => '5 мин. чтение',
+          'read_time'          => ':count мин. чтения',
         'highlights_heading' => 'Ключевые акценты',
           'tags_label'         => 'Теги:',
-          'share_label'        => 'Поделиться:',
-        'author_name'        => 'Редакционная группа',
-        'author_role'        => 'Институциональные коммуникации',
-        'author_alt'         => 'Редакционная группа библиотеки',
-        'editorial_bio'      => 'Освещает институциональные обновления, исследовательские инициативы и цифровые проекты KazUTB.',
-          'editorial_articles' => 'Все публикации',
           'related_heading'    => 'Связанные материалы',
-          'newsletter_heading' => 'Будьте в курсе',
-          'newsletter_body'    => 'Подпишитесь на институциональный вестник — ежемесячные новости о новых поступлениях и научных программах.',
-          'newsletter_email'   => 'Институциональный email',
-          'newsletter_cta'     => 'Подписаться',
+          'repository_heading' => 'Научная работа',
+          'repository_cta'     => 'Открыть запись в репозитории',
       ],
       'kk' => [
-          'title_suffix'       => 'KazUTB',
+          'title_suffix'       => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
           'back'               => 'Жаңалықтарға оралу',
-          'read_time'          => '5 мин. оқу',
+          'read_time'          => ':count мин. оқу',
           'highlights_heading' => 'Негізгі тұстар',
           'tags_label'         => 'Тегтер:',
-          'share_label'        => 'Бөлісу:',
-          'author_name'        => 'Редакциялық топ',
-          'author_role'        => 'Институционалдық коммуникациялар',
-          'author_alt'         => 'Кітапхананың редакциялық тобы',
-          'editorial_bio'      => 'KazUTB институционалдық жаңартуларын, зерттеу бастамаларын және цифрлық жобаларын жариялайды.',
-          'editorial_articles' => 'Барлық жарияланымдар',
           'related_heading'    => 'Байланысты материалдар',
-          'newsletter_heading' => 'Хабардар болыңыз',
-          'newsletter_body'    => 'Жаңа жинақтар мен ғылыми бағдарламалар туралы ай сайынғы жаңартулар алу үшін институционалдық хабаршыға жазылыңыз.',
-          'newsletter_email'   => 'Мекемелік email',
-          'newsletter_cta'     => 'Жазылу',
+          'repository_heading' => 'Ғылыми жұмыс',
+          'repository_cta'     => 'Репозиторий жазбасын ашу',
       ],
       'en' => [
-          'title_suffix'       => 'KazUTB',
+          'title_suffix'       => 'Kazakh University of Technology and Business named after K. Kulazhanov',
           'back'               => 'Return to News & Announcements',
-          'read_time'          => '5 min read',
+          'read_time'          => ':count min read',
           'highlights_heading' => 'Project Highlights',
           'tags_label'         => 'Tags:',
-          'share_label'        => 'Share:',
-          'author_name'        => 'Editorial Team',
-          'author_role'        => 'Institutional Communications',
-          'author_alt'         => 'Library editorial team',
-          'editorial_bio'      => 'Covering institutional updates, research initiatives, and digital projects for the KazUTB ecosystem.',
-          'editorial_articles' => 'All dispatches',
           'related_heading'    => 'Related Updates',
-          'newsletter_heading' => 'Stay Informed',
-          'newsletter_body'    => 'Subscribe to the scholarly digest for monthly updates on new collections and research programmes.',
-          'newsletter_email'   => 'Institutional Email',
-          'newsletter_cta'     => 'Subscribe',
+          'repository_heading' => 'Scholarly work',
+          'repository_cta'     => 'Open repository record',
       ],
   ][$lang];
 
-      $sidebarRelated = array_slice($relatedArticles ?? [], 0, 3);
+  $isEventDetail = ($activePage ?? '') === 'events' || ($article['schema_type'] ?? null) === 'Event';
+  $detailIndexPath = $isEventDetail ? '/events' : '/news';
+  $detailItemPrefix = $isEventDetail ? '/events/' : '/news/';
+  if ($isEventDetail) {
+      $chrome['back'] = [
+          'ru' => 'Вернуться к мероприятиям',
+          'kk' => 'Іс-шараларға оралу',
+          'en' => 'Back to events',
+      ][$lang];
+  }
+
+  $articleBodyText = collect($article['body'][$lang] ?? [])
+      ->map(static fn ($block) => trim((string) ($block['text'] ?? '')))
+      ->filter()
+      ->implode(' ');
+  preg_match_all('/[\p{L}\p{N}]+/u', strip_tags($articleBodyText), $articleWords);
+  $readMinutes = max(1, (int) ceil(count($articleWords[0] ?? []) / 200));
+  $chrome['read_time'] = str_replace(':count', (string) $readMinutes, $chrome['read_time']);
+  $sidebarRelated = array_slice($relatedArticles ?? [], 0, 3);
 @endphp
 
 @section('title', $article['title'][$lang] . ' — ' . $chrome['title_suffix'])
+@section('meta_description', $article['excerpt'][$lang])
 
 @section('content')
 <div class="news-detail-canonical" data-section="news-detail-canonical-page">
@@ -82,7 +77,7 @@
   <article class="news-detail-canonical__article" data-section="news-detail-canonical-article">
 
     {{-- Back link --}}
-    <a href="{{ $routeWithLang('/news') }}"
+    <a href="{{ $routeWithLang($detailIndexPath) }}"
        class="news-detail-canonical__back"
        data-test-id="news-detail-canonical-back">
       <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
@@ -113,6 +108,30 @@
       <figcaption class="news-detail-canonical__hero-caption">{{ $article['hero']['alt'][$lang] }}</figcaption>
       @endif
     </figure>
+    @endif
+
+    @if(!empty($article['event']['starts_at']))
+    <section class="news-detail-canonical__highlight" aria-label="{{ __('news.editor.event_details') }}">
+      <h2 class="news-detail-canonical__highlight-heading">{{ __('news.editor.event_details') }}</h2>
+      <dl>
+        <div><dt>{{ __('news.fields.starts_at') }}</dt><dd><time datetime="{{ $article['event']['starts_at'] }}">{{ $article['event']['starts_display'] }}</time></dd></div>
+        @if($article['event']['ends_at'])<div><dt>{{ __('news.fields.ends_at') }}</dt><dd><time datetime="{{ $article['event']['ends_at'] }}">{{ $article['event']['ends_display'] }}</time></dd></div>@endif
+        @if($article['event']['venue'])<div><dt>{{ __('news.fields.venue') }}</dt><dd>{{ $article['event']['venue'] }}</dd></div>@endif
+        @if($article['event']['online_url'])<div><dt>{{ __('news.fields.online_url') }}</dt><dd><a href="{{ $article['event']['online_url'] }}" target="_blank" rel="noopener noreferrer">{{ __('news.public.online') }}</a></dd></div>@endif
+        @if($article['event']['organizer'])<div><dt>{{ __('news.fields.organizer') }}</dt><dd>{{ $article['event']['organizer'] }}</dd></div>@endif
+      </dl>
+      @if($article['event']['registration_url'])<form method="POST" action="{{ route('news.registration-click',$article['id']) }}">@csrf<button class="news-detail-canonical__cta-btn" type="submit">{{ __('news.actions.register') }}</button></form>@endif
+    </section>
+    @endif
+
+    @if(! empty($article['repository']))
+    <section class="news-detail-canonical__highlight" data-section="news-linked-repository">
+      <h2 class="news-detail-canonical__highlight-heading">{{ $chrome['repository_heading'] }}</h2>
+      <p>{{ $article['repository']['title'] }}@if($article['repository']['year']) · {{ $article['repository']['year'] }}@endif</p>
+      <a class="news-detail-canonical__cta-btn"
+         href="{{ $routeWithLang('/repository/' . $article['repository']['id']) }}"
+         data-test-id="news-linked-repository-open">{{ $chrome['repository_cta'] }}</a>
+    </section>
     @endif
 
     {{-- Article body --}}
@@ -151,54 +170,26 @@
       @endif
     </div>
 
-    {{-- Article footer: tags + share (static UI) --}}
+    {{-- Article footer: the managed category is informational until the
+         public payload exposes a stable category slug for filtering. --}}
     <footer class="news-detail-canonical__footer">
       <div class="news-detail-canonical__tags">
         <span class="news-detail-canonical__tags-label">{{ $chrome['tags_label'] }}</span>
-        <a href="{{ $routeWithLang('/news') }}" class="news-detail-canonical__tag">{{ $article['category'][$lang] }}</a>
-      </div>
-      <div class="news-detail-canonical__share">
-        <span class="news-detail-canonical__share-label">{{ $chrome['share_label'] }}</span>
-        <button class="news-detail-canonical__share-btn" type="button" aria-label="{{ $chrome['share_label'] }}">
-          <span class="material-symbols-outlined" aria-hidden="true">share</span>
-        </button>
-        <button class="news-detail-canonical__share-btn" type="button" aria-label="Bookmark">
-          <span class="material-symbols-outlined" aria-hidden="true">bookmark_add</span>
-        </button>
+        <span class="news-detail-canonical__tag">{{ $article['category'][$lang] }}</span>
       </div>
     </footer>
 
   </article>
 
   {{-- ── Sidebar ─────────────────────────────────────────────────────── --}}
+  @if(! empty($sidebarRelated))
   <aside class="news-detail-canonical__sidebar" data-section="news-detail-canonical-sidebar">
-
-    {{-- Editorial / author card --}}
-    <div class="news-detail-canonical__author" data-test-id="news-detail-canonical-author">
-      <div class="news-detail-canonical__author-info">
-        <img src="{{ asset('images/news/author-visit.jpg') }}"
-             alt="{{ $chrome['author_alt'] }}"
-             class="news-detail-canonical__author-portrait"
-             loading="lazy" />
-        <div>
-          <h4 class="news-detail-canonical__author-name">{{ $chrome['author_name'] }}</h4>
-          <p class="news-detail-canonical__author-role">{{ $chrome['author_role'] }}</p>
-        </div>
-      </div>
-      <p class="news-detail-canonical__author-bio">{{ $chrome['editorial_bio'] }}</p>
-      <a href="{{ $routeWithLang('/news') }}" class="news-detail-canonical__author-link">
-        {{ $chrome['editorial_articles'] }}
-        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-      </a>
-    </div>
-
-    {{-- Related updates --}}
-    @if(! empty($sidebarRelated))
+    {{-- Related updates are sourced from published managed records. --}}
     <div class="news-detail-canonical__related" data-section="news-detail-canonical-related">
       <h3 class="news-detail-canonical__related-heading">{{ $chrome['related_heading'] }}</h3>
       <div class="news-detail-canonical__related-list">
         @foreach($sidebarRelated as $rel)
-        <a href="{{ $routeWithLang('/news/' . $rel['slug']) }}"
+        <a href="{{ $routeWithLang($detailItemPrefix . $rel['slug']) }}"
            class="news-detail-canonical__related-item">
           @if(! empty($rel['hero']['image']))
           <img src="{{ asset($rel['hero']['image']) }}"
@@ -219,32 +210,37 @@
         @endforeach
       </div>
     </div>
-    @endif
-
-    {{-- Newsletter (informational only - no subscription backend) --}}
-    <div class="news-detail-canonical__newsletter" data-test-id="news-detail-canonical-newsletter">
-      <div class="news-detail-canonical__newsletter-bg-icon" aria-hidden="true">
-        <span class="material-symbols-outlined">drafts</span>
-      </div>
-      <div class="news-detail-canonical__newsletter-content">
-        <h3 class="news-detail-canonical__newsletter-heading">{{ $chrome['newsletter_heading'] }}</h3>
-        <p class="news-detail-canonical__newsletter-body">{{ $chrome['newsletter_body'] }}</p>
-        <form class="news-detail-canonical__newsletter-form" onsubmit="return false;" novalidate>
-          <input type="email"
-                 class="news-detail-canonical__newsletter-input"
-                 placeholder="{{ $chrome['newsletter_email'] }}"
-                 aria-label="{{ $chrome['newsletter_email'] }}" />
-          <button type="submit" class="news-detail-canonical__newsletter-btn">{{ $chrome['newsletter_cta'] }}</button>
-        </form>
-      </div>
-    </div>
-
   </aside>
+  @endif
 
 </div>
 @endsection
 
 @section('head')
+@php
+  $structuredData = [
+    '@context' => 'https://schema.org',
+    '@type' => $article['schema_type'] ?? 'NewsArticle',
+    'headline' => $article['title'][$lang],
+    'description' => $article['excerpt'][$lang],
+    'datePublished' => $article['published_at'],
+    'url' => $routeWithLang(url()->current()),
+  ];
+  if (($article['schema_type'] ?? null) === 'Event' && !empty($article['event']['starts_at'])) {
+    $structuredData['startDate'] = $article['event']['starts_at'];
+    $structuredData['endDate'] = $article['event']['ends_at'] ?: null;
+    if ($article['event']['venue']) {
+      $structuredData['location'] = ['@type' => 'Place', 'name' => $article['event']['venue']];
+    } elseif ($article['event']['online_url']) {
+      $structuredData['location'] = ['@type' => 'VirtualLocation', 'url' => $article['event']['online_url']];
+    }
+  }
+@endphp
+<meta property="og:type" content="{{ ($article['schema_type'] ?? null) === 'Event' ? 'website' : 'article' }}">
+<meta property="og:title" content="{{ $article['title'][$lang] }}">
+<meta property="og:description" content="{{ $article['excerpt'][$lang] }}">
+<meta property="og:url" content="{{ $routeWithLang(url()->current()) }}">
+<script type="application/ld+json">@json(array_filter($structuredData, static fn ($value) => $value !== null), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)</script>
 <style>
   /* ============================================================
      news-detail-canonical — Phase 3.g
@@ -283,6 +279,13 @@
     display: flex;
     flex-direction: column;
     gap: 32px;
+  }
+
+  .news-detail-canonical__title,
+  .news-detail-canonical__subtitle,
+  .news-detail-canonical__body,
+  .news-detail-canonical__related-title {
+    overflow-wrap: anywhere;
   }
 
   .news-detail-canonical__sidebar {

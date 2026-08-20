@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Single source of truth for the Data Quality workbench (Master.md §11, ДИР §6).
+ * Single source of truth for the Data Quality workbench (Master.md 11, ДИР 6).
  *
  * The queues used to be an ad-hoc match() in the controller. They are grouped
  * here by *the kind of work they demand*, because that is what decides the UI a
@@ -164,7 +164,7 @@ class DataQualityQueues
     }
 
     /**
-     * Titles that appear on more than one record — merge candidates (§11.3).
+     * Titles that appear on more than one record — merge candidates (11.3).
      */
     public function duplicateGroups()
     {

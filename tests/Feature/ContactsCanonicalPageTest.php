@@ -9,15 +9,9 @@ use Tests\TestCase;
 /**
  * Phase 3 Cluster B.6 — canonical-exact /contacts page.
  *
- * Mirrors docs/design-exports/contacts_canonical. The previous shared-view
- * activePage='contacts' branch on about.blade.php and the B.3
- * contacts-location/contacts-fund-rooms/contacts-visit-notes markers are
- * retired.
- *
- * The fund-guidance block (three v1 rooms 1/200, 1/202, 1/203 plus the map
- * placeholder) was removed from the page on request; its absence is pinned by
- * test_contacts_page_no_longer_renders_the_fund_guidance_block so it cannot
- * reappear unnoticed. The seeded copy is retained in $contactsSeedProvider.
+ * Locks the public-shell redesign, source-backed official contact data, the
+ * one verified staff profile, and the authenticated inquiry flow. Unverified
+ * rooms, people, and invented research/technical channels must stay absent.
  */
 class ContactsCanonicalPageTest extends TestCase
 {
@@ -47,13 +41,16 @@ class ContactsCanonicalPageTest extends TestCase
         $response = $this->get('/contacts?lang=en');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Library', false);
-        $response->assertSee('Direct Inquiries', false);
-        $response->assertSee('Academic Support', false);
-        $response->assertSee('Support Channels', false);
-        $response->assertSee('Submit an Inquiry', false);
+        $response->assertSee('Kazakh University of Technology and Business named after K. Kulazhanov', false);
+        $response->assertSee('Official University Contact Details.', false);
+        $response->assertSee('Contact channels', false);
+        $response->assertSee('Scientific Library', false);
+        $response->assertSee('General university contact', false);
+        $response->assertSee('Submit an official request', false);
         $response->assertSee('Physical Location', false);
+        $response->assertSee('info@kaztbu.edu.kz', false);
         $response->assertSee('Library staff', false);
+        $response->assertSee('Панкей Ж.', false);
     }
 
     public function test_contacts_page_renders_all_canonical_sections(): void
@@ -67,6 +64,7 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertSee('data-section="contacts-canonical-location"', false);
         $response->assertSee('data-section="contacts-canonical-staff"', false);
         $response->assertSee('data-section="contacts-canonical-visit-rules"', false);
+        $response->assertDontSee('data-section="contacts-canonical-fund-rooms"', false);
     }
 
     public function test_contacts_page_renders_canonical_sections_in_order(): void
@@ -77,8 +75,8 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertSeeInOrder([
             'data-section="contacts-canonical-hero"',
             'data-section="contacts-canonical-support"',
-            'data-section="contacts-canonical-inquiry-form"',
             'data-section="contacts-canonical-location"',
+            'data-section="contacts-canonical-inquiry-form"',
             'data-section="contacts-canonical-staff"',
             'data-section="contacts-canonical-visit-rules"',
         ], false);
@@ -101,38 +99,60 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertDontSee('KazUTB Digital Library', false);
     }
 
-    public function test_contacts_page_no_longer_renders_the_fund_guidance_block(): void
+    public function test_contacts_page_renders_one_verified_staff_profile_and_no_unverified_rooms(): void
     {
         $response = $this->get('/contacts?lang=en');
 
         $response->assertOk();
-        $response->assertDontSee('data-section="contacts-canonical-fund-guidance"', false);
-        $response->assertDontSee('data-fund-room-slot', false);
-        $response->assertDontSee('data-room-code="1/200"', false);
-        $response->assertDontSee('data-room-code="1/202"', false);
-        $response->assertDontSee('data-room-code="1/203"', false);
-        $response->assertDontSee('data-test-id="contacts-canonical-map"', false);
+        $response->assertDontSee('data-section="contacts-canonical-fund-rooms"', false);
+        $response->assertDontSee('data-room-slot', false);
+        $response->assertDontSee('Room 1/200', false);
+        $response->assertDontSee('Room 1/202', false);
+        $response->assertDontSee('Room 1/203', false);
+        $response->assertSee('data-section="contacts-canonical-staff"', false);
+        $response->assertSee('data-staff-slug="pankey-zh"', false);
+        $response->assertSee('Панкей Ж.', false);
+        $response->assertDontSee('Корпешова Эльмира Мауткановна', false);
+        $response->assertDontSee('Сайлаубек Айман Бастарбекқызы', false);
+        $this->assertSame(1, substr_count($response->getContent(), 'data-staff-slot'));
     }
 
-    public function test_contacts_page_renders_both_support_channel_emails(): void
+    public function test_contacts_page_uses_only_the_two_source_backed_contact_channels(): void
     {
         $response = $this->get('/contacts?lang=en');
+        $content = $response->getContent();
 
         $response->assertOk();
-        $response->assertSee('data-test-id="contacts-canonical-channel-email-research"', false);
-        $response->assertSee('data-test-id="contacts-canonical-channel-email-technical"', false);
-        $response->assertSee('library@kazutb.edu.kz', false);
-        $response->assertSee('support@kazutb.edu.kz', false);
+        $response->assertSee('data-test-id="contacts-canonical-channel-email-library"', false);
+        $response->assertSee('zh.pankey@kaztbu.edu.kz', false);
+        $response->assertSee('data-test-id="contacts-canonical-channel-email-general"', false);
+        $response->assertSee('info@kaztbu.edu.kz', false);
+        $response->assertSee('+7 (7172) 69-70-60', false);
+        $response->assertDontSee('contacts-canonical-channel-email-research', false);
+        $response->assertDontSee('contacts-canonical-channel-email-technical', false);
+        $response->assertDontSee('library@kazutb.edu.kz', false);
+        $response->assertDontSee('support@kazutb.edu.kz', false);
+        $response->assertDontSee('+7 (7172) 64-58-58', false);
+        $this->assertSame(2, substr_count($content, 'data-support-channel'));
+
+        $this->assertSame(1, preg_match(
+            '/<article[^>]*data-channel-slug="library"[^>]*>.*?<\/article>/s',
+            $content,
+            $libraryCard,
+        ));
+        $this->assertStringContainsString('zh.pankey@kaztbu.edu.kz', $libraryCard[0]);
+        $this->assertStringNotContainsString('tel:', $libraryCard[0]);
     }
 
-    public function test_contacts_page_renders_inquiry_form_with_mailto_action(): void
+    public function test_guest_inquiry_uses_the_existing_authenticated_message_flow(): void
     {
         $response = $this->get('/contacts?lang=en');
 
         $response->assertOk();
-        $response->assertSee('data-test-id="contacts-canonical-inquiry-form"', false);
-        $response->assertSee('data-test-id="contacts-canonical-inquiry-submit"', false);
-        $response->assertSee('action="mailto:library@kazutb.edu.kz"', false);
+        $response->assertSee('data-test-id="contacts-canonical-inquiry-cta"', false);
+        $response->assertSee('Sign in to submit a request', false);
+        $response->assertSee('/login?redirect=', false);
+        $response->assertDontSee('action="mailto:', false);
     }
 
     public function test_contacts_page_renders_directions_link(): void
@@ -161,9 +181,16 @@ class ContactsCanonicalPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('37A Kayym Mukhamedkhanov Street, Astana', false);
-        $response->assertSee('+7 (7172) 64-58-58', false);
+        $response->assertSee('+7 (7172) 69-70-60', false);
+        $response->assertSee('info@kaztbu.edu.kz', false);
         $response->assertSee('Opening hours', false);
-        $response->assertSee('Mon – Fri', false);
+        $response->assertSee('Confirmed time window', false);
+        $response->assertSee('08:30 – 17:30', false);
+        $response->assertSee('Confirm working days on the official page', false);
+        $response->assertSee('data-test-id="contacts-official-hours-source"', false);
+        $response->assertSee('https://www.kaztbu.edu.kz/biblioteka', false);
+        $response->assertDontSee('Mon – Fri', false);
+        $response->assertDontSee('+7 (7172) 64-58-58', false);
     }
 
     public function test_contacts_ru_variant_renders_canonical_copy(): void
@@ -171,12 +198,17 @@ class ContactsCanonicalPageTest extends TestCase
         $response = $this->get('/contacts?lang=ru');
 
         $response->assertOk();
-        $response->assertSee('Прямые обращения', false);
-        $response->assertSee('Каналы поддержки', false);
-        $response->assertSee('Отправить запрос', false);
+        $response->assertSee('Официальные контакты', false);
+        $response->assertSee('Контактные каналы', false);
+        $response->assertSee('Научная библиотека', false);
+        $response->assertSee('zh.pankey@kaztbu.edu.kz', false);
+        $response->assertSee('Общий контакт университета', false);
+        $response->assertSee('Отправить официальный запрос', false);
+        $response->assertSee('info@kaztbu.edu.kz', false);
         $response->assertSee('Сотрудники библиотеки', false);
-        $response->assertSee('href="/rules"', false);
-        $response->assertSee('href="/leadership"', false);
+        $response->assertSee('Панкей Ж.', false);
+        $response->assertSee('href="/rules?lang=ru"', false);
+        $response->assertSee('href="/leadership?lang=ru"', false);
     }
 
     public function test_contacts_kk_variant_renders_canonical_copy_and_preserves_lang(): void
@@ -184,11 +216,16 @@ class ContactsCanonicalPageTest extends TestCase
         $response = $this->get('/contacts?lang=kk');
 
         $response->assertOk();
-        $response->assertSee('Тікелей сұраулар', false);
-        $response->assertSee('Қолдау арналары', false);
+        $response->assertSee('ресми байланыс арналары', false);
+        $response->assertSee('Байланыс арналары', false);
+        $response->assertSee('Ғылыми кітапхана', false);
+        $response->assertSee('zh.pankey@kaztbu.edu.kz', false);
+        $response->assertSee('Университеттің жалпы байланыс арнасы', false);
+        $response->assertSee('info@kaztbu.edu.kz', false);
         $response->assertSee('Кітапхана қызметкерлері', false);
-        $response->assertSee('href="/rules?lang=kk"', false);
-        $response->assertSee('href="/leadership?lang=kk"', false);
+        $response->assertSee('Панкей Ж.', false);
+        $response->assertSee('href="/rules"', false);
+        $response->assertSee('href="/leadership"', false);
     }
 
     public function test_contacts_page_guest_navbar_shows_sign_in(): void
@@ -201,12 +238,15 @@ class ContactsCanonicalPageTest extends TestCase
 
     public function test_contacts_page_authenticated_reader_navbar_shows_sign_out(): void
     {
-        $this->loginAs('student');
-
-        $response = $this->get('/contacts?lang=en');
+        $response = $this->withSession(['library.user' => [
+            'id' => 'qa-reader-001',
+            'name' => 'QA Reader',
+            'role' => 'reader',
+        ]])->get('/contacts?lang=en');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Library', false);
+        $response->assertSee('Open requests', false);
+        $response->assertSee('href="/dashboard/messages?lang=en"', false);
         $response->assertSee('Sign out', false);
     }
 }

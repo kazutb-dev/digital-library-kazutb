@@ -50,7 +50,7 @@ class CatalogPageTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSee('Каталог книг', false)
+            ->assertSee('Каталог университетской библиотеки', false)
             ->assertSee('/api/v1/catalog-db', false)
             ->assertSee('id="catalog-active-filters"', false)
             ->assertSee('id="language-chips"', false)
@@ -132,8 +132,8 @@ class CatalogPageTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('institution: "technology_library"', false)
-            ->assertSee('Только доступные экземпляры')
-            ->assertSee('Только с физическим фондом');
+            ->assertSee('Тек қолжетімді даналар')
+            ->assertSee('Тек физикалық қоры бар');
     }
 
     /**
@@ -208,11 +208,12 @@ class CatalogPageTest extends TestCase
 
     public function test_catalog_page_shows_human_friendly_library_locations(): void
     {
-        $response = $this->get('/catalog?institution=college_library');
+        $response = $this->get('/catalog?institution=college_library&lang=ru');
 
         $response
             ->assertOk()
-            ->assertSee('Библиотека колледжа · каб. 3')
+            ->assertSee('Библиотека колледжа')
+            ->assertDontSee('каб. 3')
             ->assertSee('Тестовое издание каталога', false);
     }
 

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Accessible library</title>
+  <rect width="96" height="96" rx="20" fill="#f2ecff"/>
+  <circle cx="48" cy="21" r="7" fill="#684aa5"/>
+  <path d="M31 36h34M48 29v22M48 51 34 73M48 51l14 22" fill="none" stroke="#684aa5" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="24" cy="79" r="3" fill="#b77b57"/><circle cx="36" cy="79" r="3" fill="#b77b57"/><circle cx="48" cy="79" r="3" fill="#b77b57"/><circle cx="60" cy="79" r="3" fill="#b77b57"/><circle cx="72" cy="79" r="3" fill="#b77b57"/>
+</svg>

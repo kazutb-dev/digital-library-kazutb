@@ -114,7 +114,7 @@
                   </div>
                 </div>
 
-                {{-- §8 — approximate availability estimate for a queued request.
+                {{-- 8 — approximate availability estimate for a queued request.
                      Deliberately hedged: it is not a promised date. --}}
                 @php $forecastDays = $forecasts[$reservation->id] ?? null; @endphp
                 @if ($forecastDays !== null)

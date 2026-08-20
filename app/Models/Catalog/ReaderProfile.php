@@ -70,11 +70,11 @@ class ReaderProfile extends Model
                 'ticket_number' => static::nextTicketNumber(),
                 // §9.4 — every card is scannable from the moment it is issued.
                 'barcode' => static::nextBarcode(),
-                'category' => match ($user->profile_type ?? null) {
-                    'teacher' => 'teacher',
-                    'staff' => 'staff',
-                    default => 'student',
-                },
+                // Reader category is independent from authorization, but a
+                // staff account first seen at the desk must never be silently
+                // classified as a student. Explicitly provisioned reader
+                // categories are already persisted before this lazy fallback.
+                'category' => $user->effectiveRole() === 'member' ? 'student' : 'staff',
                 'status' => 'active',
             ],
         );

@@ -23,7 +23,7 @@
         </x-admin.page-header>
 
         {{-- Progress line: gives the day a visible floor, so a 9 000-item
-             backlog does not read as an endless list (ДИР §6). --}}
+             backlog does not read as an endless list (ДИР 6). --}}
         <section class="admin-card mb-8">
             <div class="flex flex-wrap items-end justify-between gap-4">
                 <div>
@@ -142,7 +142,7 @@
                 </div>
             </header>
 
-            {{-- ДИР §6.3 — the language queue is not one list of 2 208 rows but
+            {{-- ДИР 6.3 — the language queue is not one list of 2 208 rows but
                  three routes of different risk, each with its own safe tool. --}}
             @if ($mode === 'tiers' && $tierCounts !== null)
                 @php
@@ -240,7 +240,7 @@
                             </table>
                         </div>
 
-                        {{-- ДИР §6.3 "сравнение похожих записей": field-by-field,
+                        {{-- ДИР 6.3 "сравнение похожих записей": field-by-field,
                              with rows that disagree highlighted, so the librarian
                              can see what actually differs before merging. --}}
                         @php
@@ -424,7 +424,7 @@
                                                 {{ __('librarian.data_cleanup.open_public') }}
                                             </a>
 
-                                            {{-- ДИР §6.3 — the third answer for a language mismatch:
+                                            {{-- ДИР 6.3 — the third answer for a language mismatch:
                                                  a Russian edition that legitimately carries a Kazakh
                                                  subtitle. Clears the flag, keeps `language`. --}}
                                             @if ($issue === 'language_mismatch')

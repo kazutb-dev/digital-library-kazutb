@@ -25,7 +25,7 @@ class CatalogController extends Controller
             'material_type' => ['nullable', 'string', 'in:all,digital,archive,physical'],
             'page' => ['nullable', 'integer', 'min:1'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'sort' => ['nullable', 'string', 'in:popular,newest,title,author'],
+            'sort' => ['nullable', 'string', 'in:popular,newest,oldest,title,author'],
             'year_from' => ['nullable', 'integer', 'min:1900', 'max:2100'],
             'year_to' => ['nullable', 'integer', 'min:1900', 'max:2100'],
             'available_only' => ['nullable', 'string', 'in:0,1,true,false'],
@@ -34,13 +34,13 @@ class CatalogController extends Controller
             // classifies by UDC and category, which the `udc` parameter serves.
             'subject_id' => ['nullable', 'string', 'uuid'],
             'institution' => ['nullable', 'string', 'in:college_library,economic_library,technology_library,ktslib'],
-            // Canonical axes (Master.md §8.2). Multi-value axes take a
+            // Canonical axes (Master.md 8.2). Multi-value axes take a
             // comma-separated list so several boxes can be ticked at once.
             'resource_type' => ['nullable', 'string', 'max:255'],
             'fund' => ['nullable', 'string', 'max:255'],
             'branch' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:255'],
-            'availability' => ['nullable', 'string', 'in:available,issued,electronic_only,processing,repair'],
+            'availability' => ['nullable', 'string', 'in:available,issued,electronic_only,processing,repair,no_holdings'],
             'format' => ['nullable', 'string', 'in:print,electronic,hybrid'],
         ]);
 

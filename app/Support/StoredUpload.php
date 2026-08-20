@@ -11,6 +11,7 @@ final class StoredUpload
 {
     public static function put(UploadedFile $file, string $directory, string $disk): string
     {
+        UploadedFileSecurity::assertSafe($file);
         $path = $file->store($directory, $disk);
 
         if (! is_string($path) || trim($path) === '') {

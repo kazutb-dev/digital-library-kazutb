@@ -9,7 +9,7 @@
   // The remaining output is the Cluster B.5 canonical-exact /about per
   // docs/design-exports/about_library_canonical.
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
   $activePage = $activePage ?? 'about';
 
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
@@ -24,7 +24,7 @@
 
   $copy = [
       'ru' => [
-          'title' => 'О библиотеке — KazUTB',
+          'title' => 'О библиотеке — Казахский университет технологии и бизнеса имени К. Кулажанова',
           'collection_areas' => [
               [
                   'slug' => 'technology',
@@ -65,7 +65,7 @@
               [
                   'slug' => 'contacts',
                   'title' => 'Контакты и расположение',
-                  'body' => 'Адрес, режим работы, фондовые комнаты и способы связаться с библиотекой.',
+                  'body' => 'Подтверждённые адрес, режим работы и способы связаться с библиотекой.',
                   'href' => '/contacts',
                   'cta' => 'Открыть контакты',
               ],
@@ -74,19 +74,17 @@
           'canon_hero_eyebrow' => 'Учреждение',
           'canon_hero_title_a' => 'Сохраняем знание.',
           'canon_hero_title_b' => 'Поддерживаем исследования.',
-          'canon_hero_body' => 'KazUTB — университетская библиотека Казахского университета технологии и бизнеса имени К. Кулажанова, соединяющая академическую традицию и цифровой сервис для поддержки учебной и исследовательской работы.',
-          'canon_hero_image_alt' => 'Читательский зал университетской библиотеки с книжными стеллажами и столами для работы',
+          'canon_hero_body' => 'Казахский университет технологии и бизнеса имени К. Кулажанова — университетская библиотека Казахского университета технологии и бизнеса имени К. Кулажанова, соединяющая академическую традицию и цифровой сервис для поддержки учебной и исследовательской работы.',
           'canon_hero_badge_title' => 'Институциональная библиотека',
-          'canon_hero_badge_body' => 'Поддержка академических программ кампуса и колледжа КазУТБ.',
+          'canon_hero_badge_body' => 'Поддержка академических программ кампуса и колледжа Казахский университет технологии и бизнеса имени К. Кулажанова.',
           'canon_mission_title' => 'Наша миссия',
           'canon_mission_body' => 'Собирать, сохранять и открывать доступ к учебным и научным материалам, необходимым программам университета. Мы поддерживаем среду сосредоточенной академической работы, где цифровые сервисы остаются незаметными, а читатель и работа с материалами — в центре.',
           'canon_mission_cta' => 'Открыть каталог',
           'canon_stats' => [
-              ['value' => '3', 'label' => 'Комнаты фонда'],
               ['value' => '3', 'label' => 'Языка интерфейса'],
           ],
           'canon_collection_header_title' => 'Профиль коллекции',
-          'canon_collection_header_body' => 'Коллекция выстроена вокруг реальной академической программы КазУТБ и покрывает четыре ключевых направления.',
+          'canon_collection_header_body' => 'Коллекция выстроена вокруг реальной академической программы Казахский университет технологии и бизнеса имени К. Кулажанова и покрывает четыре ключевых направления.',
           'canon_directory_title' => 'Институциональный справочник',
           'canon_areas_material_icons' => [
               'technology' => 'science',
@@ -96,7 +94,7 @@
           ],
       ],
       'kk' => [
-          'title' => 'Кітапхана туралы — KazUTB',
+          'title' => 'Кітапхана туралы — Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
           'collection_areas' => [
               [
                   'slug' => 'technology',
@@ -137,7 +135,7 @@
               [
                   'slug' => 'contacts',
                   'title' => 'Байланыс және орналасу',
-                  'body' => 'Мекенжай, жұмыс режимі, қор бөлмелері және кітапханамен байланысу жолдары.',
+                  'body' => 'Расталған мекенжай, жұмыс режимі және кітапханамен байланысу жолдары.',
                   'href' => '/contacts',
                   'cta' => 'Байланысты ашу',
               ],
@@ -146,19 +144,17 @@
           'canon_hero_eyebrow' => 'Мекеме',
           'canon_hero_title_a' => 'Білімді сақтаймыз.',
           'canon_hero_title_b' => 'Зерттеуді қолдаймыз.',
-          'canon_hero_body' => 'KazUTB — Қ. Құлажанов атындағы Қазақ технология және бизнес университетінің академиялық дәстүр мен цифрлық қызметті біріктіретін, оқу мен зерттеу жұмысын қолдайтын университет кітапханасы.',
-          'canon_hero_image_alt' => 'Көп қабатты сөрелері мен оқу үстелдері бар университет кітапханасының оқу залы',
+          'canon_hero_body' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті — Қ. Құлажанов атындағы Қазақ технология және бизнес университетінің академиялық дәстүр мен цифрлық қызметті біріктіретін, оқу мен зерттеу жұмысын қолдайтын университет кітапханасы.',
           'canon_hero_badge_title' => 'Институционалдық кітапхана',
-          'canon_hero_badge_body' => 'KazUTB университеті мен колледжінің академиялық бағдарламаларын қолдау.',
+          'canon_hero_badge_body' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті университеті мен колледжінің академиялық бағдарламаларын қолдау.',
           'canon_mission_title' => 'Біздің миссиямыз',
           'canon_mission_body' => 'Университет бағдарламаларына қажет оқу және зерттеу материалдарын жинау, сақтау және қолжетімді ету. Біз цифрлық қызмет байқалмай тұратын, академиялық жұмыстың өзі бірінші орынға шығатын ортаны қолдаймыз.',
           'canon_mission_cta' => 'Каталогты ашу',
           'canon_stats' => [
-              ['value' => '3', 'label' => 'Қор бөлмелері'],
               ['value' => '3', 'label' => 'Интерфейс тілдері'],
           ],
           'canon_collection_header_title' => 'Қор профилі',
-          'canon_collection_header_body' => 'Қор KazUTB академиялық бағдарламасының төңірегінде құрылған және төрт негізгі бағытты қамтиды.',
+          'canon_collection_header_body' => 'Қор Қ. Құлажанов атындағы Қазақ технология және бизнес университеті академиялық бағдарламасының төңірегінде құрылған және төрт негізгі бағытты қамтиды.',
           'canon_directory_title' => 'Институционалдық анықтамалық',
           'canon_areas_material_icons' => [
               'technology' => 'science',
@@ -168,7 +164,7 @@
           ],
       ],
       'en' => [
-          'title' => 'About — KazUTB',
+          'title' => 'About — Kazakh University of Technology and Business named after K. Kulazhanov',
           'collection_areas' => [
               [
                   'slug' => 'technology',
@@ -209,7 +205,7 @@
               [
                   'slug' => 'contacts',
                   'title' => 'Contacts and location',
-                  'body' => 'Address, opening hours, fund rooms, and ways to reach the library.',
+                  'body' => 'Verified address, opening-hours information, and ways to reach the library.',
                   'href' => '/contacts',
                   'cta' => 'Open contacts',
               ],
@@ -218,15 +214,13 @@
           'canon_hero_eyebrow' => 'Institution',
           'canon_hero_title_a' => 'Preserving Knowledge.',
           'canon_hero_title_b' => 'Supporting Research.',
-          'canon_hero_body' => 'The KazUTB is the university library of the Kazakh University of Technology and Business named after K. Kulazhanov, bringing together academic tradition and digital service to support teaching and research.',
-          'canon_hero_image_alt' => 'Reading room of the university library with shelves and study desks',
+          'canon_hero_body' => 'The Kazakh University of Technology and Business named after K. Kulazhanov is the university library of the Kazakh University of Technology and Business named after K. Kulazhanov, bringing together academic tradition and digital service to support teaching and research.',
           'canon_hero_badge_title' => 'Institutional library',
-          'canon_hero_badge_body' => 'Supporting the academic programmes of the KazUTB university and college campus.',
+          'canon_hero_badge_body' => 'Supporting the academic programmes of the Kazakh University of Technology and Business named after K. Kulazhanov university and college campus.',
           'canon_mission_title' => 'Our Mission',
           'canon_mission_body' => 'To collect, preserve and provide access to the teaching and research materials that the university\'s programmes rely on. We support an environment of focused academic work where digital services step back and the reader\'s work with materials comes first.',
           'canon_mission_cta' => 'Open catalog',
           'canon_stats' => [
-              ['value' => '3', 'label' => 'Fund rooms'],
               ['value' => '3', 'label' => 'Interface languages'],
           ],
           'canon_collection_header_title' => 'The Collection Profile',
@@ -243,6 +237,7 @@
 @endphp
 
 @section('title', $copy['title'])
+@section('meta_description', $copy['canon_hero_body'])
 
 @section('content')
   {{-- Cluster B.5 — canonical-exact /about rebuild per docs/design-exports/about_library_canonical.

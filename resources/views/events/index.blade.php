@@ -2,7 +2,7 @@
 
 @php
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
   $activePage = $activePage ?? 'events';
   $initialVisibleEvents = 10;
 
@@ -15,10 +15,33 @@
   };
 
   $copy = $events['chrome'][$lang];
+  $copy['hero_eyebrow'] = ['ru' => 'Мероприятия библиотеки', 'kk' => 'Кітапхана іс-шаралары', 'en' => 'Library events'][$lang];
+  $copy['hero_title'] = ['ru' => 'Календарь мероприятий', 'kk' => 'Іс-шаралар күнтізбесі', 'en' => 'Events calendar'][$lang];
+  $copy['hero_body'] = [
+    'ru' => 'Предстоящие мероприятия, опубликованные библиотекой на портале.',
+    'kk' => 'Кітапхана порталда жариялаған алдағы іс-шаралар.',
+    'en' => 'Upcoming events published by the library on this portal.',
+  ][$lang];
   $eventItems = $events['items'];
+  $emptyCopy = [
+    'ru' => [
+      'title' => 'Ближайших мероприятий пока нет.',
+      'body' => 'Когда библиотека опубликует новое мероприятие, оно появится здесь.',
+    ],
+    'kk' => [
+      'title' => 'Алдағы іс-шаралар әзірге жоқ.',
+      'body' => 'Кітапхана жаңа іс-шараны жариялаған кезде, ол осы жерде пайда болады.',
+    ],
+    'en' => [
+      'title' => 'No upcoming events yet.',
+      'body' => 'New library events will appear here after they are published.',
+    ],
+  ][$lang];
+  $hasEvents = count($eventItems) > 0;
 @endphp
 
 @section('title', $copy['title'])
+@section('meta_description', $copy['hero_body'])
 
 @section('content')
   <div class="events-canonical public-v2 events-v2">
@@ -41,9 +64,10 @@
 
     <div class="public-v2__body">
     <div class="public-v2__inset">
+    @if($hasEvents)
     {{-- Events list — vertical stack, first event carries the teal highlight rail. --}}
     <section class="events-canonical__list" data-section="events-canonical-list">
-      @forelse($eventItems as $index => $event)
+      @foreach($eventItems as $index => $event)
         @php
           $e = $event['i18n'][$lang];
           $isFeatured = ! empty($event['featured']);
@@ -65,12 +89,14 @@
           <div class="events-canonical__body">
             <h2 class="events-canonical__title">{{ $e['title'] }}</h2>
             <p class="events-canonical__description">{{ $e['description'] }}</p>
+            @if(!empty($e['venue']))
             <div class="events-canonical__footer">
               <div class="events-canonical__venue">
                 <span class="material-symbols-outlined" aria-hidden="true">location_on</span>
                 <span>{{ $e['venue'] }}</span>
               </div>
             </div>
+            @endif
           </div>
           <a style="margin-right:20px;" class="public-v2__button events-v2__register"
              href="{{ $routeWithLang('/events/' . $eventSlug) }}"
@@ -78,27 +104,29 @@
             {{ $copy['event_details_cta'] }}
           </a>
         </article>
-      @empty
-        <div class="public-v2__empty">
-          <span class="material-symbols-outlined" aria-hidden="true">event_busy</span>
-          <h3>{{ $copy['hero_title'] }}</h3>
-          <p>{{ $copy['hero_body'] }}</p>
-        </div>
-      @endforelse
+      @endforeach
     </section>
 
-    {{-- Load More — UI-only surface for now; real pagination arrives with /events/{slug} module. --}}
-    <div class="events-canonical__load-more-wrap" data-section="events-canonical-load-more">
-      <button
-        type="button"
-        class="events-canonical__load-more"
-        data-test-id="events-canonical-load-more"
-        data-events-load-more
-        @if(count($eventItems) <= $initialVisibleEvents) hidden @endif
-      >
-        {{ $copy['load_more'] }}
-      </button>
-    </div>
+    @if(count($eventItems) > $initialVisibleEvents)
+      {{-- Load More — UI-only surface for now; real pagination arrives with /events/{slug} module. --}}
+      <div class="events-canonical__load-more-wrap" data-section="events-canonical-load-more">
+        <button
+          type="button"
+          class="events-canonical__load-more"
+          data-test-id="events-canonical-load-more"
+          data-events-load-more
+        >
+          {{ $copy['load_more'] }}
+        </button>
+      </div>
+    @endif
+    @else
+      <div class="public-v2__empty events-canonical__empty" data-test-id="events-canonical-empty">
+        <span class="material-symbols-outlined" aria-hidden="true">event_busy</span>
+        <h3>{{ $emptyCopy['title'] }}</h3>
+        <p>{{ $emptyCopy['body'] }}</p>
+      </div>
+    @endif
 
     </div>
     </div>
@@ -107,6 +135,10 @@
 
 @section('head')
 <style>
+  .events-canonical__title,
+  .events-canonical__description,
+  .events-canonical__venue { overflow-wrap: anywhere; }
+
   .events-canonical {
     width: 100%;
     max-width: none;
@@ -359,6 +391,10 @@
 
   .events-canonical__card[hidden] {
     display: none !important;
+  }
+
+  .events-canonical__empty {
+    padding: 40px 24px;
   }
 </style>
 @endsection

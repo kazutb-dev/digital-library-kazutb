@@ -25,7 +25,7 @@
             <label class="admin-label" for="resource-type">{{ __('admin.external_resources.fields.type') }}</label>
             <select class="admin-input" id="resource-type" name="resource_type">
                 <option value="">{{ __('common.fields.all') }}</option>
-                @foreach (['licensed', 'open', 'partner', 'internal'] as $type)
+                @foreach (\App\Models\ExternalResource::TYPES as $type)
                     <option value="{{ $type }}" @selected(($filters['resource_type'] ?? '') === $type)>{{ __('admin.external_resources.types.'.$type) }}</option>
                 @endforeach
             </select>
@@ -37,6 +37,7 @@
                 <option value="active" @selected(($filters['status'] ?? '') === 'active')>{{ __('common.status.active') }}</option>
                 <option value="inactive" @selected(($filters['status'] ?? '') === 'inactive')>{{ __('common.status.inactive') }}</option>
                 <option value="expiring" @selected(($filters['status'] ?? '') === 'expiring')>{{ __('common.status.expiring_soon') }}</option>
+                <option value="expired" @selected(($filters['status'] ?? '') === 'expired')>{{ __('external_resources.statuses.expired') }}</option>
             </select>
         </div>
         <div class="flex items-end gap-2">
@@ -50,10 +51,11 @@
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         @forelse ($resources as $resource)
             @php
-                $expired = $resource->license_expires_at?->isPast() ?? false;
+                $effectiveExpiry = $resource->effectiveExpiryDate();
+                $expired = $resource->licenceExpired();
                 $expiring = ! $expired && $resource->expiresSoon(30);
                 $licenseStatus = $expired ? 'expired' : ($expiring ? 'expiring_soon' : 'active');
-                $licenseLabel = $resource->license_expires_at
+                $licenseLabel = $effectiveExpiry
                     ? __('admin.external_resources.license.'.($expired ? 'expired' : ($expiring ? 'expiring_soon' : 'valid')))
                     : __('admin.external_resources.license.not_applicable');
             @endphp
@@ -70,6 +72,7 @@
                         <div class="mb-2 flex flex-wrap gap-2">
                             <x-admin.status-badge :status="$resource->is_active ? 'active' : 'inactive'" :label="__('common.status.'.($resource->is_active ? 'active' : 'inactive'))" />
                             <x-admin.status-badge :status="$licenseStatus" :label="$licenseLabel" />
+                            <x-admin.status-badge :status="$resource->publication_status" :label="__('digital.external.publication_statuses.'.$resource->publication_status)" />
                         </div>
                         <h2 class="font-headline text-2xl leading-tight text-primary">{{ $resource->title }}</h2>
                         <p class="mt-1 text-xs text-slate-500">{{ __('admin.external_resources.types.'.$resource->resource_type) }}@if($resource->provider) · {{ $resource->provider }}@endif</p>
@@ -92,13 +95,21 @@
                             'text-red-700' => $expired,
                             'text-amber-700' => $expiring,
                         ])>
-                            {{ $resource->license_expires_at?->format('d.m.Y') ?? __('common.time.not_available') }}
+                            {{ $effectiveExpiry?->format('d.m.Y') ?? __('external_resources.expiry.not_specified') }}
                             @if ($expiring)
-                                · {{ __('admin.external_resources.license.days_remaining', ['count' => (int) today('UTC')->diffInDays($resource->license_expires_at)]) }}
+                                · {{ __('admin.external_resources.license.days_remaining', ['count' => (int) today('UTC')->diffInDays($effectiveExpiry)]) }}
                             @endif
                         </dd>
                     </div>
                 </dl>
+
+                @if (! empty($resource->content_types))
+                    <div class="mt-3 flex flex-wrap gap-2" aria-label="{{ __('external_resources.admin.content_types') }}">
+                        @foreach ($resource->content_types as $contentType)
+                            <span class="rounded-full bg-surface-low px-3 py-1 text-xs font-semibold text-slate-600">{{ __('external_resources.content_types.'.$contentType) }}</span>
+                        @endforeach
+                    </div>
+                @endif
 
                 @if ($resource->access_instructions)
                     <div class="mt-3 rounded-xl border border-secondary/20 bg-secondary-soft/40 p-4">
@@ -114,9 +125,11 @@
                     <a href="{{ route('admin.external-resources.edit', $resource) }}" class="admin-btn admin-btn-primary">
                         <span class="material-symbols-outlined text-[18px]">edit</span>{{ __('common.actions.edit') }}
                     </a>
-                    <a href="{{ $resource->url }}" rel="noopener noreferrer" target="_blank" class="admin-btn admin-btn-secondary">
-                        <span class="material-symbols-outlined text-[18px]">open_in_new</span>{{ __('common.actions.open') }}
-                    </a>
+                    @if ($resource->publication_status === 'published' && $resource->is_active && $resource->readyForPublication())
+                        <a href="{{ route('external-resources.open', $resource) }}" rel="noopener noreferrer" target="_blank" class="admin-btn admin-btn-secondary">
+                            <span class="material-symbols-outlined text-[18px]">open_in_new</span>{{ __('common.actions.open') }}
+                        </a>
+                    @endif
                 </div>
             </article>
         @empty

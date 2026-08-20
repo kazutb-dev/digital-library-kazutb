@@ -6,7 +6,7 @@ use App\Models\Catalog\BookCopy;
 use App\Models\Setting;
 
 /**
- * ДИР §9.3 — the loan period depends on how many copies of the edition the
+ * ДИР 9.3 — the loan period depends on how many copies of the edition the
  * library holds: a scarce title comes back sooner so the next reader is not
  * kept waiting, an abundant one can stay out longer.
  *
@@ -118,7 +118,7 @@ class LoanPeriodPolicy
     }
 
     /**
-     * Human-readable summary of the whole scale, e.g. "1–2 экз. → 3 дн.".
+     * Human-readable summary of the whole scale, e.g. "1–2 экз. — 3 дн.".
      *
      * @return list<array{key: string, days: int, from: int, to: int|null}>
      */

@@ -94,6 +94,7 @@ Configure secrets in GitHub → Settings → Secrets:
 |--------|---------|-------|
 | `library_dev_postgres_data` | DEV DB data | Docker managed |
 | `library_prod_postgres_data` | PROD DB data | Docker managed, back up regularly |
+| `library_prod_repository_private_data` | Private repository PDFs and version history | Persistent across image deploys; back up with the database |
 | `library_dev_node_modules` | DEV npm cache | Avoids host-container UID issues |
 
 ## Backup
@@ -103,6 +104,12 @@ Configure secrets in GitHub → Settings → Secrets:
 docker compose -f docker-compose.prod.yml exec postgres \
   pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" \
   | gzip > "backup-$(date +%Y%m%d).sql.gz"
+
+# Backup private repository files (restore together with the matching DB dump)
+docker run --rm \
+  -v library_prod_repository_private_data:/data:ro \
+  -v "$PWD":/backup \
+  alpine tar -czf "/backup/repository-private-$(date +%Y%m%d).tar.gz" -C /data .
 ```
 
 ## Health check
@@ -118,4 +125,6 @@ Expected: HTTP 200 with `{"data": [...], "meta": {...}}`.
 - Config: `docker/nginx.conf` — serves from `/app/public`, PHP-FPM on `:9000`
 - Config: `docker/supervisord.conf` — manages nginx + php-fpm processes
 - PHP config: `docker/php.ini`
-- Entrypoint: `docker/entrypoint.sh` — runs migrations, warms caches, starts supervisor
+- Entrypoint: `docker/entrypoint.sh` — checks runtime/schema compatibility without
+  changing the database, then warms caches and starts supervisor. Migrations are
+  a separate, explicitly approved deployment operation.

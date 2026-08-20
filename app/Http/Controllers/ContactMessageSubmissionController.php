@@ -3,107 +3,86 @@
 namespace App\Http\Controllers;
 
 use App\Models\ContactMessage;
+use App\Models\MessageAttachment;
 use App\Models\Setting;
-use App\Models\User;
-use App\Services\AuditLogger;
-use App\Support\StoredUpload;
+use App\Services\Messages\MessageAttachmentService;
+use App\Services\Messages\MessageSubmissionService;
+use App\Services\Messages\MessageWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Throwable;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContactMessageSubmissionController extends Controller
 {
-    public function store(Request $request, AuditLogger $audit): RedirectResponse
+    public function store(Request $request, MessageSubmissionService $submission): RedirectResponse
     {
         $validated = $request->validate([
-            'category' => ['required', Rule::in($this->categories())],
-            'subject' => ['required', 'string', 'max:255'],
-            'body' => ['required', 'string', 'max:20000'],
-            'attachments' => ['nullable', 'array', 'max:3'],
-            // Images remain disabled until the runtime has a trusted metadata
-            // sanitizer; this prevents EXIF location/device data from entering storage.
-            'attachments.*' => ['file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,txt'],
+            'type' => ['required', Rule::in(ContactMessage::TYPES)],
+            'category_id' => ['required', 'integer', Rule::exists('message_categories', 'id')->where('active', true)],
+            'subject' => ['required', 'string', 'min:5', 'max:255'],
+            'body' => ['required', 'string', 'min:10', 'max:20000'],
+            'requested_priority' => ['nullable', Rule::in(['low', 'medium', 'high'])],
+            'preferred_contact_channel' => ['required', Rule::in(['in_app', 'email'])],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'related_entity_type' => ['nullable', Rule::in(['book', 'copy', 'loan', 'reservation', 'fine', 'incident', 'electronic_material', 'news', 'branch'])],
+            'related_entity_id' => ['nullable', 'required_with:related_entity_type', 'integer'],
+            'complaint_against_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'submission_token' => ['required', 'uuid'],
+            'contact_confirmed' => ['accepted'],
+            'attachments' => ['nullable', 'array', 'max:10'],
+            'attachments.*' => ['file', 'max:51200'],
         ]);
-
-        $sessionUser = $request->session()->get('library.user', []);
-        $authUser = $request->user();
-        $senderEmail = (string) ($authUser?->email ?? $sessionUser['email'] ?? '');
-
-        if ($authUser === null && $senderEmail !== '') {
-            $authUser = User::query()->where('email', $senderEmail)->first();
+        if (($validated['complaint_against_user_id'] ?? null) && $validated['type'] !== 'complaint') {
+            return back()->withErrors(['complaint_against_user_id' => __('messages.validation.complaint_staff_only')])->withInput();
         }
 
-        $attachments = [];
-        try {
-            foreach ($request->file('attachments', []) as $file) {
-                $attachments[] = [
-                    'path' => StoredUpload::put($file, 'contact-attachments', 'local'),
-                    'name' => $file->getClientOriginalName(),
-                    'size' => $file->getSize(),
-                    'mime' => $file->getClientMimeType(),
-                ];
-            }
+        $message = $submission->submit($request->user(), $validated, $request);
 
-            DB::transaction(function () use (
-                $validated,
-                $authUser,
-                $senderEmail,
-                $attachments,
-                $audit,
-                $sessionUser,
-            ): void {
-                $message = ContactMessage::query()->create([
-                    'category' => $validated['category'],
-                    'subject' => $validated['subject'],
-                    'body' => $validated['body'],
-                    'sender_id' => $authUser?->getKey(),
-                    'sender_email' => $senderEmail,
-                    'status' => 'open',
-                    'priority' => 'normal',
-                    'attachments' => $attachments ?: null,
-                ]);
-
-                $audit->logRequired(
-                    actionType: 'message.created',
-                    entityType: 'contact_message',
-                    entityId: $message->getKey(),
-                    newValues: [
-                        'category' => $message->category,
-                        'status' => $message->status,
-                        'attachment_count' => count($attachments),
-                    ],
-                    scope: 'operational',
-                    actor: $authUser ?? (is_array($sessionUser) ? $sessionUser : null),
-                );
-            });
-        } catch (Throwable $exception) {
-            foreach ($attachments as $attachment) {
-                StoredUpload::deleteOrReport($attachment['path'], 'local');
-            }
-
-            throw $exception;
-        }
-
-        return back()->with('success', __('messages.submitted'));
+        return redirect()->route('member.messages.show', $message)->with('success', __('messages.messages.registered', ['ticket' => $message->ticket_number]));
     }
 
-    /**
-     * @return list<string>
-     */
-    private function categories(): array
+    public function reply(Request $request, ContactMessage $message, MessageWorkflowService $workflow, MessageAttachmentService $attachments): RedirectResponse
     {
-        $configured = Setting::valueFor(
-            'message_categories',
-            ['request', 'complaint', 'suggestion', 'question', 'other'],
-        );
+        $this->owner($request, $message);
+        $validated = $request->validate(['body' => ['required', 'string', 'min:2', 'max:20000'], 'attachments' => ['nullable', 'array', 'max:10'], 'attachments.*' => ['file', 'max:51200']]);
+        $entry = $workflow->userReply($message, $request->user(), $validated['body']);
+        $attachments->store($message, $entry, $request->file('attachments', []), $request->user());
 
-        return collect(is_array($configured) ? $configured : [])
-            ->map(fn (mixed $value): string => mb_strtolower(trim((string) $value)))
-            ->filter(fn (string $value): bool => $value !== '' && mb_strlen($value) <= 32)
-            ->unique()
-            ->values()
-            ->all() ?: ['request', 'complaint', 'suggestion', 'question', 'other'];
+        return back()->with('success', __('messages.messages.reply_sent'));
+    }
+
+    public function feedback(Request $request, ContactMessage $message, MessageWorkflowService $workflow): RedirectResponse
+    {
+        $this->owner($request, $message);
+        $validated = $request->validate(['score' => ['required', 'integer', 'between:1,5'], 'comment' => ['nullable', 'string', 'max:2000']]);
+        $workflow->feedback($message, $request->user(), (int) $validated['score'], $validated['comment'] ?? null);
+
+        return back()->with('success', __('messages.messages.feedback_saved'));
+    }
+
+    public function reopen(Request $request, ContactMessage $message, MessageWorkflowService $workflow): RedirectResponse
+    {
+        $this->owner($request, $message);
+        $validated = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:3000']]);
+        abort_unless($message->status === 'resolved' && $message->resolved_at?->gte(now('UTC')->subDays(max(1, (int) Setting::valueFor('library_feedback_reopen_days', 14)))), 409);
+        $workflow->readerReopen($message, $request->user(), $validated['reason']);
+
+        return back()->with('success', __('messages.messages.reopened'));
+    }
+
+    public function attachment(Request $request, ContactMessage $message, MessageAttachment $attachment): StreamedResponse
+    {
+        $this->owner($request, $message);
+        abort_unless((int) $attachment->contact_message_id === (int) $message->getKey() && $attachment->visibility === 'public', 404);
+        abort_unless(Storage::disk($attachment->disk)->exists($attachment->path), 404);
+
+        return Storage::disk($attachment->disk)->download($attachment->path, $attachment->original_name, ['Cache-Control' => 'private, no-store', 'X-Robots-Tag' => 'noindex, nofollow']);
+    }
+
+    private function owner(Request $request, ContactMessage $message): void
+    {
+        abort_unless((int) ($message->user_id ?: $message->sender_id) === (int) $request->user()->getKey(), 404);
     }
 }

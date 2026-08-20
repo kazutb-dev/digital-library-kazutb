@@ -351,7 +351,7 @@ class ReaderContactNormalizationService
             return ['valid' => false, 'normalized' => '', 'normalizedKey' => '', 'error' => 'Empty phone'];
         }
 
-        // Kazakhstan phone normalization: 8xxx → +7xxx, 7xxx → +7xxx
+        // Kazakhstan phone normalization: 8xxx — +7xxx, 7xxx — +7xxx
         if (preg_match('/^8(\d{10})$/', $cleaned, $m)) {
             $cleaned = '+7'.$m[1];
         } elseif (preg_match('/^7(\d{10})$/', $cleaned, $m)) {

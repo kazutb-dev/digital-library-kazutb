@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\LibraryAuthenticationException;
-use App\Models\User;
-use App\Services\AuditLogger;
 use App\Services\AuthSessionManager;
 use App\Services\LibraryAuthenticator;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +17,7 @@ class WebAuthController extends Controller
             'login' => ['nullable', 'string', 'max:191', 'required_without:email'],
             'password' => ['required', 'string', 'max:1024'],
             'device_name' => ['nullable', 'string', 'max:255'],
+            'redirect' => ['nullable', 'string', 'max:2048'],
         ]);
 
         try {
@@ -34,6 +33,11 @@ class WebAuthController extends Controller
             );
         }
 
+        $redirect = (string) ($validated['redirect'] ?? '');
+        if ($redirect !== '' && str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//') && ! str_contains($redirect, '\\')) {
+            return redirect($redirect);
+        }
+
         return redirect()->intended($result['landing']);
     }
 
@@ -44,58 +48,4 @@ class WebAuthController extends Controller
         return redirect('/login');
     }
 
-    public function demo(
-        Request $request,
-        string $role,
-        AuthSessionManager $sessions,
-        AuditLogger $audit,
-    ): RedirectResponse {
-        if (! (bool) config('demo_users.enabled')) {
-            $this->auditDemoFailure($audit, $request, $role, 'demo_login_disabled');
-            abort(404);
-        }
-
-        $identity = config("demo_users.identities.{$role}");
-        if (! is_array($identity)) {
-            $this->auditDemoFailure($audit, $request, $role, 'unknown_demo_identity');
-            abort(404);
-        }
-
-        $user = User::query()->where('email', $identity['email'])->first();
-        if ($user === null) {
-            $this->auditDemoFailure($audit, $request, $role, 'demo_user_missing');
-
-            return back()->withErrors([
-                'login' => __('auth.demo_user_missing', ['email' => $identity['email']]),
-            ]);
-        }
-
-        try {
-            $sessions->login($request, $user, $identity['profile_type'] ?? null);
-        } catch (LibraryAuthenticationException $exception) {
-            return back()->withErrors(['login' => $exception->getMessage()]);
-        }
-
-        $request->session()->put('library.crm_token', 'demo-rbac-'.$role);
-        $request->session()->put('library.demo_identity', $role);
-
-        return redirect()->intended($sessions->landing($user));
-    }
-
-    private function auditDemoFailure(
-        AuditLogger $audit,
-        Request $request,
-        string $role,
-        string $reason,
-    ): void {
-        $audit->logRequired(
-            actionType: 'login.fail',
-            entityType: 'authentication',
-            entityId: 'demo:'.$role,
-            newValues: ['reason' => $reason],
-            scope: 'security',
-            actor: ['name' => 'demo:'.$role, 'role' => 'guest'],
-            request: $request,
-        );
-    }
 }

@@ -72,6 +72,11 @@ class AuditLogger
 
         $request ??= request();
         $context = $this->actorContext($actor);
+        // Library-domain mutations are operational events. Historically many
+        // callers used the more descriptive `library` label, but treating it
+        // as an unknown scope hid scheduler-originated circulation events from
+        // the librarian audit stream.
+        $scope = $scope === 'library' ? 'operational' : $scope;
 
         return ActivityLog::query()->create([
             'actor_id' => $context['id'],
@@ -140,7 +145,7 @@ class AuditLogger
     }
 
     /**
-     * Future-facing access scope from PROJECT_CONTEXT §26.3.
+     * Future-facing access scope from PROJECT_CONTEXT 26.3.
      *
      * Admins receive the full log. Librarians receive their own actions plus
      * operational events. Members receive only events tied to their account.
@@ -183,7 +188,7 @@ class AuditLogger
         $actor ??= Auth::user();
 
         if ($actor instanceof User) {
-            $role = (string) ($actor->getRoleNames()->first() ?: $actor->role ?: 'member');
+            $role = $actor->effectiveRole();
             $normalizedRole = mb_strtolower($role);
 
             return [
@@ -241,7 +246,18 @@ class AuditLogger
             return null;
         }
 
-        $sensitiveFragments = ['password', 'token', 'secret', 'authorization', 'api_key'];
+        $sensitiveFragments = [
+            'password',
+            'passwd',
+            'token',
+            'secret',
+            'authorization',
+            'cookie',
+            'api_key',
+            'client_secret',
+            'access_token',
+            'refresh_token',
+        ];
 
         foreach (Arr::dot($values) as $key => $value) {
             $normalized = mb_strtolower((string) $key);

@@ -2,38 +2,63 @@
 
 namespace Tests\Feature;
 
+use App\Models\Catalog\BibliographicRecord;
+use App\Models\Catalog\BookCopy;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class BookPageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    private const KNOWN_ISBN = '978-5-358-09150-5';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpAdminControlPlane();
+
+        $record = BibliographicRecord::factory()->create([
+            'title' => 'Verified public detail fixture',
+            'primary_author' => 'Public Test Author',
+            'isbn' => self::KNOWN_ISBN,
+            'language' => 'ru',
+            'is_draft' => false,
+        ]);
+        BookCopy::factory()->create([
+            'bibliographic_record_id' => $record->getKey(),
+            'status' => 'available',
+        ]);
+    }
+
     public function test_book_page_renders_successfully(): void
     {
-        $response = $this->get('/book/978-5-358-09150-5');
+        $response = $this->get('/book/'.self::KNOWN_ISBN);
 
         $response
             ->assertOk()
-            ->assertSee('Просмотр книги', false)
+            ->assertSee('Кітапты қарау', false)
             ->assertSee('/api/v1/book-db/', false);
     }
 
-    public function test_book_page_uses_real_api_data_fields(): void
+    public function test_book_page_uses_public_api_fields_without_internal_quality_requirements(): void
     {
-        $response = $this->get('/book/test-isbn');
+        $response = $this->get('/book/'.self::KNOWN_ISBN.'?lang=ru');
 
         $response
             ->assertOk()
             ->assertSee('availability', false)
             ->assertSee('locations', false)
             ->assertSee('authors', false)
-            ->assertSee('needsReview', false)
-            ->assertSee('reviewReasonCodes', false)
-            ->assertSee('institutionUnit', false)
-            ->assertSee('servicePoint', false);
+            ->assertSee('viewerAuthenticated', false)
+            ->assertSee('formatLocationLabel', false)
+            ->assertDontSee('needsReview', false)
+            ->assertDontSee('reviewReasonCodes', false);
     }
 
     public function test_book_page_has_no_fake_content(): void
     {
-        $response = $this->get('/book/test-isbn');
+        $response = $this->get('/book/'.self::KNOWN_ISBN);
         $content = $response->getContent();
 
         $response->assertOk();
@@ -54,34 +79,35 @@ class BookPageTest extends TestCase
         $this->assertStringNotContainsString('Основной фонд, зал №1', $content);
     }
 
-    public function test_book_page_shows_locations_table(): void
+    public function test_book_page_shows_privacy_aware_locations_table_with_totals(): void
     {
-        $response = $this->get('/book/test-isbn');
+        $response = $this->get('/book/'.self::KNOWN_ISBN.'?lang=ru');
 
         $response
             ->assertOk()
             ->assertSee('locations-table', false)
             ->assertSee('Наличие по пунктам выдачи', false)
-            ->assertSee('Подразделение', false)
-            ->assertSee('Корпус', false)
-            ->assertSee('Библиотечная точка', false)
-            ->assertSee('Зал / сигла хранения', false)
-            ->assertDontSee('Всего экземпляров', false);
+            ->assertSee('Локация', false)
+            ->assertSee('Всего экземпляров', false)
+            ->assertSee('Доступно сейчас', false)
+            ->assertSee('Выдано', false)
+            ->assertSee('viewerAuthenticated', false)
+            ->assertSee('data-exact-location', false);
     }
 
     public function test_book_page_has_catalog_back_link(): void
     {
-        $response = $this->get('/book/test-isbn');
+        $response = $this->get('/book/'.self::KNOWN_ISBN.'?lang=ru');
 
         $response
             ->assertOk()
-            ->assertSee('href="/catalog"', false)
+            ->assertSee('href="/catalog?lang=ru"', false)
             ->assertSee('Вернуться в каталог', false);
     }
 
     public function test_book_page_has_exported_detail_structure_and_real_ctas(): void
     {
-        $response = $this->get('/book/test-isbn');
+        $response = $this->get('/book/'.self::KNOWN_ISBN);
 
         $response
             ->assertOk()
@@ -98,12 +124,19 @@ class BookPageTest extends TestCase
 
     public function test_book_page_supports_locale_specific_detail_copy(): void
     {
-        $response = $this->get('/book/test-isbn?lang=en');
+        $response = $this->get('/book/'.self::KNOWN_ISBN.'?lang=en');
 
         $response
             ->assertOk()
             ->assertSee('Back to Catalog')
             ->assertSee('Abstract')
             ->assertSee('/catalog?lang=en', false);
+    }
+
+    public function test_unknown_book_returns_not_found_instead_of_a_synthetic_detail(): void
+    {
+        $this->get('/book/test-isbn?lang=en')
+            ->assertNotFound()
+            ->assertDontSee('id="book-detail-page"', false);
     }
 }

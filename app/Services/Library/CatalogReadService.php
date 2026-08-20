@@ -5,7 +5,9 @@ namespace App\Services\Library;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\UdcCode;
+use App\Services\Localization\LocalizedContentResolver;
 use App\Support\DatabaseSchema;
+use App\Support\PublicCatalogLanguage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -13,7 +15,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Public catalogue read model (Master.md §6, §8, §9).
+ * Public catalogue read model (Master.md 6, 8, 9).
  *
  * Reads the canonical `bibliographic_records` / `book_copies` tables. The
  * response shape is preserved from the previous legacy-view implementation so
@@ -23,6 +25,8 @@ use Illuminate\Support\Facades\DB;
  */
 class CatalogReadService
 {
+    public function __construct(private readonly LocalizedContentResolver $localizedContent) {}
+
     /**
      * Public institution filter values mapped onto real branch/fund codes.
      * Keeping the legacy filter vocabulary avoids breaking existing links.
@@ -32,25 +36,6 @@ class CatalogReadService
         'economic_library' => ['funds' => ['UNIVERSITY-ECONOMIC'], 'branches' => ['ECONOMICS-DESK']],
         'technology_library' => ['funds' => ['UNIVERSITY-TECHNOLOGY'], 'branches' => ['TECHNOLOGY-DESK']],
         'ktslib' => ['funds' => ['MAIN', 'RESEARCH', 'EDUCATIONAL'], 'branches' => ['SCIENTIFIC-LIBRARY', 'READING-ROOM']],
-    ];
-
-    /**
-     * Service-point codes the catalogue UI already knows how to label
-     * ("Библиотека колледжа · каб. 3"). Emitting them keeps those curated
-     * labels working now that holdings come from branches and funds.
-     */
-    private const SERVICE_POINT_CODES = [
-        'ECONOMICS-DESK' => '1',
-        'TECHNOLOGY-DESK' => '2',
-        'SCIENTIFIC-LIBRARY' => 'kstlib',
-        'READING-ROOM' => 'kstlib',
-    ];
-
-    private const CAMPUS_CODES = [
-        'ECONOMICS-DESK' => 'university_economic',
-        'TECHNOLOGY-DESK' => 'university_technological',
-        'SCIENTIFIC-LIBRARY' => 'university_central',
-        'READING-ROOM' => 'university_central',
     ];
 
     /**
@@ -98,25 +83,32 @@ class CatalogReadService
         // The public catalogue represents the whole physical fund. Incomplete
         // metadata remains flagged for librarians through is_draft and the
         // Data Cleanup queue, but it must not hide a real book from readers.
+        $publicCopies = static fn (Builder $copies): Builder => $copies
+            ->whereNotIn('status', ['written_off', 'lost']);
         $builder = BibliographicRecord::query()
             ->when($completeOnly, fn (Builder $query) => $query
                 ->where('is_draft', false)
                 ->whereNotNull('title')
                 ->whereRaw("TRIM(title) <> ''"))
+            ->with('translations')
             ->withCount([
-                'copies',
-                'copies as physical_copies_count' => fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost']),
+                'copies' => $publicCopies,
+                'copies as physical_copies_count' => $publicCopies,
                 'copies as available_copies_count' => fn (Builder $copies) => $copies->where('status', 'available'),
                 'copies as issued_copies_count' => fn (Builder $copies) => $copies->whereIn('status', ['issued', 'overdue']),
                 'copies as processing_copies_count' => fn (Builder $copies) => $copies->where('status', 'in_processing'),
                 'copies as repair_copies_count' => fn (Builder $copies) => $copies->where('status', 'under_repair'),
-                'copies as reading_room_copies_count' => fn (Builder $copies) => $copies->where('access_restriction', 'reading_room'),
-                'copies as limited_copies_count' => fn (Builder $copies) => $copies->where('access_restriction', 'limited'),
-                'electronicMaterials as active_electronic_materials_count' => fn (Builder $materials) => $materials->where('is_active', true),
+                'copies as reading_room_copies_count' => fn (Builder $copies) => $publicCopies($copies)
+                    ->where('access_restriction', 'reading_room'),
+                'copies as limited_copies_count' => fn (Builder $copies) => $publicCopies($copies)
+                    ->where('access_restriction', 'limited'),
+                // Keep the response-model attribute name for compatibility;
+                // its value is deliberately limited to published materials.
+                'electronicMaterials as active_electronic_materials_count' => fn (Builder $materials) => $materials->published(),
             ]);
         $builder
-            ->withSum('copies as total_issue_count', 'issue_count')
-            ->withMax('copies as latest_registration_date', 'registration_date');
+            ->withSum(['copies as total_issue_count' => $publicCopies], 'issue_count')
+            ->withMax(['copies as latest_registration_date' => $publicCopies], 'registration_date');
 
         $this->applyTextFilters($builder, $query, $title, $author, $publisher, $isbn, $subject);
         $this->applyFacets($builder, $udc, $language, $yearFrom, $yearTo, $materialType, $subjectId);
@@ -199,22 +191,27 @@ class CatalogReadService
                 'copies as desk_copies_count' => $deskCopies,
                 'copies as desk_available_copies_count' => fn (Builder $copies) => $deskCopies($copies)->where('status', 'available'),
             ])
+            ->with('translations')
             ->withSum(['copies as desk_issue_count' => $deskCopies], 'issue_count')
             ->orderByDesc('desk_issue_count')
             ->orderByDesc('desk_available_copies_count')
             ->orderBy('title')
             ->limit(max(1, min(12, $limit)))
             ->get()
-            ->map(fn (BibliographicRecord $record): array => [
-                'id' => (string) $record->getKey(),
-                'identifier' => (string) ($record->isbn ?: $record->getKey()),
-                'title' => (string) $record->title,
-                'author' => (string) ($record->primary_author ?: __('common.catalog.author_unknown')),
-                'copies' => (int) ($record->desk_available_copies_count ?? 0),
-                'totalCopies' => (int) ($record->desk_copies_count ?? 0),
-                'issueCount' => (int) ($record->desk_issue_count ?? 0),
-                'coverPath' => $record->cover_path,
-            ])
+            ->map(function (BibliographicRecord $record): array {
+                $localized = $this->localizedContent->bibliographic($record);
+
+                return [
+                    'id' => (string) $record->getKey(),
+                    'identifier' => (string) ($record->isbn ?: $record->getKey()),
+                    'title' => $localized['title'],
+                    'author' => (string) ($record->primary_author ?: __('common.catalog.author_unknown')),
+                    'copies' => (int) ($record->desk_available_copies_count ?? 0),
+                    'totalCopies' => (int) ($record->desk_copies_count ?? 0),
+                    'issueCount' => (int) ($record->desk_issue_count ?? 0),
+                    'coverPath' => $record->cover_path,
+                ];
+            })
             ->all();
     }
 
@@ -243,7 +240,7 @@ class CatalogReadService
     }
 
     /**
-     * Canonical filter axes that map straight onto the schema (Master.md §8.2):
+     * Canonical filter axes that map straight onto the schema (Master.md 8.2):
      * document type, fund, branch, subject area, availability, and format.
      * Multi-value axes accept a comma-separated list, so a reader can tick
      * several boxes on one axis.
@@ -266,18 +263,36 @@ class CatalogReadService
         }
 
         if (($funds = $this->splitList($fund)) !== []) {
-            $builder->whereHas('copies', fn (Builder $copies) => $copies
-                ->whereNotIn('status', ['written_off'])
-                ->whereHas('fund', fn (Builder $related) => $related->whereIn('code', $funds)));
+            $includeUnassigned = in_array('__unassigned__', $funds, true);
+            $fundCodes = array_values(array_diff($funds, ['__unassigned__']));
+            $builder->whereHas('copies', function (Builder $copies) use ($includeUnassigned, $fundCodes): void {
+                $copies->whereNotIn('status', ['written_off', 'lost'])->where(function (Builder $matching) use ($includeUnassigned, $fundCodes): void {
+                    if ($fundCodes !== []) {
+                        $matching->whereHas('fund', fn (Builder $related) => $related->whereIn('code', $fundCodes));
+                    }
+                    if ($includeUnassigned) {
+                        ($fundCodes === [] ? $matching->whereNull('fund_id') : $matching->orWhereNull('fund_id'));
+                    }
+                });
+            });
         }
 
         if (($branches = $this->splitList($branch)) !== []) {
-            $builder->whereHas('copies', fn (Builder $copies) => $copies
-                ->whereNotIn('status', ['written_off'])
-                ->whereHas('branch', fn (Builder $related) => $related->whereIn('code', $branches)));
+            $includeUnassigned = in_array('__unassigned__', $branches, true);
+            $branchCodes = array_values(array_diff($branches, ['__unassigned__']));
+            $builder->whereHas('copies', function (Builder $copies) use ($includeUnassigned, $branchCodes): void {
+                $copies->whereNotIn('status', ['written_off', 'lost'])->where(function (Builder $matching) use ($includeUnassigned, $branchCodes): void {
+                    if ($branchCodes !== []) {
+                        $matching->whereHas('branch', fn (Builder $related) => $related->whereIn('code', $branchCodes));
+                    }
+                    if ($includeUnassigned) {
+                        ($branchCodes === [] ? $matching->whereNull('branch_id') : $matching->orWhereNull('branch_id'));
+                    }
+                });
+            });
         }
 
-        // §8.3 — availability is an aggregate over the record's copies, not a
+        // 8.3 — availability is an aggregate over the record's copies, not a
         // column: a record is "available" when at least one copy is on shelf.
         $availabilityKey = mb_strtolower(trim((string) $availability));
         match ($availabilityKey) {
@@ -286,18 +301,21 @@ class CatalogReadService
                 ->whereHas('copies', fn (Builder $copies) => $copies->whereIn('status', ['issued', 'overdue']))
                 ->whereDoesntHave('copies', fn (Builder $copies) => $copies->where('status', 'available')),
             'electronic_only' => $builder
-                ->whereHas('electronicMaterials', fn (Builder $materials) => $materials->where('is_active', true))
+                ->whereHas('electronicMaterials', fn (Builder $materials) => $materials->published())
                 ->whereDoesntHave('copies', fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost'])),
             'processing' => $builder->whereHas('copies', fn (Builder $copies) => $copies->where('status', 'in_processing')),
             'repair' => $builder->whereHas('copies', fn (Builder $copies) => $copies->where('status', 'under_repair')),
+            'no_holdings' => $builder
+                ->whereDoesntHave('copies', fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost']))
+                ->whereDoesntHave('electronicMaterials', fn (Builder $materials) => $materials->published()),
             default => null,
         };
 
-        // §8.4 — print / electronic / hybrid, derived from what the record
+        // 8.4 — print / electronic / hybrid, derived from what the record
         // actually holds rather than a stored flag.
         $formatKey = mb_strtolower(trim((string) $format));
         $hasPhysical = fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost']);
-        $hasDigital = fn (Builder $materials) => $materials->where('is_active', true);
+        $hasDigital = fn (Builder $materials) => $materials->published();
         match ($formatKey) {
             'print' => $builder
                 ->whereHas('copies', $hasPhysical)
@@ -327,7 +345,7 @@ class CatalogReadService
 
     /**
      * Real filter axes with live counts, so the sidebar can only ever offer
-     * values that exist in the collection (Master.md §8.2). Every entry is
+     * values that exist in the collection (Master.md 8.2). Every entry is
      * derived from the database — nothing here is a curated constant list.
      *
      * @return array<string, mixed>
@@ -380,10 +398,15 @@ class CatalogReadService
      */
     private function languageFacet(): array
     {
-        $counts = BibliographicRecord::query()
+        $rawCounts = BibliographicRecord::query()
             ->selectRaw('language, count(*) as total')
             ->groupBy('language')
             ->pluck('total', 'language');
+
+        $counts = ['ru' => 0, 'kk' => 0, 'en' => 0, 'other' => 0];
+        foreach ($rawCounts as $raw => $total) {
+            $counts[PublicCatalogLanguage::normalize(is_string($raw) ? $raw : null)] += (int) $total;
+        }
 
         return collect(['ru', 'kk', 'en', 'other'])
             ->map(fn (string $code): array => ['value' => $code, 'count' => (int) ($counts[$code] ?? 0)])
@@ -397,17 +420,27 @@ class CatalogReadService
     {
         $table = $relation === 'fund' ? 'funds' : 'branches';
 
-        return DB::table('book_copies')
-            ->join($table, "{$table}.id", '=', "book_copies.{$relation}_id")
-            ->join('bibliographic_records', 'bibliographic_records.id', '=', 'book_copies.bibliographic_record_id')
-            ->whereNotIn('book_copies.status', ['written_off'])
-            ->selectRaw("{$table}.code as value, {$table}.name as label, count(distinct bibliographic_records.id) as total")
-            ->groupBy("{$table}.code", "{$table}.name")
-            ->orderByDesc('total')
+        // Aggregate on the narrow foreign-key columns before joining the
+        // descriptive table. Grouping by the (potentially wide) code/name
+        // columns made PostgreSQL sort all 50k holdings at their declared
+        // varchar width. The equivalent two-stage form is materially cheaper
+        // and preserves the exact distinct-record semantics.
+        $counts = DB::table('book_copies')
+            ->whereNotIn('status', ['written_off', 'lost'])
+            ->selectRaw("{$relation}_id as relation_id, count(distinct bibliographic_record_id) as total")
+            ->groupBy("{$relation}_id");
+
+        return DB::query()
+            ->fromSub($counts, 'holding_counts')
+            ->leftJoin($table, "{$table}.id", '=', 'holding_counts.relation_id')
+            ->selectRaw("{$table}.code as value, {$table}.name as label, holding_counts.total")
+            ->orderByDesc('holding_counts.total')
             ->get()
             ->map(fn ($row): array => [
-                'value' => (string) $row->value,
-                'label' => (string) $row->label,
+                'value' => $row->value === null ? '__unassigned__' : (string) $row->value,
+                'label' => $row->value === null
+                    ? (string) __('common.catalog.'.($relation === 'fund' ? 'fund_unassigned' : 'branch_unassigned'))
+                    : (string) $row->label,
                 'count' => (int) $row->total,
             ])
             ->all();
@@ -471,7 +504,7 @@ class CatalogReadService
      */
     private function availabilityFacet(): array
     {
-        $states = ['available', 'issued', 'electronic_only', 'processing', 'repair'];
+        $states = ['available', 'issued', 'electronic_only', 'processing', 'repair', 'no_holdings'];
 
         return collect($states)
             ->map(function (string $state): array {
@@ -530,6 +563,7 @@ class CatalogReadService
 
         $bounds = BibliographicRecord::query()
             ->whereNotNull('publication_year')
+            ->whereBetween('publication_year', [1400, (int) date('Y') + 1])
             ->selectRaw('MIN(publication_year) as min_year, MAX(publication_year) as max_year')
             ->first();
 
@@ -557,20 +591,25 @@ class CatalogReadService
         array $popularRecordIds = [],
         bool $includeUdcCode = false,
     ): array {
+        $localized = $this->localizedContent->bibliographic($record);
         $available = (int) ($record->available_copies_count ?? $record->copies()->where('status', 'available')->count());
         $totalCopies = (int) ($record->physical_copies_count ?? $record->copies()->whereNotIn('status', ['written_off', 'lost'])->count());
-        $digitalCount = (int) ($record->active_electronic_materials_count ?? 0);
+        $digitalCount = (int) ($record->active_electronic_materials_count
+            ?? $record->electronicMaterials()->published()->count());
         $availabilityStatus = match (true) {
             $available > 0 => 'available',
             (int) ($record->processing_copies_count ?? 0) > 0 => 'in_processing',
             (int) ($record->repair_copies_count ?? 0) > 0 => 'under_repair',
             (int) ($record->issued_copies_count ?? 0) > 0 => 'issued',
+            $totalCopies > 0 => 'unavailable',
+            $digitalCount > 0 => 'electronic_only',
             default => 'no_holdings',
         };
         $format = match (true) {
             $totalCopies > 0 && $digitalCount > 0 => 'hybrid',
-            $digitalCount > 0 || in_array($record->resource_type, ['ebook', 'digital_document'], true) => 'electronic',
-            default => 'print',
+            $totalCopies > 0 => 'print',
+            $digitalCount > 0 => 'electronic',
+            default => 'metadata_only',
         };
         $accessRestriction = match (true) {
             (int) ($record->limited_copies_count ?? 0) > 0 => 'limited',
@@ -586,12 +625,16 @@ class CatalogReadService
         $udcCode = trim((string) ($record->udc_code ?? ''));
         $udcDescription = $this->udcDescription($udcCode);
 
+        $languageCode = PublicCatalogLanguage::normalize((string) $record->language);
+
         return [
             'id' => (string) $record->getKey(),
             'title' => [
-                'display' => (string) $record->title,
+                'display' => $localized['title'],
                 'raw' => (string) $record->title,
                 'subtitle' => (string) ($record->subtitle ?? ''),
+                'original' => $localized['original_title'],
+                'isFallback' => $localized['is_fallback'],
             ],
             'primaryAuthor' => $record->primary_author,
             'authors' => $record->allAuthors(),
@@ -600,18 +643,24 @@ class CatalogReadService
             ],
             'publicationYear' => $record->publication_year,
             'language' => [
-                'code' => (string) $record->language,
-                'raw' => (string) $record->language,
+                'code' => $languageCode,
+                // Kept for response-shape compatibility. Public consumers get
+                // the canonical display code, never the legacy MARC value.
+                'raw' => $languageCode,
+                'label' => PublicCatalogLanguage::label($languageCode),
             ],
             'isbn' => [
                 'raw' => (string) ($record->isbn ?? ''),
             ],
             'resourceType' => (string) $record->resource_type,
-            'annotation' => (string) ($record->annotation ?? ''),
-            'keywords' => (array) ($record->keywords ?? []),
+            'annotation' => $localized['annotation'],
+            'originalAnnotation' => $localized['original_annotation'],
+            'keywords' => $localized['keywords'],
+            'metadataLocale' => $localized['locale'],
             'coverPath' => $record->cover_path,
             'copies' => [
                 'available' => $available,
+                'issued' => (int) ($record->issued_copies_count ?? 0),
                 'total' => $totalCopies,
             ],
             'availability' => [
@@ -665,13 +714,14 @@ class CatalogReadService
      */
     private function popularRecordIds(): array
     {
-        return Cache::remember('catalog.popular_record_ids', now()->addMinutes(15), function (): array {
+        return Cache::remember('catalog.popular_record_ids.v2', now()->addMinutes(15), function (): array {
             $recordCount = BibliographicRecord::query()->count();
             if ($recordCount === 0) {
                 return [];
             }
 
             return DB::table('book_copies')
+                ->whereNotIn('status', ['written_off', 'lost'])
                 ->selectRaw('bibliographic_record_id, SUM(issue_count) AS issue_total')
                 ->groupBy('bibliographic_record_id')
                 ->havingRaw('SUM(issue_count) > 0')
@@ -712,10 +762,13 @@ class CatalogReadService
         }
         if (($value = trim((string) $isbn)) !== '') {
             $normalized = preg_replace('/[^0-9xX]/', '', $value) ?: $value;
-            $builder->where(function (Builder $inner) use ($value, $normalized): void {
+            $expression = $builder->getConnection()->getDriverName() === 'pgsql'
+                ? "LOWER(REGEXP_REPLACE(COALESCE(isbn, ''), '[^0-9Xx]', '', 'g'))"
+                : "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(isbn, ''), '-', ''), ' ', ''), '.', ''), '/', ''))";
+            $builder->where(function (Builder $inner) use ($expression, $normalized, $value): void {
                 $inner
                     ->where('isbn', 'like', '%'.$value.'%')
-                    ->orWhere('isbn', 'like', '%'.$normalized.'%');
+                    ->orWhereRaw("{$expression} LIKE ?", ['%'.mb_strtolower($normalized).'%']);
             });
         }
         if (($value = trim((string) $subject)) !== '') {
@@ -745,7 +798,21 @@ class CatalogReadService
             $builder->where('udc_code', 'like', $value.'%');
         }
         if (($value = trim((string) $language)) !== '') {
-            $builder->whereIn('language', $this->languageAliases($value));
+            $canonical = PublicCatalogLanguage::normalize($value);
+            if ($canonical === 'other') {
+                $known = PublicCatalogLanguage::allKnownStorageAliases();
+                $placeholders = implode(',', array_fill(0, count($known), '?'));
+                $builder->where(function (Builder $languages) use ($known, $placeholders): void {
+                    $languages
+                        ->whereNull('language')
+                        ->orWhereRaw("TRIM(COALESCE(language, '')) = ''")
+                        ->orWhereRaw("LOWER(TRIM(language)) NOT IN ({$placeholders})", $known);
+                });
+            } else {
+                $aliases = PublicCatalogLanguage::storageAliases($canonical);
+                $placeholders = implode(',', array_fill(0, count($aliases), '?'));
+                $builder->whereRaw("LOWER(TRIM(language)) IN ({$placeholders})", $aliases);
+            }
         }
         if ($yearFrom !== null) {
             $builder->where('publication_year', '>=', $yearFrom);
@@ -753,17 +820,13 @@ class CatalogReadService
         if ($yearTo !== null) {
             $builder->where('publication_year', '<=', $yearTo);
         }
-        // `materialType` carries the public format vocabulary (Master.md §8.4),
+        // `materialType` carries the public format vocabulary (Master.md 8.4),
         // not the bibliographic resource type: печатный / электронный / гибрид.
         $format = mb_strtolower(trim((string) $materialType));
         if ($format === 'physical') {
             $builder->whereHas('copies', fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost']));
         } elseif ($format === 'digital') {
-            $builder->where(function (Builder $inner): void {
-                $inner
-                    ->whereHas('electronicMaterials', fn (Builder $materials) => $materials->where('is_active', true))
-                    ->orWhereIn('resource_type', ['ebook', 'digital_document']);
-            });
+            $builder->whereHas('electronicMaterials', fn (Builder $materials) => $materials->published());
         } elseif ($format === 'archive') {
             $builder->whereIn('resource_type', ['dissertation', 'abstract', 'publication', 'periodical']);
         }
@@ -817,14 +880,27 @@ class CatalogReadService
                 ->orderByDesc(
                     BookCopy::query()
                         ->selectRaw('MAX(registration_date)')
+                        ->whereNotIn('status', ['written_off', 'lost'])
                         ->whereColumn('book_copies.bibliographic_record_id', 'bibliographic_records.id'),
                 )
                 ->orderByDesc('created_at')
                 ->orderBy('title'),
             'newest' => $builder->orderByDesc('publication_year')->orderBy('title'),
+            'oldest' => $builder->orderBy('publication_year')->orderBy('title'),
             'title' => $builder->orderBy('title'),
             'author' => $builder->orderByRaw('COALESCE(primary_author, \'\') ASC')->orderBy('title'),
-            default => $builder->orderByDesc('available_copies_count')->orderBy('title'),
+            'popular' => $builder
+                // PostgreSQL sorts NULL aggregates first on DESC. NULLS LAST
+                // keeps records with no holdings behind circulated records.
+                ->orderByRaw('total_issue_count DESC NULLS LAST')
+                ->orderByDesc('available_copies_count')
+                ->orderBy('title')
+                ->orderBy('id'),
+            default => $builder
+                ->orderByRaw('total_issue_count DESC NULLS LAST')
+                ->orderByDesc('available_copies_count')
+                ->orderBy('title')
+                ->orderBy('id'),
         };
     }
 
@@ -871,11 +947,7 @@ class CatalogReadService
                     $first = $group->first();
                     $branchCode = (string) ($first->branch?->code ?? '');
                     $fundCode = (string) ($first->fund?->code ?? '');
-                    // The college collection is identified by its fund, since
-                    // it has no dedicated service point of its own.
-                    $servicePointCode = $fundCode === 'COLLEGE'
-                        ? '3'
-                        : (self::SERVICE_POINT_CODES[$branchCode] ?? $branchCode);
+                    $servicePointCode = $branchCode !== '' ? $branchCode : $fundCode;
 
                     return [
                         'institutionUnit' => [
@@ -883,7 +955,7 @@ class CatalogReadService
                             'name' => (string) ($first->fund?->name ?? ''),
                         ],
                         'campus' => [
-                            'code' => $fundCode === 'COLLEGE' ? 'college_main' : (self::CAMPUS_CODES[$branchCode] ?? $branchCode),
+                            'code' => $branchCode,
                             'name' => (string) ($first->branch?->name ?? ''),
                         ],
                         'servicePoint' => [
@@ -897,6 +969,7 @@ class CatalogReadService
                         'copies' => [
                             'total' => $group->count(),
                             'available' => $group->where('status', 'available')->count(),
+                            'issued' => $group->whereIn('status', ['issued', 'overdue'])->count(),
                         ],
                     ];
                 })
@@ -910,18 +983,4 @@ class CatalogReadService
         return $result;
     }
 
-    /**
-     * @return list<string>
-     */
-    private function languageAliases(string $language): array
-    {
-        $normalized = mb_strtolower(trim($language));
-
-        return match ($normalized) {
-            'kk', 'kaz', 'kz', 'kazakh', 'қазақша' => ['kk'],
-            'ru', 'rus', 'russian', 'русский' => ['ru'],
-            'en', 'eng', 'english', 'английский' => ['en'],
-            default => [$normalized],
-        };
-    }
 }

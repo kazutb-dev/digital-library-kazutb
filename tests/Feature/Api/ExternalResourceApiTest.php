@@ -165,15 +165,17 @@ class ExternalResourceApiTest extends TestCase
         $this->assertArrayHasKey('open', $accessTypes);
     }
 
-    public function test_ipr_smart_has_expiry_date(): void
+    public function test_ipr_smart_with_unverified_contract_date_remains_a_private_draft(): void
     {
         $this->signInToLibraryAs($this->makeControlPlaneUser('member'));
-        $response = $this->getJson('/api/v1/external-resources/ipr-smart');
-
-        $response->assertOk();
-
-        $this->assertNotNull($response->json('data.expiry_date'));
-        $this->assertEquals('2026-09-30', $response->json('data.expiry_date'));
+        $this->getJson('/api/v1/external-resources/ipr-smart')->assertNotFound();
+        $this->assertDatabaseHas('external_resources', [
+            'slug' => 'ipr-smart',
+            'publication_status' => 'draft',
+            'is_active' => 0,
+            'license_expires_at' => null,
+            'contract_ends_at' => null,
+        ]);
     }
 
     public function test_guest_cannot_open_member_only_licensed_resource(): void

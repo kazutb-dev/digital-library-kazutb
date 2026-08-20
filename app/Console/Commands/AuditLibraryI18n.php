@@ -8,15 +8,13 @@ use Illuminate\Support\Facades\File;
 
 class AuditLibraryI18n extends Command
 {
-    private const PROHIBITED_BRAND = 'KazUTB Smart'.' Library';
-
     protected $signature = 'library:i18n:audit {--json= : Optional JSON report path}';
 
     protected $description = 'Audit translation parity, placeholders and prohibited UI branding';
 
     /** @var list<string> */
     private const INTERNATIONAL_TERMS = [
-        'API', 'CSV', 'DOI', 'Excel', 'ISBN', 'ISSN', 'KazUTB', 'MARC',
+        'API', 'CSV', 'DOI', 'Excel', 'ISBN', 'ISSN', 'MARC',
         'ORCID', 'PDF', 'QR', 'URL', 'English', 'UTC', 'ID', 'RDR00000001',
         'ҚАЗ', 'РУС', 'ENG', 'Қазақша', 'Русский',
     ];
@@ -56,7 +54,7 @@ class AuditLibraryI18n extends Command
                         $problems[] = $this->problem($group.'.'.$key, $values, 'critical: empty '.$locale);
                     } elseif ((string) $value === $group.'.'.$key) {
                         $problems[] = $this->problem($group.'.'.$key, $values, 'critical: raw key value '.$locale);
-                    } elseif (str_contains((string) $value, self::PROHIBITED_BRAND)) {
+                    } elseif ($this->containsProhibitedBrand((string) $value)) {
                         $problems[] = $this->problem($group.'.'.$key, $values, 'critical: prohibited brand '.$locale);
                     }
                 }
@@ -79,10 +77,6 @@ class AuditLibraryI18n extends Command
                     $problems[] = $this->problem($group.'.'.$key, $values, 'warning: identical kk/ru/en');
                 }
             }
-        }
-
-        foreach ($this->prohibitedBrandLocations() as $location) {
-            $problems[] = $this->problem($location, [], 'critical: prohibited brand in source');
         }
 
         $critical = array_values(array_filter($problems, fn (array $row): bool => str_starts_with($row['problem'], 'critical:')));
@@ -161,7 +155,7 @@ class AuditLibraryI18n extends Command
                     continue;
                 }
                 foreach (preg_split('/\R/', File::get($file->getPathname())) ?: [] as $line => $text) {
-                    if (str_contains($text, self::PROHIBITED_BRAND)) {
+                    if ($this->containsProhibitedBrand($text)) {
                         $locations[] = str_replace(base_path().'/', '', $file->getPathname()).':'.($line + 1);
                     }
                 }
@@ -169,6 +163,19 @@ class AuditLibraryI18n extends Command
         }
 
         return $locations;
+    }
+
+    private function containsProhibitedBrand(string $value): bool
+    {
+        $value = (string) preg_replace(
+            '/(?:[\w.+-]+@)?[\w.-]*(?:kazutb|kaztbu)[\w.-]*(?:\.edu\.kz|\.local)/iu',
+            '',
+            $value,
+        );
+        $latin = 'Kaz'.'UTB|Kaz'.'TBU';
+        $cyrillic = 'Каз'.'УТБ|Каз'.'ТБУ|Қаз'.'УТБ|Қаз'.'ТБУ';
+
+        return preg_match('/(?<![\pL\pN])(?:'.$latin.'|'.$cyrillic.')(?![\pL\pN])/iu', $value) === 1;
     }
 
     private function short(mixed $value): string

@@ -56,6 +56,8 @@ class DigitalMaterialController extends Controller
         }
 
         if (! $this->access->canAccess($material, $request)) {
+            $this->access->recordAccess($material, $request, 'stream', false, 'access_policy');
+
             return response()->json([
                 'error' => $this->access->accessDeniedReason($material, $request),
                 'success' => false,
@@ -65,6 +67,8 @@ class DigitalMaterialController extends Controller
         if (! $this->access->fileExists($material)) {
             return $this->notFound();
         }
+
+        $this->access->recordAccess($material, $request, 'stream', true);
 
         return $this->fileResponse($material, asAttachment: false);
     }
@@ -85,6 +89,8 @@ class DigitalMaterialController extends Controller
         // a copy" — otherwise a reader with legitimate access sees a bare 403
         // and reports it as a broken button.
         if (! $this->access->canAccess($material, $request)) {
+            $this->access->recordAccess($material, $request, 'download', false, 'access_policy');
+
             return response()->json([
                 'error' => $this->access->accessDeniedReason($material, $request),
                 'success' => false,
@@ -92,6 +98,8 @@ class DigitalMaterialController extends Controller
         }
 
         if (! $this->access->canDownload($material, $request)) {
+            $this->access->recordAccess($material, $request, 'download', false, 'download_disabled');
+
             return response()->json([
                 'error' => (string) __('ui.digital.denied_download'),
                 'success' => false,
@@ -101,6 +109,8 @@ class DigitalMaterialController extends Controller
         if (! $this->access->fileExists($material)) {
             return $this->notFound();
         }
+
+        $this->access->recordAccess($material, $request, 'download', true);
 
         return $this->fileResponse($material, asAttachment: true);
     }

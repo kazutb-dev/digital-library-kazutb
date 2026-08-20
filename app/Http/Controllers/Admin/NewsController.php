@@ -3,194 +3,102 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AnnualContentPlanItem;
+use App\Models\Catalog\RepositoryItem;
 use App\Models\News;
+use App\Models\NewsCategory;
 use App\Models\Setting;
-use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\News\NewsEditorService;
+use App\Services\News\NewsWorkflowService;
 use App\Support\Csv;
-use App\Support\StoredUpload;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Throwable;
 
 class NewsController extends Controller
 {
     public function index(Request $request): View
     {
-        $filters = $request->validate([
-            'search' => ['nullable', 'string', 'max:160'],
-            'status' => ['nullable', Rule::in(['draft', 'scheduled', 'published', 'archived'])],
-            'category' => ['nullable', Rule::in($this->categories())],
-            'language' => ['nullable', Rule::in(['ru', 'kk', 'en'])],
-            'sort' => ['nullable', Rule::in(['created_at', 'updated_at', 'publish_at', 'title'])],
-            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
-        ]);
+        $filters = $request->validate(['search' => ['nullable', 'string', 'max:160'], 'status' => ['nullable', Rule::in(News::STATUSES)], 'type' => ['nullable', Rule::in(News::TYPES)], 'sort' => ['nullable', Rule::in(['created_at', 'updated_at', 'scheduled_publish_at', 'title_kk'])], 'direction' => ['nullable', Rule::in(['asc', 'desc'])]]);
+        $query = News::query()->with(['creator', 'approver']);
+        if (Schema::hasTable('news_categories')) {
+            $query->with('newsCategory');
+        }
+        if ($search = trim((string) ($filters['search'] ?? ''))) {
+            $query->search($search);
+        }foreach (['status', 'type'] as $field) {
+            if ($filters[$field] ?? null) {
+                $query->where($field, $filters[$field]);
+            }
+        }
 
-        $mayEditAny = $request->user()?->can('news.edit_any') === true;
-        $news = $this->filteredQuery($filters)
-            ->when(! $mayEditAny, fn (Builder $query): Builder => $query->where('created_by', $request->user()?->getKey()))
-            ->with(['creator', 'publisher'])
-            ->orderBy($filters['sort'] ?? 'created_at', $filters['direction'] ?? 'desc')
-            ->paginate(Setting::resultsPerPage())
-            ->withQueryString();
-
-        return view('admin.news.index', [
-            'newsItems' => $news,
-            'filters' => $filters,
-            'statusCounts' => News::query()
-                ->when(! $mayEditAny, fn (Builder $query): Builder => $query->where('created_by', $request->user()?->getKey()))
-                ->selectRaw('status, count(*) as aggregate')
-                ->groupBy('status')
-                ->pluck('aggregate', 'status'),
-            'categories' => $this->categories(),
-        ]);
+        return view('admin.news.index', ['newsItems' => $query->orderBy($filters['sort'] ?? 'created_at', $filters['direction'] ?? 'desc')->paginate(Setting::resultsPerPage())->withQueryString(), 'filters' => $filters, 'statusCounts' => News::query()->selectRaw('status,count(*) aggregate')->groupBy('status')->pluck('aggregate', 'status'), 'categories' => Schema::hasTable('news_categories') ? NewsCategory::query()->where('active', true)->orderBy('sort_order')->get() : collect()]);
     }
 
     public function create(): View
     {
-        return view('admin.news.form', [
-            'newsItem' => new News([
-                'language' => app()->getLocale(),
-                'category' => 'announcement',
-                'status' => 'draft',
-                'show_on_homepage' => false,
-            ]),
-            'categories' => $this->categories(),
-        ]);
+        return $this->form(new News(['status' => 'draft', 'type' => 'announcement', 'timezone' => 'Asia/Almaty']));
     }
 
-    public function store(Request $request, AuditLogger $audit): RedirectResponse
+    public function store(Request $request, NewsEditorService $editor): RedirectResponse
     {
-        $validated = $this->validated($request);
-        if (in_array($validated['status'], ['scheduled', 'published'], true)) {
-            abort_unless($request->user()?->can('news.publish'), 403);
-        }
-        $validated['slug'] = $this->uniqueSlug($validated['title']);
-        $validated['created_by'] = $request->user()?->getKey();
-        $this->applyPublicationState($validated, $request);
+        $news = $editor->save($request, $request->user());
 
-        $newCover = null;
-        if ($request->hasFile('cover_image')) {
-            $newCover = StoredUpload::put($request->file('cover_image'), 'news-covers', 'public');
-            $validated['cover_image'] = $newCover;
-        }
-
-        unset($validated['reason']);
-        try {
-            $news = DB::transaction(function () use ($validated, $audit): News {
-                $news = News::query()->create($validated);
-
-                $audit->logRequired(
-                    actionType: $news->status === 'published' ? 'publish' : 'create',
-                    entityType: 'news',
-                    entityId: $news->getKey(),
-                    newValues: $this->snapshot($news),
-                    scope: 'operational',
-                );
-
-                return $news;
-            });
-        } catch (Throwable $exception) {
-            StoredUpload::deleteOrReport($newCover, 'public');
-
-            throw $exception;
-        }
-
-        return redirect()
-            ->route('admin.news.edit', $news)
-            ->with('success', __('common.created_successfully'));
+        return redirect()->route('admin.news.edit', $news)->with('success', __('news.messages.created'));
     }
 
     public function edit(Request $request, News $news): View
     {
-        $this->assertMayEdit($request->user(), $news);
+        $this->assertMayEdit($request, $news);
 
-        return view('admin.news.form', [
-            'newsItem' => $news,
-            'categories' => $this->categories(),
-        ]);
+        return $this->form($news->load(['reviews.actor', 'revisions', 'annualPlanItem']));
     }
 
-    public function update(Request $request, News $news, AuditLogger $audit): RedirectResponse
+    public function update(Request $request, News $news, NewsEditorService $editor): RedirectResponse
     {
-        $this->assertMayEdit($request->user(), $news);
-        $validated = $this->validated($request, $news);
-        $this->authorizePublicationControls($request, $news, $validated);
-        $newCover = null;
-        if ($request->hasFile('cover_image')) {
-            $newCover = StoredUpload::put($request->file('cover_image'), 'news-covers', 'public');
-            $validated['cover_image'] = $newCover;
-        }
+        $editor->save($request, $request->user(), $news);
 
-        unset($validated['reason']);
-        try {
-            $oldCover = DB::transaction(function () use ($news, $validated, $request, $audit): ?string {
-                News::query()->whereKey($news->getKey())->lockForUpdate()->firstOrFail();
-                $news->refresh();
-                $this->assertMayEdit($request->user(), $news);
+        return back()->with('success', __('news.messages.updated'));
+    }
 
-                $old = $this->snapshot($news);
-                $oldCover = $news->cover_image;
-                $values = $validated;
-                $this->authorizePublicationControls($request, $news, $values);
-                $this->applyPublicationState($values, $request, $news);
-                $news->update($values);
-                $news->refresh();
-                $action = $old['status'] !== $news->status && $news->status === 'published'
-                    ? 'publish'
-                    : ($old['status'] === 'published' && $news->status !== 'published' ? 'unpublish' : 'update');
+    public function autosave(Request $request, News $news, NewsEditorService $editor): JsonResponse
+    {
+        abort_unless(in_array($news->status, ['draft', 'changes_requested'], true), 409);
+        $saved = $editor->save($request, $request->user(), $news);
 
-                $audit->logRequired(
-                    actionType: $action,
-                    entityType: 'news',
-                    entityId: $news->getKey(),
-                    oldValues: $old,
-                    newValues: $this->snapshot($news),
-                    scope: 'operational',
-                );
+        return response()->json(['saved_at' => $saved->updated_at?->toIso8601String()]);
+    }
 
-                return $oldCover;
-            });
-        } catch (Throwable $exception) {
-            StoredUpload::deleteOrReport($newCover, 'public');
+    public function transition(Request $request, News $news, NewsWorkflowService $workflow): RedirectResponse
+    {
+        $data = $request->validate(['status' => ['required', Rule::in(News::STATUSES)], 'comment' => ['nullable', 'string', 'max:3000'], 'reason' => ['nullable', 'string', 'max:3000'], 'scheduled_publish_at' => ['nullable', 'date']]);
+        $workflow->transition($news, $data['status'], $request->user(), $data);
 
-            throw $exception;
-        }
+        return back()->with('success', __('news.messages.transitioned'));
+    }
 
-        if ($oldCover && $news->cover_image !== $oldCover) {
-            StoredUpload::deleteOrReport($oldCover, 'public');
-        }
+    public function emergencyPublish(Request $request, News $news, NewsWorkflowService $workflow): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:10', 'max:3000']]);
+        $workflow->emergencyPublish($news, $request->user(), $data['reason']);
 
-        return back()->with('success', __('common.updated_successfully'));
+        return back()->with('success', __('news.messages.published'));
     }
 
     public function destroy(Request $request, News $news, AuditLogger $audit): RedirectResponse
     {
-        $validated = $request->validate([
-            'reason' => ['required', 'string', 'min:5', 'max:1000'],
-        ]);
-        DB::transaction(function () use ($news, $validated, $audit): void {
-            News::query()->whereKey($news->getKey())->lockForUpdate()->firstOrFail();
-            $news->refresh();
-            $snapshot = $this->snapshot($news);
+        abort_unless($news->status === 'draft' && $request->user()->can('news.delete_draft'), 403);
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:1000']]);
+        DB::transaction(function () use ($news, $data, $audit) {
+            $snapshot = $news->only(['title_kk', 'status']);
             $news->delete();
-
-            $audit->logRequired(
-                actionType: 'delete',
-                entityType: 'news',
-                entityId: $news->getKey(),
-                oldValues: $snapshot,
-                reason: $validated['reason'],
-                scope: 'operational',
-            );
+            $audit->logRequired(actionType: 'news.delete_draft', entityType: 'news', entityId: $news->getKey(), oldValues: $snapshot, reason: $data['reason'], scope: 'operational');
         });
 
         return redirect()->route('admin.news.index')->with('success', __('common.deleted_successfully'));
@@ -198,237 +106,66 @@ class NewsController extends Controller
 
     public function export(Request $request, AuditLogger $audit): StreamedResponse
     {
-        $filters = $request->validate([
-            'search' => ['nullable', 'string', 'max:160'],
-            'status' => ['nullable', Rule::in(['draft', 'scheduled', 'published', 'archived'])],
-            'category' => ['nullable', Rule::in($this->categories())],
-            'language' => ['nullable', Rule::in(['ru', 'kk', 'en'])],
-        ]);
-        $rows = $this->filteredQuery($filters)->with('creator')->orderByDesc('created_at')->cursor();
+        $rows = News::query()->with(['creator', 'newsCategory'])->orderByDesc('created_at')->cursor();
+        $audit->logRequired(actionType: 'export', entityType: 'report', entityId: 'news', newValues: ['format' => 'csv'], scope: 'system');
 
-        $audit->logRequired(
-            actionType: 'export',
-            entityType: 'report',
-            entityId: 'news',
-            newValues: ['format' => 'csv', 'filters' => $filters],
-            scope: 'system',
-        );
-
-        return response()->streamDownload(function () use ($rows): void {
-            $output = fopen('php://output', 'wb');
-            fwrite($output, "\xEF\xBB\xBF");
-            Csv::writeRow($output, [
-                __('reports.columns.id'),
-                __('reports.columns.title'),
-                __('reports.columns.language'),
-                __('reports.columns.category'),
-                __('reports.columns.status'),
-                __('reports.columns.homepage'),
-                __('reports.columns.publish_at_utc'),
-                __('reports.columns.author'),
-            ]);
-
-            foreach ($rows as $news) {
-                Csv::writeRow($output, [
-                    $news->getKey(),
-                    $news->title,
-                    __('common.languages.'.$news->language),
-                    trans()->has('news.categories.'.$news->category)
-                        ? __('news.categories.'.$news->category)
-                        : $news->category,
-                    __('news.statuses.'.$news->status),
-                    $news->show_on_homepage ? __('common.boolean.yes') : __('common.boolean.no'),
-                    $news->publish_at?->utc()->toIso8601String(),
-                    $news->creator?->name,
-                ]);
-            }
-
-            fclose($output);
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'wb');
+            fwrite($out, "\xEF\xBB\xBF");
+            Csv::writeRow($out, ['ID', 'Title KK', 'Type', 'Category', 'Status', 'Published at', 'Author']);
+            foreach ($rows as $item) {
+                Csv::writeRow($out, [$item->public_id, $item->title_kk, $item->type, $item->newsCategory?->name(), $item->status, $item->published_at?->toIso8601String(), $item->creator?->name]);
+            }fclose($out);
         }, 'news-'.now('UTC')->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function validated(Request $request, ?News $news = null): array
+    public function categories(): View
     {
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'category' => ['required', Rule::in($this->categories())],
-            'language' => ['required', Rule::in(['ru', 'kk', 'en'])],
-            'body' => ['required', 'string', 'max:100000'],
-            'excerpt' => ['nullable', 'string', 'max:1000'],
-            'status' => ['required', Rule::in(['draft', 'scheduled', 'published', 'archived'])],
-            'publish_at' => ['nullable', 'date', 'required_if:status,scheduled'],
-            'show_on_homepage' => ['required', 'boolean'],
-            'cover_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'reason' => ['nullable', 'string', 'max:1000'],
-        ]);
-        $validated['show_on_homepage'] = $request->boolean('show_on_homepage');
-
-        if (($validated['status'] ?? null) === 'scheduled' && Carbon::parse($validated['publish_at'])->isPast()) {
-            throw ValidationException::withMessages([
-                'publish_at' => __('news.validation.schedule_future'),
-            ]);
-        }
-
-        if (
-            ($validated['status'] ?? null) === 'published'
-            && ! empty($validated['publish_at'])
-            && Carbon::parse($validated['publish_at'])->isFuture()
-        ) {
-            throw ValidationException::withMessages([
-                'publish_at' => __('news.validation.published_not_future'),
-            ]);
-        }
-
-        return $validated;
+        return view('admin.news.categories', ['categories' => NewsCategory::query()->withCount('publications')->orderBy('sort_order')->get()]);
     }
 
-    /**
-     * @param  array<string, mixed>  $values
-     */
-    private function applyPublicationState(array &$values, Request $request, ?News $news = null): void
+    public function storeCategory(Request $request, AuditLogger $audit): RedirectResponse
     {
-        if ($values['status'] === 'published') {
-            $values['publish_at'] ??= now('UTC');
-            if ($news?->status !== 'published' || $news->published_by === null) {
-                $values['published_by'] = $request->user()?->getKey();
-            }
-        } elseif ($values['status'] === 'scheduled') {
-            // The scheduling operator is the accountable approver for the
-            // automatic publication performed later by the scheduler.
-            if ($news?->status !== 'scheduled' || $news->published_by === null) {
-                $values['published_by'] = $request->user()?->getKey();
-            }
-        } elseif ($news?->status === 'scheduled') {
-            $values['published_by'] = null;
-        }
+        $data = $this->categoryData($request);
+        $category = NewsCategory::query()->create($data);
+        $audit->logRequired(actionType: 'news.category_created', entityType: 'news_category', entityId: $category->getKey(), newValues: $data, scope: 'operational');
+
+        return back()->with('success', __('news.categories_admin.created'));
     }
 
-    /**
-     * @param  array<string, mixed>  $filters
-     */
-    private function filteredQuery(array $filters): Builder
+    public function updateCategory(Request $request, NewsCategory $category, AuditLogger $audit): RedirectResponse
     {
-        $query = News::query();
+        $data = $this->categoryData($request, $category);
+        $old = $category->toArray();
+        $category->update($data);
+        $audit->logRequired(actionType: 'news.category_updated', entityType: 'news_category', entityId: $category->getKey(), oldValues: $old, newValues: $data, scope: 'operational');
 
-        if ($search = trim((string) ($filters['search'] ?? ''))) {
-            $needle = '%'.mb_strtolower($search).'%';
-            $query->where(function (Builder $builder) use ($needle): void {
-                $builder->whereRaw('LOWER(title) LIKE ?', [$needle])
-                    ->orWhereRaw('LOWER(body) LIKE ?', [$needle]);
-            });
-        }
-
-        foreach (['status', 'category', 'language'] as $field) {
-            if (! empty($filters[$field])) {
-                $query->where($field, $filters[$field]);
-            }
-        }
-
-        return $query;
+        return back()->with('success', __('news.categories_admin.updated'));
     }
 
-    private function uniqueSlug(string $title): string
+    public function analytics(): View
     {
-        $base = Str::slug($title) ?: 'news';
-        $slug = $base;
-        $counter = 2;
+        $status = News::query()->selectRaw('status,count(*) aggregate')->groupBy('status')->pluck('aggregate', 'status');
+        $types = News::query()->selectRaw('type,count(*) aggregate')->groupBy('type')->pluck('aggregate', 'type');
+        $popular = News::query()->published()->orderByDesc('view_count')->limit(10)->get();
+        $averageExpression = DB::getDriverName() === 'pgsql' ? 'AVG(EXTRACT(EPOCH FROM (approved_at-created_at))/3600)' : 'AVG((julianday(approved_at)-julianday(created_at))*24)';
+        $averageReviewHours = News::query()->whereNotNull('approved_at')->selectRaw($averageExpression.' value')->value('value');
 
-        while (News::withTrashed()->where('slug', $slug)->exists()) {
-            $slug = "{$base}-{$counter}";
-            $counter++;
-        }
-
-        return $slug;
+        return view('admin.news.analytics', compact('status', 'types', 'popular', 'averageReviewHours'));
     }
 
-    private function assertMayEdit(?User $user, News $news): void
+    private function form(News $newsItem): View
     {
-        abort_unless(
-            $user !== null
-            && (
-                $user->can('news.edit_any')
-                || ($user->can('news.edit_own') && (int) $news->created_by === (int) $user->getKey())
-            ),
-            403,
-        );
+        return view('admin.news.form', ['newsItem' => $newsItem, 'categories' => Schema::hasTable('news_categories') ? NewsCategory::query()->where('active', true)->orderBy('sort_order')->get() : collect(), 'planItems' => Schema::hasTable('annual_content_plan_items') ? AnnualContentPlanItem::query()->whereIn('status', ['planned', 'preparing'])->orderBy('planned_date')->get() : collect(), 'repositoryWorks' => Schema::hasTable('repository_approvals') ? RepositoryItem::query()->publicMetadata()->orderByDesc('published_at')->limit(250)->get(['id', 'title', 'year']) : collect()]);
     }
 
-    /**
-     * Editors without publication authority may edit content, but cannot
-     * reschedule, publish, withdraw, or change homepage exposure.
-     *
-     * @param  array<string, mixed>  $values
-     */
-    private function authorizePublicationControls(Request $request, News $news, array &$values): void
+    private function assertMayEdit(Request $request, News $news): void
     {
-        if ($request->user()?->can('news.publish')) {
-            return;
-        }
-
-        $controlledStatuses = ['scheduled', 'published'];
-        $controlsAreRelevant = in_array($news->status, $controlledStatuses, true)
-            || in_array((string) ($values['status'] ?? ''), $controlledStatuses, true);
-
-        if (! $controlsAreRelevant) {
-            return;
-        }
-
-        $currentPublishAt = $news->publish_at?->utc()->format('Y-m-d H:i');
-        $requestedPublishAt = empty($values['publish_at'])
-            ? null
-            : Carbon::parse($values['publish_at'])->utc()->format('Y-m-d H:i');
-        $controlsChanged = (string) $values['status'] !== (string) $news->status
-            || (bool) $values['show_on_homepage'] !== (bool) $news->show_on_homepage
-            || $requestedPublishAt !== $currentPublishAt;
-
-        abort_if($controlsChanged, 403);
-
-        // Preserve exact stored values (including seconds and approver) when
-        // a non-publisher submits an otherwise unchanged edit form.
-        $values['status'] = $news->status;
-        $values['publish_at'] = $news->publish_at;
-        $values['show_on_homepage'] = (bool) $news->show_on_homepage;
+        abort_unless($request->user()->can('news.edit_any') || ($request->user()->can('news.edit_own') && (int) $news->created_by === (int) $request->user()->getKey()), 403);
     }
 
-    /**
-     * @return list<string>
-     */
-    private function categories(): array
+    private function categoryData(Request $request, ?NewsCategory $category = null): array
     {
-        $configured = Setting::valueFor(
-            'news_categories',
-            ['event', 'announcement', 'update', 'schedule'],
-        );
-
-        return collect(is_array($configured) ? $configured : [])
-            ->map(fn (mixed $value): string => mb_strtolower(trim((string) $value)))
-            ->filter(fn (string $value): bool => $value !== '' && mb_strlen($value) <= 32)
-            ->unique()
-            ->values()
-            ->all() ?: ['event', 'announcement', 'update', 'schedule'];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function snapshot(News $news): array
-    {
-        return [
-            'title' => $news->title,
-            'slug' => $news->slug,
-            'language' => $news->language,
-            'category' => $news->category,
-            'body' => $news->body,
-            'excerpt' => $news->excerpt,
-            'status' => $news->status,
-            'publish_at' => $news->publish_at?->utc()->toIso8601String(),
-            'show_on_homepage' => (bool) $news->show_on_homepage,
-            'cover_image' => $news->cover_image,
-            'created_by' => $news->created_by,
-            'published_by' => $news->published_by,
-        ];
+        return $request->validate(['slug' => ['required', 'alpha_dash', 'max:100', Rule::unique('news_categories', 'slug')->ignore($category?->getKey())], 'name_kk' => ['required', 'string', 'max:255'], 'name_ru' => ['nullable', 'string', 'max:255'], 'name_en' => ['nullable', 'string', 'max:255'], 'icon' => ['nullable', 'string', 'max:64'], 'color_token' => ['required', Rule::in(['teal', 'blue', 'amber', 'red', 'slate'])], 'allowed_types' => ['nullable', 'array'], 'allowed_types.*' => [Rule::in(News::TYPES)], 'default_visibility' => ['required', Rule::in(['public', 'members', 'staff'])], 'active' => ['nullable', 'boolean'], 'sort_order' => ['required', 'integer', 'min:0', 'max:1000']]) + ['active' => $request->boolean('active')];
     }
 }

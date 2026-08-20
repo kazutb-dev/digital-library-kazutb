@@ -115,12 +115,19 @@ class IssueWorkflowService
     public function falsePositive(DataQualityIssue $issue, string $reason, User $actor): DataQualityIssue
     {
         return $this->mutate($issue, $actor, 'data_quality.issue_false_positive', function (DataQualityIssue $locked) use ($reason, $actor): void {
+            $context = (array) ($locked->context ?? []);
+            $context['suppression'] = [
+                'current_value' => $locked->current_value,
+                'rules_version' => DataQualityRuleRegistry::VERSION,
+                'decided_at' => now()->toIso8601String(),
+            ];
             $locked->update([
                 'status' => 'false_positive',
                 'false_positive_reason' => $reason,
                 'resolution_type' => 'false_positive',
                 'resolved_at' => now(),
                 'resolved_by' => $actor->getKey(),
+                'context' => $context,
             ]);
         }, $reason);
     }

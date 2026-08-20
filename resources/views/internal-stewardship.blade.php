@@ -545,7 +545,7 @@
         <!-- ═══════ OVERVIEW TAB ═══════ -->
         <section class="tab-content active" id="tab-overview">
             <div class="panel">
-                <h2>📊 Общее здоровье данных</h2>
+                <h2> Общее здоровье данных</h2>
                 <div class="cards" id="health-cards">
                     <div class="metric soft"><div class="metric-label">Загрузка…</div></div>
                 </div>
@@ -569,7 +569,7 @@
                 </div>
             </div>
             <div class="panel">
-                <h2>📈 Прогресс по типу сущности</h2>
+                <h2> Прогресс по типу сущности</h2>
                 <div id="entity-progress">
                     <div class="metric soft"><div class="metric-label">Загрузка…</div></div>
                 </div>
@@ -622,7 +622,7 @@
                     <div id="copy-page-info" class="meta"></div>
                     <div class="pager-actions">
                         <button id="copy-prev" class="button secondary small" onclick="loadCopyQueue(copyPage-1)">← Prev</button>
-                        <button id="copy-next" class="button secondary small" onclick="loadCopyQueue(copyPage+1)">Next →</button>
+                        <button id="copy-next" class="button secondary small" onclick="loadCopyQueue(copyPage+1)">Next —</button>
                     </div>
                 </div>
             </div>
@@ -694,7 +694,7 @@
                     <div id="doc-page-info" class="meta"></div>
                     <div class="pager-actions">
                         <button id="doc-prev" class="button secondary small" onclick="loadDocQueue(docPage-1)">← Prev</button>
-                        <button id="doc-next" class="button secondary small" onclick="loadDocQueue(docPage+1)">Next →</button>
+                        <button id="doc-next" class="button secondary small" onclick="loadDocQueue(docPage+1)">Next —</button>
                     </div>
                 </div>
             </div>
@@ -757,7 +757,7 @@
                     <div id="reader-page-info" class="meta"></div>
                     <div class="pager-actions">
                         <button id="reader-prev" class="button secondary small" onclick="loadReaderQueue(readerPage-1)">← Prev</button>
-                        <button id="reader-next" class="button secondary small" onclick="loadReaderQueue(readerPage+1)">Next →</button>
+                        <button id="reader-next" class="button secondary small" onclick="loadReaderQueue(readerPage+1)">Next —</button>
                     </div>
                 </div>
             </div>
@@ -1494,7 +1494,7 @@
                 const data = await api('/api/v1/internal/reader-contacts/validate', 'POST', { contact_type: type, value });
                 const r = data.data || {};
                 const badge = r.valid ? 'entity' : 'reason';
-                st.innerHTML = `<span class="badge ${badge}">${esc(r.normalized)} — ${r.valid ? '✅ Валиден' : '❌ Невалиден'}</span>${r.error ? ` <span class="meta">${esc(r.error)}</span>` : ''}`;
+                st.innerHTML = `<span class="badge ${badge}">${esc(r.normalized)} — ${r.valid ? ' Валиден' : ' Невалиден'}</span>${r.error ? ` <span class="meta">${esc(r.error)}</span>` : ''}`;
             } catch (err) {
                 st.innerHTML = `<span class="badge reason">Ошибка: ${esc(err.message || '')}</span>`;
             }
@@ -1521,11 +1521,11 @@
                     html += '<table style="width:100%;font-size:13px"><thead><tr><th>Тип</th><th>Значение</th><th>Статус</th><th></th></tr></thead><tbody>';
                     contacts.forEach(c => {
                         const statusBadge = c.isPlaceholder ? '<span class="badge reason">заглушка</span>'
-                            : c.isValidFormat ? '<span class="badge entity">✅ валиден</span>'
-                            : '<span class="badge reason">❌ невалиден</span>';
+                            : c.isValidFormat ? '<span class="badge entity"> валиден</span>'
+                            : '<span class="badge reason"> невалиден</span>';
                         html += `<tr>
                             <td>${esc(c.contactType)}</td>
-                            <td>${esc(c.valueRaw || '—')} ${c.valueNormalized && c.valueNormalized !== c.valueRaw ? '<span class="meta">→ '+esc(c.valueNormalized)+'</span>' : ''}</td>
+                            <td>${esc(c.valueRaw || '—')} ${c.valueNormalized && c.valueNormalized !== c.valueRaw ? '<span class="meta">— '+esc(c.valueNormalized)+'</span>' : ''}</td>
                             <td>${statusBadge}${c.isPrimary ? ' <span class="badge entity">основной</span>' : ''}</td>
                             <td><button class="button small secondary" onclick="editContactPrompt('${esc(c.id)}','${esc(readerId)}')">Изменить</button></td>
                         </tr>`;
@@ -1619,7 +1619,7 @@
                 const data = await api('/api/v1/internal/enrichment/check-isbn', 'POST', { isbn });
                 const r = data.data || {};
                 const badge = r.valid ? 'entity' : 'reason';
-                st.innerHTML = `<span class="badge ${badge}">${esc(r.isbn)} — ${r.valid ? '✅ Валиден' : '❌ Невалиден'} (${esc(r.format || 'unknown')})</span>${r.error ? ` <span class="meta">${esc(r.error)}</span>` : ''}`;
+                st.innerHTML = `<span class="badge ${badge}">${esc(r.isbn)} — ${r.valid ? ' Валиден' : ' Невалиден'} (${esc(r.format || 'unknown')})</span>${r.error ? ` <span class="meta">${esc(r.error)}</span>` : ''}`;
             } catch (err) {
                 st.innerHTML = `<span class="badge reason">Ошибка: ${esc(err.message || '')}</span>`;
             }
@@ -1696,7 +1696,7 @@
                 const r = data.data || {};
                 const content = document.getElementById(`doc-enrich-content-${docId}`);
                 if (content) {
-                    content.innerHTML = `<span class="badge entity">✅ Применено: ${(r.applied || []).join(', ')}</span>
+                    content.innerHTML = `<span class="badge entity"> Применено: ${(r.applied || []).join(', ')}</span>
                         ${r.skipped?.length ? `<span class="badge reason">Пропущено: ${r.skipped.join(', ')}</span>` : ''}
                         <button class="button small secondary" onclick="document.getElementById('doc-enrich-${docId}').style.display='none'" style="margin-left:8px">Закрыть</button>`;
                 }

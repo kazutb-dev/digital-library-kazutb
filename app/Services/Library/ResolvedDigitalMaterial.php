@@ -31,6 +31,13 @@ final readonly class ResolvedDigitalMaterial
         public ?string $storageDisk,
         public ?string $storagePath,
         public string $originalFilename,
+        public array $restrictedRoles = [],
+        public bool $campusOnly = false,
+        public ?\DateTimeInterface $embargoUntil = null,
+        public string $workflowStatus = 'published',
+        public string $downloadPolicy = 'disabled',
+        public string $printPolicy = 'disabled',
+        public string $copyPolicy = 'disabled',
     ) {}
 
     /**

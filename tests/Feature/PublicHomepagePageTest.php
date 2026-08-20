@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Support\Facades\Cache;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -11,14 +12,15 @@ use Tests\TestCase;
  * Public homepage — contract for the redesigned page.
  *
  * The homepage was rebuilt around a single-row institutional header, a
- * full-bleed hero with the catalog search, and five content sections:
+ * full-bleed hero with the catalog search, and source-backed content sections:
  *
  *   1. Hero                     data-section="homepage-canonical-hero"
- *   2. Recommended by faculty   data-section="homepage-faculty-picks"
- *   3. New additions            data-section="homepage-new-arrivals"
- *   4. Library collections      data-section="homepage-collections"
- *   5. Library statistics       data-section="homepage-statistics"
- *   6. FAQ                      data-section="homepage-faq"
+ *   2. Source-backed figures    data-section="homepage-hero-stats"
+ *   3. Library collections      data-section="homepage-faculty-picks" (only with real usage data)
+ *   4. Reader workflow          data-section="homepage-how-to-use-library"
+ *   5. New additions            data-section="homepage-new-arrivals"
+ *   6. UDC collections          data-section="homepage-collections"
+ *   7. FAQ                      data-section="homepage-faq"
  *
  * This file supersedes the previous contract, which described the retired
  * "canonical bento" shell (hero stats card, quick-link chips, collections
@@ -63,7 +65,7 @@ class PublicHomepagePageTest extends TestCase
 
     public function test_guest_can_view_homepage(): void
     {
-        $response = $this->get('/');
+        $response = $this->get('/?lang=ru');
 
         $response->assertOk()
             ->assertSee('Научная библиотека')
@@ -96,7 +98,7 @@ class PublicHomepagePageTest extends TestCase
 
     public function test_header_renders_as_a_single_row_with_brand_navigation_and_actions(): void
     {
-        $response = $this->get('/');
+        $response = $this->get('/?lang=ru');
 
         $response->assertOk()
             ->assertSee('id="siteHeader"', false)
@@ -114,7 +116,7 @@ class PublicHomepagePageTest extends TestCase
         $response->assertOk();
 
         foreach (['/catalog', '/resources', '/repository', '/news', '/events', '/contacts'] as $href) {
-            $response->assertSee('href="'.$href.'"', false);
+            $response->assertSee('href="'.$href.'?lang=ru"', false);
         }
     }
 
@@ -124,7 +126,7 @@ class PublicHomepagePageTest extends TestCase
 
         $response->assertOk()
             ->assertSee('id="site-search-input"', false)
-            ->assertSee('href="/shortlist"', false)
+            ->assertSee('href="/shortlist?lang=ru"', false)
             ->assertSee('data-locale-switcher', false)
             ->assertSee('name="locale" value="kk"', false)
             ->assertSee('name="locale" value="en"', false);
@@ -151,7 +153,7 @@ class PublicHomepagePageTest extends TestCase
             ->assertSee('Sign out');
     }
 
-    public function test_footer_keeps_its_four_column_information_architecture(): void
+    public function test_footer_exposes_only_the_four_verified_information_groups(): void
     {
         $response = $this->get('/');
 
@@ -159,8 +161,15 @@ class PublicHomepagePageTest extends TestCase
             ->assertSee('university-footer', false)
             ->assertSee('Навигация')
             ->assertSee('Обновления')
-            ->assertSee('Институт')
-            ->assertSee('Поддержка');
+            ->assertSee('О библиотеке')
+            ->assertSee('Поддержка')
+            ->assertDontSee('Институт');
+
+        $this->assertSame(
+            4,
+            substr_count($response->getContent(), 'class="university-footer__column"'),
+            'The footer must not invent an unsupported institutional column.',
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -200,33 +209,27 @@ class PublicHomepagePageTest extends TestCase
     // 2. Recommended by faculty
     // ─────────────────────────────────────────────────────────────────
 
-    public function test_faculty_picks_section_renders_every_field_of_study(): void
+    public function test_faculty_showcase_is_omitted_without_source_backed_usage(): void
     {
         $response = $this->get('/');
+        $markup = substr($response->getContent(), strpos($response->getContent(), '<div data-section="homepage-canonical-page">'));
 
-        $response->assertOk()
-            ->assertSee('data-section="homepage-faculty-picks"', false)
-            ->assertSee('Популярные книги по абонементам')
-            ->assertSee('Абонемент экономической литературы')
-            ->assertSee('Абонемент технической литературы')
-            ->assertSee('Абонемент ИТ и инженерии');
-
-        // One tab per field of study in the faculty showcase.
-        $this->assertSame(
-            3,
-            substr_count($response->getContent(), 'class="homepage-faculty-showcase__desk"'),
-            'The faculty section must offer one entry per lending desk.',
+        $response->assertOk();
+        $this->assertDoesNotMatchRegularExpression(
+            '/<section\b[^>]*\bdata-section="homepage-faculty-picks"/u',
+            $markup,
         );
+        $this->assertStringNotContainsString('class="homepage-faculty-showcase__desk"', $markup);
     }
 
-    public function test_faculty_cards_open_a_real_catalog_query(): void
+    public function test_homepage_does_not_publish_legacy_institution_filters_without_source_data(): void
     {
         $response = $this->get('/');
 
         $response->assertOk()
-            ->assertSee('institution=economic_library', false)
-            ->assertSee('institution=technology_library', false)
-            ->assertSee('institution=college_library', false);
+            ->assertDontSee('institution=economic_library', false)
+            ->assertDontSee('institution=technology_library', false)
+            ->assertDontSee('institution=college_library', false);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -235,21 +238,23 @@ class PublicHomepagePageTest extends TestCase
 
     public function test_new_additions_section_renders_a_scrollable_rail(): void
     {
-        $response = $this->get('/');
+        $response = $this->get('/?lang=ru');
 
         $response->assertOk()
             ->assertSee('data-section="homepage-new-arrivals"', false)
             ->assertSee('Новые поступления')
-            ->assertSee('Каталог пополняется');
+            ->assertSee('Каталог пополняется')
+            ->assertDontSee('id="hs-arrivals-rail"', false);
     }
 
     public function test_new_addition_cards_carry_catalog_metadata_and_a_detail_link(): void
     {
-        $response = $this->get('/');
+        $response = $this->get('/?lang=ru');
 
         $response->assertOk()
             ->assertSee('data-section="homepage-new-arrivals"', false)
-            ->assertSee('Каталог пополняется');
+            ->assertSee('Каталог пополняется')
+            ->assertDontSee('data-book-id=', false);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -289,34 +294,65 @@ class PublicHomepagePageTest extends TestCase
     // 5. Statistics
     // ─────────────────────────────────────────────────────────────────
 
-    public function test_statistics_section_renders_every_figure(): void
+    public function test_statistics_render_only_source_backed_figures(): void
     {
-        $response = $this->get('/');
+        Cache::put('public.portal.statistics.v3', [
+            'catalog_titles' => 9562,
+            'physical_copies' => 50907,
+            'electronic_materials' => null,
+            'published_resources' => 6,
+            'published_repository' => 0,
+            'published_news' => 0,
+            'published_events' => 0,
+        ], now()->addMinute());
+
+        $response = $this->get('/?lang=ru');
 
         $response->assertOk()
-            ->assertSee('data-section="homepage-statistics"', false)
-            ->assertSee('Статистика библиотеки')
-            ->assertSee('46 000+')
-            ->assertSee('Уникальных книг в библиотеке')
-            ->assertSee('100 000+')
-            ->assertSee('Печатных экземпляров')
-            ->assertSee('Читальных зала');
+            ->assertSee('data-section="homepage-hero-stats"', false)
+            ->assertSee('data-stat-source="catalog_titles"', false)
+            ->assertSee('9 562')
+            ->assertSee('Наименований в электронном каталоге')
+            ->assertSee('data-stat-source="physical_copies"', false)
+            ->assertSee('50 907')
+            ->assertSee('Экземпляров в библиотечном фонде')
+            ->assertSee('data-stat-source="published_resources"', false)
+            ->assertSee('Ресурсов с опубликованными условиями доступа')
+            ->assertSee('data-stat-source="public_catalog_availability"', false)
+            ->assertSee('Онлайн-каталог доступен круглосуточно')
+            ->assertDontSee('46 000+')
+            ->assertDontSee('100 000+')
+            ->assertDontSee('90 000+')
+            ->assertDontSee('2 416+');
 
         $this->assertSame(
-            3,
-            substr_count($response->getContent(), 'class="hs-stat"'),
-            'The statistics section must render three figures.',
+            4,
+            substr_count($response->getContent(), 'class="homepage-hero-stats__item"'),
+            'Every rendered figure must be either source-backed or the explicit online-catalogue availability claim.',
         );
     }
 
     public function test_statistics_are_localised_for_english_number_formatting(): void
     {
+        Cache::put('public.portal.statistics.v3', [
+            'catalog_titles' => 9562,
+            'physical_copies' => 50907,
+            'electronic_materials' => null,
+            'published_resources' => null,
+            'published_repository' => 0,
+            'published_news' => 0,
+            'published_events' => 0,
+        ], now()->addMinute());
+
         $this->get('/?lang=en')
             ->assertOk()
-            ->assertSee('46,000+')
-            ->assertSee('Unique books in the library')
-            ->assertSee('100,000+')
-            ->assertSee('Reading rooms');
+            ->assertSee('9,562')
+            ->assertSee('Titles in the electronic catalogue')
+            ->assertSee('50,907')
+            ->assertSee('Copies in the library collection')
+            ->assertSee('The online catalogue is available around the clock')
+            ->assertDontSee('46,000+')
+            ->assertDontSee('100,000+');
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -336,39 +372,44 @@ class PublicHomepagePageTest extends TestCase
             ->assertSee('Как забронировать литературу?')
             ->assertSee('Как пользоваться электронной библиотекой?')
             ->assertSee('Как получить доступ из дома?')
-            ->assertSee('Как пользоваться AI-помощником?')
-            ->assertSee('Как связаться с библиотекарем?');
+            ->assertSee('Как связаться с библиотекарем?')
+            ->assertDontSee('Как пользоваться AI-помощником?');
 
         // <details>/<summary> keeps the accordion usable without JavaScript.
         $this->assertSame(
-            8,
+            7,
             substr_count($response->getContent(), '<details class="hs-faq__item">'),
             'Each FAQ entry must be a native disclosure element.',
         );
     }
 
-    public function test_faq_answers_match_the_published_circulation_policy(): void
+    public function test_faq_uses_current_workflow_copy_without_unverified_limits(): void
     {
         $response = $this->get('/');
 
         $response->assertOk()
-            // Renewal terms (PROJECT_CONTEXT §13) and reservation limits (§12).
-            ->assertSee('продлить один раз')
-            ->assertSee('до трёх')
-            ->assertSee('3 дня')
-            // Digital access is read-only by policy (§19.2).
-            ->assertSee('Скачивание файлов не предусмотрено')
+            ->assertSee('Если продление разрешено для текущей выдачи')
+            ->assertSee('Кнопка бронирования показывается только когда запрос доступен')
+            ->assertSee('скачивание (если разрешено)')
             // The section links out to the full rules document.
-            ->assertSee('href="/rules?lang=ru#borrowing"', false);
+            ->assertSee('href="/rules?lang=ru#borrowing"', false)
+            ->assertDontSee('Скачивание файлов не предусмотрено')
+            ->assertDontSee('продлить один раз')
+            ->assertDontSee('до трёх')
+            ->assertDontSee('3 дня');
     }
 
-    public function test_faq_states_that_the_ai_assistant_is_not_yet_available(): void
+    public function test_public_faq_does_not_expose_development_roadmap_copy(): void
     {
-        // PROJECT_CONTEXT §34 lists AI-assisted discovery as future scope; the
-        // page must not imply readers can use it today.
-        $this->get('/')
+        $this->get('/?lang=ru')
             ->assertOk()
-            ->assertSee('находится в разработке');
+            ->assertDontSee('находится в разработке')
+            ->assertDontSee('пока недоступен читателям');
+
+        $this->get('/?lang=en')
+            ->assertOk()
+            ->assertDontSee('under development')
+            ->assertDontSee('not yet available to readers');
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -378,17 +419,20 @@ class PublicHomepagePageTest extends TestCase
     public function test_sections_appear_in_the_designed_order(): void
     {
         $content = $this->get('/')->assertOk()->getContent();
+        $markupStart = strpos($content, '<div data-section="homepage-canonical-page">');
+        $this->assertNotFalse($markupStart, 'The canonical homepage wrapper is missing.');
+        $markup = substr($content, $markupStart);
 
         $positions = [];
         foreach ([
             'homepage-canonical-hero',
-            'homepage-faculty-picks',
+            'homepage-hero-stats',
+            'homepage-how-to-use-library',
             'homepage-new-arrivals',
             'homepage-collections',
-            'homepage-statistics',
             'homepage-faq',
         ] as $section) {
-            $position = strpos($content, 'data-section="'.$section.'"');
+            $position = strpos($markup, 'data-section="'.$section.'"');
             $this->assertNotFalse($position, "Section {$section} is missing from the homepage.");
             $positions[$section] = $position;
         }
@@ -407,12 +451,12 @@ class PublicHomepagePageTest extends TestCase
     {
         $content = $this->get('/')->assertOk()->getContent();
 
-        // One h2 per content section keeps the document outline navigable:
-        // faculty picks, how-to-use, new arrivals, collections, statistics, FAQ.
+        // Source-backed figures live in the hero strip and do not introduce a
+        // fake statistics heading. The remaining content sections each do.
         $this->assertSame(
-            6,
+            4,
             substr_count($content, 'class="hs-title"'),
-            'Each content section must expose exactly one section heading.',
+            'Every source-backed content section rendered by the empty test fixture must expose one heading.',
         );
     }
 
@@ -465,31 +509,33 @@ class PublicHomepagePageTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSee('<html lang="ru">', false)
-            ->assertSee('Популярные книги по абонементам');
+            ->assertSee('Как пользоваться библиотекой');
     }
 
-    public function test_kazakh_locale_renders_every_section_heading(): void
+    public function test_kazakh_locale_renders_public_sections_and_truthful_online_claim(): void
     {
         $this->get('/?lang=kk')
             ->assertOk()
             ->assertSee('<html lang="kk">', false)
-            ->assertSee('Абонементтер бойынша танымал кітаптар')
+            ->assertSee('Кітапхананы қалай пайдалану керек')
             ->assertSee('Жаңа түсімдер')
             ->assertSee('Кітапхана жинақтары')
-            ->assertSee('Кітапхана статистикасы')
-            ->assertSee('Жиі қойылатын сұрақтар');
+            ->assertSee('Жиі қойылатын сұрақтар')
+            ->assertSee('Онлайн каталог тәулік бойы қолжетімді')
+            ->assertDontSee('Кітапхана статистикасы');
     }
 
-    public function test_english_locale_renders_every_section_heading(): void
+    public function test_english_locale_renders_public_sections_and_truthful_online_claim(): void
     {
         $this->get('/?lang=en')
             ->assertOk()
             ->assertSee('<html lang="en">', false)
-            ->assertSee('Popular books by desk')
+            ->assertSee('How to use the library')
             ->assertSee('New additions')
             ->assertSee('Library collections')
-            ->assertSee('Library statistics')
-            ->assertSee('Frequently asked questions');
+            ->assertSee('Frequently asked questions')
+            ->assertSee('The online catalogue is available around the clock')
+            ->assertDontSee('Library statistics');
     }
 
     public function test_internal_links_carry_the_active_locale(): void

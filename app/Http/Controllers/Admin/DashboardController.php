@@ -26,7 +26,7 @@ class DashboardController extends Controller
             'logs' => $user->can('system.logs'),
             'news' => $user->canAny(['news.edit_any', 'news.edit_own']),
             'news_create' => $user->can('news.create'),
-            'messages' => $user->can('messages.view_all'),
+            'messages' => $user->can('messages.view_assigned'),
             'reports' => $user->can('reports.view_full'),
             'reports_export' => $user->can('reports.export') && $user->can('reports.view_full'),
             'settings' => $user->can('system.settings'),

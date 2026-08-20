@@ -35,8 +35,8 @@ class EnsureControlPlaneAccess
 
         // Reader requests.
         'messages.view_all',
+        'messages.view_assigned',
         'messages.resolve',
-        'messages.delete',
 
         // System-wide analytics and exports.
         'reports.view_full',
@@ -52,6 +52,7 @@ class EnsureControlPlaneAccess
         }
 
         if (! $user->hasRole('admin') && $user->hasAnyRole([
+            'librarian',
             'director',
             'senior_librarian',
             'acquisitions',

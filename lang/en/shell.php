@@ -2,7 +2,7 @@
 
 return [
     'language_switcher' => 'Change interface language',
-    'legacy_account_notice' => 'This legacy reader workspace is being retired. The canonical KazUTB experience now lives in the <strong>Reader account → /dashboard</strong>.',
+    'legacy_account_notice' => 'Reader services are available in <strong>My library</strong>.',
     'member' => [
         'title' => 'Reader account',
         'subtitle' => 'Reader services and activity',
@@ -17,6 +17,6 @@ return [
         'operator' => 'Library operator',
         'role' => 'Librarian',
         'navigation' => 'Librarian console navigation',
-        'coming_soon' => 'soon',
+        'coming_soon' => 'unavailable',
     ],
 ];

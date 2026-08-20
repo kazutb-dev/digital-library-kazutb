@@ -4,13 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\ExternalResourceService;
+use App\Support\LocaleResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ExternalResourceController extends Controller
 {
     public function __construct(
-        private readonly ExternalResourceService $service
+        private readonly ExternalResourceService $service,
+        private readonly LocaleResolver $localeResolver,
     ) {}
 
     /**
@@ -19,11 +21,18 @@ class ExternalResourceController extends Controller
      * GET /api/v1/external-resources
      *   ?category=electronic_library|research_database|open_access|analytics
      *   &access_type=campus|remote_auth|open
-     *   &status=active|expiring_soon|inactive
+     *   &status=active|expiring_soon|expired
+     *   &audience=guest|student|teacher|library_staff
+     *   &content_type=scientific_articles
+     *   &access_scope=guest|authenticated|campus|remote
      */
     public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['category', 'access_type', 'status']);
+        app()->setLocale($this->localeResolver->resolve($request));
+        $filters = $request->only([
+            'category', 'resource_type', 'access_type', 'status',
+            'audience', 'content_type', 'access_scope',
+        ]);
 
         $resources = $this->service->list($filters);
 
@@ -32,7 +41,16 @@ class ExternalResourceController extends Controller
             'meta' => [
                 'total' => $resources->count(),
                 'categories' => $this->service->categories(),
+                'resource_types' => $this->service->resourceTypes(),
                 'access_types' => $this->service->accessTypes(),
+                'audiences' => $this->service->audiences(),
+                'content_types' => $this->service->contentTypes(),
+                'access_scopes' => [
+                    'guest' => __('external_resources.filters.access_scopes.guest'),
+                    'authenticated' => __('external_resources.filters.access_scopes.authenticated'),
+                    'campus' => __('external_resources.filters.access_scopes.campus'),
+                    'remote' => __('external_resources.filters.access_scopes.remote'),
+                ],
             ],
         ]);
     }
@@ -42,13 +60,14 @@ class ExternalResourceController extends Controller
      *
      * GET /api/v1/external-resources/{slug}
      */
-    public function show(string $slug): JsonResponse
+    public function show(Request $request, string $slug): JsonResponse
     {
+        app()->setLocale($this->localeResolver->resolve($request));
         $resource = $this->service->findBySlug($slug);
 
         if (! $resource) {
             return response()->json([
-                'message' => 'Ресурс не найден.',
+                'message' => __('external_resources.api.not_found'),
             ], 404);
         }
 

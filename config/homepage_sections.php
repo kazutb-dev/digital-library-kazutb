@@ -6,9 +6,8 @@
 // catalog in the `/` route and rendered only when the catalog can answer, so a
 // card never shows an invented number.
 //
-// The institutional figures in `stats` are supplied by the library as public
-// claims about the physical service (reading rooms, fund availability); the
-// platform cannot compute them today.
+// Physical rooms, schedules and other operational claims are intentionally
+// absent unless an authoritative source is available.
 
 return [
 
@@ -41,16 +40,16 @@ return [
     // ════════════════════════════════════════════════════════════════
     'ru' => [
         'faculty' => [
-            'kicker' => 'Абонементы библиотеки',
-            'title' => 'Три основных абонемента',
-            'lead' => 'Вместо рекомендаций кафедр здесь показаны реальные абонементы по факультетам.',
-            'cta' => 'Открыть абонемент',
+            'kicker' => 'Подразделения фонда',
+            'title' => 'Книги по библиотечным фондам',
+            'lead' => 'Названия соответствуют подразделениям, зарегистрированным в каталоге.',
+            'cta' => 'Показать книги',
             'count_label' => 'раздел фонда',
-            'all' => 'Все абонементы',
+            'all' => 'Открыть каталог',
             'names' => [
-                'econ' => 'Абонемент экономического факультета',
-                'tech' => 'Абонемент технологического факультета',
-                'engit' => 'Абонемент факультета инжиниринга и информационных технологий',
+                'econ' => 'Экономическая библиотека',
+                'tech' => 'Технологическая библиотека',
+                'engit' => 'Библиотека колледжа',
             ],
         ],
 
@@ -62,7 +61,7 @@ return [
             'details' => 'Подробнее',
             'available' => 'Доступно',
             'unavailable' => 'Все выданы',
-            'no_holdings' => 'Данные о наличии уточняются',
+            'no_holdings' => 'Экземпляры не зарегистрированы',
             'copies' => 'экз.',
             'prev' => 'Предыдущие поступления',
             'next' => 'Следующие поступления',
@@ -105,12 +104,8 @@ return [
         'stats' => [
             'kicker' => 'Библиотека в цифрах',
             'title' => 'Статистика библиотеки',
-            'lead' => 'Фонд и пространства библиотеки поддерживают ежедневную учёбу, самостоятельную работу и исследования студентов.',
-            'items' => [
-                ['value' => '46 000+',  'label' => 'Уникальных книг в библиотеке', 'icon' => 'auto_stories'],
-                ['value' => '100 000+', 'label' => 'Печатных экземпляров', 'icon' => 'library_books'],
-                ['value' => '3',        'label' => 'Читальных зала', 'icon' => 'meeting_room'],
-            ],
+            'lead' => 'Показатели рассчитываются по текущему состоянию системы.',
+            'items' => [],
         ],
 
         'faq' => [
@@ -121,35 +116,31 @@ return [
             'items' => [
                 [
                     'q' => 'Как получить читательский билет?',
-                    'a' => 'Отдельный билет для цифровых сервисов не нужен: доступ к каталогу, электронным материалам и личному кабинету открывается по корпоративной учётной записи университета. Для получения печатных изданий обратитесь на пункт выдачи с удостоверением университета — сотрудник зарегистрирует вас в системе обслуживания.',
+                    'a' => 'Каталог и публичные описания доступны без отдельного билета. Для входа в личный кабинет используйте выданные университетом учётные данные; условия электронных материалов указаны в их карточках. Порядок получения печатных изданий уточните у библиотеки по контактам на сайте.',
                 ],
                 [
                     'q' => 'Как войти в личный кабинет?',
-                    'a' => 'Нажмите «Войти» в шапке сайта и введите корпоративный логин и пароль университета. Отдельная регистрация не требуется — учётные записи создаются централизованно. Гостям доступны каталог, описания ресурсов и научный репозиторий без входа.',
+                    'a' => 'Нажмите «Войти» в шапке сайта и используйте выданные университетом учётные данные. Если доступ не предоставлен, свяжитесь с библиотекой. Гостям доступны каталог, описания ресурсов и публичные записи научного репозитория без входа.',
                 ],
                 [
                     'q' => 'Как продлить книгу?',
-                    'a' => 'Продление доступно в личном кабинете в разделе истории выдач. Издание можно продлить один раз на тот же срок, если на него нет активной брони другого читателя. При наличии просроченных выдач продление и новые брони недоступны до возврата.',
+                    'a' => 'Откройте историю выдач в личном кабинете. Если продление разрешено для текущей выдачи, там будут показаны действие и новый срок.',
                 ],
                 [
                     'q' => 'Как забронировать литературу?',
-                    'a' => 'Найдите издание в каталоге, откройте карточку и нажмите «Забронировать». Бронировать можно только доступные экземпляры, одновременно — до трёх. Бронь подтверждает библиотекарь, после чего экземпляр хранится на пункте выдачи 3 дня; при неявке бронь автоматически снимается.',
+                    'a' => 'Найдите издание в каталоге и откройте его карточку. Кнопка бронирования показывается только когда запрос доступен; текущие условия и сроки будут указаны в личном кабинете.',
                 ],
                 [
                     'q' => 'Как пользоваться электронной библиотекой?',
-                    'a' => 'Электронные материалы открываются в контролируемом просмотрщике прямо в браузере. Скачивание файлов не предусмотрено — это условие соглашений с правообладателями. Обложки и ознакомительные фрагменты видны всем, полный текст — авторизованным читателям при наличии соответствующего уровня доступа.',
+                    'a' => 'Для каждого опубликованного электронного материала интерфейс показывает доступные действия и условия: просмотр, скачивание (если разрешено) или необходимость входа.',
                 ],
                 [
                     'q' => 'Как получить доступ из дома?',
-                    'a' => 'Каталог, репозиторий и описания ресурсов открыты из любой точки без входа. Для электронных материалов и личного кабинета достаточно войти по корпоративной учётной записи. Лицензионные внешние базы имеют собственные условия доступа — они указаны в карточке каждого ресурса на странице «Ресурсы».',
-                ],
-                [
-                    'q' => 'Как пользоваться AI-помощником?',
-                    'a' => 'Интеллектуальный подбор литературы находится в разработке и пока недоступен читателям. Сегодня эту задачу выполняет библиограф: отправьте тему исследования или курса через страницу контактов, и специалист подготовит подборку источников и черновик списка литературы.',
+                    'a' => 'Каталог, публичные записи репозитория и описания ресурсов открыты из любой точки без входа. Доступ к личному кабинету и электронным материалам зависит от вашей учётной записи и условий конкретного материала. Условия внешних ресурсов указаны в их карточках на странице «Ресурсы».',
                 ],
                 [
                     'q' => 'Как связаться с библиотекарем?',
-                    'a' => 'Через страницу контактов: там указаны электронная почта, телефоны и часы работы, а также форма обращения для авторизованных читателей. Очно — на пунктах выдачи: технологический фонд (1/200), фонд колледжа (1/202) и экономический фонд (1/203).',
+                    'a' => 'На странице контактов указаны подтверждённые электронная почта, телефон, часы работы и канал обращения для авторизованных читателей. Точное место обслуживания перед визитом уточните у библиотеки.',
                 ],
             ],
         ],
@@ -158,16 +149,16 @@ return [
     // ════════════════════════════════════════════════════════════════
     'kk' => [
         'faculty' => [
-            'kicker' => 'Кітапхана абонементтері',
-            'title' => 'Үш негізгі абонемент',
-            'lead' => 'Кафедра ұсыныстарының орнына мұнда факультеттер бойынша қызмет көрсететін нақты абонементтер берілген.',
-            'cta' => 'Абонементті ашу',
+            'kicker' => 'Қор бөлімшелері',
+            'title' => 'Кітапхана қорлары бойынша кітаптар',
+            'lead' => 'Атаулар каталогта тіркелген бөлімшелерге сәйкес келеді.',
+            'cta' => 'Кітаптарды көрсету',
             'count_label' => 'қор бөлімі',
-            'all' => 'Барлық абонементтер',
+            'all' => 'Каталогты ашу',
             'names' => [
-                'econ' => 'Экономикалық факультет абонементі',
-                'tech' => 'Технологиялық факультет абонементі',
-                'engit' => 'Инжиниринг және ақпараттық технологиялар факультетінің абонементі',
+                'econ' => 'Экономикалық кітапхана',
+                'tech' => 'Технологиялық кітапхана',
+                'engit' => 'Колледж кітапханасы',
             ],
         ],
 
@@ -179,7 +170,7 @@ return [
             'details' => 'Толығырақ',
             'available' => 'Қолжетімді',
             'unavailable' => 'Барлығы берілген',
-            'no_holdings' => 'Қор туралы дерек нақтылануда',
+            'no_holdings' => 'Даналар тіркелмеген',
             'copies' => 'дана',
             'prev' => 'Алдыңғы түсімдер',
             'next' => 'Келесі түсімдер',
@@ -222,12 +213,8 @@ return [
         'stats' => [
             'kicker' => 'Кітапхана сандармен',
             'title' => 'Кітапхана статистикасы',
-            'lead' => 'Кітапхана қоры мен кеңістіктері студенттердің күнделікті оқуын, өзіндік жұмысын және зерттеулерін қолдайды.',
-            'items' => [
-                ['value' => '46 000+',  'label' => 'Кітапханадағы бірегей кітап', 'icon' => 'auto_stories'],
-                ['value' => '100 000+', 'label' => 'Баспа данасы', 'icon' => 'library_books'],
-                ['value' => '3',        'label' => 'Оқу залы', 'icon' => 'meeting_room'],
-            ],
+            'lead' => 'Көрсеткіштер жүйенің ағымдағы күйі бойынша есептеледі.',
+            'items' => [],
         ],
 
         'faq' => [
@@ -238,35 +225,31 @@ return [
             'items' => [
                 [
                     'q' => 'Оқырман билетін қалай алуға болады?',
-                    'a' => 'Цифрлық сервистер үшін бөлек билет қажет емес: каталогқа, электрондық материалдарға және жеке кабинетке қолжетімділік университеттің корпоративтік есептік жазбасы арқылы ашылады. Баспа басылымдарын алу үшін университет куәлігімен беру пунктіне жүгініңіз — қызметкер сізді қызмет көрсету жүйесіне тіркейді.',
+                    'a' => 'Каталог пен ашық сипаттамалар бөлек билетсіз қолжетімді. Жеке кабинетке кіру үшін университет берген есептік жазбаны пайдаланыңыз; электрондық материалдың шарттары оның карточкасында көрсетіледі. Баспа басылымдарын алу тәртібін сайттағы байланыстар арқылы кітапханадан анықтаңыз.',
                 ],
                 [
                     'q' => 'Жеке кабинетке қалай кіруге болады?',
-                    'a' => 'Сайттың жоғарғы жағындағы «Кіру» түймесін басып, университеттің корпоративтік логині мен құпиясөзін енгізіңіз. Бөлек тіркелу қажет емес — есептік жазбалар орталықтандырылып жасалады. Қонақтарға каталог, ресурс сипаттамалары және ғылыми репозиторий кірусіз қолжетімді.',
+                    'a' => 'Сайттың жоғарғы жағындағы «Кіру» түймесін басып, университет берген есептік жазбаны пайдаланыңыз. Қолжетімділік берілмесе, кітапханаға хабарласыңыз. Қонақтарға каталог, ресурс сипаттамалары және ғылыми репозиторийдің ашық жазбалары кірусіз қолжетімді.',
                 ],
                 [
                     'q' => 'Кітапты қалай ұзартуға болады?',
-                    'a' => 'Ұзарту жеке кабинеттегі беру тарихы бөлімінде қолжетімді. Басылымды басқа оқырманның белсенді броны болмаса, сол мерзімге бір рет ұзартуға болады. Мерзімі өткен берулер болса, ұзарту мен жаңа брондау қайтарылғанға дейін мүмкін емес.',
+                    'a' => 'Жеке кабинеттегі беру тарихын ашыңыз. Егер ағымдағы беруді ұзартуға рұқсат етілсе, сол жерде әрекет пен жаңа мерзім көрсетіледі.',
                 ],
                 [
                     'q' => 'Әдебиетті қалай брондауға болады?',
-                    'a' => 'Каталогтан басылымды тауып, карточкасын ашыңыз да «Брондау» түймесін басыңыз. Тек қолжетімді даналарды брондауға болады, бір мезгілде — үшеуге дейін. Бронды кітапханашы растайды, содан кейін дана беру пунктінде 3 күн сақталады; келмеген жағдайда бронь автоматты түрде алынады.',
+                    'a' => 'Каталогтан басылымды тауып, оның карточкасын ашыңыз. Брондау түймесі сұрау қолжетімді болғанда ғана көрсетіледі; ағымдағы шарттар мен мерзімдер жеке кабинетте беріледі.',
                 ],
                 [
                     'q' => 'Электрондық кітапхананы қалай пайдалану керек?',
-                    'a' => 'Электрондық материалдар браузерде бақыланатын қарау құралында ашылады. Файлдарды жүктеп алу қарастырылмаған — бұл құқық иеленушілермен келісім шарты. Мұқабалар мен таныстыру үзінділері барлығына көрінеді, толық мәтін — тиісті қолжетімділік деңгейі бар авторизацияланған оқырмандарға.',
+                    'a' => 'Әр жарияланған электрондық материал үшін интерфейс қолжетімді әрекеттер мен шарттарды көрсетеді: қарау, рұқсат етілсе жүктеу немесе жүйеге кіру қажеттілігі.',
                 ],
                 [
                     'q' => 'Үйден қалай қол жеткізуге болады?',
-                    'a' => 'Каталог, репозиторий және ресурс сипаттамалары кез келген жерден кірусіз ашық. Электрондық материалдар мен жеке кабинет үшін корпоративтік есептік жазбамен кіру жеткілікті. Лицензияланған сыртқы дерекқорлардың өз шарттары бар — олар «Ресурстар» бетіндегі әр ресурс карточкасында көрсетілген.',
-                ],
-                [
-                    'q' => 'AI-көмекшіні қалай пайдалану керек?',
-                    'a' => 'Әдебиетті интеллектуалды іріктеу әзірленуде және оқырмандарға әзірге қолжетімді емес. Бүгінде бұл міндетті библиограф орындайды: зерттеу немесе курс тақырыбын байланыс беті арқылы жіберіңіз, маман дереккөздер іріктемесін және әдебиеттер тізімінің жобасын дайындайды.',
+                    'a' => 'Каталог, репозиторийдің ашық жазбалары және ресурс сипаттамалары кез келген жерден кірусіз қолжетімді. Жеке кабинет пен электрондық материалдарға қолжетімділік есептік жазбаңызға және нақты материалдың шарттарына байланысты. Сыртқы ресурстардың шарттары «Ресурстар» бетіндегі карточкаларда көрсетілген.',
                 ],
                 [
                     'q' => 'Кітапханашымен қалай байланысуға болады?',
-                    'a' => 'Байланыс беті арқылы: онда электрондық пошта, телефондар мен жұмыс уақыты, сондай-ақ авторизацияланған оқырмандарға арналған өтініш нысаны көрсетілген. Тікелей — беру пункттерінде: технологиялық қор (1/200), колледж қоры (1/202) және экономикалық қор (1/203).',
+                    'a' => 'Байланыс бетінде расталған электрондық пошта, телефон, жұмыс уақыты және авторизацияланған оқырмандарға арналған өтініш арнасы көрсетілген. Келмес бұрын нақты қызмет көрсету орнын кітапханадан анықтаңыз.',
                 ],
             ],
         ],
@@ -275,16 +258,16 @@ return [
     // ════════════════════════════════════════════════════════════════
     'en' => [
         'faculty' => [
-            'kicker' => 'Library lending desks',
-            'title' => 'Three main lending desks',
-            'lead' => 'Instead of department recommendations, this section highlights the real reader service points by faculty.',
-            'cta' => 'Open desk',
+            'kicker' => 'Library collections',
+            'title' => 'Books by library collection',
+            'lead' => 'Names match the collection units registered in the catalog.',
+            'cta' => 'Show books',
             'count_label' => 'service unit',
-            'all' => 'All desks',
+            'all' => 'Open catalog',
             'names' => [
-                'econ' => 'Economics faculty desk',
-                'tech' => 'Technology faculty desk',
-                'engit' => 'Engineering and information technology faculty desk',
+                'econ' => 'Economics Library',
+                'tech' => 'Technology Library',
+                'engit' => 'College Library',
             ],
         ],
 
@@ -296,7 +279,7 @@ return [
             'details' => 'Details',
             'available' => 'Available',
             'unavailable' => 'All on loan',
-            'no_holdings' => 'Holdings data pending',
+            'no_holdings' => 'No copies are registered',
             'copies' => 'copies',
             'prev' => 'Previous additions',
             'next' => 'Next additions',
@@ -339,12 +322,8 @@ return [
         'stats' => [
             'kicker' => 'The library in numbers',
             'title' => 'Library statistics',
-            'lead' => 'The library collection and its spaces support students’ daily learning, independent work, and research.',
-            'items' => [
-                ['value' => '46,000+',  'label' => 'Unique books in the library', 'icon' => 'auto_stories'],
-                ['value' => '100,000+', 'label' => 'Printed copies', 'icon' => 'library_books'],
-                ['value' => '3',        'label' => 'Reading rooms', 'icon' => 'meeting_room'],
-            ],
+            'lead' => 'Figures are calculated from the current system state.',
+            'items' => [],
         ],
 
         'faq' => [
@@ -355,35 +334,31 @@ return [
             'items' => [
                 [
                     'q' => 'How do I get a library card?',
-                    'a' => 'No separate card is needed for digital services: the catalog, digital materials and member dashboard open with your corporate university account. To borrow print editions, visit a service desk with your university ID and a member of staff will register you in the circulation system.',
+                    'a' => 'The catalog and public descriptions are available without a separate card. Use the account issued by the university to sign in; each digital-material record states its own access conditions. Confirm the procedure for borrowing print editions with the library through the contacts listed on this site.',
                 ],
                 [
                     'q' => 'How do I sign in to the member dashboard?',
-                    'a' => 'Press "Sign in" in the site header and enter your corporate university login and password. No separate registration is required — accounts are created centrally. Guests can browse the catalog, resource descriptions and the scholarly repository without signing in.',
+                    'a' => 'Press "Sign in" in the site header and use the account issued by the university. If you have not been granted access, contact the library. Guests can browse the catalog, resource descriptions and public scholarly-repository records without signing in.',
                 ],
                 [
                     'q' => 'How do I renew a book?',
-                    'a' => 'Renewal is available in your dashboard under borrowing history. An item can be renewed once for the same period, provided no other reader holds an active reservation on it. While you have overdue loans, renewals and new reservations are unavailable until the items are returned.',
+                    'a' => 'Open borrowing history in your dashboard. If renewal is allowed for the current loan, the action and the new due date will be shown there.',
                 ],
                 [
                     'q' => 'How do I reserve an item?',
-                    'a' => 'Find the edition in the catalog, open its record and press "Reserve". Only available copies can be reserved, up to three at a time. A librarian confirms the reservation, after which the copy is held at the service desk for 3 days; if it is not collected, the reservation expires automatically.',
+                    'a' => 'Find the edition in the catalog and open its record. The reservation action is shown only when a request is available; current terms and dates are stated in the reader dashboard.',
                 ],
                 [
                     'q' => 'How does the digital library work?',
-                    'a' => 'Digital materials open in a controlled viewer directly in the browser. File downloads are not provided — this is a condition of our agreements with rights holders. Covers and limited previews are visible to everyone; full text is available to signed-in readers with the appropriate access level.',
+                    'a' => 'For each published digital material, the interface shows the available actions and conditions: viewing, downloading when permitted, or a sign-in requirement.',
                 ],
                 [
                     'q' => 'How do I get access from home?',
-                    'a' => 'The catalog, repository and resource descriptions are open from anywhere without signing in. Digital materials and the dashboard only require your corporate account. Licensed external databases have their own access conditions, stated on each resource card on the Resources page.',
-                ],
-                [
-                    'q' => 'How do I use the AI assistant?',
-                    'a' => 'Intelligent literature selection is under development and not yet available to readers. Today a bibliographer does this work: send your research or course topic through the contacts page and a specialist will prepare a set of sources and a draft reading list.',
+                    'a' => 'The catalog, public repository records and resource descriptions are available from anywhere without signing in. Access to the dashboard and digital materials depends on your account and the conditions of each material. Conditions for external resources are stated on their cards on the Resources page.',
                 ],
                 [
                     'q' => 'How do I contact a librarian?',
-                    'a' => 'Through the contacts page, which lists email, phone numbers and opening hours, along with an inquiry form for signed-in readers. In person, visit a service desk: technology fund (1/200), college fund (1/202) or economics fund (1/203).',
+                    'a' => 'The contacts page lists the verified email, phone number, opening-hours information and inquiry route for signed-in readers. Confirm the exact service point with the library before visiting.',
                 ],
             ],
         ],

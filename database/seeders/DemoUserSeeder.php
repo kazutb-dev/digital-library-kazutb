@@ -43,7 +43,7 @@ class DemoUserSeeder extends Seeder
                 'email_verified_at' => now(),
             ]);
             if ($isNew) {
-                $user->locale = 'kk';
+                $user->locale = 'ru';
             }
             $user->save();
 

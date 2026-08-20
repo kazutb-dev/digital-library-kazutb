@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Librarian;
 
 use App\Exceptions\CirculationException;
 use App\Http\Controllers\Controller;
+use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\Loan;
 use App\Models\Catalog\ReaderProfile;
@@ -19,7 +20,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
- * Circulation desk (Master.md §14, scenario §31.2): dashboard, issue,
+ * Circulation desk (Master.md 14, scenario 31.2): dashboard, issue,
  * return, renewal. The desk works in exactly the order the regulation
  * prescribes — reader first, restrictions second, copy third.
  */
@@ -93,7 +94,7 @@ class CirculationController extends Controller
     }
 
     /**
-     * Step 1 of §14.1 — find the reader by name / ticket / email / barcode.
+     * Step 1 of 14.1 — find the reader by name / ticket / email / barcode.
      */
     public function readerLookup(Request $request): JsonResponse
     {
@@ -113,7 +114,7 @@ class CirculationController extends Controller
                     ->orWhere('name', 'like', $rawNeedle)
                     ->orWhereRaw('LOWER(email) LIKE ?', [$needle])
                     ->orWhereRaw('LOWER(COALESCE(ad_login, \'\')) LIKE ?', [$needle])
-                    // §9.4 — a scanned card barcode must resolve here too, not
+                    // 9.4 — a scanned card barcode must resolve here too, not
                     // only free-text name/ticket search.
                     ->orWhereHas('readerProfile', fn (Builder $profile) => $profile
                         ->whereRaw('LOWER(ticket_number) LIKE ?', [$needle])
@@ -153,7 +154,25 @@ class CirculationController extends Controller
             ->first();
 
         if ($copy === null) {
-            return response()->json(['data' => null]);
+            $editions = $this->findEditionsByIsbn($term);
+
+            if ($editions->isNotEmpty()) {
+                return response()->json([
+                    'data' => null,
+                    'match_type' => 'isbn',
+                    'editions' => $editions->map(fn (BibliographicRecord $record): array => [
+                        'id' => $record->getKey(),
+                        'title' => $record->title,
+                        'author' => $record->primary_author,
+                        'isbn' => $record->isbn,
+                        'copies_count' => (int) $record->copies_count,
+                        'available_copies_count' => (int) $record->available_copies_count,
+                        'copies_url' => route('librarian.copies.index', ['search' => $record->isbn]),
+                    ])->values(),
+                ]);
+            }
+
+            return response()->json(['data' => null, 'match_type' => null]);
         }
 
         return response()->json(['data' => [
@@ -190,6 +209,15 @@ class CirculationController extends Controller
         $copy = $this->findCopyByCode($validated['copy_code']);
 
         if ($copy === null) {
+            $edition = $this->findEditionsByIsbn($validated['copy_code'])->first();
+            if ($edition !== null) {
+                return back()->withInput()->withErrors([
+                    'copy_code' => __('librarian.errors.isbn_requires_copy_code', [
+                        'count' => (int) $edition->available_copies_count,
+                    ]),
+                ]);
+            }
+
             return back()->withInput()->withErrors(['copy_code' => __('librarian.errors.copy_not_found')]);
         }
 
@@ -318,12 +346,12 @@ class CirculationController extends Controller
     }
 
     /**
-     * §9.4 — printable reader card carrying the scannable code, mirroring the
+     * 9.4 — printable reader card carrying the scannable code, mirroring the
      * copy label at /librarian/copies/{copy}/label.
      */
     public function readerCard(User $reader, MachineCodeService $codes): View
     {
-        // Guarantees the card has a code even for a profile predating §9.4.
+        // Guarantees the card has a code even for a profile predating 9.4.
         $profile = ReaderProfile::forUser($reader);
 
         return view('librarian.circulation.reader-card', [
@@ -342,5 +370,33 @@ class CirculationController extends Controller
             ->whereRaw('LOWER(barcode) = ?', [$normalized])
             ->orWhereRaw('LOWER(inventory_number) = ?', [$normalized])
             ->first();
+    }
+
+    /**
+     * ISBN identifies an edition, never a physical copy. This lookup exists so
+     * the circulation desk can explain an ISBN match without silently issuing
+     * an arbitrary copy and corrupting copy-level accountability.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, BibliographicRecord>
+     */
+    private function findEditionsByIsbn(string $value)
+    {
+        $normalized = preg_replace('/[^0-9x]/i', '', mb_strtolower(trim($value))) ?? '';
+        if (! in_array(strlen($normalized), [10, 13], true)) {
+            return BibliographicRecord::query()->whereRaw('1 = 0')->get();
+        }
+
+        return BibliographicRecord::query()
+            ->whereRaw(
+                "REPLACE(REPLACE(REPLACE(LOWER(COALESCE(isbn, '')), '-', ''), ' ', ''), '–', '') = ?",
+                [$normalized],
+            )
+            ->withCount([
+                'copies',
+                'copies as available_copies_count' => fn (Builder $query) => $query->where('status', 'available'),
+            ])
+            ->orderBy('id')
+            ->limit(5)
+            ->get();
     }
 }

@@ -6,6 +6,8 @@
         "build": "vite build",
         "dev": "vite",
         "test:e2e": "playwright test",
+        "test:e2e:vertical": "playwright test --config=playwright.vertical.config.ts",
+        "test:e2e:vertical:list": "playwright test --config=playwright.vertical.config.ts --list",
         "test:e2e:install": "playwright install chromium",
         "test:e2e:install:system": "playwright install --with-deps chromium",
         "qa:frontend": "npm run build && npm run test:e2e",
@@ -19,11 +21,11 @@
         "@playwright/test": "^1.59.1",
         "@tailwindcss/vite": "^4.0.0",
         "@vitejs/plugin-react": "^6.0.1",
-        "axios": "^1.11.0",
-        "concurrently": "^9.0.1",
+        "axios": "^1.19.0",
+        "concurrently": "^9.2.4",
         "laravel-vite-plugin": "^3.0.0",
         "tailwindcss": "^4.0.0",
-        "vite": "^8.0.0"
+        "vite": "^8.2.2"
     },
     "dependencies": {
         "@21st-sdk/agent": "^0.0.14",
@@ -34,7 +36,6 @@
         "pdfjs-dist": "^6.2.108",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
-        "react-router-dom": "^7.14.0",
         "zod": "^4.3.6"
     }
 }

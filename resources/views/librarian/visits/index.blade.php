@@ -36,7 +36,7 @@
         @endforeach
     </div>
 
-    {{-- §9.4 — the scan point. A physical turnstile or kiosk can post to the
+    {{-- 9.4 — the scan point. A physical turnstile or kiosk can post to the
          same endpoint later; nothing here assumes a keyboard. --}}
     <form method="POST" action="{{ route('librarian.visits.store') }}" class="admin-card mb-6" id="visit-form">
         @csrf

@@ -102,7 +102,7 @@ class AuthSessionManager
             'title' => '',
             'phone_extension' => '',
             'profile_type' => $profileType ?: ($canonicalRole === 'member' ? 'member' : 'staff'),
-            'locale' => (string) ($user->locale ?: 'kk'),
+            'locale' => (string) ($user->locale ?: LocaleResolver::DEFAULT),
         ];
 
         // Establish the authenticated session only after the mandatory audit
@@ -157,15 +157,6 @@ class AuthSessionManager
 
     private function canonicalRole(User $user): string
     {
-        $role = (string) ($user->getRoleNames()->first() ?: match ($user->role) {
-            'admin' => 'admin',
-            'librarian' => 'librarian',
-            default => 'member',
-        });
-        $normalized = mb_strtolower($role);
-
-        return in_array($normalized, ['admin', 'librarian', 'member'], true)
-            ? $normalized
-            : $role;
+        return $user->effectiveRole();
     }
 }

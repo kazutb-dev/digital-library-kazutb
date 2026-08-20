@@ -75,6 +75,11 @@ class BibliographicRecord extends Model
         return $this->hasMany(ElectronicMaterial::class);
     }
 
+    public function translations(): HasMany
+    {
+        return $this->hasMany(BibliographicRecordTranslation::class);
+    }
+
     public function reservations(): HasMany
     {
         return $this->hasMany(Reservation::class);
@@ -99,14 +104,22 @@ class BibliographicRecord extends Model
     {
         $term = trim($term);
         $needle = '%'.mb_strtolower($term).'%';
+        $normalizedIsbn = mb_strtolower((string) preg_replace('/[^0-9xX]/', '', $term));
+        $isbnExpression = $query->getConnection()->getDriverName() === 'pgsql'
+            ? "LOWER(REGEXP_REPLACE(COALESCE(isbn, ''), '[^0-9Xx]', '', 'g'))"
+            : "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(isbn, ''), '-', ''), ' ', ''), '.', ''), '/', ''))";
 
-        return $query->where(function (Builder $builder) use ($needle, $term): void {
+        return $query->where(function (Builder $builder) use ($isbnExpression, $needle, $normalizedIsbn, $term): void {
             $builder
                 ->whereRaw('LOWER(title) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(COALESCE(subtitle, \'\')) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(COALESCE(primary_author, \'\')) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(COALESCE(publisher, \'\')) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(COALESCE(isbn, \'\')) LIKE ?', [$needle])
+                ->when(
+                    strlen($normalizedIsbn) >= 8,
+                    fn (Builder $isbnQuery) => $isbnQuery->orWhereRaw("{$isbnExpression} LIKE ?", ['%'.$normalizedIsbn.'%']),
+                )
                 ->orWhereRaw('LOWER(COALESCE(udc_code, \'\')) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(COALESCE(author_mark, \'\')) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(COALESCE(category, \'\')) LIKE ?', [$needle])
@@ -114,7 +127,20 @@ class BibliographicRecord extends Model
                 ->orWhereRaw('LOWER(COALESCE(annotation, \'\')) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(CAST(additional_authors AS TEXT)) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(CAST(keywords AS TEXT)) LIKE ?', [$needle])
-                ->orWhereJsonContains('keywords', $term);
+                ->orWhereJsonContains('keywords', $term)
+                ->orWhereHas('translations', function (Builder $translations) use ($needle, $term): void {
+                    $translations
+                        ->whereIn('translation_status', BibliographicRecordTranslation::PUBLIC_STATUSES)
+                        ->where(function (Builder $content) use ($needle, $term): void {
+                            $content
+                                ->whereRaw('LOWER(title) LIKE ?', [$needle])
+                                ->orWhere('title', 'like', '%'.$term.'%')
+                                ->orWhereRaw('LOWER(COALESCE(annotation, \'\')) LIKE ?', [$needle])
+                                ->orWhere('annotation', 'like', '%'.$term.'%')
+                                ->orWhereRaw('LOWER(CAST(keywords AS TEXT)) LIKE ?', [$needle])
+                                ->orWhereJsonContains('keywords', $term);
+                        });
+                });
         });
     }
 

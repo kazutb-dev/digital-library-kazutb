@@ -12,7 +12,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
- * Fines and debts board (Master.md §14.4-14.5, ТЗ Этап 5.4). Waiving always
+ * Fines and debts board (Master.md 14.4-14.5, ТЗ Этап 5.4). Waiving always
  * requires a reason and is audited.
  */
 class FineController extends Controller

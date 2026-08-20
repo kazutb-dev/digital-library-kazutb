@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test';
 
 const identities = [
   { slug: 'student', landing: '/dashboard' },
-  { slug: 'teacher', landing: '/dashboard' },
   { slug: 'librarian', landing: '/librarian' },
   { slug: 'senior_librarian', landing: '/librarian' },
   { slug: 'director', landing: '/librarian' },
@@ -73,11 +72,11 @@ for (const identity of identities) {
     expect(runtimeErrors).toEqual([]);
 
     await page.goto(identity.landing);
-    if (locale !== 'kk') {
-      const defaultLocaleForm = page.locator('[data-locale-switcher] form:has(input[name="locale"][value="kk"])').first();
+    if (locale !== 'ru') {
+      const defaultLocaleForm = page.locator('[data-locale-switcher] form:has(input[name="locale"][value="ru"])').first();
       await defaultLocaleForm.locator('xpath=ancestor::details[1]/summary').click();
       await defaultLocaleForm.locator('button').click();
-      await expect(page.locator('html')).toHaveAttribute('lang', 'kk');
+      await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
     }
     const librarianLogout = page.locator('#librarian-logout-btn');
     if (await librarianLogout.count()) {

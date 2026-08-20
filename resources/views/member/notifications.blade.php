@@ -30,7 +30,7 @@
       'loan_due_soon' => 'primary',
   ];
 
-  // Family → the reader page that actually resolves the event. Real routes only.
+  // Family — the reader page that actually resolves the event. Real routes only.
   $familyOf = static function (string $eventType): ?string {
       foreach (NotificationController::FAMILIES as $family => $events) {
           if (in_array($eventType, $events, true)) {

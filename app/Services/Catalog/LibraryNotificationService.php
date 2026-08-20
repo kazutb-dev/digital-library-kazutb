@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * Delivery layer for reader notifications (Master.md §15.6). Consults the
+ * Delivery layer for reader notifications (Master.md 15.6). Consults the
  * admin-managed notification_settings matrix per event type. In-app is the
  * primary channel; email goes through Laravel Mail only when a real mailer
  * is configured — with the log driver the email branch is skipped entirely

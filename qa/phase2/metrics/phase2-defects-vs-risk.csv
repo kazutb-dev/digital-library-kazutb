@@ -1,8 +1,0 @@
-"module_feature","high_risk_level","expected_defects","defects_found","pass_fail","evidence","notes"
-"Authentication","P0","Low-to-medium","0","Pass","qa/phase2/evidence/logs/phase2-api-tests.log","auth guard smoke checks passed"
-"Authorization/RBAC","P1","Medium","3","Fail","qa/phase2/evidence/logs/phase2-phpunit.log","targeted PHPUnit access-boundary assertions failed"
-"Catalog/Public routes","P0","Medium","1","Fail","qa/phase2/evidence/logs/phase2-playwright.log","/news returned 500 in UI smoke"
-"Circulation/Operations","P0","Medium","1","Fail","qa/phase2/evidence/logs/phase2-api-tests.log","operations guard expectation mismatch surfaced"
-"Integration API","P1","Medium","2","Fail","qa/phase2/evidence/logs/phase2-api-tests.log","integration endpoints returned 404"
-"Admin operations","P1","Medium","1","Fail","qa/phase2/evidence/logs/phase2-api-tests.log","admin integrations route returned 404 for anonymous request"
-"Data/Coverage readiness","P0 (R13)","Medium","1","Fail","qa/phase2/evidence/logs/phase2-coverage.log","coverage driver unavailable in local measured run"

@@ -210,7 +210,7 @@
         <div class="card">
             <div>
                 <div class="card__brand">
-                    <span class="card__brand-name">KazUTB</span>
+                    <span class="card__brand-name">Kazakh University of Technology and Business named after K. Kulazhanov</span>
                     <span class="card__brand-note">{{ __('librarian.circulation.reader_card') }}</span>
                 </div>
 

@@ -2,7 +2,7 @@
 
 @php
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
 
   $withLang = function (string $path, array $query = []) use ($lang): string {
       $normalizedPath = '/' . ltrim($path, '/');
@@ -26,374 +26,91 @@
   $sections = config('homepage_sections', []);
   $newArrivals = $newArrivals ?? [];
   $udcCounts = $udcCounts ?? [];
+  $publicStats = is_array($publicStats ?? null) ? $publicStats : [];
+  $formatPublicCount = static fn (int $value): string => number_format($value, 0, '.', $lang === 'en' ? ',' : ' ');
+  $homepageTruthCopy = [
+      'ru' => [
+          'titles' => 'Наименований в электронном каталоге',
+          'copies' => 'Экземпляров в библиотечном фонде',
+          'resources' => 'Ресурсов с опубликованными условиями доступа',
+          'online' => 'Онлайн-каталог доступен круглосуточно',
+      ],
+      'kk' => [
+          'titles' => 'Электрондық каталогтағы атаулар',
+          'copies' => 'Кітапхана қорындағы даналар',
+          'resources' => 'Қолжетімділік шарттары жарияланған ресурстар',
+          'online' => 'Онлайн каталог тәулік бойы қолжетімді',
+      ],
+      'en' => [
+          'titles' => 'Titles in the electronic catalogue',
+          'copies' => 'Copies in the library collection',
+          'resources' => 'Resources with published access conditions',
+          'online' => 'The online catalogue is available around the clock',
+      ],
+  ][$lang];
+  $homepageTruthStats = [];
+  foreach ([
+      ['source' => 'catalog_titles', 'label' => 'titles', 'icon' => 'menu_book'],
+      ['source' => 'physical_copies', 'label' => 'copies', 'icon' => 'library_books'],
+      ['source' => 'published_resources', 'label' => 'resources', 'icon' => 'database'],
+  ] as $definition) {
+      $value = $publicStats[$definition['source']] ?? null;
+      if (is_int($value) && $value > 0) {
+          $homepageTruthStats[] = [
+              'value' => $formatPublicCount($value),
+              'label' => $homepageTruthCopy[$definition['label']],
+              'icon' => $definition['icon'],
+              'source' => $definition['source'],
+          ];
+      }
+  }
+  $homepageHeroStats = $homepageTruthStats;
+  $homepageHeroStats[] = [
+      'value' => '24/7',
+      'label' => $homepageTruthCopy['online'],
+      'icon' => 'schedule',
+      'source' => 'public_catalog_availability',
+  ];
 
   $chrome = [
       'ru' => [
-          'title'                    => 'Главная — Библиотека КазТБУ',
-          'hero_kicker'              => 'Цифровой куратор',
+          'title'                    => 'Главная — Научная библиотека — Казахский университет технологии и бизнеса имени К. Кулажанова',
           'hero_h1'                  => 'Открывайте знания,',
           'hero_h1_accent'           => 'управляйте источниками.',
-          'hero_lead'                => 'Академические коллекции, архивы и цифровые ресурсы КазТБУ в одном месте.',
+          'hero_lead'                => 'Электронный каталог библиотечного фонда, опубликованные внешние ресурсы и библиотечные сервисы в одном месте.',
           'search_placeholder'       => 'Поиск по каталогу, авторам, УДК…',
           'search_cta'               => 'Найти',
-          'trending'                 => 'Актуальные темы:',
-          'hero_img_alt'             => 'Читальный зал библиотеки КазТБУ',
-          'stats_archives_label'     => 'Архивных материалов',
-          'stats_archives_value'     => '120 000+',
-          'stats_scholars_label'     => 'Активных читателей',
-          'stats_scholars_value'     => '8 400+',
-          'gateway_heading'          => 'Навигационный центр библиотеки',
-          'gateway_lead'             => 'Переходите к ключевым публичным разделам: от каталога и репозитория до новостей, правил и контактов.',
-          'gateway_meta'             => 'Public Gateway',
-          'identity_brand' => 'Библиотека КазТБУ',
+          'hero_img_alt'             => 'Интерьер библиотечного читального зала',
+          'identity_brand' => 'Научная библиотека — Казахский университет технологии и бизнеса имени К. Кулажанова',
       ],
       'kk' => [
-          'title'                    => 'Басты бет — КазТБУ Кітапханасы',
-          'hero_kicker'              => 'Цифрлық куратор',
+          'title'                    => 'Басты бет — Қ. Құлажанов атындағы Қазақ технология және бизнес университеті Кітапханасы',
           'hero_h1'                  => 'Білімді ашыңыз,',
           'hero_h1_accent'           => 'дереккөздерді басқарыңыз.',
-          'hero_lead'                => 'КазТБУ академиялық жинақтары, мұрағаттары және цифрлық ресурстары бір жерде.',
+          'hero_lead'                => 'Кітапхана қорының электрондық каталогы, жарияланған сыртқы ресурстар және кітапхана қызметтері бір жерде.',
           'search_placeholder'       => 'Каталог, авторлар, ӘЖЖ бойынша іздеу…',
           'search_cta'               => 'Іздеу',
-          'trending'                 => 'Өзекті тақырыптар:',
-          'hero_img_alt'             => 'КазТБУ кітапханасының оқу залы',
-          'stats_archives_label'     => 'Мұрағат материалдары',
-          'stats_archives_value'     => '120 000+',
-          'stats_scholars_label'     => 'Белсенді оқырмандар',
-          'stats_scholars_value'     => '8 400+',
-          'gateway_heading'          => 'Кітапхана навигация орталығы',
-          'gateway_lead'             => 'Каталогтан репозиторийге дейін, жаңалықтардан ережелер мен байланысқа дейін негізгі қоғамдық бөлімдерге өтіңіз.',
-          'gateway_meta'             => 'Public Gateway',
-          'identity_brand' => 'КазТБУ Кітапханасы',
+          'hero_img_alt'             => 'Кітапхана оқу залының көрінісі',
+          'identity_brand' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті Кітапханасы',
       ],
       'en' => [
-          'title'                    => 'Home — KazUTB',
-          'hero_kicker'              => 'Digital Curator',
+          'title'                    => 'Home — Kazakh University of Technology and Business named after K. Kulazhanov',
           'hero_h1'                  => 'Discover Knowledge,',
           'hero_h1_accent'           => 'Curate Your Sources.',
-          'hero_lead'                => 'KazUTB academic collections, archives, and digital resources in one place.',
+          'hero_lead'                => 'The library collection catalogue, published external resources, and library services in one place.',
           'search_placeholder'       => 'Search by title, author, UDC…',
           'search_cta'               => 'Search',
-          'trending'                 => 'Trending topics:',
-          'hero_img_alt'             => 'KazUTB Library Reading Room',
-          'stats_archives_label'     => 'Archived Materials',
-          'stats_archives_value'     => '120,000+',
-          'stats_scholars_label'     => 'Active Readers',
-          'stats_scholars_value'     => '8,400+',
-          'gateway_heading'          => 'Library Navigation Hub',
-          'gateway_lead'             => 'Jump to all core public sections, from catalog and repository to news, rules, leadership, and contacts.',
-          'gateway_meta'             => 'Public Gateway',
-          'identity_brand' => 'KazUTB Library',
+          'hero_img_alt'             => 'Library reading room interior',
+          'identity_brand' => 'Kazakh University of Technology and Business named after K. Kulazhanov Library',
       ],
   ];
 
   $copy = $chrome[$lang];
 
-  $topicLinks = [
-      'ru' => [
-          ['label' => 'Экономическая реформа',    'href' => $withLang('/catalog', ['udc' => '33'])],
-          ['label' => 'Устойчивые технологии',    'href' => $withLang('/catalog', ['udc' => '62'])],
-          ['label' => 'История Центральной Азии', 'href' => $withLang('/catalog', ['udc' => '008'])],
-      ],
-      'kk' => [
-          ['label' => 'Экономикалық реформа',  'href' => $withLang('/catalog', ['udc' => '33'])],
-          ['label' => 'Тұрақты технологиялар', 'href' => $withLang('/catalog', ['udc' => '62'])],
-          ['label' => 'Орта Азия тарихы',      'href' => $withLang('/catalog', ['udc' => '008'])],
-      ],
-      'en' => [
-          ['label' => 'Economic Reform',       'href' => $withLang('/catalog', ['udc' => '33'])],
-          ['label' => 'Sustainable Tech',      'href' => $withLang('/catalog', ['udc' => '62'])],
-          ['label' => 'Central Asian History', 'href' => $withLang('/catalog', ['udc' => '008'])],
-      ],
-  ];
-  $topics = $topicLinks[$lang];
-
-  $gatewayLinks = [
-      ['label' => $lang === 'ru' ? 'Каталог' : ($lang === 'kk' ? 'Каталог' : 'Catalog'), 'href' => $withLang('/catalog')],
-      ['label' => $lang === 'ru' ? 'Каталог' : ($lang === 'kk' ? 'Каталог' : 'Catalog'), 'href' => $withLang('/catalog')],
-      ['label' => $lang === 'ru' ? 'Ресурсы' : ($lang === 'kk' ? 'Ресурстар' : 'Resources'), 'href' => $withLang('/resources')],
-      ['label' => $lang === 'ru' ? 'Репозиторий' : ($lang === 'kk' ? 'Репозиторий' : 'Repository'), 'href' => $withLang('/repository')],
-      ['label' => $lang === 'ru' ? 'Новости' : ($lang === 'kk' ? 'Жаңалықтар' : 'News'), 'href' => $withLang('/news')],
-      ['label' => $lang === 'ru' ? 'События' : ($lang === 'kk' ? 'Іс-шаралар' : 'Events'), 'href' => $withLang('/events')],
-      ['label' => $lang === 'ru' ? 'О библиотеке' : ($lang === 'kk' ? 'Кітапхана туралы' : 'About'), 'href' => $withLang('/about')],
-      ['label' => $lang === 'ru' ? 'Руководство' : ($lang === 'kk' ? 'Басшылық' : 'Leadership'), 'href' => $withLang('/leadership')],
-      ['label' => $lang === 'ru' ? 'Правила' : ($lang === 'kk' ? 'Ережелер' : 'Rules'), 'href' => $withLang('/rules')],
-      ['label' => $lang === 'ru' ? 'Контакты' : ($lang === 'kk' ? 'Байланыс' : 'Contacts'), 'href' => $withLang('/contacts')],
-  ];
-
-      $gatewayMeta = [
-        ['icon' => 'library_books', 'tone' => 'bg-secondary-container/60 text-secondary', 'subtitle' => $lang === 'ru' ? 'Поиск и доступ' : ($lang === 'kk' ? 'Іздеу және қолжетімділік' : 'Search and access')],
-        ['icon' => 'search', 'tone' => 'bg-primary-container/55 text-primary', 'subtitle' => $lang === 'ru' ? 'Подборки и подбор' : ($lang === 'kk' ? 'Іріктемелер мен ашылымдар' : 'Curated discovery')],
-        ['icon' => 'database', 'tone' => 'bg-tertiary-container/55 text-tertiary', 'subtitle' => $lang === 'ru' ? 'Коллекции и базы' : ($lang === 'kk' ? 'Жинақтар мен дерекқорлар' : 'Collections and databases')],
-        ['icon' => 'inventory_2', 'tone' => 'bg-primary-fixed/30 text-primary', 'subtitle' => $lang === 'ru' ? 'Архив и репозиторий' : ($lang === 'kk' ? 'Мұрағат және репозиторий' : 'Archive and repository')],
-        ['icon' => 'newspaper', 'tone' => 'bg-secondary-fixed/30 text-secondary', 'subtitle' => $lang === 'ru' ? 'Новости и анонсы' : ($lang === 'kk' ? 'Жаңалықтар мен анонстар' : 'News and announcements')],
-        ['icon' => 'event', 'tone' => 'bg-tertiary-fixed/30 text-tertiary', 'subtitle' => $lang === 'ru' ? 'Календарь библиотеки' : ($lang === 'kk' ? 'Кітапхана күнтізбесі' : 'Library calendar')],
-        ['icon' => 'account_balance', 'tone' => 'bg-primary-container/55 text-primary', 'subtitle' => $lang === 'ru' ? 'Миссия и профиль' : ($lang === 'kk' ? 'Миссия және профиль' : 'Mission and profile')],
-        ['icon' => 'badge', 'tone' => 'bg-secondary-container/55 text-secondary', 'subtitle' => $lang === 'ru' ? 'Команда и контакты' : ($lang === 'kk' ? 'Команда және байланыс' : 'Team and contacts')],
-        ['icon' => 'gavel', 'tone' => 'bg-primary-fixed/30 text-primary', 'subtitle' => $lang === 'ru' ? 'Условия пользования' : ($lang === 'kk' ? 'Пайдалану шарттары' : 'Use conditions')],
-        ['icon' => 'call', 'tone' => 'bg-secondary-fixed/30 text-secondary', 'subtitle' => $lang === 'ru' ? 'Помощь и визит' : ($lang === 'kk' ? 'Көмек пен келу' : 'Help and visit')],
-      ];
-
-      $hubImages = [
-        'about' => ['src' => '/images/news/campus-library.jpg', 'alt' => $copy['hero_img_alt']],
-        'leadership' => ['src' => '/images/news/author-visit.jpg', 'alt' => $lang === 'en' ? 'Library leadership meeting' : ($lang === 'kk' ? 'Кітапхана басшылығымен кездесу' : 'Встреча с руководством библиотеки')],
-        'rules' => ['src' => '/images/news/classics-event.jpg', 'alt' => $lang === 'en' ? 'Library collection display' : ($lang === 'kk' ? 'Кітапхана қорларының көрмесі' : 'Книжная выставка и фонды библиотеки')],
-        'contacts' => ['src' => '/images/news/default-library.jpg', 'alt' => $lang === 'en' ? 'KazUTB main building' : ($lang === 'kk' ? 'ҚазТБУ негізгі корпусы' : 'Главный корпус КазТБУ')],
-        'news' => ['src' => '/images/news/ai-workshop.jpg', 'alt' => $lang === 'en' ? 'Digital preservation research session' : ($lang === 'kk' ? 'Цифрлық сақтау бойынша зерттеу сессиясы' : 'Исследовательская сессия по цифровому сохранению')],
-        'events' => ['src' => '/images/news/campus-library.jpg', 'alt' => $lang === 'en' ? 'Symposium in the reading room' : ($lang === 'kk' ? 'Оқу залындағы симпозиум' : 'Симпозиум в читальном зале')],
-      ];
-
-      $hubCards = [
-        'ru' => [
-          'about' => ['eyebrow' => 'О библиотеке', 'title' => 'Институциональная библиотека', 'body' => 'Сохраняем знание. Поддерживаем исследования. Университетская библиотека соединяет академическую традицию и цифровой сервис.', 'cta' => 'Открыть раздел', 'href' => $withLang('/about'), 'icon' => 'account_balance'],
-          'leadership' => ['eyebrow' => 'Руководство', 'title' => 'Команда и зоны ответственности', 'body' => 'Руководство координирует академические сервисы, цифровые коллекции и институциональные процессы библиотеки.', 'cta' => 'Открыть раздел', 'href' => $withLang('/leadership'), 'icon' => 'badge'],
-          'rules' => ['eyebrow' => 'Правила', 'title' => 'Пользование фондом и ресурсами', 'body' => 'Условия записи, выдачи, пользования фондом и доступа к цифровым ресурсам.', 'cta' => 'Открыть правила', 'href' => $withLang('/rules'), 'icon' => 'gavel'],
-          'contacts' => ['eyebrow' => 'Контакты', 'title' => 'Адрес, часы и каналы поддержки', 'body' => 'Адрес, режим работы и способы связаться с библиотекой для консультаций, доступа и административных вопросов.', 'cta' => 'Открыть контакты', 'href' => $withLang('/contacts'), 'icon' => 'call'],
-          'news' => ['eyebrow' => 'Новости', 'title' => 'Архивная целостность и цифровое сохранение', 'body' => 'Исследователи и специалисты по цифровому сохранению обсудили долгосрочное хранение, связность метаданных и контролируемый доступ.', 'meta' => '14 апреля 2026 · Главный материал', 'cta' => 'Все новости', 'href' => $withLang('/news'), 'icon' => 'newspaper'],
-          'events' => ['eyebrow' => 'События', 'title' => 'Цифровое сохранение фондов', 'body' => 'Открытая сессия для преподавателей и исследователей о цифровом сохранении материалов, метаданных и долгосрочном хранении.', 'meta' => '14 мая 2026 · Симпозиум', 'cta' => 'Все события', 'href' => $withLang('/events'), 'icon' => 'event'],
-        ],
-        'kk' => [
-          'about' => ['eyebrow' => 'Кітапхана туралы', 'title' => 'Институционалдық кітапхана', 'body' => 'Білімді сақтаймыз. Зерттеуді қолдаймыз. Университет кітапханасы академиялық дәстүр мен цифрлық сервисті біріктіреді.', 'cta' => 'Бөлімді ашу', 'href' => $withLang('/about'), 'icon' => 'account_balance'],
-          'leadership' => ['eyebrow' => 'Басшылық', 'title' => 'Команда және жауапкершілік аймақтары', 'body' => 'Басшылық кітапхананың академиялық сервистерін, цифрлық жинақтарын және институционалдық процестерін үйлестіреді.', 'cta' => 'Бөлімді ашу', 'href' => $withLang('/leadership'), 'icon' => 'badge'],
-          'rules' => ['eyebrow' => 'Ережелер', 'title' => 'Қорды және ресурстарды пайдалану', 'body' => 'Тіркелу, беру, қорды пайдалану және цифрлық ресурстарға қолжетімділік шарттары.', 'cta' => 'Ережелерді ашу', 'href' => $withLang('/rules'), 'icon' => 'gavel'],
-          'contacts' => ['eyebrow' => 'Байланыс', 'title' => 'Мекенжай, жұмыс уақыты және қолдау арналары', 'body' => 'Кітапханамен кеңес, қолжетімділік және әкімшілік сұрақтар бойынша байланысу жолдары.', 'cta' => 'Байланыстарды ашу', 'href' => $withLang('/contacts'), 'icon' => 'call'],
-          'news' => ['eyebrow' => 'Жаңалықтар', 'title' => 'Мұрағат тұтастығы және цифрлық сақтау', 'body' => 'Зерттеушілер мен цифрлық сақтау мамандары ұзақ мерзімді сақтау, метадеректер байланыстылығы және бақыланатын қолжетімділікті талқылады.', 'meta' => '2026 жылғы 14 сәуір · Басты материал', 'cta' => 'Барлық жаңалықтар', 'href' => $withLang('/news'), 'icon' => 'newspaper'],
-          'events' => ['eyebrow' => 'Іс-шаралар', 'title' => 'Қорларды цифрлық сақтау', 'body' => 'Оқытушылар мен зерттеушілерге арналған ашық сессия: материалдарды цифрлық сақтау, метадеректер және ұзақ мерзімді сақтау.', 'meta' => '2026 жылғы 14 мамыр · Симпозиум', 'cta' => 'Барлық іс-шаралар', 'href' => $withLang('/events'), 'icon' => 'event'],
-        ],
-        'en' => [
-          'about' => ['eyebrow' => 'About', 'title' => 'Institutional library', 'body' => 'Preserving knowledge. Supporting research. The university library brings academic tradition and digital service together.', 'cta' => 'Open the section', 'href' => $withLang('/about'), 'icon' => 'account_balance'],
-          'leadership' => ['eyebrow' => 'Leadership', 'title' => 'Team and responsibility areas', 'body' => 'Library leadership coordinates academic services, digital collections, and institutional workflows.', 'cta' => 'Open the section', 'href' => $withLang('/leadership'), 'icon' => 'badge'],
-          'rules' => ['eyebrow' => 'Rules', 'title' => 'Use of the collection and resources', 'body' => 'Registration, loans, collection use, and access to digital resources.', 'cta' => 'Open rules', 'href' => $withLang('/rules'), 'icon' => 'gavel'],
-          'contacts' => ['eyebrow' => 'Contacts', 'title' => 'Address, hours, and support channels', 'body' => 'How to reach the library for consultations, access questions, and administrative matters.', 'cta' => 'Open contacts', 'href' => $withLang('/contacts'), 'icon' => 'call'],
-          'news' => ['eyebrow' => 'News', 'title' => 'Archival integrity and digital preservation', 'body' => 'Researchers and digital preservation specialists discussed long-term retention, metadata continuity, and controlled access.', 'meta' => 'April 14, 2026 · Featured report', 'cta' => 'All news', 'href' => $withLang('/news'), 'icon' => 'newspaper'],
-          'events' => ['eyebrow' => 'Events', 'title' => 'Digital preservation of collections', 'body' => 'An open session for faculty and researchers on digital preservation, metadata workflows, and long-term retention.', 'meta' => 'May 14, 2026 · Symposium', 'cta' => 'All events', 'href' => $withLang('/events'), 'icon' => 'event'],
-        ],
-      ][$lang];
-
-  $premium = [
-        'ru' => [
-          'collections_eyebrow' => 'Кураторский выбор · Выпуск 01',
-          'collections_note' => 'Фонд собран вокруг академических программ университета и проверен библиотечными специалистами.',
-          'collection_metrics' => [
-            ['value' => 'УДК', 'label' => 'Системная индексация'],
-            ['value' => '3', 'label' => 'Языка коллекций'],
-            ['value' => '24/7', 'label' => 'Доступ к цифровому фонду'],
-          ],
-          'services_eyebrow' => 'Research concierge',
-          'services_note' => 'От первого запроса до готовой библиографии — точные сервисы для учебной и исследовательской работы.',
-          'directory_eyebrow' => 'Library directory · 10 направлений',
-          'institution_eyebrow' => 'Институция',
-          'institution_heading' => 'Библиотека как интеллектуальная инфраструктура',
-          'institution_lead' => 'Не просто место хранения книг, а среда, где академическая память университета становится доступной, связной и полезной.',
-          'journal_eyebrow' => 'Library Journal · 2026',
-          'journal_heading' => 'Люди, исследования, события',
-          'journal_lead' => 'Редакционная лента о том, как библиотека сохраняет наследие и поддерживает новые исследования.',
-          'read_story' => 'Читать материал',
-          'view_agenda' => 'Открыть календарь',
-        ],
-        'kk' => [
-          'collections_eyebrow' => 'Кураторлық таңдау · 01 шығарылым',
-          'collections_note' => 'Қор университеттің академиялық бағдарламаларына сай жинақталып, кітапхана мамандарымен тексерілген.',
-          'collection_metrics' => [
-            ['value' => 'ӘОЖ', 'label' => 'Жүйелік индекстеу'],
-            ['value' => '3', 'label' => 'Жинақ тілдері'],
-            ['value' => '24/7', 'label' => 'Цифрлық қорға қолжетімділік'],
-          ],
-          'services_eyebrow' => 'Research concierge',
-          'services_note' => 'Алғашқы сұраудан дайын библиографияға дейін — оқу мен зерттеуге арналған дәл сервистер.',
-          'directory_eyebrow' => 'Library directory · 10 бағыт',
-          'institution_eyebrow' => 'Институция',
-          'institution_heading' => 'Кітапхана зияткерлік инфрақұрылым ретінде',
-          'institution_lead' => 'Кітап сақтайтын орын ғана емес, университеттің академиялық жады қолжетімді және пайдалы болатын орта.',
-          'journal_eyebrow' => 'Library Journal · 2026',
-          'journal_heading' => 'Адамдар, зерттеулер, оқиғалар',
-          'journal_lead' => 'Кітапхананың мұраны сақтап, жаңа зерттеулерді қалай қолдайтыны туралы редакциялық лента.',
-          'read_story' => 'Материалды оқу',
-          'view_agenda' => 'Күнтізбені ашу',
-        ],
-      'en' => [
-          'collections_eyebrow' => 'Curator selection · Edition 01',
-          'collections_note' => 'The holdings follow the university curriculum and are reviewed by library specialists.',
-          'collection_metrics' => [
-            ['value' => 'UDC', 'label' => 'Systematic indexing'],
-            ['value' => '3', 'label' => 'Collection languages'],
-            ['value' => '24/7', 'label' => 'Digital access'],
-          ],
-          'services_eyebrow' => 'Research concierge',
-          'services_note' => 'From the first question to a finished bibliography: precise services for study and research.',
-          'directory_eyebrow' => 'Library directory · 10 destinations',
-          'institution_eyebrow' => 'Institution',
-          'institution_heading' => 'The library as intellectual infrastructure',
-          'institution_lead' => 'More than book storage: a place where the university’s academic memory becomes connected, accessible, and useful.',
-          'journal_eyebrow' => 'Library Journal · 2026',
-          'journal_heading' => 'People, research, events',
-          'journal_lead' => 'An editorial stream about preserving heritage and enabling new research.',
-          'read_story' => 'Read the story',
-          'view_agenda' => 'View agenda',
-        ],
-      ][$lang];
-
-      $libraryData = [
-        'ru' => [
-          'overview_kicker' => 'Фонд в цифрах',
-          'overview_title' => 'Живая академическая коллекция',
-          'overview_lead' => 'Фонд растёт вместе с образовательными программами и исследовательскими направлениями КазТБУ.',
-          'growth_title' => 'Динамика использования фонда',
-          'growth_note' => '+12,4% к прошлому семестру',
-          'growth_period' => 'Февраль — июль 2026',
-          'growth_primary' => 'Книговыдача',
-          'growth_secondary' => 'Онлайн-просмотры',
-          'growth_latest' => '1 284',
-          'growth_months' => ['Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл'],
-          'metrics' => [
-            ['value' => '8 930', 'label' => 'Наименований в каталоге', 'note' => 'Печатный и цифровой фонд'],
-            ['value' => '2 416', 'label' => 'Цифровых материалов', 'note' => 'Доступны удалённо'],
-            ['value' => '126', 'label' => 'Журналов и периодики', 'note' => 'Научные и отраслевые'],
-            ['value' => '3', 'label' => 'Языка коллекции', 'note' => 'Қазақша · Русский · English'],
-          ],
-          'categories_kicker' => 'Предметный навигатор',
-          'categories_title' => 'Исследуйте знания по направлениям',
-          'categories_lead' => 'Категории отражают профиль университета и помогают быстро перейти к релевантной литературе.',
-          'categories' => [
-            ['name' => 'Информационные технологии', 'count' => '1 840', 'share' => 86, 'icon' => 'terminal', 'query' => 'информационные технологии'],
-            ['name' => 'Экономика и бизнес', 'count' => '1 560', 'share' => 74, 'icon' => 'monitoring', 'query' => 'экономика'],
-            ['name' => 'Инженерия и технологии', 'count' => '1 490', 'share' => 69, 'icon' => 'precision_manufacturing', 'query' => 'инженерия'],
-            ['name' => 'Туризм и сервис', 'count' => '980', 'share' => 48, 'icon' => 'travel_explore', 'query' => 'туризм'],
-            ['name' => 'Дизайн и лёгкая промышленность', 'count' => '740', 'share' => 37, 'icon' => 'design_services', 'query' => 'дизайн'],
-            ['name' => 'Социальные науки', 'count' => '1 120', 'share' => 56, 'icon' => 'public', 'query' => 'социальные науки'],
-          ],
-          'books_kicker' => 'Книжная полка',
-          'books_title' => 'Новые поступления',
-          'books_lead' => 'Издания, недавно добавленные в академический фонд.',
-          'all_books' => 'Смотреть весь каталог',
-          'books' => [
-            ['title' => 'Архитектура информационных систем', 'author' => 'А. С. Омаров', 'year' => '2026', 'code' => '004.2', 'tone' => 'forest'],
-            ['title' => 'Экономика устойчивого развития', 'author' => 'Л. К. Абдрахманова', 'year' => '2025', 'code' => '330.3', 'tone' => 'clay'],
-            ['title' => 'Инженерные методы проектирования', 'author' => 'М. Т. Садыков', 'year' => '2026', 'code' => '62.001', 'tone' => 'ink'],
-            ['title' => 'Сервис и управление качеством', 'author' => 'Е. Н. Ким', 'year' => '2025', 'code' => '338.4', 'tone' => 'sage'],
-            ['title' => 'Data Science Methods for Research', 'author' => 'S. Tleubayeva', 'year' => '2024', 'code' => '519.2', 'tone' => 'ink'],
-            ['title' => 'Artificial Intelligence in Higher Education', 'author' => 'A. Kurmanbayev', 'year' => '2026', 'code' => '004.8', 'tone' => 'forest'],
-            ['title' => 'Refactoring', 'author' => 'Martin Fowler', 'year' => '2018', 'code' => '005.1', 'tone' => 'clay'],
-            ['title' => 'Clean Code', 'author' => 'Robert C. Martin', 'year' => '2019', 'code' => '005.1', 'tone' => 'sage'],
-          ],
-          'analytics_kicker' => 'Collection intelligence',
-          'analytics_title' => 'Как используется библиотека',
-          'analytics_lead' => 'Сводный взгляд на языки фонда, форматы и читательскую активность.',
-          'languages' => 'Языки фонда',
-          'formats' => 'Форматы материалов',
-          'activity' => 'Обращения к каталогу',
-          'month_note' => 'Последние 6 месяцев',
-          'format_rows' => [['Печатные книги', 72], ['Электронные издания', 46], ['Научные статьи', 34], ['Архивные материалы', 22]],
-          'language_rows' => [['Қазақша', '52%'], ['Русский', '31%'], ['English', '17%']],
-        ],
-        'kk' => [
-          'overview_kicker' => 'Қор сандармен',
-          'overview_title' => 'Дамып келе жатқан академиялық жинақ',
-          'overview_lead' => 'Қор ҚазТБУ білім беру бағдарламалары мен зерттеу бағыттарымен бірге өседі.',
-          'growth_title' => 'Қорды пайдалану динамикасы',
-          'growth_note' => 'Өткен семестрмен салыстырғанда +12,4%',
-          'growth_period' => 'Ақпан — шілде 2026',
-          'growth_primary' => 'Кітап беру',
-          'growth_secondary' => 'Онлайн қаралымдар',
-          'growth_latest' => '1 284',
-          'growth_months' => ['Ақп', 'Нау', 'Сәу', 'Мам', 'Мау', 'Шіл'],
-          'metrics' => [
-            ['value' => '8 930', 'label' => 'Каталогтағы атаулар', 'note' => 'Баспа және цифрлық қор'],
-            ['value' => '2 416', 'label' => 'Цифрлық материал', 'note' => 'Қашықтан қолжетімді'],
-            ['value' => '126', 'label' => 'Журнал және мерзімді басылым', 'note' => 'Ғылыми және салалық'],
-            ['value' => '3', 'label' => 'Жинақ тілі', 'note' => 'Қазақша · Русский · English'],
-          ],
-          'categories_kicker' => 'Пәндік навигатор',
-          'categories_title' => 'Білімді бағыттар бойынша зерттеңіз',
-          'categories_lead' => 'Санаттар университет бейінін көрсетеді және қажетті әдебиетке тез өтуге көмектеседі.',
-          'categories' => [
-            ['name' => 'Ақпараттық технологиялар', 'count' => '1 840', 'share' => 86, 'icon' => 'terminal', 'query' => 'ақпараттық технологиялар'],
-            ['name' => 'Экономика және бизнес', 'count' => '1 560', 'share' => 74, 'icon' => 'monitoring', 'query' => 'экономика'],
-            ['name' => 'Инженерия және технологиялар', 'count' => '1 490', 'share' => 69, 'icon' => 'precision_manufacturing', 'query' => 'инженерия'],
-            ['name' => 'Туризм және сервис', 'count' => '980', 'share' => 48, 'icon' => 'travel_explore', 'query' => 'туризм'],
-            ['name' => 'Дизайн және жеңіл өнеркәсіп', 'count' => '740', 'share' => 37, 'icon' => 'design_services', 'query' => 'дизайн'],
-            ['name' => 'Әлеуметтік ғылымдар', 'count' => '1 120', 'share' => 56, 'icon' => 'public', 'query' => 'әлеуметтік ғылымдар'],
-          ],
-          'books_kicker' => 'Кітап сөресі',
-          'books_title' => 'Жаңа түсімдер',
-          'books_lead' => 'Академиялық қорға жақында қосылған басылымдар.',
-          'all_books' => 'Толық каталог',
-          'books' => [
-            ['title' => 'Ақпараттық жүйелер архитектурасы', 'author' => 'А. С. Омаров', 'year' => '2026', 'code' => '004.2', 'tone' => 'forest'],
-            ['title' => 'Тұрақты даму экономикасы', 'author' => 'Л. К. Абдрахманова', 'year' => '2025', 'code' => '330.3', 'tone' => 'clay'],
-            ['title' => 'Инженерлік жобалау әдістері', 'author' => 'М. Т. Садыков', 'year' => '2026', 'code' => '62.001', 'tone' => 'ink'],
-            ['title' => 'Сервис және сапаны басқару', 'author' => 'Е. Н. Ким', 'year' => '2025', 'code' => '338.4', 'tone' => 'sage'],
-            ['title' => 'Data Science Methods for Research', 'author' => 'S. Tleubayeva', 'year' => '2024', 'code' => '519.2', 'tone' => 'ink'],
-            ['title' => 'Artificial Intelligence in Higher Education', 'author' => 'A. Kurmanbayev', 'year' => '2026', 'code' => '004.8', 'tone' => 'forest'],
-            ['title' => 'Refactoring', 'author' => 'Martin Fowler', 'year' => '2018', 'code' => '005.1', 'tone' => 'clay'],
-            ['title' => 'Clean Code', 'author' => 'Robert C. Martin', 'year' => '2019', 'code' => '005.1', 'tone' => 'sage'],
-          ],
-          'analytics_kicker' => 'Collection intelligence',
-          'analytics_title' => 'Кітапхана қалай пайдаланылады',
-          'analytics_lead' => 'Қор тілдері, форматтар және оқырман белсенділігі туралы жалпы көрініс.',
-          'languages' => 'Қор тілдері',
-          'formats' => 'Материал форматтары',
-          'activity' => 'Каталогқа жүгінулер',
-          'month_note' => 'Соңғы 6 ай',
-          'format_rows' => [['Баспа кітаптар', 72], ['Электрондық басылымдар', 46], ['Ғылыми мақалалар', 34], ['Мұрағат материалдары', 22]],
-          'language_rows' => [['Қазақша', '52%'], ['Русский', '31%'], ['English', '17%']],
-        ],
-        'en' => [
-          'overview_kicker' => 'The collection in numbers',
-          'overview_title' => 'A living academic collection',
-          'overview_lead' => 'The collection grows with KazUTB’s curricula and research priorities.',
-          'growth_title' => 'Collection usage over time',
-          'growth_note' => '+12.4% vs previous semester',
-          'growth_period' => 'February — July 2026',
-          'growth_primary' => 'Book loans',
-          'growth_secondary' => 'Online views',
-          'growth_latest' => '1,284',
-          'growth_months' => ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-          'metrics' => [
-            ['value' => '8,930', 'label' => 'Catalogued titles', 'note' => 'Print and digital holdings'],
-            ['value' => '2,416', 'label' => 'Digital materials', 'note' => 'Available remotely'],
-            ['value' => '126', 'label' => 'Journals and periodicals', 'note' => 'Scholarly and professional'],
-            ['value' => '3', 'label' => 'Collection languages', 'note' => 'Қазақша · Русский · English'],
-          ],
-          'categories_kicker' => 'Subject navigator',
-          'categories_title' => 'Explore knowledge by discipline',
-          'categories_lead' => 'Categories follow the university profile and lead readers to relevant literature quickly.',
-          'categories' => [
-            ['name' => 'Information Technology', 'count' => '1,840', 'share' => 86, 'icon' => 'terminal', 'query' => 'information technology'],
-            ['name' => 'Economics and Business', 'count' => '1,560', 'share' => 74, 'icon' => 'monitoring', 'query' => 'economics'],
-            ['name' => 'Engineering and Technology', 'count' => '1,490', 'share' => 69, 'icon' => 'precision_manufacturing', 'query' => 'engineering'],
-            ['name' => 'Tourism and Service', 'count' => '980', 'share' => 48, 'icon' => 'travel_explore', 'query' => 'tourism'],
-            ['name' => 'Design and Light Industry', 'count' => '740', 'share' => 37, 'icon' => 'design_services', 'query' => 'design'],
-            ['name' => 'Social Sciences', 'count' => '1,120', 'share' => 56, 'icon' => 'public', 'query' => 'social sciences'],
-          ],
-          'books_kicker' => 'The bookshelf',
-          'books_title' => 'New arrivals',
-          'books_lead' => 'Recently added titles from the academic collection.',
-          'all_books' => 'View full catalog',
-          'books' => [
-            ['title' => 'Information Systems Architecture', 'author' => 'A. S. Omarov', 'year' => '2026', 'code' => '004.2', 'tone' => 'forest'],
-            ['title' => 'Economics of Sustainable Development', 'author' => 'L. K. Abdrakhmanova', 'year' => '2025', 'code' => '330.3', 'tone' => 'clay'],
-            ['title' => 'Engineering Design Methods', 'author' => 'M. T. Sadykov', 'year' => '2026', 'code' => '62.001', 'tone' => 'ink'],
-            ['title' => 'Service and Quality Management', 'author' => 'E. N. Kim', 'year' => '2025', 'code' => '338.4', 'tone' => 'sage'],
-            ['title' => 'Data Science Methods for Research', 'author' => 'S. Tleubayeva', 'year' => '2024', 'code' => '519.2', 'tone' => 'ink'],
-            ['title' => 'Artificial Intelligence in Higher Education', 'author' => 'A. Kurmanbayev', 'year' => '2026', 'code' => '004.8', 'tone' => 'forest'],
-            ['title' => 'Refactoring', 'author' => 'Martin Fowler', 'year' => '2018', 'code' => '005.1', 'tone' => 'clay'],
-            ['title' => 'Clean Code', 'author' => 'Robert C. Martin', 'year' => '2019', 'code' => '005.1', 'tone' => 'sage'],
-          ],
-          'analytics_kicker' => 'Collection intelligence',
-          'analytics_title' => 'How the library is used',
-          'analytics_lead' => 'A concise view of collection languages, formats, and reader activity.',
-          'languages' => 'Collection languages',
-          'formats' => 'Material formats',
-          'activity' => 'Catalog activity',
-          'month_note' => 'Last 6 months',
-          'format_rows' => [['Print books', 72], ['Digital editions', 46], ['Research articles', 34], ['Archive materials', 22]],
-          'language_rows' => [['Kazakh', '52%'], ['Russian', '31%'], ['English', '17%']],
-        ],
-      ][$lang];
 @endphp
 
 @section('title', $copy['title'])
+@section('meta_description', $copy['hero_lead'])
 @section('body_class', 'homepage')
 
 @section('head')
@@ -503,8 +220,11 @@
     line-height: 1.72;
 }
 .homepage-hero__search {
+    position: relative;
+    z-index: 5;
     width: min(100%, 650px);
     margin-top: 22px;
+    scroll-margin-top: calc(var(--site-header-h, 88px) + 20px);
     display: flex;
     align-items: center;
     overflow: hidden;
@@ -1021,7 +741,7 @@
     box-shadow: 0 34px 90px rgba(0, 0, 0, .35);
 }
 .homepage-hero__card::before {
-    content: "KAZUTB / DIGITAL HOLDINGS";
+    content: "Kazakh University of Technology and Business named after K. Kulazhanov / DIGITAL HOLDINGS";
     position: absolute;
     top: 18px;
     right: 20px;
@@ -2877,26 +2597,13 @@
 
   <div class="homepage-hero-stats" data-section="homepage-hero-stats">
     <div class="homepage-hero-stats__inner">
-      <article class="homepage-hero-stats__item">
-        <span class="homepage-hero-stats__icon material-symbols-outlined" aria-hidden="true">menu_book</span>
-        <strong>250 000+</strong>
-        <span>{{ $lang === 'ru' ? 'Книг в библиотечном фонде' : ($lang === 'kk' ? 'Кітапхана қорындағы кітаптар' : 'Books in the collection') }}</span>
-      </article>
-      <article class="homepage-hero-stats__item">
-        <span class="homepage-hero-stats__icon material-symbols-outlined" aria-hidden="true">laptop_mac</span>
-        <strong>120 000+</strong>
-        <span>{{ $lang === 'ru' ? 'Электронных ресурсов' : ($lang === 'kk' ? 'Электрондық ресурстар' : 'Electronic resources') }}</span>
-      </article>
-      <article class="homepage-hero-stats__item">
-        <span class="homepage-hero-stats__icon material-symbols-outlined" aria-hidden="true">schedule</span>
-        <strong>24/7</strong>
-        <span>{{ $lang === 'ru' ? 'Удаленный доступ к электронным ресурсам' : ($lang === 'kk' ? 'Электрондық ресурстарға қашықтан қол жеткізу' : 'Remote access to electronic resources') }}</span>
-      </article>
-      <article class="homepage-hero-stats__item">
-        <span class="homepage-hero-stats__icon material-symbols-outlined" aria-hidden="true">school</span>
-        <strong>Scopus • Springer</strong>
-        <span>{{ $lang === 'ru' ? 'Мировые научные базы данных' : ($lang === 'kk' ? 'Әлемдік ғылыми дерекқорлар' : 'Global scholarly databases') }}</span>
-      </article>
+      @foreach($homepageHeroStats as $stat)
+        <article class="homepage-hero-stats__item" data-stat-source="{{ $stat['source'] }}">
+          <span class="homepage-hero-stats__icon material-symbols-outlined" aria-hidden="true">{{ $stat['icon'] }}</span>
+          <strong>{{ $stat['value'] }}</strong>
+          <span>{{ $stat['label'] }}</span>
+        </article>
+      @endforeach
     </div>
   </div>
 
@@ -2905,38 +2612,36 @@
     $facultyStats = $facultyStats ?? [];
     $facultyShowcase = [
       'econ' => [
-        'title' => $lang === 'ru' ? 'Абонемент экономической литературы' : ($lang === 'kk' ? 'Экономикалық әдебиет абонементі' : 'Economics and business desk'),
-        'lead' => $lang === 'ru' ? 'Литература по финансам, управлению, маркетингу и прикладной экономике для учебы и исследовательской работы.' : ($lang === 'kk' ? 'Қаржы, басқару, маркетинг және қолданбалы экономика бойынша әдебиеттер.' : 'Finance, management, marketing, and applied economics resources for study and research.'),
-        'meta' => $lang === 'ru' ? '1/203 · первый этаж' : ($lang === 'kk' ? '1/203 · 1-қабат' : '1/203 · first floor'),
+        'title' => $lang === 'ru' ? 'Экономическая библиотека' : ($lang === 'kk' ? 'Экономикалық кітапхана' : 'Economics Library'),
         'stats' => (int) ($facultyStats['econ'] ?? 0),
         'institution' => 'economic_library',
-        'books' => $facultyBooks['econ'] ?? [],
+        'books' => collect($facultyBooks['econ'] ?? [])->filter(static fn (array $book): bool => (int) ($book['issueCount'] ?? 0) > 0)->values()->all(),
       ],
       'tech' => [
-        'title' => $lang === 'ru' ? 'Абонемент технической литературы' : ($lang === 'kk' ? 'Техникалық әдебиет абонементі' : 'Technology and engineering desk'),
-        'lead' => $lang === 'ru' ? 'Инженерия, программирование, материалы и прикладные технологии для практических дисциплин.' : ($lang === 'kk' ? 'Инженерия, бағдарламалау, материалдар және қолданбалы технологиялар.' : 'Engineering, programming, materials, and applied technology resources.'),
-        'meta' => $lang === 'ru' ? '1/200 · первый этаж' : ($lang === 'kk' ? '1/200 · 1-қабат' : '1/200 · first floor'),
+        'title' => $lang === 'ru' ? 'Технологическая библиотека' : ($lang === 'kk' ? 'Технологиялық кітапхана' : 'Technology Library'),
         'stats' => (int) ($facultyStats['tech'] ?? 0),
         'institution' => 'technology_library',
-        'books' => $facultyBooks['tech'] ?? [],
+        'books' => collect($facultyBooks['tech'] ?? [])->filter(static fn (array $book): bool => (int) ($book['issueCount'] ?? 0) > 0)->values()->all(),
       ],
       'engit' => [
-        'title' => $lang === 'ru' ? 'Абонемент ИТ и инженерии' : ($lang === 'kk' ? 'ИТ және инжиниринг абонементі' : 'Engineering and IT desk'),
-        'lead' => $lang === 'ru' ? 'Книги по разработке, архитектуре систем, данным, сетям и цифровым сервисам.' : ($lang === 'kk' ? 'Бағдарламалау, жүйе архитектурасы, деректер, желілер және цифрлық сервистер.' : 'Books on development, system architecture, data, networks, and digital services.'),
-        'meta' => $lang === 'ru' ? '1/202 · первый этаж' : ($lang === 'kk' ? '1/202 · 1-қабат' : '1/202 · first floor'),
+        'title' => $lang === 'ru' ? 'Библиотека колледжа' : ($lang === 'kk' ? 'Колледж кітапханасы' : 'College Library'),
         'stats' => (int) ($facultyStats['engit'] ?? 0),
         'institution' => 'college_library',
-        'books' => $facultyBooks['engit'] ?? [],
+        'books' => collect($facultyBooks['engit'] ?? [])->filter(static fn (array $book): bool => (int) ($book['issueCount'] ?? 0) > 0)->values()->all(),
       ],
     ];
+    $facultyShowcase = collect($facultyShowcase)
+      ->filter(static fn (array $collection): bool => $collection['stats'] > 0 || $collection['books'] !== [])
+      ->all();
   @endphp
 
+  @if($facultyShowcase !== [])
   <section class="hs hs-section hs-section--ruled hs-section--wash homepage-faculty-showcase" data-section="homepage-faculty-picks">
     <header class="hs-head homepage-faculty-showcase__head">
       <div class="hs-head__copy">
-        <p class="hs-kicker">{{ $lang === 'ru' ? 'Абонементы библиотеки' : ($lang === 'kk' ? 'Кітапхана абонементтері' : 'Library desks') }}</p>
-        <h2 class="hs-title">{{ $lang === 'ru' ? 'Популярные книги по абонементам' : ($lang === 'kk' ? 'Абонементтер бойынша танымал кітаптар' : 'Popular books by desk') }}</h2>
-        <p class="hs-lead">{{ $lang === 'ru' ? 'Каждая витрина показывает книги, которые чаще всего спрашивают читатели в этом абонементе.' : ($lang === 'kk' ? 'Әр витринада осы абонементте жиі сұралатын кітаптар көрсетілген.' : 'Each showcase highlights the books readers ask for most in that desk.') }}</p>
+        <p class="hs-kicker">{{ $lang === 'ru' ? 'Подразделения фонда' : ($lang === 'kk' ? 'Қор бөлімшелері' : 'Library collections') }}</p>
+        <h2 class="hs-title">{{ $lang === 'ru' ? 'Книги по библиотечным фондам' : ($lang === 'kk' ? 'Кітапхана қорлары бойынша кітаптар' : 'Books by library collection') }}</h2>
+        <p class="hs-lead">{{ $lang === 'ru' ? 'Данные сформированы по зарегистрированным экземплярам и числу выдач.' : ($lang === 'kk' ? 'Деректер тіркелген даналар мен берілім саны бойынша қалыптастырылған.' : 'The data is based on registered copies and recorded loans.') }}</p>
       </div>
       <a class="hs-link" href="{{ $withLang('/catalog') }}">
         {{ $lang === 'ru' ? 'Открыть каталог' : ($lang === 'kk' ? 'Каталогты ашу' : 'Open catalog') }}
@@ -2950,16 +2655,14 @@
           <div class="homepage-faculty-showcase__desk-top">
             <div class="homepage-faculty-showcase__desk-head">
               <h3>{{ $desk['title'] }}</h3>
-              <span class="homepage-faculty-showcase__desk-meta">{{ $desk['meta'] }}</span>
             </div>
             <span class="homepage-faculty-showcase__desk-stat">
               {{ number_format($desk['stats'], 0, ',', ' ') }}
-              {{ $lang === 'ru' ? 'экземпляров' : ($lang === 'kk' ? 'дана' : 'copies') }}
+              {{ $lang === 'ru' ? 'экз.' : ($lang === 'kk' ? 'дана' : ($desk['stats'] === 1 ? 'copy' : 'copies')) }}
             </span>
           </div>
-          <p class="homepage-faculty-showcase__note">{{ $desk['lead'] }}</p>
           <div class="homepage-faculty-showcase__books">
-            <p class="homepage-faculty-showcase__books-label">{{ $lang === 'ru' ? 'Популярные книги этого абонемента' : ($lang === 'kk' ? 'Осы абонементтің танымал кітаптары' : 'Popular books at this desk') }}</p>
+            <p class="homepage-faculty-showcase__books-label">{{ $lang === 'ru' ? 'Чаще выдаваемые книги' : ($lang === 'kk' ? 'Жиі берілетін кітаптар' : 'Most borrowed books') }}</p>
             @forelse($desk['books'] as $book)
               <a class="homepage-faculty-showcase__book-row" href="{{ $withLang('/book/'.rawurlencode($book['identifier'])) }}">
                 <div
@@ -2977,7 +2680,7 @@
               </a>
             @empty
               <p class="homepage-faculty-showcase__empty">
-                {{ $lang === 'ru' ? 'Популярные книги пока не зарегистрированы.' : ($lang === 'kk' ? 'Танымал кітаптар әзірге тіркелмеген.' : 'No popular books are registered yet.') }}
+                {{ $lang === 'ru' ? 'Данные о выдачах пока отсутствуют.' : ($lang === 'kk' ? 'Берілім туралы деректер әзірге жоқ.' : 'No loan data is available yet.') }}
               </p>
             @endforelse
           </div>
@@ -2989,6 +2692,7 @@
       @endforeach
     </div>
   </section>
+  @endif
 
   <section class="hs homepage-usage" data-section="homepage-how-to-use-library">
     <header class="hs-head">
@@ -3024,13 +2728,13 @@
           ],
           [
             'icon' => 'event_repeat',
-            'title' => $lang === 'ru' ? 'Продлите срок пользования' : ($lang === 'kk' ? 'Пайдалану мерзімін ұзартыңыз' : 'Extend the loan'),
-            'lead' => $lang === 'ru' ? 'Продлите книгу онлайн, если на неё нет очереди.' : ($lang === 'kk' ? 'Егер кезек болмаса, кітапты онлайн ұзартуға болады.' : 'Renew online if there is no waiting queue.'),
+            'title' => $lang === 'ru' ? 'Проверьте срок возврата' : ($lang === 'kk' ? 'Қайтару мерзімін тексеріңіз' : 'Check the due date'),
+            'lead' => $lang === 'ru' ? 'Срок возврата и доступные действия указаны в личном кабинете.' : ($lang === 'kk' ? 'Қайтару мерзімі мен қолжетімді әрекеттер жеке кабинетте көрсетіледі.' : 'The due date and available actions are shown in your account.'),
           ],
           [
             'icon' => 'undo',
             'title' => $lang === 'ru' ? 'Верните книгу' : ($lang === 'kk' ? 'Кітапты қайтарыңыз' : 'Return the book'),
-            'lead' => $lang === 'ru' ? 'Верните литературу в установленный срок без посещения администратора.' : ($lang === 'kk' ? 'Әдебиетті белгіленген мерзімде әкімшіге бармай-ақ қайтарыңыз.' : 'Return the material on time without visiting administration.'),
+            'lead' => $lang === 'ru' ? 'Верните литературу в библиотеку в установленный срок.' : ($lang === 'kk' ? 'Әдебиетті белгіленген мерзімде кітапханаға қайтарыңыз.' : 'Return the material to the library by the due date.'),
           ],
         ];
       @endphp
@@ -3050,12 +2754,11 @@
 
     <aside class="homepage-usage__info" aria-label="{{ $lang === 'ru' ? 'Важно знать' : ($lang === 'kk' ? 'Білу маңызды' : 'Important to know') }}">
       <h3>{{ $lang === 'ru' ? 'Важно знать' : ($lang === 'kk' ? 'Білу маңызды' : 'Important to know') }}</h3>
-      <ul>
-        <li>{{ $lang === 'ru' ? 'Книги выдаются сроком до 14 дней.' : ($lang === 'kk' ? 'Кітаптар 14 күнге дейін беріледі.' : 'Books are issued for up to 14 days.') }}</li>
-        <li>{{ $lang === 'ru' ? 'Продление доступно при отсутствии бронирования.' : ($lang === 'kk' ? 'Ұзарту брондау болмаса қолжетімді.' : 'Renewal is available when no reservation exists.') }}</li>
-        <li>{{ $lang === 'ru' ? 'Одновременно можно забронировать до 3 книг.' : ($lang === 'kk' ? 'Бір уақытта 3 кітапқа дейін брондауға болады.' : 'You can reserve up to 3 books at once.') }}</li>
-        <li>{{ $lang === 'ru' ? 'Электронные ресурсы доступны круглосуточно.' : ($lang === 'kk' ? 'Электрондық ресурстар тәулік бойы қолжетімді.' : 'Electronic resources are available 24/7.') }}</li>
-      </ul>
+      <p>{{ $lang === 'ru'
+          ? 'Актуальные сроки выдачи и условия бронирования отображаются в личном кабинете. Условия внешних электронных ресурсов указаны в их карточках.'
+          : ($lang === 'kk'
+              ? 'Беру мерзімдері мен брондау шарттары жеке кабинетте көрсетіледі. Сыртқы электрондық ресурстардың шарттары олардың карточкаларында берілген.'
+              : 'Current loan periods and reservation terms are shown in the reader account. Conditions for external electronic resources are stated on each resource card.') }}</p>
     </aside>
 
     <style>
@@ -3447,9 +3150,10 @@
     top: calc(70svh - 66px);
     z-index: 4;
     width: min(calc(100vw - (var(--homepage-gutter) * 2)), 1200px);
-    margin: -40px 0 0;
+    margin: 0;
     padding: 0;
     box-sizing: border-box;
+    pointer-events: none;
     transform: translateX(-50%);
   }
   .homepage-hero-stats__inner {
@@ -3804,9 +3508,10 @@
     })();
   </script>
   </section>{{-- /homepage-how-to-use-library --}}
+  @include('home.repository')
+  @include('home.news')
   @include('home.new-arrivals')
   @include('home.collections')
-  @include('home.stats')
   @include('home.faq')
 </div>{{-- /homepage-canonical-page --}}
 @endsection

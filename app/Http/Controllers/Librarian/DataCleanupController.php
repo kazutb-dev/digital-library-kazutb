@@ -17,7 +17,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
- * Data quality workbench (Master.md §11, ДИР §6).
+ * Data quality workbench (Master.md 11, ДИР 6).
  *
  * The page is organised around the three kinds of work a record can need —
  * completion, judgement, retyping — rather than a flat wall of counters, so a
@@ -175,7 +175,7 @@ class DataCleanupController extends Controller
     }
 
     /**
-     * ДИР §6.3 — a mismatch resolved as "this really is a Russian edition with
+     * ДИР 6.3 — a mismatch resolved as "this really is a Russian edition with
      * a Kazakh subtitle". Clears the flag without touching `language`, and
      * records why so the next detection pass does not re-raise it.
      */

@@ -1,10 +1,22 @@
 @php
   $pageLang = $pageLang ?? app()->getLocale();
-  $pageLang = in_array($pageLang, ['kk', 'ru', 'en'], true) ? $pageLang : 'ru';
+  $pageLang = in_array($pageLang, ['kk', 'ru', 'en'], true) ? $pageLang : 'kk';
+  $footerSessionUser = session('library.user');
+  $footerIsAuthenticated = is_array($footerSessionUser);
+  $footerLegacyRole = mb_strtolower(trim((string) ($footerSessionUser['role'] ?? '')));
+  $footerCanonicalRole = mb_strtolower(trim((string) ($footerSessionUser['canonical_role'] ?? '')));
+  if ($footerCanonicalRole === '') {
+      $footerCanonicalRole = $footerLegacyRole === 'reader' ? 'member' : $footerLegacyRole;
+  }
+  $footerDashboardHref = match ($footerCanonicalRole) {
+      'admin' => '/admin',
+      'member' => '/dashboard',
+      default => '/librarian',
+  };
 
   $footerHref = static function (string $href) use ($pageLang): string {
       if (str_starts_with($href, 'http') || str_starts_with($href, 'mailto:') || str_starts_with($href, 'tel:')) return $href;
-      if ($pageLang === 'ru') return $href;
+      if ($pageLang === 'kk') return $href;
       return $href . (str_contains($href, '?') ? '&' : '?') . 'lang=' . $pageLang;
   };
 
@@ -13,14 +25,13 @@
       'brand' => 'Казахский университет технологии и бизнеса имени К. Кулажанова',
       'tagline' => 'Технологии · Бизнес · Инновации',
       'address' => ['010000, Казахстан, г. Астана,', 'Левый берег, район Нура,', 'ул. Кайыма Мухамедханова, 37А'],
-      'accreditation' => ['Свидетельство №28/25KA0315 от 29.12.2025 г.', 'CAAAE — до 30.06.2033 г.'],
       'navigation' => 'Навигация',
       'updates' => 'Обновления',
-      'institution' => 'Институт',
+      'institution' => 'О библиотеке',
       'support' => 'Поддержка',
       'navigation_links' => [
         ['label' => 'Каталог', 'href' => '/catalog'],
-        ['label' => 'Обзор фонда', 'href' => '/catalog'],
+        ['label' => 'Обзор фонда', 'href' => '/discover'],
         ['label' => 'Внешние ресурсы', 'href' => '/resources'],
         ['label' => 'Научный репозиторий', 'href' => '/repository'],
         ['label' => 'Моя подборка', 'href' => '/shortlist'],
@@ -43,20 +54,19 @@
         ['label' => 'Сайт университета', 'href' => 'https://kaztbu.edu.kz/'],
       ],
       'rights' => 'Все права защищены.',
-      'entity' => 'АО «КазУТБ» · Астана, Казахстан',
+      'entity' => 'АО «Казахский университет технологии и бизнеса имени К. Кулажанова» · Астана, Казахстан',
     ],
     'kk' => [
       'brand' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
       'tagline' => 'Технологиялар · Бизнес · Инновациялар',
       'address' => ['010000, Қазақстан, Астана қ.,', 'Сол жағалау, Нұра ауданы,', 'Қайым Мұхамедханов к-сі, 37А'],
-      'accreditation' => ['№28/25KA0315 куәлігі, 29.12.2025 ж.', 'CAAAE — 30.06.2033 ж. дейін'],
       'navigation' => 'Бөлімдер',
       'updates' => 'Жаңартулар',
-      'institution' => 'Институт',
+      'institution' => 'Кітапхана',
       'support' => 'Қолдау',
       'navigation_links' => [
         ['label' => 'Каталог', 'href' => '/catalog'],
-        ['label' => 'Қорға шолу', 'href' => '/catalog'],
+        ['label' => 'Қорға шолу', 'href' => '/discover'],
         ['label' => 'Сыртқы ресурстар', 'href' => '/resources'],
         ['label' => 'Ғылыми репозиторий', 'href' => '/repository'],
         ['label' => 'Менің іріктемем', 'href' => '/shortlist'],
@@ -79,20 +89,19 @@
         ['label' => 'Университет сайты', 'href' => 'https://kaztbu.edu.kz/'],
       ],
       'rights' => 'Барлық құқықтар қорғалған.',
-      'entity' => '«ҚазТБУ» АҚ · Астана, Қазақстан',
+      'entity' => '«Қ. Құлажанов атындағы Қазақ технология және бизнес университеті» АҚ · Астана, Қазақстан',
     ],
     'en' => [
       'brand' => 'Kazakh University of Technology and Business named after K. Kulazhanov',
       'tagline' => 'Technology · Business · Innovation',
       'address' => ['010000, Astana, Kazakhstan,', 'Left Bank, Nura District,', '37A Kaiym Mukhamedkhanov Street'],
-      'accreditation' => ['Certificate No. 28/25KA0315, 29 December 2025', 'CAAAE — valid until 30 June 2033'],
       'navigation' => 'Navigation',
       'updates' => 'Updates',
-      'institution' => 'Institution',
+      'institution' => 'Library',
       'support' => 'Support',
       'navigation_links' => [
         ['label' => 'Catalog', 'href' => '/catalog'],
-        ['label' => 'Discover the Collection', 'href' => '/catalog'],
+        ['label' => 'Discover the Collection', 'href' => '/discover'],
         ['label' => 'External Resources', 'href' => '/resources'],
         ['label' => 'Scholarly Repository', 'href' => '/repository'],
         ['label' => 'My Shortlist', 'href' => '/shortlist'],
@@ -115,9 +124,25 @@
         ['label' => 'University website', 'href' => 'https://kaztbu.edu.kz/'],
       ],
       'rights' => 'All rights reserved.',
-      'entity' => 'KazUTB JSC · Astana, Kazakhstan',
+      'entity' => 'Kazakh University of Technology and Business named after K. Kulazhanov JSC · Astana, Kazakhstan',
     ],
   ][$pageLang];
+
+  $footerCopy['support_links'] = array_values(array_filter(
+      array_map(static function (array $link) use ($footerDashboardHref, $footerCanonicalRole): array {
+          if ($link['href'] === '/dashboard') {
+              $link['href'] = $footerDashboardHref;
+              if (! in_array($footerCanonicalRole, ['', 'member'], true)) {
+                  $link['label'] = __('brand.workspace.label');
+              }
+          }
+
+          return $link;
+      }, $footerCopy['support_links']),
+      static fn (array $link): bool => $footerIsAuthenticated
+          ? $link['href'] !== '/login'
+          : $link['href'] !== $footerDashboardHref,
+  ));
 @endphp
 
 <style>
@@ -213,15 +238,6 @@
   .university-footer__contact:hover {
     color: #ffffff;
   }
-  .university-footer__accreditation {
-    width: fit-content;
-    margin-top: 25px;
-    padding: 9px 12px;
-    color: rgba(242, 246, 251, .56);
-    border: 1px solid rgba(242, 246, 251, .1);
-    font-size: 9px;
-    line-height: 1.55;
-  }
   .university-footer__column h2 {
     margin: 0 0 22px;
     padding-bottom: 14px;
@@ -314,12 +330,6 @@
       </p>
       <a class="university-footer__contact university-footer__contact--email" href="mailto:info@kaztbu.edu.kz">info@kaztbu.edu.kz</a>
       <a class="university-footer__contact" href="tel:+77172697060">+7 7172 69-70-60</a>
-      <a class="university-footer__contact" href="tel:+77752322266">+7 775 232-22-66</a>
-
-      <p class="university-footer__accreditation">
-        {{ $footerCopy['accreditation'][0] }}<br>
-        {{ $footerCopy['accreditation'][1] }}
-      </p>
     </div>
 
     @foreach([
@@ -331,14 +341,14 @@
       <nav class="university-footer__column" aria-label="{{ $heading }}">
         <h2>{{ $heading }}</h2>
         @foreach($links as $link)
-          <a href="{{ $footerHref($link['href']) }}" @if(str_starts_with($link['href'], 'http')) target="_blank" rel="noopener" @endif>{{ $link['label'] }}</a>
+          <a href="{{ $footerHref($link['href']) }}" @if(str_starts_with($link['href'], 'http')) target="_blank" rel="noopener noreferrer" @endif>{{ $link['label'] }}</a>
         @endforeach
       </nav>
     @endforeach
   </div>
 
   <div class="university-footer__bottom">
-    <span>© {{ date('Y') }} {{ $footerCopy['brand'] }}. {{ $footerCopy['rights'] }}</span>
+    <span> {{ date('Y') }} {{ $footerCopy['brand'] }}. {{ $footerCopy['rights'] }}</span>
     <span>{{ $footerCopy['entity'] }}</span>
   </div>
 </footer>

@@ -2,7 +2,7 @@
 
 @php
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
   $withLang = function (string $path, array $query = []) use ($lang): string {
       if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
@@ -25,7 +25,7 @@
           'browse_subjects' => 'Открыть направления',
           'back_to_account' => '← Вернуться в кабинет',
           'draft_title_label' => 'Рабочее название',
-          'draft_title_placeholder' => 'Например: Подборка для дисциплины «Информатика»',
+          'draft_title_placeholder' => 'Например: Подборка для дисциплины Информатика»',
           'draft_notes_label' => 'Заметки исследователя',
           'draft_notes_placeholder' => 'Семестр, группа, комментарии или заметка для себя...',
           'status_title' => 'Статус сохранения',
@@ -45,7 +45,7 @@
           'print' => 'Печать',
           'clear' => 'Очистить подборку',
           'librarian_note_title' => 'Заметка библиотекаря',
-          'librarian_note' => '«Сохранённые материалы синхронизируются между устройствами. Для печатных экземпляров лучше оформлять резерв не позднее чем за сутки до визита в кампус.»',
+          'librarian_note' => 'Сохранённые материалы синхронизируются между устройствами. Для печатных экземпляров лучше оформлять резерв не позднее чем за сутки до визита в кампус.»',
           'continue_title' => 'Продолжить поиск',
           'continue_body' => 'Готовы найти больше материалов для исследования? Просмотрите каталог и подключённые академические ресурсы.',
       ],
@@ -61,7 +61,7 @@
           'browse_subjects' => 'Бағыттарды қарау',
           'back_to_account' => '← Кабинетке оралу',
           'draft_title_label' => 'Жұмыс атауы',
-          'draft_title_placeholder' => 'Мысалы: «Информатика» пәніне арналған іріктеме',
+          'draft_title_placeholder' => 'Мысалы: Информатика» пәніне арналған іріктеме',
           'draft_notes_label' => 'Зерттеуші ескертпесі',
           'draft_notes_placeholder' => 'Семестр, топ, түсініктеме немесе өзіңізге белгі...',
           'status_title' => 'Сақтау күйі',
@@ -81,7 +81,7 @@
           'print' => 'Басып шығару',
           'clear' => 'Іріктемені тазарту',
           'librarian_note_title' => 'Кітапханашы ескертпесі',
-          'librarian_note' => '«Сақталған материалдар құрылғылар арасында синхрондалады. Баспа даналарын кампусқа келерден кемінде бір күн бұрын брондаған дұрыс.»',
+          'librarian_note' => 'Сақталған материалдар құрылғылар арасында синхрондалады. Баспа даналарын кампусқа келерден кемінде бір күн бұрын брондаған дұрыс.»',
           'continue_title' => 'Іздеуді жалғастыру',
           'continue_body' => 'Зерттеу үшін тағы материалдар керек пе? Каталог пен қосылған академиялық ресурстарды қараңыз.',
       ],
@@ -1209,12 +1209,12 @@
       'loadFailed' => 'Не удалось загрузить подборку',
       'exportFailed' => 'Не удалось подготовить экспорт',
       'clearConfirm' => 'Очистить всю подборку?',
-      'copied' => '✓ Скопировано',
-      'itemCopied' => '✓ Цитата скопирована',
+      'copied' => ' Скопировано',
+      'itemCopied' => ' Цитата скопирована',
       'savedToAccount' => 'Синхронизируется с аккаунтом',
       'sessionOnly' => 'Только в текущей сессии',
       'saving' => 'Сохранение...',
-      'saved' => '✓ Сохранено',
+      'saved' => ' Сохранено',
       'saveError' => 'Ошибка сохранения',
       'networkError' => 'Ошибка сети',
       'instantAccess' => 'Мгновенный цифровой доступ',
@@ -1242,12 +1242,12 @@
       'loadFailed' => 'Іріктемені жүктеу мүмкін болмады',
       'exportFailed' => 'Экспортты дайындау мүмкін болмады',
       'clearConfirm' => 'Бүкіл іріктемені тазарту керек пе?',
-      'copied' => '✓ Көшірілді',
-      'itemCopied' => '✓ Дәйексөз көшірілді',
+      'copied' => ' Көшірілді',
+      'itemCopied' => ' Дәйексөз көшірілді',
       'savedToAccount' => 'Аккаунтпен синхрондалады',
       'sessionOnly' => 'Тек ағымдағы сессияда',
       'saving' => 'Сақталуда...',
-      'saved' => '✓ Сақталды',
+      'saved' => ' Сақталды',
       'saveError' => 'Сақтау қатесі',
       'networkError' => 'Желі қатесі',
       'instantAccess' => 'Лезде цифрлық қолжетімділік',
@@ -1275,12 +1275,12 @@
       'loadFailed' => 'Unable to load the shortlist',
       'exportFailed' => 'Unable to prepare the export',
       'clearConfirm' => 'Clear the entire shortlist?',
-      'copied' => '✓ Copied',
-      'itemCopied' => '✓ Citation copied',
+      'copied' => ' Copied',
+      'itemCopied' => ' Citation copied',
       'savedToAccount' => 'Synced to account',
       'sessionOnly' => 'Session only',
       'saving' => 'Saving...',
-      'saved' => '✓ Saved',
+      'saved' => ' Saved',
       'saveError' => 'Save failed',
       'networkError' => 'Network error',
       'instantAccess' => 'Instant Digital Access',
@@ -1302,7 +1302,7 @@
 
   function withLang(path) {
     const url = new URL(path, window.location.origin);
-    if (SHORTLIST_LANG !== 'ru' && !url.searchParams.has('lang')) {
+    if (SHORTLIST_LANG !== 'kk' && !url.searchParams.has('lang')) {
       url.searchParams.set('lang', SHORTLIST_LANG);
     }
     return url.pathname + url.search;

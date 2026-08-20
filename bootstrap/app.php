@@ -35,7 +35,13 @@ return Application::configure(basePath: dirname(__DIR__))
             SetRequestLocale::class,
             RequirePasswordChange::class,
         ]);
-        $middleware->api(append: [RequestContext::class]);
+        $middleware->api(append: [
+            RequestContext::class,
+            // Public JSON representations must resolve metadata in exactly
+            // the same locale as their Blade counterparts. API requests are
+            // stateless, so the explicit `lang` query parameter is canonical.
+            SetRequestLocale::class,
+        ]);
 
         $middleware->alias([
             // Spatie RBAC — operates on the Laravel Auth guard.
@@ -59,6 +65,20 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->respond(function (Response $response): Response {
+            // A long-lived sign-in tab can outlive its server-side session.
+            // Refresh the form with a localized explanation instead of
+            // exposing the framework's CSRF exception to the user.
+            if ($response->getStatusCode() === 419 && request()->isMethod('POST') && request()->is('login')) {
+                // CSRF runs before the appended locale middleware, so recover
+                // the supported locale directly from this login request.
+                $requestedLang = (string) (request()->input('lang') ?: request()->query('lang', app()->getLocale()));
+                $lang = in_array($requestedLang, ['kk', 'ru', 'en'], true) ? $requestedLang : 'kk';
+                $target = '/login'.($lang === 'kk' ? '' : '?lang='.$lang);
+                $response = redirect($target)->withErrors([
+                    'login' => trans('auth.messages.session_expired', [], $lang),
+                ]);
+            }
+
             $requestId = request()->attributes->get('request_id');
             $correlationId = request()->attributes->get('correlation_id');
             if (is_string($requestId) && $requestId !== '') {

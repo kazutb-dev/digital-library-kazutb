@@ -15,7 +15,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
- * Attendance desk (ДИР §9.4): scan a reader card to record that they came in.
+ * Attendance desk (ДИР 9.4): scan a reader card to record that they came in.
  * Nothing here touches loans — a visit stands on its own.
  */
 class VisitController extends Controller

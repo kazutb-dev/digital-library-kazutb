@@ -74,7 +74,7 @@ class PermissionSeeder extends Seeder
         'reader_card.view_own',
         'reader_card.print_own',
 
-        // Attendance (ДИР §9.4) — recording a card scan at the entrance. Kept
+        // Attendance (ДИР 9.4) — recording a card scan at the entrance. Kept
         // separate from circulation.*: counting a visit is not lending a book.
         'visits.record',
 
@@ -87,12 +87,12 @@ class PermissionSeeder extends Seeder
         'barcodes.print',
         'barcodes.print_batch',
 
-        // Fines and debts (Master.md §14.4-14.5, §15.5).
+        // Fines and debts (Master.md 14.4-14.5, 15.5).
         'fines.view',
         'fines.manage',
         'fines.waive',
 
-        // Lost/damaged copy replacement workflow (ДИР §9.3).
+        // Lost/damaged copy replacement workflow (ДИР 9.3).
         'incidents.view',
         'incidents.create',
         'incidents.review',
@@ -112,13 +112,40 @@ class PermissionSeeder extends Seeder
         'digital.upload',
         'digital.set_access_flags',
         'digital.delete',
+        'digital.view_metadata',
+        'digital.preview',
+        'digital.read',
+        'digital.download',
+        'digital.review_metadata',
+        'digital.review_rights',
+        'digital.process',
+        'digital.approve',
+        'digital.publish',
+        'digital.restrict',
+        'digital.withdraw',
+        'digital.manage_policies',
+        'digital.view_analytics',
 
         // News and announcements.
         'news.create',
+        'news.view_internal',
         'news.edit_own',
         'news.edit_any',
-        'news.delete',
+        'news.submit_for_review',
+        'news.review',
+        'news.request_changes',
+        'news.approve',
+        'news.schedule',
         'news.publish',
+        'news.publish_emergency',
+        'news.archive',
+        'news.cancel',
+        'news.delete_draft',
+        'news.manage_categories',
+        'news.manage_annual_plan',
+        'news.manage_homepage',
+        'news.view_analytics',
+        'news.delete',
 
         // Institutional repository of scholarly works.
         'repository.browse_metadata',
@@ -127,21 +154,60 @@ class PermissionSeeder extends Seeder
         'repository.approve',
         'repository.publish',
         'repository.remove',
+        'repository.view_public',
+        'repository.view_internal',
+        'repository.create',
+        'repository.edit',
+        'repository.review_metadata',
+        'repository.review_rights',
+        'repository.request_changes',
+        'repository.withdraw',
+        'repository.manage_versions',
+        'repository.view_analytics',
 
         // Subscribed external resources.
         'external_resources.view',
         'external_resources.manage',
+        'external_resources.review',
+        'external_resources.publish',
+        'external_resources.manage_contracts',
+        'external_resources.view_contracts',
+        'external_resources.view_analytics',
 
         // Reader messages / support requests.
         'messages.submit',
+        'messages.reply_own',
         'messages.view_all',
+        'messages.view_assigned',
+        'messages.assign',
+        'messages.reassign',
+        'messages.change_priority',
+        'messages.add_internal_note',
+        'messages.request_clarification',
+        'messages.prepare_response',
+        'messages.approve_response',
+        'messages.reject',
+        'messages.close',
+        'messages.reopen',
+        'messages.manage_categories',
+        'messages.manage_routing',
+        'messages.manage_sla',
+        'messages.view_analytics',
+        'messages.view_sensitive_complaints',
+        'messages.download_attachments',
         'messages.resolve',
-        'messages.delete',
 
         // Reporting and analytics.
+        'reports.view_acquisitions',
         'reports.view_ops',
         'reports.view_full',
         'reports.export',
+        'reports.official.create',
+        'reports.official.submit',
+        'reports.official.approve',
+        'reports.official.archive',
+        'reports.official.export',
+        'reports.official.delete_draft',
         'staff_performance.view',
 
         // Acquisitions — order and accession workflows are implemented later,
@@ -149,6 +215,30 @@ class PermissionSeeder extends Seeder
         'acquisitions.create_order',
         'acquisitions.receive',
         'acquisitions.manage',
+
+        // Daily librarian workspace queues.
+        'tasks.view',
+        'tasks.manage_own',
+        'tasks.assign',
+        'acquisitions.view',
+        'edd.view',
+        'edd.manage',
+        'periodicals.view',
+        'periodicals.manage',
+        'calendar.view',
+
+        // Integration Hub. Secrets themselves are never readable through a permission.
+        'integrations.view',
+        'integrations.health',
+        'integrations.manage',
+        'integrations.sync',
+        'integrations.reconcile',
+        'integrations.retry',
+        'integrations.view_logs',
+        'integrations.view_conflicts',
+        'integrations.resolve_conflicts',
+        'integrations.manage_mapping',
+        'integrations.manage_secrets_reference',
 
         // Administration.
         'users.manage',
@@ -158,7 +248,7 @@ class PermissionSeeder extends Seeder
         'branches.manage',
         'data_cleanup.access',
 
-        // Persistent data-quality control centre (ДИР §6, ТЗ §11).
+        // Persistent data-quality control centre (ДИР 6, ТЗ 11).
         'data_quality.view',
         'data_quality.scan',
         'data_quality.triage',

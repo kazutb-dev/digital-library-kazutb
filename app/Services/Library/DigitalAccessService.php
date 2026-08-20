@@ -2,11 +2,14 @@
 
 namespace App\Services\Library;
 
+use App\Models\Catalog\DigitalMaterialAccessLog;
 use App\Models\Catalog\ElectronicMaterial;
 use App\Models\Library\DigitalMaterial;
 use App\Models\Library\DigitalReadingProgress;
 use App\Support\DatabaseSchema;
+use App\Support\StorageKey;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\IpUtils;
 
@@ -35,7 +38,7 @@ class DigitalAccessService
         if (ctype_digit($documentId) && DatabaseSchema::hasTable('electronic_materials')) {
             return ElectronicMaterial::query()
                 ->where('bibliographic_record_id', (int) $documentId)
-                ->where('is_active', true)
+                ->published()
                 ->orderBy('created_at')
                 ->get()
                 ->map(fn (ElectronicMaterial $material) => $this->fromCanonical($material))
@@ -73,7 +76,7 @@ class DigitalAccessService
 
             $material = ElectronicMaterial::query()
                 ->whereKey((int) $id)
-                ->where('is_active', true)
+                ->published()
                 ->first();
 
             return $material === null ? null : $this->fromCanonical($material);
@@ -98,11 +101,22 @@ class DigitalAccessService
         if (! $material->isActive) {
             return false;
         }
+        if ($material->embargoUntil !== null && $material->embargoUntil > now()) {
+            return false;
+        }
+        if ($material->campusOnly && ! $this->isOnCampus($request)) {
+            return false;
+        }
 
         return match ($material->accessLevel) {
             'public' => true,
             'authenticated' => $this->isIdentified($request),
             'campus' => $this->isIdentified($request) && $this->isOnCampus($request),
+            'student', 'faculty', 'staff', 'librarian' => $this->hasRole($request, $material->accessLevel),
+            'restricted_roles' => $this->hasAnyRole($request, $material->restrictedRoles),
+            'embargoed' => $material->embargoUntil !== null && $material->embargoUntil <= now()
+                && $this->isIdentified($request),
+            'metadata_only' => false,
             'restricted' => $this->isStaff($request),
             default => false,
         };
@@ -118,6 +132,23 @@ class DigitalAccessService
         return $material->allowDownload
             && $material->hasLocalFile()
             && $this->canAccess($material, $request);
+    }
+
+    public function recordAccess(ResolvedDigitalMaterial $material, Request $request, string $action, bool $allowed, ?string $reason = null): void
+    {
+        if (! str_starts_with($material->ref, 'em:') || ! Schema::hasTable('digital_material_access_logs')) {
+            return;
+        }
+
+        DigitalMaterialAccessLog::create([
+            'electronic_material_id' => (int) substr($material->ref, 3),
+            'user_id' => $request->user()?->getKey(),
+            'action' => $action,
+            'allowed' => $allowed,
+            'denial_reason' => $reason,
+            'ip_hash' => $request->ip() ? hash('sha256', $request->ip()) : null,
+            'user_agent_hash' => $request->userAgent() ? hash('sha256', $request->userAgent()) : null,
+        ]);
     }
 
     /**
@@ -273,7 +304,7 @@ class DigitalAccessService
      */
     public function localFilePath(ResolvedDigitalMaterial $material): ?string
     {
-        if (! $material->hasLocalFile()) {
+        if (! $material->hasLocalFile() || ! StorageKey::isSafe((string) $material->storagePath)) {
             return null;
         }
 
@@ -294,7 +325,7 @@ class DigitalAccessService
 
     public function fileExists(ResolvedDigitalMaterial $material): bool
     {
-        if (! $material->hasLocalFile()) {
+        if (! $material->hasLocalFile() || ! StorageKey::isSafe((string) $material->storagePath)) {
             return false;
         }
 
@@ -326,6 +357,30 @@ class DigitalAccessService
     private function isStaff(Request $request): bool
     {
         return $request->user()?->canAny(self::STAFF_PERMISSIONS) ?? false;
+    }
+
+    private function hasRole(Request $request, string $role): bool
+    {
+        $user = $request->user();
+        if ($user === null) {
+            return false;
+        }
+
+        $aliases = match ($role) {
+            'student' => ['student'],
+            'faculty' => ['faculty', 'teacher'],
+            'staff' => ['staff', 'librarian', 'senior_librarian', 'director', 'admin'],
+            'librarian' => ['librarian', 'senior_librarian', 'director'],
+            default => [$role],
+        };
+
+        return $user->hasAnyRole($aliases);
+    }
+
+    /** @param list<string> $roles */
+    private function hasAnyRole(Request $request, array $roles): bool
+    {
+        return $request->user()?->hasAnyRole($roles) ?? false;
     }
 
     /**
@@ -361,9 +416,16 @@ class DigitalAccessService
             allowDownload: (bool) $material->allow_download,
             isActive: (bool) $material->is_active,
             externalUrl: $material->external_url,
-            storageDisk: $path === '' ? null : 'local',
+            storageDisk: $path === '' ? null : (string) ($material->storage_disk ?: 'local'),
             storagePath: $path === '' ? null : $path,
-            originalFilename: $path === '' ? (string) $material->title : basename($path),
+            originalFilename: (string) ($material->original_filename ?: ($path === '' ? $material->title : basename($path))),
+            restrictedRoles: (array) ($material->restricted_roles ?? []),
+            campusOnly: (bool) $material->campus_only,
+            embargoUntil: $material->embargo_until,
+            workflowStatus: (string) $material->workflow_status,
+            downloadPolicy: (string) $material->download_policy,
+            printPolicy: (string) $material->print_policy,
+            copyPolicy: (string) $material->copy_policy,
         );
     }
 
@@ -396,7 +458,8 @@ class DigitalAccessService
         return match (mb_strtolower(trim($level))) {
             'open', 'public' => 'public',
             'authenticated' => 'authenticated',
-            'campus' => 'campus',
+            'campus', 'campus_only' => 'campus',
+            'student', 'faculty', 'staff', 'librarian', 'restricted_roles', 'embargoed', 'metadata_only' => mb_strtolower(trim($level)),
             'restricted' => 'restricted',
             default => 'restricted',
         };

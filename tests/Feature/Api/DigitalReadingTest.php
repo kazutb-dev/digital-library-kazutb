@@ -49,6 +49,7 @@ class DigitalReadingTest extends TestCase
             'access_level' => 'public',
             'allow_download' => false,
             'is_active' => true,
+            'workflow_status' => 'published',
         ], $overrides));
     }
 
@@ -90,6 +91,7 @@ class DigitalReadingTest extends TestCase
             'file_type' => 'pdf',
             'access_level' => 'public',
             'is_active' => true,
+            'workflow_status' => 'published',
         ]);
 
         $item = $this->getJson("/api/v1/documents/{$record->getKey()}/digital-materials")
@@ -449,6 +451,7 @@ class DigitalReadingTest extends TestCase
             'file_type' => 'pdf',
             'access_level' => 'public',
             'is_active' => true,
+            'workflow_status' => 'published',
         ]);
 
         $response = $this->get("/digital-viewer/{$material->getKey()}");

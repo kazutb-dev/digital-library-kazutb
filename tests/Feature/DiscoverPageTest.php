@@ -31,7 +31,7 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_renders_ok(): void
     {
-        $this->get('/discover')
+        $this->get('/discover?lang=ru')
             ->assertOk()
             ->assertSee('Центр академического поиска')
             ->assertSee('академического');
@@ -39,7 +39,7 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_has_canonical_section_markers(): void
     {
-        $html = $this->get('/discover')->assertOk()->getContent();
+        $html = $this->get('/discover?lang=ru')->assertOk()->getContent();
 
         $this->assertStringContainsString('data-section="discover-canonical-hero"', $html);
         $this->assertStringContainsString('data-section="discover-canonical-faculties"', $html);
@@ -49,7 +49,7 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_canonical_section_order(): void
     {
-        $html = $this->get('/discover')->assertOk()->getContent();
+        $html = $this->get('/discover?lang=ru')->assertOk()->getContent();
 
         $hero = strpos($html, 'data-section="discover-canonical-hero"');
         $fac = strpos($html, 'data-section="discover-canonical-faculties"');
@@ -65,7 +65,7 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_renders_all_four_faculty_bento_cards_with_catalog_wiring(): void
     {
-        $html = $this->get('/discover')->assertOk()->getContent();
+        $html = $this->get('/discover?lang=ru')->assertOk()->getContent();
 
         // All four real KazUTB faculties render with their UDC labels + slugs.
         $this->assertStringContainsString('Технологический', $html);
@@ -93,7 +93,7 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_renders_primary_udc_pathways_linking_to_catalog(): void
     {
-        $html = $this->get('/discover')->assertOk()->getContent();
+        $html = $this->get('/discover?lang=ru')->assertOk()->getContent();
 
         // The complete top-level classifier is rendered as a real tree.
         foreach (range(0, 9) as $code) {
@@ -112,7 +112,7 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_udc_is_the_primary_axis_and_faculties_carry_udc_chip(): void
     {
-        $html = $this->get('/discover')->assertOk()->getContent();
+        $html = $this->get('/discover?lang=ru')->assertOk()->getContent();
 
         // Hero lead must name UDC explicitly — UDC is the primary discovery contract.
         $this->assertStringContainsString('Универсальную десятичную классификацию', $html);
@@ -128,14 +128,14 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_has_no_bare_hash_links(): void
     {
-        $this->get('/discover')
+        $this->get('/discover?lang=ru')
             ->assertOk()
             ->assertDontSee('href="#"', false);
     }
 
     public function test_discover_page_retires_legacy_shell_markers(): void
     {
-        $response = $this->get('/discover')->assertOk();
+        $response = $this->get('/discover?lang=ru')->assertOk();
 
         // Legacy brochure shell ids/classes from the retired template.
         $response->assertDontSee('id="discover-page"', false);
@@ -165,7 +165,7 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_canonical_hero_is_single_column_no_decorative_chips(): void
     {
-        $html = $this->get('/discover')->assertOk()->getContent();
+        $html = $this->get('/discover?lang=ru')->assertOk()->getContent();
 
         // Canonical hero is a single-column display + lead — no hero-actions row
         // of CTAs, no decorative chip orbit, no quote card.
@@ -179,7 +179,7 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_faculty_bento_follows_canonical_2_1_1_2_layout(): void
     {
-        $html = $this->get('/discover')->assertOk()->getContent();
+        $html = $this->get('/discover?lang=ru')->assertOk()->getContent();
 
         // Canonical export bento: large (span 2) + small + small + large (span 2).
         // The first and last cards must carry the span-2 modifier.
@@ -200,7 +200,7 @@ class DiscoverPageTest extends TestCase
 
     public function test_discover_page_retires_deprecated_branding(): void
     {
-        $response = $this->get('/discover')->assertOk();
+        $response = $this->get('/discover?lang=ru')->assertOk();
 
         // Forbidden legacy brand drift at the page-content level. Note: the bare
         // string "Digital Library" still appears inside shared layout chrome
@@ -231,9 +231,10 @@ class DiscoverPageTest extends TestCase
             ->assertSee('ӘОЖ');
 
         $html = $response->getContent();
-        // Cross-locale links keep the lang param so navigation stays in Kazakh.
-        $this->assertStringContainsString('/catalog?faculty=technology&amp;udc=66&amp;lang=kk', $html);
-        $this->assertStringContainsString('/catalog?udc=004&amp;lang=kk', $html);
+        // Kazakh is canonical, so its links stay localized without a redundant
+        // query parameter.
+        $this->assertStringContainsString('/catalog?faculty=technology&amp;udc=66', $html);
+        $this->assertStringContainsString('/catalog?udc=004', $html);
     }
 
     public function test_discover_page_supports_english_locale(): void
@@ -255,11 +256,11 @@ class DiscoverPageTest extends TestCase
         $this->assertStringContainsString('/catalog?udc=5&amp;lang=en', $html);
     }
 
-    public function test_discover_page_falls_back_to_russian_for_unknown_lang(): void
+    public function test_discover_page_falls_back_to_kazakh_for_unknown_lang(): void
     {
         $this->get('/discover?lang=zz')
             ->assertOk()
-            ->assertSee('Центр академического поиска')
+            ->assertSee('Академиялық ізденіс орталығы')
             ->assertDontSee('Academic Discovery Hub');
     }
 }

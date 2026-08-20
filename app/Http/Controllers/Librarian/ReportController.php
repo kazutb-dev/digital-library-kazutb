@@ -3,113 +3,108 @@
 namespace App\Http\Controllers\Librarian;
 
 use App\Http\Controllers\Controller;
-use App\Models\ActivityLog;
 use App\Models\Branch;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\CirculationIncidentCase;
-use App\Models\Catalog\Fine;
-use App\Models\Catalog\Loan;
-use App\Models\Catalog\ReaderProfile;
-use App\Models\Catalog\Reservation;
 use App\Models\Catalog\InventorySession;
-use App\Models\Fund;
-use App\Models\User;
+use App\Models\Catalog\Loan;
+use App\Models\Catalog\Reservation;
 use App\Services\AuditLogger;
-use App\Services\Catalog\DataQualityQueues;
 use App\Services\Catalog\LibraryVisitService;
+use App\Services\Reports\LibraryReportService;
+use App\Services\Reports\ReportFilters;
+use App\Services\Reports\ReportRegistry;
 use App\Services\UdcClassificationService;
 use App\Support\Csv;
+use App\Support\DatabaseSchema;
+use App\Support\OfficeOpenXmlExporter;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Operational reports for the librarian workspace (Historical §22.2),
- * gated by reports.view_ops — the scope that previously had no surface.
+ * Operational reports for the librarian workspace (Historical 22.2),
+ * Every definition has its own registry permission. The route boundary only
+ * establishes an authenticated staff session; this controller enforces the
+ * least-privilege report scope before reading any dataset.
  */
 class ReportController extends Controller
 {
     public function __construct(private readonly LibraryVisitService $visits) {}
 
-    public function index(Request $request, UdcClassificationService $classification, DataQualityQueues $queues): View
+    public function index(Request $request, LibraryReportService $reports, ReportRegistry $registry): View
     {
-        [$from, $to] = $this->period($request);
-
-        // §9.4 attendance. Long periods are unreadable day by day, so the
-        // series switches to weeks past a threshold.
-        $visitDays = $this->visits->dailyTotals($from, $to);
-        $visitsByWeek = $visitDays->count() > 45;
-
-        $loanDynamics = Loan::query()
-            ->selectRaw('DATE(issued_at) as day, count(*) as issued')
-            ->whereBetween('issued_at', [$from, $to])
-            ->groupBy('day')
-            ->orderBy('day')
-            ->get();
-
-        $popular = Loan::query()
-            ->join('book_copies', 'book_copies.id', '=', 'loans.copy_id')
-            ->join('bibliographic_records', 'bibliographic_records.id', '=', 'book_copies.bibliographic_record_id')
-            ->whereBetween('loans.issued_at', [$from, $to])
-            ->selectRaw('bibliographic_records.id, bibliographic_records.title, bibliographic_records.primary_author, count(*) as issues')
-            ->groupBy('bibliographic_records.id', 'bibliographic_records.title', 'bibliographic_records.primary_author')
-            ->orderByDesc('issues')
-            ->limit(10)
-            ->get();
-
-        $fundUsage = BookCopy::query()
-            ->leftJoin('funds', 'funds.id', '=', 'book_copies.fund_id')
-            ->selectRaw("COALESCE(funds.name, '—') as fund, count(*) as copies, sum(CASE WHEN book_copies.status = 'issued' OR book_copies.status = 'overdue' THEN 1 ELSE 0 END) as on_loan")
-            ->groupBy('funds.name')
-            ->orderByDesc('copies')
-            ->get();
-
-        $acquisitions = BookCopy::query()
-            ->whereBetween('registration_date', [$from->toDateString(), $to->toDateString()])
-            ->selectRaw("COALESCE(acquisition_source, '—') as source, count(*) as copies, COALESCE(sum(price), 0) as total_price")
-            ->groupBy('acquisition_source')
-            ->orderByDesc('copies')
-            ->get();
-
-        return view('librarian.reports.index', [
-            'from' => $from,
-            'to' => $to,
-            'loanDynamics' => $loanDynamics,
-            'popular' => $popular,
-            'fundUsage' => $fundUsage,
-            'acquisitions' => $acquisitions,
-            'udcFund' => $classification->reportRows(),
-            // ДИР — leadership tracks catalogue quality without editing it.
-            // Reuses the existing Data Quality counters rather than building a
-            // second analytics path.
-            'catalogQuality' => [
-                'open' => $queues->openRecordTotal(),
-                'resolved_week' => ActivityLog::query()
-                    ->where('entity_type', 'bibliographic_record')
-                    ->where('action_type', 'metadata.update')
-                    ->where('occurred_at', '>=', now()->subWeek())
-                    ->distinct()
-                    ->count('entity_id'),
-            ],
-            'totals' => [
-                'issued' => Loan::query()->whereBetween('issued_at', [$from, $to])->count(),
-                'returned' => Loan::query()->whereBetween('returned_at', [$from, $to])->count(),
-                'reservations' => Reservation::query()->whereBetween('created_at', [$from, $to])->count(),
-                'fines_charged' => (float) Fine::query()->whereBetween('charged_at', [$from, $to])->sum('amount'),
-            ],
-            // §9.4 — attendance, which ДИР §2.2 promises library leadership
-            // alongside issues and returns.
-            'visitSummary' => $this->visits->summary($from, $to),
-            'visitSeries' => $visitsByWeek ? $this->visits->weeklyTotals($from, $to) : $visitDays,
-            'visitSeriesIsWeekly' => $visitsByWeek,
-            'visitBranches' => $this->visits->branchTotals($from, $to),
-            'incidentMetrics' => $this->incidentMetrics($request, $from, $to),
-            'incidentFilterBranches' => Branch::query()->active()->ordered()->get(),
-            'incidentFilterStaff' => User::query()->role(['librarian', 'senior_librarian', 'director'])->orderBy('name')->get(),
-            'incidentReaderCategories' => ReaderProfile::CATEGORIES,
-            'incidentFundTypes' => Fund::TYPES,
+        $request->validate([
+            'report' => ['nullable', Rule::in($registry->codes())],
+            'sort' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_.-]+$/'],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', Rule::in([25, 50, 100])],
         ]);
+        $filters = ReportFilters::fromRequest($request);
+        $type = (string) ($request->input('report') ?: collect($registry->all())
+            ->first(fn ($definition): bool => $registry->allows($request->user(), $definition))?->code);
+        abort_unless($type !== '', 403);
+        abort_unless($registry->allows($request->user(), $type), 403);
+        $report = $reports->build($type, $filters, $request->user());
+        $report = $this->screenRows($request, $report);
+
+        $attendance = $registry->allows($request->user(), 'visits')
+            ? $this->attendanceData($filters)
+            : ['canViewAttendance' => false];
+        $attendance['canViewAttendance'] ??= true;
+
+        return view('librarian.reports.index', array_merge($report, $attendance, [
+            // Kept for older integrations which consumed these two variables
+            // from the operational report page.
+            'from' => $filters->from,
+            'to' => $filters->to,
+        ]));
+    }
+
+    /** @param array<string, mixed> $report @return array<string, mixed> */
+    private function screenRows(Request $request, array $report): array
+    {
+        $columnKeys = collect($report['columns'] ?? [])->pluck('key')->map(fn (mixed $key): string => (string) $key);
+        $sort = trim((string) $request->input('sort', ''));
+        if ($sort !== '' && ! $columnKeys->containsStrict($sort)) {
+            throw ValidationException::withMessages(['sort' => __('validation.in', ['attribute' => 'sort'])]);
+        }
+        $direction = (string) $request->input('direction', 'asc');
+        $rows = collect($report['rows'] ?? []);
+        if ($sort !== '') {
+            $rows = $rows->sortBy(
+                static function (array $row) use ($sort): int|float|string {
+                    $value = data_get($row, $sort);
+
+                    return is_numeric($value) ? (float) $value : mb_strtolower((string) $value);
+                },
+                SORT_NATURAL | SORT_FLAG_CASE,
+                $direction === 'desc',
+            )->values();
+        }
+
+        $perPage = (int) $request->input('per_page', 25);
+        $total = $rows->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min((int) $request->input('page', 1), $lastPage);
+        $offset = ($page - 1) * $perPage;
+        $report['rows'] = $rows->slice($offset, $perPage)->values()->all();
+        $report['sorting'] = ['key' => $sort, 'direction' => $direction];
+        $report['pagination'] = [
+            'page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+            'last_page' => $lastPage,
+            'from' => $total === 0 ? 0 : $offset + 1,
+            'to' => min($offset + $perPage, $total),
+        ];
+
+        return $report;
     }
 
     public function export(
@@ -117,19 +112,60 @@ class ReportController extends Controller
         string $type,
         AuditLogger $audit,
         UdcClassificationService $classification,
-    ): StreamedResponse {
-        abort_unless(in_array($type, ['popular', 'fund-usage', 'dynamics', 'acquisitions', 'udc-fund', 'visits', 'incidents', 'reservations', 'circulation', 'inventory'], true), 404);
-        if ($type === 'incidents') {
-            abort_unless($request->user()?->can('incidents.view_reports'), 403);
+        LibraryReportService $reports,
+        ReportRegistry $registry,
+        OfficeOpenXmlExporter $office,
+        ?string $format = null,
+    ): Response {
+        $format = mb_strtolower($format ?: 'csv');
+        $legacyTypes = ['popular', 'dynamics', 'udc-fund', 'circulation'];
+        abort_unless(in_array($type, [...$registry->codes(), ...$legacyTypes], true), 404);
+        if (in_array($type, $legacyTypes, true)) {
+            abort_unless($request->user()?->canAny(['reports.view_ops', 'reports.view_full']), 403);
         }
-        [$from, $to] = $this->period($request);
+        if ($type === 'incidents' && ($format === 'csv' || $format === 'pdf' || $format === 'xlsx' || $format === 'docx')) {
+            abort_unless($request->user()?->canAny(['incidents.view_reports', 'reports.view_full']), 403);
+        }
+
+        $filters = ReportFilters::fromRequest($request);
+
+        if (in_array($type, LibraryReportService::TYPES, true)) {
+            abort_unless($registry->allows($request->user(), $type), 403);
+            abort_unless(in_array($format, ['csv', 'pdf', 'xlsx', 'docx'], true), 404);
+            $report = $reports->build($type, $filters, $request->user());
+
+            $audit->logRequired(
+                actionType: 'export',
+                entityType: 'report',
+                entityId: 'librarian:'.$type,
+                newValues: [
+                    'format' => $format,
+                    'filters' => $filters->toArray(),
+                    'from_utc' => $filters->from->toIso8601String(),
+                    'to_utc' => $filters->to->toIso8601String(),
+                    'rows' => count($report['rows']),
+                ],
+                scope: 'operational',
+            );
+
+            return $this->canonicalExport($type, $format, $report, $reports, $office);
+        }
+
+        abort_unless($format === 'csv', 404);
+        $from = $filters->from;
+        $to = $filters->to;
 
         $audit->logRequired(
             actionType: 'export',
             entityType: 'report',
             entityId: 'librarian:'.$type,
-            newValues: ['format' => 'csv', 'from' => $from->toDateString(), 'to' => $to->toDateString()],
-            scope: 'library',
+            newValues: [
+                'format' => 'csv',
+                'filters' => $filters->toArray(),
+                'from_utc' => $from->toIso8601String(),
+                'to_utc' => $to->toIso8601String(),
+            ],
+            scope: 'operational',
         );
 
         return response()->streamDownload(function () use ($type, $from, $to, $classification, $request): void {
@@ -138,9 +174,7 @@ class ReportController extends Controller
 
             match ($type) {
                 'popular' => $this->exportPopular($output, $from, $to),
-                'fund-usage' => $this->exportFundUsage($output),
                 'dynamics' => $this->exportDynamics($output, $from, $to),
-                'acquisitions' => $this->exportAcquisitions($output, $from, $to),
                 'udc-fund' => $this->exportUdcFund($output, $classification),
                 'visits' => $this->exportVisits($output, $from, $to),
                 'incidents' => $this->exportIncidents($output, $request, $from, $to),
@@ -151,6 +185,106 @@ class ReportController extends Controller
 
             fclose($output);
         }, 'librarian-report-'.$type.'-'.now()->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    public function print(
+        Request $request,
+        string $type,
+        AuditLogger $audit,
+        LibraryReportService $reports,
+        ReportRegistry $registry,
+    ): View {
+        abort_unless(in_array($type, $registry->codes(), true), 404);
+        abort_unless($registry->allows($request->user(), $type), 403);
+        $filters = ReportFilters::fromRequest($request);
+        $report = $reports->build($type, $filters, $request->user());
+        $generatedAt = now((string) config('app.library_timezone', 'Asia/Almaty'));
+
+        $audit->logRequired(
+            actionType: 'print',
+            entityType: 'report',
+            entityId: 'librarian:'.$type,
+            newValues: ['format' => 'print', 'filters' => $filters->toArray(), 'rows' => count($report['rows'])],
+            scope: 'operational',
+        );
+
+        return view('librarian.reports.print', array_merge($report, [
+            'report' => $report,
+            'reportTitle' => $reports->title($type),
+            'generatedAt' => $generatedAt,
+            'printMode' => true,
+        ]));
+    }
+
+    /** @param array<string, mixed> $report */
+    private function canonicalExport(
+        string $type,
+        string $format,
+        array $report,
+        LibraryReportService $reports,
+        OfficeOpenXmlExporter $office,
+    ): Response {
+        $timestamp = now('UTC')->format('Ymd-His');
+        $filename = "library-report-{$type}-{$timestamp}";
+        $columns = collect($report['columns']);
+        $headers = $columns->pluck('label')->map(fn (mixed $label): string => (string) $label)->all();
+        $rows = collect($report['rows'])->map(fn (array $row): array => $columns
+            ->map(fn (array $column): mixed => data_get($row, $column['key']))->all());
+
+        if ($format === 'csv') {
+            return response()->streamDownload(function () use ($headers, $rows): void {
+                $output = fopen('php://output', 'wb');
+                fwrite($output, "\xEF\xBB\xBF");
+                Csv::writeRow($output, $headers);
+                foreach ($rows as $row) {
+                    Csv::writeRow($output, $row);
+                }
+                fclose($output);
+            }, $filename.'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        if ($format === 'pdf') {
+            return Pdf::loadView('librarian.reports.document', array_merge($report, [
+                'report' => $report,
+                'reportTitle' => $reports->title($type),
+                'generatedAt' => now((string) config('app.library_timezone', 'Asia/Almaty')),
+                'printMode' => false,
+            ]))->setPaper('a4', 'landscape')->download($filename.'.pdf');
+        }
+
+        $path = $format === 'xlsx'
+            ? $office->xlsx($reports->title($type), $headers, $rows)
+            : $office->docx($reports->title($type), $headers, $rows, $report['filters']);
+        $mime = $format === 'xlsx'
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+        return response()->download($path, $filename.'.'.$format, ['Content-Type' => $mime])->deleteFileAfterSend(true);
+    }
+
+    /** @return array<string, mixed> */
+    private function attendanceData(ReportFilters $filters): array
+    {
+        if (! DatabaseSchema::hasTable('library_visits')) {
+            return [
+                'visitSummary' => ['total' => 0, 'visits' => 0, 'unique_readers' => 0, 'busiest_day' => null, 'busiest_day_visits' => 0],
+                'visitSeries' => collect(),
+                'visitSeriesIsWeekly' => false,
+                'visitBranches' => collect(),
+            ];
+        }
+
+        $days = $this->visits->dailyTotals($filters->from, $filters->to);
+        $weekly = $days->count() > 45;
+        $summary = $this->visits->summary($filters->from, $filters->to);
+        $summary['total'] = $summary['visits'];
+
+        return [
+            'visitSummary' => $summary,
+            'visitSeries' => $weekly ? $this->visits->weeklyTotals($filters->from, $filters->to) : $days,
+            'visitSeriesIsWeekly' => $weekly,
+            'visitBranches' => $this->visits->branchTotals($filters->from, $filters->to),
+        ];
     }
 
     /**
@@ -222,7 +356,7 @@ class ReportController extends Controller
     }
 
     /**
-     * §9.4 attendance export: the daily series first, then the branch split, so
+     * 9.4 attendance export: the daily series first, then the branch split, so
      * one file answers both "when" and "where".
      */
     private function exportVisits($output, Carbon $from, Carbon $to): void
@@ -316,21 +450,21 @@ class ReportController extends Controller
     private function exportReservations($output, Carbon $from, Carbon $to): void
     {
         Csv::writeRow($output, ['Reservation', 'Created', 'Status', 'Reader', 'Ticket', 'Title', 'Copy', 'Pickup branch', 'Queued', 'Ready', 'Expires']);
-        Reservation::query()->whereBetween('created_at', [$from, $to])->with(['reader.readerProfile','bibliographicRecord','assignedCopy','pickupBranch'])
-            ->orderBy('created_at')->each(fn($r)=>Csv::writeRow($output, [$r->reservation_number,$r->created_at?->toIso8601String(),$r->status,$r->reader?->name,$r->reader?->readerProfile?->ticket_number,$r->bibliographicRecord?->title,$r->assignedCopy?->inventory_number,$r->pickupBranch?->name,$r->queued_at?->toIso8601String(),$r->ready_at?->toIso8601String(),$r->expires_at?->toIso8601String()]));
+        Reservation::query()->whereBetween('created_at', [$from, $to])->with(['reader.readerProfile', 'bibliographicRecord', 'assignedCopy', 'pickupBranch'])
+            ->orderBy('created_at')->each(fn ($r) => Csv::writeRow($output, [$r->reservation_number, $r->created_at?->toIso8601String(), $r->status, $r->reader?->name, $r->reader?->readerProfile?->ticket_number, $r->bibliographicRecord?->title, $r->assignedCopy?->inventory_number, $r->pickupBranch?->name, $r->queued_at?->toIso8601String(), $r->ready_at?->toIso8601String(), $r->expires_at?->toIso8601String()]));
     }
 
     private function exportCirculation($output, Carbon $from, Carbon $to): void
     {
-        Csv::writeRow($output, ['Loan','Issued','Due','Returned','Status','Renewals','Reader','Title','Inventory','Fine']);
-        Loan::query()->whereBetween('issued_at',[$from,$to])->with(['reader','copy.bibliographicRecord','fines'])->orderBy('issued_at')
-            ->each(fn($l)=>Csv::writeRow($output,[$l->id,$l->issued_at?->toIso8601String(),$l->due_at?->toIso8601String(),$l->returned_at?->toIso8601String(),$l->status,$l->renewal_count,$l->reader?->name,$l->copy?->bibliographicRecord?->title,$l->copy?->inventory_number,$l->fines->sum('amount')]));
+        Csv::writeRow($output, ['Loan', 'Issued', 'Due', 'Returned', 'Status', 'Renewals', 'Reader', 'Title', 'Inventory', 'Fine']);
+        Loan::query()->whereBetween('issued_at', [$from, $to])->with(['reader', 'copy.bibliographicRecord', 'fines'])->orderBy('issued_at')
+            ->each(fn ($l) => Csv::writeRow($output, [$l->id, $l->issued_at?->toIso8601String(), $l->due_at?->toIso8601String(), $l->returned_at?->toIso8601String(), $l->status, $l->renewal_count, $l->reader?->name, $l->copy?->bibliographicRecord?->title, $l->copy?->inventory_number, $l->fines->sum('amount')]));
     }
 
     private function exportInventory($output, Carbon $from, Carbon $to): void
     {
-        Csv::writeRow($output,['Session','Date','Status','Branch','Expected','Found','Missing','Misplaced','Unknown','Duplicates']);
-        InventorySession::query()->whereBetween('inventory_date',[$from->toDateString(),$to->toDateString()])->with('branch')->orderBy('inventory_date')
-            ->each(fn($s)=>Csv::writeRow($output,[$s->session_number,$s->inventory_date?->toDateString(),$s->status,$s->branch?->name,$s->expected_count,$s->found_count,$s->missing_count,$s->misplaced_count,$s->unknown_count,$s->duplicate_count]));
+        Csv::writeRow($output, ['Session', 'Date', 'Status', 'Branch', 'Expected', 'Found', 'Missing', 'Misplaced', 'Unknown', 'Duplicates']);
+        InventorySession::query()->whereBetween('inventory_date', [$from->toDateString(), $to->toDateString()])->with('branch')->orderBy('inventory_date')
+            ->each(fn ($s) => Csv::writeRow($output, [$s->session_number, $s->inventory_date?->toDateString(), $s->status, $s->branch?->name, $s->expected_count, $s->found_count, $s->missing_count, $s->misplaced_count, $s->unknown_count, $s->duplicate_count]));
     }
 }

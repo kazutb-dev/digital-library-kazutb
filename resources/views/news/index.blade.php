@@ -4,7 +4,7 @@
 
 @php
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
       if ($lang !== 'kk' && ! array_key_exists('lang', $query)) {
           $query['lang'] = $lang;
@@ -15,58 +15,58 @@
 
   $chrome = [
       'ru' => [
-          'title'           => 'Новости и анонсы — KazUTB',
+          'title'           => 'Новости и анонсы — Казахский университет технологии и бизнеса имени К. Кулажанова',
           'eyebrow'         => 'Институциональные обновления',
           'heading'         => 'Библиотечный вестник',
-          'lead'            => 'Последние объявления, открытия в архивах и научные инициативы KazUTB.',
+          'lead'            => 'Новости, объявления и другие материалы, опубликованные библиотекой на портале.',
           'featured_read'   => 'Читать полностью',
-          'grid_heading'    => 'Последние статьи',
+          'grid_heading'    => 'Последние публикации',
           'filter_all'      => 'Все темы',
           'filter_events'   => 'Мероприятия',
           'filter_research' => 'Исследования',
-          'bento_eyebrow'   => 'Мероприятия',
-          'bento_heading'   => 'Открытые лекции, презентации и академические конференции',
-          'bento_body'      => 'Узнайте о ближайших событиях, симпозиумах и публичных программах KazUTB.',
-          'bento_cta'       => 'Смотреть мероприятия',
           'load_more'       => 'Загрузить ещё',
-            'page_prev'       => 'Назад',
-            'page_next'       => 'Вперёд',
+          'empty_title'     => 'Публикаций пока нет.',
+          'empty_body'      => 'Следите за обновлениями библиотеки.',
+          'empty_filtered'  => 'По выбранным условиям публикации не найдены.',
+          'empty_reset'     => 'Сбросить фильтры',
+          'page_prev'       => 'Назад',
+          'page_next'       => 'Вперёд',
       ],
       'kk' => [
-          'title'           => 'Жаңалықтар мен хабарландырулар — KazUTB',
+          'title'           => 'Жаңалықтар мен хабарландырулар — Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
           'eyebrow'         => 'Институционалдық жаңартулар',
           'heading'         => 'Кітапхана хабаршысы',
-          'lead'            => 'KazUTB соңғы хабарландырулары, мұрағат жаңалықтары және ғылыми бастамалары.',
+          'lead'            => 'Кітапхана порталда жариялаған жаңалықтар, хабарландырулар және басқа материалдар.',
           'featured_read'   => 'Толығырақ оқу',
-          'grid_heading'    => 'Соңғы мақалалар',
+          'grid_heading'    => 'Соңғы жарияланымдар',
           'filter_all'      => 'Барлық тақырыптар',
           'filter_events'   => 'Іс-шаралар',
           'filter_research' => 'Зерттеулер',
-          'bento_eyebrow'   => 'Іс-шаралар',
-          'bento_heading'   => 'Ашық лекциялар, презентациялар және академиялық конференциялар',
-          'bento_body'      => 'KazUTB алдағы іс-шаралары, симпозиумдар және ашық бағдарламалар туралы біліңіз.',
-          'bento_cta'       => 'Барлық іс-шараларды қарау',
           'load_more'       => 'Тағы жүктеу',
-            'page_prev'       => 'Артқа',
-            'page_next'       => 'Алға',
+          'empty_title'     => 'Әзірге жарияланымдар жоқ.',
+          'empty_body'      => 'Кітапхана жаңалықтарын қадағалаңыз.',
+          'empty_filtered'  => 'Таңдалған шарттарға сай жарияланымдар табылмады.',
+          'empty_reset'     => 'Сүзгілерді тазалау',
+          'page_prev'       => 'Артқа',
+          'page_next'       => 'Алға',
       ],
       'en' => [
-          'title'           => 'News and announcements — KazUTB',
+          'title'           => 'News and announcements — Kazakh University of Technology and Business named after K. Kulazhanov',
           'eyebrow'         => 'Institutional Updates',
           'heading'         => 'Library Dispatch',
-          'lead'            => 'The latest announcements, archival discoveries, and scholarly initiatives from the KazUTB.',
+          'lead'            => 'News, announcements, and other updates published by the library on this portal.',
           'featured_read'   => 'Read full dispatch',
-          'grid_heading'    => 'Recent Articles',
+          'grid_heading'    => 'Recent publications',
           'filter_all'      => 'All Topics',
           'filter_events'   => 'Events',
           'filter_research' => 'Research',
-          'bento_eyebrow'   => 'Library Events',
-          'bento_heading'   => 'Open lectures, collection showcases, and academic symposia',
-          'bento_body'      => 'Discover upcoming events, symposia, and public programmes at KazUTB.',
-          'bento_cta'       => 'View all events',
           'load_more'       => 'Load More Dispatches',
-            'page_prev'       => 'Previous',
-            'page_next'       => 'Next',
+          'empty_title'     => 'No publications yet.',
+          'empty_body'      => 'Follow the library for updates.',
+          'empty_filtered'  => 'No publications match the selected criteria.',
+          'empty_reset'     => 'Clear filters',
+          'page_prev'       => 'Previous',
+          'page_next'       => 'Next',
       ],
   ][$lang];
 
@@ -116,9 +116,15 @@
 
   $leadCards = array_slice($rest, 0, 3);
   $tailCards = array_slice($rest, 3);
+  $hasNews = ($newsTotal ?? count($newsArticles)) > 0;
+  $hasActiveNewsFilters = request('topic', 'all') !== 'all'
+      || collect(['q', 'type', 'category', 'from', 'to'])->contains(
+          static fn (string $key): bool => request()->filled($key)
+      );
 @endphp
 
 @section('title', $chrome['title'])
+@section('meta_description', $chrome['lead'])
 
 @section('content')
 <div class="news-canonical public-v2 news-v2" data-section="news-canonical-page">
@@ -132,7 +138,7 @@
       <p class="public-v2__lead">{{ $chrome['lead'] }}</p>
     </div>
     <aside class="public-v2__hero-note">
-      <strong>{{ count($newsArticles) }}</strong>
+      <strong>{{ $newsTotal ?? count($newsArticles) }}</strong>
       <span>{{ $chrome['grid_heading'] }}</span>
     </aside>
     </div>
@@ -173,25 +179,41 @@
   <div class="public-v2__body" data-section="news-canonical-grid">
     <div class="public-v2__inset">
 
+    @if(!$hasNews)
+      <div class="public-v2__empty news-canonical__empty" data-test-id="news-canonical-empty">
+        <span class="material-symbols-outlined" aria-hidden="true">newspaper</span>
+        <h3>{{ $hasActiveNewsFilters ? $chrome['empty_filtered'] : $chrome['empty_title'] }}</h3>
+        @unless($hasActiveNewsFilters)
+          <p>{{ $chrome['empty_body'] }}</p>
+        @endunless
+        @if($hasActiveNewsFilters)
+          <a class="news-canonical__empty-reset" href="{{ $routeWithLang('/news') }}">{{ $chrome['empty_reset'] }}</a>
+        @endif
+      </div>
+    @else
+
     {{-- Filter bar / section header --}}
     <div class="news-canonical__grid-bar" data-test-id="news-canonical-filter">
       <h3 class="public-v2__section-title news-canonical__grid-heading">{{ $chrome['grid_heading'] }}</h3>
       <div class="news-canonical__filter-tabs" aria-label="{{ $chrome['filter_all'] }}">
         <a class="news-canonical__filter-tab {{ request('topic', 'all') === 'all' ? 'news-canonical__filter-tab--active' : '' }}" href="{{ $routeWithLang('/news', ['topic' => 'all']) }}">{{ $chrome['filter_all'] }}</a>
-        <a class="news-canonical__filter-tab {{ request('topic') === 'events' ? 'news-canonical__filter-tab--active' : '' }}" href="{{ $routeWithLang('/news', ['topic' => 'events']) }}">{{ $chrome['filter_events'] }}</a>
+        <a class="news-canonical__filter-tab" href="{{ $routeWithLang('/events') }}">{{ $chrome['filter_events'] }}</a>
         <a class="news-canonical__filter-tab {{ request('topic') === 'research' ? 'news-canonical__filter-tab--active' : '' }}" href="{{ $routeWithLang('/news', ['topic' => 'research']) }}">{{ $chrome['filter_research'] }}</a>
       </div>
     </div>
+    @if(($filterCategories ?? collect())->isNotEmpty())
+      <form class="mb-8 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-5" method="GET" role="search">
+        @if($lang !== 'kk')<input type="hidden" name="lang" value="{{ $lang }}">@endif
+        <label class="sr-only" for="news-q">{{ __('common.actions.search') }}</label>
+        <input id="news-q" class="rounded-lg border-slate-300" name="q" value="{{ request('q') }}" placeholder="{{ __('news.search_placeholder') }}">
+        <select class="rounded-lg border-slate-300" name="type" aria-label="{{ __('news.fields.type') }}"><option value="">{{ __('news.filters.all_types') }}</option>@foreach($newsTypes ?? array_values(array_diff(\App\Models\News::TYPES, ['event', 'schedule'])) as $type)<option value="{{ $type }}" @selected(request('type')===$type)>{{ __('news.types.'.$type) }}</option>@endforeach</select>
+        <select class="rounded-lg border-slate-300" name="category" aria-label="{{ __('news.fields.category') }}"><option value="">{{ __('news.fields.category') }}</option>@foreach($filterCategories as $category)<option value="{{ $category->slug }}" @selected(request('category')===$category->slug)>{{ $category->name($lang) }}</option>@endforeach</select>
+        <input class="rounded-lg border-slate-300" type="date" name="from" value="{{ request('from') }}" aria-label="{{ __('news.filters.from') }}">
+        <div class="flex gap-2"><input class="min-w-0 flex-1 rounded-lg border-slate-300" type="date" name="to" value="{{ request('to') }}" aria-label="{{ __('news.filters.to') }}"><button class="rounded-lg bg-primary px-4 font-bold text-white" type="submit">{{ __('common.actions.filter') }}</button></div>
+      </form>
+    @endif
 
     <div class="news-canonical__grid">
-      @if(empty($newsArticles))
-        <div class="public-v2__empty">
-          <span class="material-symbols-outlined" aria-hidden="true">newspaper</span>
-          <h3>{{ $chrome['grid_heading'] }}</h3>
-          <p>{{ $chrome['lead'] }}</p>
-        </div>
-      @endif
-
       @if($showCanonicalHero)
       {{-- Canonical first row: exactly the first three article cards --}}
       @foreach($leadCards as $article)
@@ -280,11 +302,8 @@
       <div class="news-canonical__load-more">
         <a class="news-canonical__load-more-btn" href="{{ $routeWithLang('/news', ['page' => $currentPage + 1]) }}">{{ $chrome['load_more'] }}</a>
       </div>
-    @else
-      <div class="news-canonical__load-more">
-        <span class="news-canonical__load-more-btn news-canonical__load-more-btn--disabled" aria-disabled="true">{{ $chrome['load_more'] }}</span>
-      </div>
-      @endif
+    @endif
+    @endif
     </div>
     </div>
 
@@ -293,6 +312,11 @@
 
 @section('head')
 <style>
+  .news-canonical__featured-title,
+  .news-canonical__featured-excerpt,
+  .news-canonical__card-title,
+  .news-canonical__card-excerpt { overflow-wrap: anywhere; }
+
   /* ============================================================
      news-canonical — Phase 3.f
      Scoped to /news index only.
@@ -756,6 +780,18 @@
     color: #74777f;
     cursor: default;
     pointer-events: none;
+  }
+
+  .news-canonical__empty {
+    padding: 40px 24px;
+  }
+
+  .news-canonical__empty-reset {
+    display: inline-flex;
+    margin-top: 16px;
+    color: #006a6a;
+    font-size: 13px;
+    font-weight: 700;
   }
 </style>
 @endsection

@@ -3,10 +3,11 @@
 namespace App\Services\Catalog;
 
 use App\Models\Catalog\BibliographicRecord;
+use App\Services\Library\IsbnService;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Likely-duplicate lookup for cataloguing (Master.md §11.3, ДИР §6.2).
+ * Likely-duplicate lookup for cataloguing (Master.md 11.3, ДИР 6.2).
  *
  * Extracted from CatalogController so the same rule backs both entry points:
  * the "проверить на дубли" control the librarian presses before submitting,
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class DuplicateRecordFinder
 {
+    public function __construct(private readonly IsbnService $isbn) {}
+
     /**
      * @param  array<string, mixed>  $attributes
      */
@@ -47,14 +50,19 @@ class DuplicateRecordFinder
             return $byTitle;
         }
 
-        $isbn = trim((string) ($attributes['isbn'] ?? ''));
+        $isbn = $this->isbn->normalize((string) ($attributes['isbn'] ?? ''));
         if ($isbn === '') {
             return null;
         }
 
-        return BibliographicRecord::query()
+        $query = BibliographicRecord::query();
+        $isbnExpression = $query->getConnection()->getDriverName() === 'pgsql'
+            ? "REGEXP_REPLACE(UPPER(COALESCE(isbn, '')), '[^0-9X]', '', 'g')"
+            : "UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(isbn, ''), '-', ''), ' ', ''), '.', ''), '/', ''), '(', ''), ')', ''))";
+
+        return $query
             ->when($ignoreId !== null, fn (Builder $query) => $query->whereKeyNot($ignoreId))
-            ->where('isbn', $isbn)
+            ->whereRaw("{$isbnExpression} = ?", [$isbn])
             ->first();
     }
 

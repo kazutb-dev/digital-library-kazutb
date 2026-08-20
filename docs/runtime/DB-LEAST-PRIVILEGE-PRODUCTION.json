@@ -1,0 +1,24 @@
+{
+    "changed_at_utc": "2026-08-20T07:56:42+00:00",
+    "database": "digital_library_recovered",
+    "runtime_role": "library_app",
+    "runtime_flags": {
+        "rolsuper": false,
+        "rolcreatedb": false,
+        "rolcreaterole": false,
+        "rolreplication": false,
+        "rolbypassrls": false
+    },
+    "migrator_role": "library_migrator",
+    "admin_role": "library_user",
+    "records": 9562,
+    "copies": 50907,
+    "users": 18,
+    "backup": {
+        "path": "/app/storage/app/backups/security-pre-privilege/20260820T075320Z/digital_library_recovered_20260820T075320Z.dump",
+        "size": 21636543,
+        "sha256": "2f38bd712fc080e56b7f60d8c908fce317b3a6f0b46a80879f172a53f3a755d4",
+        "restore_test": "PASS"
+    },
+    "secrets_written_to_report": false
+}

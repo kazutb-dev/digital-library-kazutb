@@ -7,12 +7,14 @@ use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\Loan;
 use App\Models\Catalog\UdcCode;
 use App\Models\User;
+use App\Services\Localization\LocalizedContentResolver;
 use App\Support\DatabaseSchema;
+use App\Support\PublicCatalogLanguage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
- * Book detail read model (Master.md §9.2-§9.3).
+ * Book detail read model (Master.md 9.2-9.3).
  *
  * Resolves a record by numeric id or ISBN from the canonical catalogue tables
  * and returns the shape the book page and /api/v1/book-db expect. Returns null
@@ -20,6 +22,8 @@ use Illuminate\Support\Collection;
  */
 class BookDetailReadService
 {
+    public function __construct(private readonly LocalizedContentResolver $localizedContent) {}
+
     public function findByIdentifier(string $identifier, ?User $viewer = null): ?array
     {
         $identifier = trim($identifier);
@@ -33,16 +37,22 @@ class BookDetailReadService
         }
 
         $normalizedIsbn = preg_replace('/[^0-9xX]/', '', $identifier) ?: $identifier;
+        $isbnExpression = BibliographicRecord::query()->getConnection()->getDriverName() === 'pgsql'
+            ? "LOWER(REGEXP_REPLACE(COALESCE(isbn, ''), '[^0-9Xx]', '', 'g'))"
+            : "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(isbn, ''), '-', ''), ' ', ''), '.', ''), '/', ''))";
 
         $record = BibliographicRecord::query()
-            ->where(function (Builder $builder) use ($identifier, $normalizedIsbn): void {
-                $builder->where('isbn', $identifier)->orWhere('isbn', $normalizedIsbn);
+            ->where(function (Builder $builder) use ($identifier, $isbnExpression, $normalizedIsbn): void {
+                $builder
+                    ->where('isbn', $identifier)
+                    ->orWhereRaw("{$isbnExpression} = ?", [mb_strtolower($normalizedIsbn)]);
                 if (ctype_digit($identifier)) {
                     $builder->orWhere('id', (int) $identifier);
                 }
             })
+            ->with('translations')
             ->withCount([
-                'copies',
+                'copies' => fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost']),
                 'copies as available_copies_count' => fn (Builder $copies) => $copies->where('status', 'available'),
             ])
             ->first();
@@ -51,12 +61,15 @@ class BookDetailReadService
             return null;
         }
 
+        $localized = $this->localizedContent->bibliographic($record);
+
         $copies = $record->copies()
-            ->whereNotIn('status', ['written_off'])
+            ->whereNotIn('status', ['written_off', 'lost'])
             ->with(['branch', 'fund'])
             ->get();
 
         $available = $copies->where('status', 'available')->count();
+        $issued = $copies->whereIn('status', ['issued', 'overdue'])->count();
         $total = $copies->count();
         $readerLoan = $viewer === null
             ? null
@@ -75,12 +88,16 @@ class BookDetailReadService
                 ->orderByRaw('LENGTH(code) DESC')
                 ->first();
 
+        $languageCode = PublicCatalogLanguage::normalize((string) $record->language);
+
         return [
             'id' => (string) $record->getKey(),
             'title' => [
-                'display' => (string) $record->title,
+                'display' => $localized['title'],
                 'raw' => (string) $record->title,
                 'subtitle' => (string) ($record->subtitle ?? ''),
+                'original' => $localized['original_title'],
+                'isFallback' => $localized['is_fallback'],
             ],
             'primaryAuthor' => $record->primary_author ?: __('common.catalog.author_unknown'),
             // Unsubstituted source values. The display fields above fall back to
@@ -97,42 +114,50 @@ class BookDetailReadService
             ],
             'publicationYear' => $record->publication_year,
             'language' => [
-                'code' => (string) $record->language,
-                'raw' => (string) $record->language,
+                'code' => $languageCode,
+                'raw' => $languageCode,
+                'label' => PublicCatalogLanguage::label($languageCode),
             ],
             'isbn' => [
                 'raw' => (string) ($record->isbn ?? ''),
                 'isValid' => $this->isValidIsbn((string) ($record->isbn ?? '')),
             ],
             'resourceType' => (string) $record->resource_type,
-            'annotation' => (string) ($record->annotation ?? ''),
-            'keywords' => (array) ($record->keywords ?? []),
+            'annotation' => $localized['annotation'],
+            'originalAnnotation' => $localized['original_annotation'],
+            'keywords' => $localized['keywords'],
+            'metadataLocale' => $localized['locale'],
             'notes' => $canViewInternalNotes ? (string) ($record->notes ?? '') : '',
             'coverPath' => $record->cover_path,
             'authorMark' => (string) ($record->author_mark ?? ''),
             'copies' => [
                 'available' => $available,
+                'issued' => $issued,
                 'total' => $total,
             ],
             'availability' => [
                 'isAvailable' => $available > 0,
                 'availableCopies' => $available,
+                'issuedCopies' => $issued,
                 'totalCopies' => $total,
                 'locations' => $this->groupLocations($copies, $viewer !== null),
             ],
             'viewer' => [
                 'authenticated' => $viewer !== null,
-                'canReserve' => $viewer !== null && $available > 0,
+                'canReserve' => $viewer !== null && ! $record->is_draft && $available > 0,
+                'reservationEligible' => ! $record->is_draft && $available > 0,
                 'activeLoan' => $readerLoan === null ? null : [
                     'status' => (string) $readerLoan->status,
                     'issuedAt' => $readerLoan->issued_at?->toIso8601String(),
                     'dueAt' => $readerLoan->due_at?->toIso8601String(),
                 ],
             ],
-            'quality' => [
-                'needsReview' => (bool) $record->is_draft,
-                'reviewReasonCodes' => $record->missingRequiredFields(),
-            ],
+            ...($canViewInternalNotes ? [
+                'quality' => [
+                    'needsReview' => (bool) $record->is_draft,
+                    'reviewReasonCodes' => $record->missingRequiredFields(),
+                ],
+            ] : []),
             'classification' => $record->category !== null && $record->category !== ''
                 ? [['id' => $record->category, 'label' => $record->category, 'sourceKind' => 'subject']]
                 : [],
@@ -145,7 +170,7 @@ class BookDetailReadService
                 'source' => $udcCode !== '' ? 'udc' : '',
             ],
             'electronicMaterials' => $record->electronicMaterials()
-                ->where('is_active', true)
+                ->published()
                 ->get()
                 ->map(static fn ($material): array => [
                     'id' => (string) $material->getKey(),
@@ -158,11 +183,12 @@ class BookDetailReadService
                 ])
                 ->all(),
             'relatedMaterials' => $record->relatedRecords()
+                ->with('translations')
                 ->limit(6)
                 ->get(['bibliographic_records.id', 'title', 'isbn', 'primary_author', 'publication_year'])
-                ->map(static fn (BibliographicRecord $related): array => [
+                ->map(fn (BibliographicRecord $related): array => [
                     'id' => (string) $related->getKey(),
-                    'title' => (string) $related->title,
+                    'title' => $this->localizedContent->bibliographic($related)['title'],
                     'isbn' => (string) ($related->isbn ?? ''),
                     'author' => (string) ($related->primary_author ?? ''),
                     'publicationYear' => $related->publication_year,
@@ -194,6 +220,7 @@ class BookDetailReadService
             ->where('title', 'not like', '[Без заглавия;%')
             ->orderByDesc('publication_year')
             ->limit(6)
+            ->with('translations')
             ->get();
 
         if ($exact->count() < 6) {
@@ -207,14 +234,15 @@ class BookDetailReadService
                 ->where('title', 'not like', '[Без заглавия;%')
                 ->orderByDesc('publication_year')
                 ->limit(6 - $exact->count())
+                ->with('translations')
                 ->get();
             $exact = $exact->concat($fallback);
         }
 
         return $exact
-            ->map(static fn (BibliographicRecord $similar): array => [
+            ->map(fn (BibliographicRecord $similar): array => [
                 'id' => (string) $similar->getKey(),
-                'title' => (string) $similar->title,
+                'title' => $this->localizedContent->bibliographic($similar)['title'],
                 'isbn' => (string) ($similar->isbn ?? ''),
                 'author' => (string) ($similar->primary_author ?? ''),
                 'publicationYear' => $similar->publication_year,
@@ -248,12 +276,12 @@ class BookDetailReadService
                         'name' => (string) ($first->fund?->name ?? ''),
                     ],
                     'campus' => [
-                        'code' => $showExactLocation ? (string) ($first->branch?->code ?? '') : '',
-                        'name' => $showExactLocation ? (string) ($first->branch?->name ?? '') : '',
+                        'code' => (string) ($first->branch?->code ?? ''),
+                        'name' => (string) ($first->branch?->name ?? ''),
                     ],
                     'servicePoint' => [
-                        'code' => $showExactLocation ? (string) ($first->branch?->code ?? '') : '',
-                        'name' => $showExactLocation ? (string) ($first->branch?->name ?? '') : '',
+                        'code' => (string) ($first->branch?->code ?? ''),
+                        'name' => (string) ($first->branch?->name ?? ''),
                     ],
                     'storageSigla' => $showExactLocation ? (string) ($first->storage_sigla ?? '') : '',
                     'address' => $showExactLocation ? (string) ($first->branch?->address ?? '') : '',

@@ -12,6 +12,9 @@
         $copies = $record->exists ? $record->copies : collect();
         $materials = $record->exists ? $record->electronicMaterials : collect();
         $relations = $record->exists ? $record->relatedRecords : collect();
+        $fromDataQuality = $fromDataQuality ?? false;
+        $sourceIssue = $sourceIssue ?? null;
+        $nextQualityIssue = $nextQualityIssue ?? null;
         $sizeLabel = static function (?int $bytes): string {
             if (! $bytes) {
                 return '—';
@@ -95,9 +98,31 @@
         </div>
     @endif
 
+    @if ($record->exists)
+        <section class="admin-card mb-6 border-l-4 {{ $qualityIssues->isEmpty() ? 'border-l-emerald-500' : 'border-l-amber-500' }}">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 class="font-headline text-2xl text-primary">{{ __('data_quality.title') }}</h2>
+                    <p class="mt-1 text-sm text-slate-600">{{ $qualityIssues->isEmpty() ? __('data_quality.record.clean') : trans_choice('data_quality.record.issue_count', $qualityIssues->count(), ['count' => $qualityIssues->count()]) }}</p>
+                </div>
+                <a class="admin-btn admin-btn-secondary" href="{{ route('librarian.data-quality.index', ['q' => $record->title, 'lang' => app()->getLocale()]) }}">{{ __('data_quality.record.open_issues') }}</a>
+            </div>
+            @if($qualityIssues->isNotEmpty())
+                <div class="mt-4 grid gap-2 md:grid-cols-2">
+                    @foreach($qualityIssues->take(6) as $qualityIssue)
+                        <a class="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm hover:border-secondary" href="{{ route('librarian.data-quality.issues.show', [$qualityIssue, 'lang' => app()->getLocale()]) }}">
+                            <span>{{ __('data_quality.rules.'.$qualityIssue->rule_code) }}</span>
+                            <span class="rounded-full border px-2 py-1 text-xs">{{ __('data_quality.severity.'.$qualityIssue->severity) }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            @endif
+        </section>
+    @endif
+
     <form
         method="POST"
-        action="{{ $record->exists ? route('librarian.catalog.update', $record) : route('librarian.catalog.store') }}"
+        action="{{ $record->exists ? route('librarian.catalog.update', [$record, 'lang' => app()->getLocale()]) : route('librarian.catalog.store', ['lang' => app()->getLocale()]) }}"
         class="grid gap-6 lg:grid-cols-3 lg:items-start"
     >
         @csrf
@@ -106,6 +131,10 @@
         @endif
         @if ($duplicate)
             <input type="hidden" name="confirmed_duplicate" value="1">
+        @endif
+        @if ($fromDataQuality)
+            <input type="hidden" name="from" value="data-quality">
+            <input type="hidden" name="issue" value="{{ $sourceIssue?->id }}">
         @endif
 
         <div class="space-y-6 lg:col-span-2">
@@ -120,7 +149,7 @@
                             @error('title')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
                         </label>
 
-                        {{-- ДИР §6.2: check before submitting, not after a
+                        {{-- ДИР 6.2: check before submitting, not after a
                              rejected save. Hits the same rule store() uses. --}}
                         <div class="mt-2 flex flex-wrap items-center gap-3">
                             <button class="admin-btn admin-btn-secondary" type="button" id="duplicate-check-btn">
@@ -228,6 +257,70 @@
                     </label>
                 </div>
             </section>
+
+            <section class="admin-card" data-section="catalog-translations">
+                <div class="mb-5">
+                    <p class="text-xs font-bold uppercase tracking-[.16em] text-secondary">{{ __('librarian.catalog.translations.eyebrow') }}</p>
+                    <h2 class="mt-1 font-headline text-2xl text-primary">{{ __('librarian.catalog.translations.title') }}</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('librarian.catalog.translations.help') }}</p>
+                </div>
+
+                <details class="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <summary class="cursor-pointer font-semibold text-primary">{{ __('librarian.catalog.translations.original') }}</summary>
+                    <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                        <div><dt class="text-slate-500">{{ __('librarian.catalog.fields.language') }}</dt><dd class="font-semibold">{{ __('librarian.catalog.languages.'.($record->language ?: 'other')) }}</dd></div>
+                        <div><dt class="text-slate-500">{{ __('librarian.catalog.fields.title') }}</dt><dd class="font-semibold">{{ $record->title ?: '—' }}</dd></div>
+                        <div class="sm:col-span-2"><dt class="text-slate-500">{{ __('librarian.catalog.fields.annotation') }}</dt><dd class="whitespace-pre-line">{{ $record->annotation ?: '—' }}</dd></div>
+                    </dl>
+                </details>
+
+                <div class="space-y-4">
+                    @foreach (\App\Models\Catalog\BibliographicRecordTranslation::LOCALES as $translationLocale)
+                        @php
+                            $translation = $record->translations?->firstWhere('locale', $translationLocale);
+                        @endphp
+                        <details class="rounded-xl border border-slate-200 p-4" @if($translationLocale === app()->getLocale()) open @endif>
+                            <summary class="cursor-pointer font-bold text-primary">{{ __('librarian.catalog.languages.'.$translationLocale) }}</summary>
+                            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                <label class="sm:col-span-2">
+                                    <span class="admin-label">{{ __('librarian.catalog.fields.title') }}</span>
+                                    <input class="admin-input" name="translations[{{ $translationLocale }}][title]" maxlength="1000" value="{{ old("translations.$translationLocale.title", $translation?->title) }}">
+                                </label>
+                                <label>
+                                    <span class="admin-label">{{ __('librarian.catalog.translations.status') }}</span>
+                                    <select class="admin-input" name="translations[{{ $translationLocale }}][translation_status]">
+                                        @foreach (\App\Models\Catalog\BibliographicRecordTranslation::STATUSES as $status)
+                                            <option value="{{ $status }}" @selected(old("translations.$translationLocale.translation_status", $translation?->translation_status ?: 'draft') === $status)>{{ __('librarian.catalog.translations.statuses.'.$status) }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label>
+                                    <span class="admin-label">{{ __('librarian.catalog.translations.source') }}</span>
+                                    <select class="admin-input" name="translations[{{ $translationLocale }}][source]">
+                                        @foreach (\App\Models\Catalog\BibliographicRecordTranslation::SOURCES as $source)
+                                            <option value="{{ $source }}" @selected(old("translations.$translationLocale.source", $translation?->source ?: 'manual_translation') === $source)>{{ __('librarian.catalog.translations.sources.'.$source) }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="sm:col-span-2">
+                                    <span class="admin-label">{{ __('librarian.catalog.fields.annotation') }}</span>
+                                    <textarea class="admin-input" name="translations[{{ $translationLocale }}][annotation]" rows="4" maxlength="10000">{{ old("translations.$translationLocale.annotation", $translation?->annotation) }}</textarea>
+                                </label>
+                                <label class="sm:col-span-2">
+                                    <span class="admin-label">{{ __('librarian.catalog.fields.keywords') }}</span>
+                                    <textarea class="admin-input" name="translations[{{ $translationLocale }}][keywords]" rows="2" maxlength="2000">{{ old("translations.$translationLocale.keywords", implode("\n", $translation?->keywords ?? [])) }}</textarea>
+                                </label>
+                                @if($translation)
+                                    <label class="sm:col-span-2 flex items-center gap-2 text-sm text-red-700">
+                                        <input type="checkbox" name="translations[{{ $translationLocale }}][remove]" value="1">
+                                        {{ __('librarian.catalog.translations.remove') }}
+                                    </label>
+                                @endif
+                            </div>
+                        </details>
+                    @endforeach
+                </div>
+            </section>
         </div>
 
         <aside class="space-y-6">
@@ -274,7 +367,7 @@
                         @error('notes')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
                     </label>
 
-                    {{-- ДИР §6.3 "пометка записи как проблемной": independent of
+                    {{-- ДИР 6.3 "пометка записи как проблемной": independent of
                          is_draft, so a complete-but-suspicious record can still
                          be queued for review. --}}
                     <div class="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
@@ -331,6 +424,14 @@
                             ? __('librarian.catalog.duplicate_confirm')
                             : ($record->exists ? __('common.actions.save_changes') : __('common.actions.create')) }}
                     </button>
+                    @if($record->exists && $fromDataQuality)
+                        <button class="admin-btn admin-btn-secondary w-full" type="submit" name="save_and_revalidate" value="1">
+                            <span class="material-symbols-outlined text-[19px]">fact_check</span>
+                            {{ __('data_quality.actions.save_revalidate') }}
+                        </button>
+                        <a class="admin-btn admin-btn-secondary w-full" href="{{ route('librarian.data-quality.issues.show', [$sourceIssue, 'lang' => app()->getLocale()]) }}">← {{ __('data_quality.object.back') }}</a>
+                        @if($nextQualityIssue)<a class="admin-btn admin-btn-secondary w-full" href="{{ route('librarian.data-quality.issues.show', [$nextQualityIssue, 'lang' => app()->getLocale()]) }}">{{ __('data_quality.object.next') }} <span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span></a>@endif
+                    @endif
                     <a class="admin-btn admin-btn-secondary w-full" href="{{ route('librarian.catalog.index') }}">
                         {{ __('common.actions.cancel') }}
                     </a>
@@ -350,8 +451,13 @@
                             'available' => $copies->where('status', 'available')->count(),
                         ]) }}
                     </p>
+                    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                        <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-800">{{ __('librarian.copies.marking.with_barcode') }}: {{ $copies->filter(fn($copy) => filled($copy->barcode))->count() }}</span>
+                        <span class="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-semibold text-amber-800">{{ __('librarian.copies.marking.without_barcode') }}: {{ $copies->filter(fn($copy) => blank($copy->barcode))->count() }}</span>
+                        <a class="font-semibold text-secondary hover:underline" href="{{ route('librarian.copies.index', ['record_id' => $record->id]) }}">{{ __('librarian.circulation.view_edition_copies') }}</a>
+                    </div>
 
-                    {{-- §9.3 — the cataloguer registering copies should see that
+                    {{-- 9.3 — the cataloguer registering copies should see that
                          the count drives the real loan period readers get. Read
                          only: the scale itself is an admin setting. --}}
                     @php
@@ -369,7 +475,7 @@
                             <span class="mt-0.5 block text-slate-500">
                                 {{ __('librarian.catalog.loan_period_scale', [
                                     'scale' => collect($loanPeriods->scaleRows())
-                                        ->map(fn (array $row): string => ($row['to'] === null ? $row['from'].'+' : $row['from'].'–'.$row['to']).' → '.$row['days'])
+                                        ->map(fn (array $row): string => ($row['to'] === null ? $row['from'].'+' : $row['from'].'–'.$row['to']).' — '.$row['days'])
                                         ->implode(', '),
                                 ]) }}
                             </span>
@@ -456,7 +562,7 @@
             </div>
         </section>
 
-        {{-- §18: electronic materials attached to this record. Each row is its
+        {{-- 18: electronic materials attached to this record. Each row is its
              own form so a save never touches the metadata form above. --}}
         <section class="admin-card mt-6">
             <h2 class="font-headline text-2xl text-primary">{{ __('librarian.catalog.materials.section') }}</h2>
@@ -578,7 +684,7 @@
             </details>
         </section>
 
-        {{-- §10.4: manual links between records. Written both ways by the
+        {{-- 10.4: manual links between records. Written both ways by the
              controller, so removing from either side clears the pair. --}}
         <section class="admin-card mt-6">
             <h2 class="font-headline text-2xl text-primary">{{ __('librarian.catalog.relations.section') }}</h2>
@@ -650,7 +756,7 @@
             </form>
         </section>
 
-        {{-- ДИР §6.3 "история исправлений" — per-record, so it is reachable
+        {{-- ДИР 6.3 "история исправлений" — per-record, so it is reachable
              without /admin/logs access. --}}
         <section class="admin-card mt-6">
             <h2 class="font-headline text-2xl text-primary">{{ __('librarian.catalog.history.section') }}</h2>
@@ -683,7 +789,7 @@
                                 <p class="mt-2 text-xs text-slate-600"><strong>{{ __('common.fields.reason') }}:</strong> {{ $entry->reason }}</p>
                             @endif
 
-                            {{-- ДИР §6.3 — undo one change. Restores only the
+                            {{-- ДИР 6.3 — undo one change. Restores only the
                                  fields this entry altered; the revert is itself
                                  audited rather than erasing the entry. --}}
                             @if ($changed->isNotEmpty() && $entry->action_type === 'metadata.update')
@@ -721,7 +827,7 @@
                                                             return '—';
                                                         }
                                                         if (is_bool($value)) {
-                                                            return $value ? '✓' : '✗';
+                                                            return $value ? '' : '';
                                                         }
 
                                                         return is_scalar($value)
@@ -864,7 +970,7 @@
 </script>
 
 <script>
-    // ДИР §6.2 — pre-submit duplicate check. Reads the live form values and
+    // ДИР 6.2 — pre-submit duplicate check. Reads the live form values and
     // renders the match inline with a link, so the librarian can open and
     // compare the existing record instead of just being told one exists.
     (function () {
@@ -971,7 +1077,7 @@
 </script>
 
 <script>
-    // ДИР §6.3 "подсветка аномалий" / §6.4 ISBN. Deliberately advisory: the
+    // ДИР 6.3 "подсветка аномалий" / 6.4 ISBN. Deliberately advisory: the
     // imported fund contains legitimate legacy ISBNs that fail the modern
     // checksum, so a bad value is highlighted, never blocked.
     (function () {

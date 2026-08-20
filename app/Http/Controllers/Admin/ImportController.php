@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
- * CSV import for users and external resources: upload → validated preview →
+ * CSV import for users and external resources: upload — validated preview —
  * confirmed commit. The commit re-parses nothing — it applies the cached,
  * already-validated plan inside a single transaction and refuses to run when
  * any row still carries an error, so imports are all-or-nothing.

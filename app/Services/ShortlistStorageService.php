@@ -338,7 +338,7 @@ class ShortlistStorageService
             ->orderBy('id')->first();
     }
 
-    // ── Session → DB migration ────────────────────────────────────
+    // ── Session — DB migration ────────────────────────────────────
 
     /**
      * Migrate session shortlist items and draft metadata into the DB.
@@ -368,7 +368,7 @@ class ShortlistStorageService
 
         $draft = $this->getOrCreateDraft($userId);
 
-        // Merge draft metadata (session → DB only if DB is empty)
+        // Merge draft metadata (session — DB only if DB is empty)
         if (is_array($sessionDraft) && ! empty($sessionDraft)) {
             if ($draft->title === null && isset($sessionDraft['title'])) {
                 $draft->title = $sessionDraft['title'];
@@ -420,7 +420,7 @@ class ShortlistStorageService
             if (! empty($toInsert)) {
                 LiteratureDraftItem::insert($toInsert);
 
-                Log::info('Shortlist session→DB migration', [
+                Log::info('Shortlist session—DB migration', [
                     'user_id' => $userId,
                     'migrated_items' => count($toInsert),
                     'skipped_duplicates' => count($sessionItems) - count($toInsert),

@@ -48,18 +48,96 @@ class DuplicateDetectionService
                 return [
                     'record' => $candidate,
                     'score' => $details['score'],
-                    'level' => $details['score'] >= $this->exactThreshold() ? 'exact' : 'probable',
+                    'level' => $details['score'] >= $this->exactThreshold()
+                        ? 'exact'
+                        : ($details['score'] >= $this->probableThreshold() ? 'probable' : 'possible'),
                     'details' => $details,
                 ];
             })
-            ->filter(fn (array $match): bool => $match['score'] >= $this->probableThreshold())
+            ->filter(fn (array $match): bool => $match['score'] >= $this->possibleThreshold())
             ->sortByDesc('score')
             ->values();
     }
 
     public function detectAndStore(BibliographicRecord $record): Collection
     {
-        return $this->candidates($record, $record->getKey())->map(function (array $match) use ($record): DuplicateGroup {
+        return $this->storeMatches($record, $this->candidates($record, $record->getKey()));
+    }
+
+    /**
+     * Build the candidate map for a full scan in two bounded passes. This
+     * avoids issuing one broad LIKE query per MARC record while preserving the
+     * detailed fuzzy detector for an individual record after editing.
+     *
+     * @return array<int,Collection<int,array{record:BibliographicRecord,score:float,level:string,details:array<string,mixed>}>>
+     */
+    public function bulkCandidates(): array
+    {
+        $records = BibliographicRecord::query()->where('merge_status', 'active')
+            ->get(['id', 'title', 'primary_author', 'publication_year', 'publisher', 'language', 'isbn', 'udc_code', 'resource_type'])
+            ->keyBy('id');
+        $buckets = [];
+        foreach ($records as $record) {
+            $isbn = $this->isbn->normalize((string) $record->isbn);
+            $title = $this->normalizeText((string) $record->title);
+            $author = $this->normalizeText((string) $record->primary_author);
+            if ($isbn !== '') {
+                $buckets['isbn:'.$isbn][] = $record->getKey();
+            }
+            if ($title !== '' && $author !== '') {
+                $buckets['work:'.$title.'|'.$author][] = $record->getKey();
+            }
+        }
+
+        $candidateIds = [];
+        foreach ($buckets as $ids) {
+            $ids = array_values(array_unique($ids));
+            if (count($ids) < 2) {
+                continue;
+            }
+            foreach ($ids as $id) {
+                $candidateIds[$id] = array_values(array_unique([...($candidateIds[$id] ?? []), ...array_diff($ids, [$id])]));
+            }
+        }
+
+        $result = [];
+        foreach ($candidateIds as $id => $ids) {
+            $subject = $records->get($id);
+            $isbn = $this->isbn->normalize((string) $subject->isbn);
+            $title = $this->normalizeText((string) $subject->title);
+            $author = $this->normalizeText((string) $subject->primary_author);
+            $matches = collect($ids)->map(function (int $candidateId) use ($records, $subject, $isbn, $title, $author): array {
+                $candidate = $records->get($candidateId);
+                $details = $this->compare($subject->toArray(), $candidate, $isbn, $title, $author);
+
+                return [
+                    'record' => $candidate,
+                    'score' => $details['score'],
+                    'level' => $details['score'] >= $this->exactThreshold()
+                        ? 'exact'
+                        : ($details['score'] >= $this->probableThreshold() ? 'probable' : 'possible'),
+                    'details' => $details,
+                ];
+            })->filter(fn (array $match): bool => $match['score'] >= $this->possibleThreshold())
+                ->sortByDesc('score')->values();
+            if ($matches->isNotEmpty()) {
+                $result[(int) $id] = $matches;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Persist an already calculated candidate set so a full scan does not run
+     * the expensive comparison query twice.
+     *
+     * @param  Collection<int,array{record:BibliographicRecord,score:float,level:string,details:array<string,mixed>}>  $matches
+     * @return Collection<int,DuplicateGroup>
+     */
+    public function storeMatches(BibliographicRecord $record, Collection $matches): Collection
+    {
+        return $matches->map(function (array $match) use ($record): DuplicateGroup {
             $ids = collect([$record->getKey(), $match['record']->getKey()])->sort()->values();
             $fingerprint = hash('sha256', $ids->implode('|'));
             $group = DuplicateGroup::query()->firstOrCreate(
@@ -160,5 +238,10 @@ class DuplicateDetectionService
     private function probableThreshold(): float
     {
         return (float) Setting::valueFor('data_quality_duplicate_probable_threshold', 65);
+    }
+
+    private function possibleThreshold(): float
+    {
+        return (float) Setting::valueFor('data_quality_duplicate_possible_threshold', 50);
     }
 }

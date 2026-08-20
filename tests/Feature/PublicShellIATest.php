@@ -22,17 +22,17 @@ class PublicShellIATest extends TestCase
         $response->assertOk();
 
         // Primary nav links — every major public surface must be reachable.
-        foreach (['/catalog', '/discover', '/resources', '/news', '/events'] as $href) {
-            $response->assertSee('href="'.$href.'"', false);
+        foreach (['/catalog', '/discover', '/resources', '/repository', '/news', '/events'] as $href) {
+            $response->assertSee('href="'.$href.'?lang=ru"', false);
         }
 
         // Institution disclosure hosts About / Leadership / Rules / Contacts.
         foreach (['/about', '/leadership', '/rules', '/contacts'] as $href) {
-            $response->assertSee('href="'.$href.'"', false);
+            $response->assertSee('href="'.$href.'?lang=ru"', false);
         }
 
         // Authenticated landing route.
-        $response->assertSee('href="/dashboard"', false);
+        $response->assertSee('href="/dashboard?lang=ru"', false);
     }
 
     public function test_navbar_no_longer_links_to_legacy_account_route(): void
@@ -66,10 +66,12 @@ class PublicShellIATest extends TestCase
     {
         $response = $this->get('/about?lang=ru');
         $response->assertOk()
-            // fullUrlWithQuery must preserve the current path (/about) for every locale.
-            ->assertSee('/about?lang=kk', false)
-            ->assertSee('/about?lang=en', false)
-            ->assertSee('/about?lang=ru', false);
+            ->assertSee('action="'.route('locale.update').'"', false)
+            ->assertSee('name="return_to" value="http://localhost/about?lang=ru"', false);
+
+        foreach (['kk', 'ru', 'en'] as $locale) {
+            $response->assertSee('name="locale" value="'.$locale.'"', false);
+        }
     }
 
     public function test_post_login_destination_for_member_is_dashboard(): void
@@ -89,7 +91,7 @@ class PublicShellIATest extends TestCase
 
         $this->withSession($session)->get('/login')->assertRedirect('/dashboard');
         $this->withSession($session)->get('/login?lang=en')->assertRedirect('/dashboard?lang=en');
-        $this->withSession($session)->get('/login?lang=kk')->assertRedirect('/dashboard?lang=kk');
+        $this->withSession($session)->get('/login?lang=kk')->assertRedirect('/dashboard');
     }
 
     public function test_legacy_account_route_remains_for_backward_compatibility(): void

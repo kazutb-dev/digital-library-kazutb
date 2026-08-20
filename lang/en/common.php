@@ -1,13 +1,26 @@
 <?php
 
 return [
+    'system' => 'System',
     'catalog' => [
         'author_unknown' => 'Author not specified',
         'publisher_unknown' => 'Publisher not specified',
         'title_unknown' => 'Untitled',
+        'fund_unassigned' => 'Fund not specified',
+        'branch_unassigned' => 'Library point not specified',
+    ],
+    'public_landing' => [
+        'title' => 'KazUTB Scientific Library',
+        'description' => 'The library\'s public catalogue, electronic resources, and services.',
+        'stats' => [
+            'catalog_titles' => 'titles in the electronic catalogue',
+            'physical_copies' => 'copies in the library collection',
+            'published_resources' => 'resources with published access terms',
+            'public_catalog_availability' => 'round-the-clock online access to the public catalogue',
+        ],
     ],
 
-    'app_name' => 'KazUTB Library',
+    'app_name' => 'Kazakh University of Technology and Business named after K. Kulazhanov Library',
     'admin_portal' => 'Admin Portal',
     'available' => 'Available',
     'unavailable' => 'Unavailable',
@@ -21,6 +34,7 @@ return [
         'ru' => 'Russian',
         'kk' => 'Kazakh',
         'en' => 'English',
+        'other' => 'Other / not specified',
     ],
     'actions' => [
         'add' => 'Add',
@@ -55,6 +69,7 @@ return [
         'sort' => 'Sort',
         'export' => 'Export',
         'download' => 'Download',
+        'print' => 'Print',
         'upload' => 'Upload',
         'back' => 'Back',
         'continue' => 'Continue',

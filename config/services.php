@@ -46,8 +46,8 @@ return [
 
     'integration' => [
         // Comma-separated list of valid CRM integration bearer tokens.
-        // When empty, token presence is still required but any non-empty token is accepted (legacy behavior).
-        // In production, set INTEGRATION_ALLOWED_TOKENS to restrict access.
+        // An empty allowlist fails closed; every environment that enables the
+        // integration boundary must configure at least one explicit token.
         'allowed_tokens' => env('INTEGRATION_ALLOWED_TOKENS', ''),
     ],
 

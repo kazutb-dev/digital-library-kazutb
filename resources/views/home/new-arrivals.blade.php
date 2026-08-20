@@ -46,7 +46,7 @@
             $coverTone = $coverTones[$index % count($coverTones)];
           @endphp
 
-          <article class="hs-book {{ $coverTone }}" data-book-id="{{ $book['id'] ?? '' }}">
+          <article class="hs-book {{ $coverTone }}" data-book-id="{{ $book['id'] ?? '' }}" @if($repeat > 0) aria-hidden="true" @endif>
             <div class="hs-book__cover{{ $coverPath !== '' ? ' hs-book__cover--image' : ' hs-book__cover--placeholder' }}">
               @if($coverPath !== '')
                 <img class="hs-book__cover-image" src="{{ $coverPath }}" alt="" loading="lazy" />
@@ -63,7 +63,7 @@
             </div>
 
             <div class="hs-book__body">
-              <h3 class="hs-book__title"><a href="{{ $detail }}">{{ $title }}</a></h3>
+              <h3 class="hs-book__title"><a href="{{ $detail }}" @if($repeat > 0) tabindex="-1" @endif>{{ $title }}</a></h3>
 
               @if($author !== '')
                 <p class="hs-book__author">{{ $author }}</p>
@@ -87,7 +87,7 @@
                 </span>
               @endif
 
-              <a class="hs-book__cta" href="{{ $detail }}">{{ $a['details'] }}</a>
+              <a class="hs-book__cta" href="{{ $detail }}" @if($repeat > 0) tabindex="-1" @endif>{{ $a['details'] }}</a>
             </div>
           </article>
           @endforeach

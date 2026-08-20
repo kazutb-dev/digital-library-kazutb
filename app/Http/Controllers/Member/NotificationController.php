@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 /**
- * In-app reader notification centre (Master.md §15.6).
+ * In-app reader notification centre (Master.md 15.6).
  *
  * The feed is strictly scoped to the authenticated reader: every read and
  * every mutation is filtered by user_id in this controller, never by hiding

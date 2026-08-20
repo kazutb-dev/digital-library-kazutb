@@ -15,7 +15,7 @@ class BrandAndLocaleSwitcherUiTest extends TestCase
     {
         parent::setUp();
         $this->setUpAdminControlPlane();
-        config(['app.locale' => 'kk', 'app.fallback_locale' => 'kk']);
+        config(['app.locale' => 'ru', 'app.fallback_locale' => 'ru']);
     }
 
     public function test_public_login_member_librarian_and_admin_share_the_same_locale_control(): void
@@ -39,12 +39,10 @@ class BrandAndLocaleSwitcherUiTest extends TestCase
                 ->assertSee('data-locale-globe', false)
                 ->assertSee('aria-expanded="false"', false)
                 ->assertSee('aria-current="true"', false)
-                ->assertSee('ҚАЗ')
-                ->assertSee('РУС')
-                ->assertSee('ENG')
                 ->assertSee('Қазақша')
                 ->assertSee('Русский')
                 ->assertSee('English')
+                ->assertDontSee('locale-switcher__option-label', false)
                 ->assertDontSee('🌐');
 
             $this->assertSame(1, preg_match_all('/<details[^>]*\sdata-locale-switcher(?:\s|>)/', $response->getContent()));
@@ -52,7 +50,7 @@ class BrandAndLocaleSwitcherUiTest extends TestCase
         }
     }
 
-    public function test_switcher_uses_localized_short_label_and_preserves_the_current_url(): void
+    public function test_switcher_uses_full_language_name_and_preserves_the_current_url(): void
     {
         foreach (LocaleResolver::SUPPORTED as $locale) {
             $this->app['session']->flush();
@@ -60,7 +58,7 @@ class BrandAndLocaleSwitcherUiTest extends TestCase
 
             $response->assertOk()
                 ->assertSee('<html lang="'.$locale.'"', false)
-                ->assertSee(__('locale.labels.'.$locale, locale: $locale))
+                ->assertSee(__('locale.names.'.$locale, locale: $locale))
                 ->assertSee('name="return_to"', false)
                 ->assertSee('q=metadata', false)
                 ->assertSee('page=2', false);

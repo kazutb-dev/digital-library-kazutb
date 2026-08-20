@@ -28,7 +28,7 @@ use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
- * Reader personal cabinet (Master.md §15).
+ * Reader personal cabinet (Master.md 15).
  *
  * Every screen under /dashboard/* is backed by the canonical circulation
  * schema — reader profile, loans, reservations, fines and notifications.
@@ -49,7 +49,7 @@ class CabinetController extends Controller
     ) {}
 
     /**
-     * §15.1-§15.2 — the cabinet landing page: ticket, limits, what is on hand,
+     * 15.1-15.2 — the cabinet landing page: ticket, limits, what is on hand,
      * what is reserved, what is owed and what is new.
      */
     public function dashboard(Request $request): View
@@ -101,7 +101,7 @@ class CabinetController extends Controller
     }
 
     /**
-     * §15.2 — everything currently on hand, with the renewal control (§5.3).
+     * 15.2 — everything currently on hand, with the renewal control (5.3).
      */
     public function loans(Request $request): View
     {
@@ -146,7 +146,7 @@ class CabinetController extends Controller
     }
 
     /**
-     * §5.3 — reader-initiated renewal. Ownership is checked here as well as in
+     * 5.3 — reader-initiated renewal. Ownership is checked here as well as in
      * the service, so a forged loan id can never reach the domain layer.
      */
     public function renewLoan(Request $request, Loan $loan): RedirectResponse
@@ -168,7 +168,7 @@ class CabinetController extends Controller
     }
 
     /**
-     * §15.3 — active queue plus the closed history of past requests.
+     * 15.3 — active queue plus the closed history of past requests.
      */
     public function reservations(Request $request): View
     {
@@ -189,7 +189,7 @@ class CabinetController extends Controller
             }
         });
 
-        // §8 — the reader sees the same rough availability estimate as the
+        // 8 — the reader sees the same rough availability estimate as the
         // librarian, explicitly labelled as approximate.
         $copyCounts = $this->reservationInsights->circulatingCopyCounts($active->pluck('bibliographic_record_id'));
 
@@ -210,7 +210,7 @@ class CabinetController extends Controller
     }
 
     /**
-     * §13.1 / §31.1 — a reader reserves an edition from the catalogue.
+     * 13.1 / 31.1 — a reader reserves an edition from the catalogue.
      * The `reservation.create` permission is enforced by route middleware and
      * re-checked here; the queue service owns every remaining domain rule.
      */
@@ -227,7 +227,7 @@ class CabinetController extends Controller
         $record = BibliographicRecord::query()->findOrFail($validated['bibliographic_record_id']);
 
         // Drafts are not published catalogue records — they must not be
-        // reservable from the public book page (§9.1).
+        // reservable from the public book page (9.1).
         abort_if((bool) $record->is_draft, 404);
 
         try {
@@ -243,7 +243,7 @@ class CabinetController extends Controller
     }
 
     /**
-     * §15.3 — the reader withdraws their own request.
+     * 15.3 — the reader withdraws their own request.
      */
     public function cancelReservation(Request $request, Reservation $reservation): RedirectResponse
     {
@@ -269,7 +269,7 @@ class CabinetController extends Controller
     }
 
     /**
-     * §15.4 — closed loans, whether they came back late, and the fines they
+     * 15.4 — closed loans, whether they came back late, and the fines they
      * generated.
      */
     public function history(Request $request): View
@@ -314,7 +314,7 @@ class CabinetController extends Controller
     }
 
     /**
-     * §15.5 — read-only debt list. Settlement happens at the desk.
+     * 15.5 — read-only debt list. Settlement happens at the desk.
      */
     public function fines(Request $request): View
     {

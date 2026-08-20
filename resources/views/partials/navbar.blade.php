@@ -8,6 +8,15 @@
   // The reader notification bell is only meaningful for ordinary members —
   // /dashboard/* is closed to librarians and administrators.
   $navbarSessionRole = mb_strtolower(trim((string) (session('library.user')['role'] ?? '')));
+  $navbarCanonicalRole = mb_strtolower(trim((string) (session('library.user')['canonical_role'] ?? '')));
+  if ($navbarCanonicalRole === '') {
+      $navbarCanonicalRole = $navbarSessionRole === 'reader' ? 'member' : $navbarSessionRole;
+  }
+  $navbarDashboardHref = match ($navbarCanonicalRole) {
+      'admin' => '/admin',
+      'member' => '/dashboard',
+      default => '/librarian',
+  };
   $isMemberReader = $isAuthenticated && $navbarSessionRole === 'reader';
   $unreadNotifications = 0;
   if ($isMemberReader && auth()->check() && \Illuminate\Support\Facades\Schema::hasTable('reader_notifications')) {
@@ -35,7 +44,6 @@
         ['Руководство', '/leadership'],
         ['Правила библиотеки', '/rules'],
         ['Обзор фонда', '/discover'],
-        ['Обзор фонда', '/catalog'],
       ],
       'search' => 'Поиск',
       'search_placeholder' => 'Название, автор, УДК…',
@@ -64,7 +72,6 @@
         ['Басшылық', '/leadership'],
         ['Кітапхана ережелері', '/rules'],
         ['Қорға шолу', '/discover'],
-        ['Қорға шолу', '/catalog'],
       ],
       'search' => 'Іздеу',
       'search_placeholder' => 'Атауы, авторы, ӘОЖ…',
@@ -93,7 +100,6 @@
         ['Leadership', '/leadership'],
         ['Library Rules', '/rules'],
         ['Browse the collection', '/discover'],
-        ['Browse the collection', '/catalog'],
       ],
       'search' => 'Search',
       'search_placeholder' => 'Title, author, UDC…',
@@ -971,10 +977,15 @@
         </a>
       @endif
 
-      <x-locale-switcher variant="dark" class="hdr-lang" />
+      <x-locale-switcher
+        variant="dark"
+        :showLabel="false"
+        class="locale-switcher locale-switcher--dark hdr-lang"
+        style="background: transparent; border: none; box-shadow: none;"
+      />
 
       @if($isAuthenticated)
-        <a class="hdr-icon hdr-icon--account" href="{{ $routeWithLang('/dashboard') }}" aria-label="{{ $headerCopy['dashboard'] }}" title="{{ $headerCopy['dashboard'] }}">
+        <a class="hdr-icon hdr-icon--account" href="{{ $routeWithLang($navbarDashboardHref) }}" aria-label="{{ $headerCopy['dashboard'] }}" title="{{ $headerCopy['dashboard'] }}">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <circle cx="12" cy="8.5" r="3.25"></circle>
             <path d="M5.5 19c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"></path>
@@ -995,7 +1006,7 @@
         </summary>
         <nav class="hdr-panel hdr-panel--menu" aria-label="{{ $headerCopy['menu'] }}">
           @foreach($headerCopy['links'] as [$key, $label, $href])
-            <a class="hdr-menu__link" href="{{ $routeWithLang($href) }}">{{ $label }}</a>
+            <a class="hdr-menu__link" href="{{ $routeWithLang($href) }}" @if($activePage === $key) aria-current="page" @endif>{{ $label }}</a>
           @endforeach
 
           <p class="hdr-menu__group">{{ $headerCopy['institution'] }}</p>
@@ -1012,14 +1023,13 @@
           <p class="hdr-menu__group">{{ $headerCopy['dashboard'] }}</p>
           @unless($isAuthenticated)
             <a class="hdr-menu__link hdr-menu__link--accent" href="{{ $routeWithLang('/login') }}">{{ $headerCopy['guest'] }}</a>
-          @endunless
-          <a class="hdr-menu__link hdr-menu__link--accent" href="{{ $routeWithLang('/dashboard') }}">{{ $headerCopy['dashboard'] }}</a>
-          @if($isAuthenticated)
+          @else
+            <a class="hdr-menu__link hdr-menu__link--accent" href="{{ $routeWithLang($navbarDashboardHref) }}">{{ $headerCopy['dashboard'] }}</a>
             <form method="POST" action="{{ route('logout') }}">
               @csrf
               <button class="hdr-menu__link hdr-menu__link--muted" type="submit" style="width:100%;border:0;background:transparent;text-align:left;font:inherit;cursor:pointer;">{{ $headerCopy['signout'] }}</button>
             </form>
-          @endif
+          @endunless
         </nav>
       </details>
     </div>
@@ -1065,7 +1075,6 @@
         error: 'Не удалось загрузить результаты. Попробуйте ещё раз через несколько секунд.',
         fallback: 'Каталожная запись',
         authorFallback: 'Автор не указан',
-        descriptionFallback: 'Аннотация скоро появится в каталоге.',
         udcLabel: 'УДК',
         count: 'материалов',
         yearLabel: 'Год',
@@ -1090,7 +1099,6 @@
         error: 'Нәтижелерді жүктеу мүмкін болмады. Бірнеше секундтан кейін қайталап көріңіз.',
         fallback: 'Каталогтық жазба',
         authorFallback: 'Автор көрсетілмеген',
-        descriptionFallback: 'Аннотация кейінірек каталогқа қосылады.',
         udcLabel: 'ӘОЖ',
         count: 'материал',
         yearLabel: 'Жыл',
@@ -1115,7 +1123,6 @@
         error: 'Unable to load results. Please try again in a few seconds.',
         fallback: 'Catalog record',
         authorFallback: 'Author not specified',
-        descriptionFallback: 'An abstract will be added to the catalog soon.',
         udcLabel: 'UDC',
         count: 'materials',
         yearLabel: 'Year',
@@ -1140,7 +1147,6 @@
       error: 'Unable to load results.',
       fallback: 'Catalog record',
       authorFallback: 'Author not specified',
-      descriptionFallback: 'An abstract will be added to the catalog soon.',
       udcLabel: 'UDC',
       count: 'materials',
       yearLabel: 'Year',
@@ -1189,6 +1195,8 @@
     };
 
     const buildDescription = (item) => {
+      const annotation = String(item?.annotation || '').trim();
+      if (annotation) return annotation;
       const subtitle = String(item?.title?.subtitle || '').trim();
       if (subtitle) return subtitle;
       const subjects = Array.isArray(item?.classification)
@@ -1219,22 +1227,23 @@
       }
 
       results.innerHTML = normalized.map((item, index) => {
-        const titleText = String(item?.title?.display || item?.title?.raw || 'Untitled');
+        const titleText = String(item?.title?.display || item?.title?.raw || searchCopy.fallback);
         const authorText = String(item?.primaryAuthor || searchCopy.authorFallback);
         const publisherText = String(item?.publisher?.name || '');
         const yearText = String(item?.publicationYear || '—');
         const isbnText = String(item?.isbn?.raw || '');
         const udcText = String(item?.udc?.raw || '');
-        const languageCode = String(item?.language?.code || item?.language?.raw || '').toUpperCase();
+        const languageLabel = String(item?.language?.label || '');
         const resourceTypeKey = String(item?.resourceType || '').toLowerCase();
         const resourceTypeText = searchCopy.resourceTypes?.[resourceTypeKey] || (resourceTypeKey ? resourceTypeKey : searchCopy.fallback);
-        const description = buildDescription(item) || searchCopy.descriptionFallback;
+        const description = buildDescription(item);
         const coverPath = String(item?.coverUrl || item?.coverPath || item?.cover?.medium || item?.cover?.small || '');
         const coverUrl = coverPath
           ? (coverPath.startsWith('http://') || coverPath.startsWith('https://') || coverPath.startsWith('/') ? coverPath : `/storage/${coverPath.replace(/^\/+/, '')}`)
           : '';
-        const href = isbnText
-          ? withLang(`/book/${encodeURIComponent(isbnText)}`)
+        const detailIdentifier = isbnText || String(item?.id || '');
+        const href = detailIdentifier
+          ? withLang(`/book/${encodeURIComponent(detailIdentifier)}`)
           : withLang('/catalog', q ? { q } : {});
         const chips = [];
         if (item?.copies?.available !== undefined) {
@@ -1242,7 +1251,7 @@
         }
         if (publisherText) chips.push(publisherText);
         if (yearText !== '—') chips.push(`${searchCopy.yearLabel} ${yearText}`);
-        if (languageCode) chips.push(`${searchCopy.languageLabel} ${languageCode}`);
+        if (languageLabel) chips.push(`${searchCopy.languageLabel} ${languageLabel}`);
         if (udcText !== '') chips.push(`${searchCopy.udcLabel} ${udcText}`);
         const keywordText = Array.isArray(item?.keywords)
           ? item.keywords.map((keyword) => String(keyword).trim()).filter(Boolean).slice(0, 2).join(' · ')
@@ -1263,7 +1272,7 @@
               <div class="hdr-search__result-kicker">${escapeHtml(publisherText || searchCopy.fallback)}</div>
               <h3 class="hdr-search__result-title">${escapeHtml(titleText)}</h3>
               <p class="hdr-search__result-author">${escapeHtml(authorText)}</p>
-              <p class="hdr-search__result-desc">${escapeHtml(description)}</p>
+              ${description ? `<p class="hdr-search__result-desc">${escapeHtml(description)}</p>` : ''}
               <div class="hdr-search__result-meta">
                 ${chips.length ? chips.slice(0, 4).map((chip) => `<span class="hdr-search__result-chip">${escapeHtml(chip)}</span>`).join('') : `<span class="hdr-search__result-chip">${escapeHtml(searchCopy.fallback)}</span>`}
                 ${keywordText ? `<span class="hdr-search__result-chip">${escapeHtml(keywordText)}</span>` : ''}

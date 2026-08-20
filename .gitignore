@@ -23,6 +23,26 @@
 /storage/*.key
 /storage/*.log
 /storage/pail
+
+# Production/runtime evidence and data must never enter Git.
+/storage/app/recovery/
+/storage/app/backups/
+/storage/backups/
+/storage/app/private/*
+!/storage/app/private/.gitignore
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/logs/*
+!/storage/logs/.gitignore
+
+# Production TLS material is provisioned outside source control.
+/ssl/
 /build
 /coverage
 /playwright-report

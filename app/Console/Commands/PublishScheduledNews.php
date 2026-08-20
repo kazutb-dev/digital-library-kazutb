@@ -3,54 +3,23 @@
 namespace App\Console\Commands;
 
 use App\Models\News;
-use App\Services\AuditLogger;
+use App\Services\News\NewsWorkflowService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PublishScheduledNews extends Command
 {
-    protected $signature = 'news:publish-scheduled';
+    protected $signature = 'library:news-sweep';
 
     protected $description = 'Publish news items whose scheduled publication time has arrived';
 
-    public function handle(AuditLogger $audit): int
+    public function handle(NewsWorkflowService $workflow): int
     {
         $published = 0;
 
-        News::query()->dueForPublication()->orderBy('id')->chunkById(100, function ($items) use ($audit, &$published): void {
+        News::query()->dueForPublication()->orderBy('id')->chunkById(100, function ($items) use ($workflow, &$published): void {
             foreach ($items as $news) {
-                $didPublish = DB::transaction(function () use ($news, $audit): bool {
-                    $lockedNews = News::query()
-                        ->dueForPublication()
-                        ->whereKey($news->getKey())
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($lockedNews === null) {
-                        return false;
-                    }
-
-                    $old = [
-                        'status' => $lockedNews->status,
-                        'publish_at' => $lockedNews->publish_at?->utc()->toIso8601String(),
-                    ];
-                    $lockedNews->update(['status' => 'published']);
-
-                    $audit->logRequired(
-                        actionType: 'publish',
-                        entityType: 'news',
-                        entityId: $lockedNews->getKey(),
-                        oldValues: $old,
-                        newValues: [
-                            'status' => 'published',
-                            'publish_at' => $lockedNews->publish_at?->utc()->toIso8601String(),
-                        ],
-                        scope: 'operational',
-                        actor: ['name' => 'Scheduler', 'role' => 'system'],
-                    );
-
-                    return true;
-                });
+                $didPublish = $workflow->publishDue($news);
 
                 if ($didPublish) {
                     $published++;
@@ -59,6 +28,25 @@ class PublishScheduledNews extends Command
         });
 
         $this->info("Published scheduled news: {$published}");
+
+        $archived = 0;
+        if (Schema::hasColumn('news', 'expires_at')) {
+            News::query()->published()->whereNotNull('expires_at')->where('expires_at', '<=', now('UTC'))->orderBy('id')->chunkById(100, function ($items) use ($workflow, &$archived): void {
+                foreach ($items as $news) {
+                    if ($workflow->archiveExpired($news)) {
+                        $archived++;
+                    }
+                }
+            });
+        }
+        if (Schema::hasColumn('news', 'homepage_until')) {
+            News::query()->published()->where('show_on_homepage', true)->whereNotNull('homepage_until')->where('homepage_until', '<=', now('UTC'))->orderBy('id')->chunkById(100, function ($items) use ($workflow): void {
+                foreach ($items as $news) {
+                    $workflow->removeExpiredHomepagePlacement($news);
+                }
+            });
+        }
+        $this->info("Archived expired announcements: {$archived}");
 
         return self::SUCCESS;
     }

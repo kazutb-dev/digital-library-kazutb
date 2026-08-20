@@ -15,10 +15,13 @@ use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\ContactMessageSubmissionController;
 use App\Http\Controllers\DigitalViewerController;
 use App\Http\Controllers\DiscoverController;
+use App\Http\Controllers\ExternalResourceRedirectController;
+use App\Http\Controllers\Librarian\AnnualContentPlanController as LibrarianAnnualContentPlanController;
 use App\Http\Controllers\Librarian\CatalogAttachmentController as LibrarianCatalogAttachmentController;
 use App\Http\Controllers\Librarian\CatalogController as LibrarianCatalogController;
 use App\Http\Controllers\Librarian\CirculationController as LibrarianCirculationController;
@@ -26,16 +29,22 @@ use App\Http\Controllers\Librarian\CopyController as LibrarianCopyController;
 use App\Http\Controllers\Librarian\DashboardController as LibrarianDashboardController;
 use App\Http\Controllers\Librarian\DataCleanupController as LibrarianDataCleanupController;
 use App\Http\Controllers\Librarian\DataQualityController as LibrarianDataQualityController;
+use App\Http\Controllers\Librarian\DigitalMaterialController as LibrarianDigitalMaterialController;
+use App\Http\Controllers\Librarian\DirectoryReaderController as LibrarianDirectoryReaderController;
+use App\Http\Controllers\Librarian\ExecutiveDashboardController as LibrarianExecutiveDashboardController;
 use App\Http\Controllers\Librarian\FineController as LibrarianFineController;
 use App\Http\Controllers\Librarian\IncidentController as LibrarianIncidentController;
 use App\Http\Controllers\Librarian\InventoryController as LibrarianInventoryController;
 use App\Http\Controllers\Librarian\MessageController as LibrarianMessageController;
 use App\Http\Controllers\Librarian\NewsController as LibrarianNewsController;
+use App\Http\Controllers\Librarian\OfficialReportController as LibrarianOfficialReportController;
+use App\Http\Controllers\Librarian\ProfileController as LibrarianProfileController;
 use App\Http\Controllers\Librarian\ReportController as LibrarianReportController;
 use App\Http\Controllers\Librarian\RepositoryController as LibrarianRepositoryController;
 use App\Http\Controllers\Librarian\ReservationController as LibrarianReservationController;
 use App\Http\Controllers\Librarian\UdcReferenceController as LibrarianUdcReferenceController;
 use App\Http\Controllers\Librarian\VisitController as LibrarianVisitController;
+use App\Http\Controllers\Librarian\WorkspaceController as LibrarianWorkspaceController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\Member\CabinetController as MemberCabinetController;
 use App\Http\Controllers\Member\CollectionController as MemberCollectionController;
@@ -43,13 +52,19 @@ use App\Http\Controllers\Member\IncidentController as MemberIncidentController;
 use App\Http\Controllers\Member\NotificationController as MemberNotificationController;
 use App\Http\Controllers\Member\PortalController as MemberPortalController;
 use App\Http\Controllers\PasswordChangeController;
+use App\Http\Controllers\PublicExternalResourceController;
 use App\Http\Controllers\RepositoryController as PublicRepositoryController;
 use App\Http\Controllers\WebAuthController;
+use App\Models\Catalog\RepositoryItem;
 use App\Models\News;
+use App\Models\NewsCategory;
+use App\Models\NewsSlugRedirect;
 use App\Models\Setting;
 use App\Services\ExternalResourceService;
 use App\Services\Library\BookDetailReadService;
 use App\Services\Library\CatalogReadService;
+use App\Services\Library\PublicPortalStatistics;
+use App\Services\News\NewsAnalyticsService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
@@ -77,7 +92,7 @@ $internalStaffView = static function (Request $request, string $view) {
 };
 
 // Role-based post-login landing destination.
-// Canonical page map (PROJECT_CONTEXT §30) expects: admin -> /admin,
+// Canonical page map (PROJECT_CONTEXT 30) expects: admin -> /admin,
 // librarian -> /librarian, member -> /dashboard.
 // Wave 1: /account is no longer a primary surface; member readers land on
 // /dashboard. The legacy /account route is retained ONLY as a hidden
@@ -104,10 +119,22 @@ $memberView = static function (Request $request, string $view, array $data = [])
     ], $data));
 };
 
-$newsModelToPublicArticle = static function ($record): array {
-    $publishedAt = $record->publish_at ?? $record->published_at ?? $record->updated_at ?? $record->created_at ?? now();
+$publicHttpUrl = static function (mixed $value): ?string {
+    $url = trim((string) $value);
+    if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false) {
+        return null;
+    }
+
+    return in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)
+        ? $url
+        : null;
+};
+
+$newsModelToPublicArticle = static function ($record) use ($publicHttpUrl): array {
+    $publishedAt = $record->published_at ?? $record->publish_at ?? $record->updated_at ?? $record->created_at ?? now();
     $publishedAt = $publishedAt instanceof CarbonInterface ? $publishedAt : now();
-    $content = trim((string) ($record->body ?? $record->content ?? ''));
+    $requestedLocale = in_array(app()->getLocale(), ['ru', 'kk', 'en'], true) ? app()->getLocale() : 'kk';
+    $content = method_exists($record, 'localized') ? $record->localized('content', $requestedLocale) : trim((string) ($record->body ?? $record->content ?? ''));
     $paragraphs = preg_split('/\R{2,}/', $content) ?: [];
     $paragraphs = array_values(array_filter(array_map(static fn ($value) => trim((string) $value), $paragraphs)));
 
@@ -123,10 +150,8 @@ $newsModelToPublicArticle = static function ($record): array {
         ];
     }
 
-    $language = in_array((string) ($record->language ?? 'ru'), ['ru', 'kk', 'en'], true)
-        ? (string) $record->language
-        : 'ru';
-    $categoryKey = 'news.categories.'.(string) ($record->category ?? 'announcement');
+    $language = $requestedLocale;
+    $categoryKey = 'news.types.'.(string) ($record->type ?? $record->category ?? 'announcement');
     $categoryLabel = Lang::has($categoryKey, $language)
         ? trans($categoryKey, [], $language)
         : Str::of((string) ($record->category ?? 'announcement'))
@@ -134,13 +159,32 @@ $newsModelToPublicArticle = static function ($record): array {
             ->replace('_', ' ')
             ->title()
             ->toString();
-    $excerpt = trim((string) ($record->excerpt ?: Str::limit(preg_replace('/\s+/', ' ', strip_tags($content)), 220)));
+    $localizedExcerpt = method_exists($record, 'localized') ? $record->localized('excerpt', $language) : (string) $record->excerpt;
+    $excerpt = trim((string) ($localizedExcerpt ?: Str::limit(preg_replace('/\s+/', ' ', strip_tags($content)), 220)));
+    $localizedTitle = method_exists($record, 'localized') ? $record->localized('title', $language) : (string) $record->title;
+    $localizedSlug = method_exists($record, 'localizedSlug') ? $record->localizedSlug($language) : (string) $record->slug;
+    $repositoryWork = null;
+    if ($record instanceof News
+        && Schema::hasColumn('news', 'repository_item_id')
+        && filled($record->repository_item_id)) {
+        try {
+            $repositoryWork = RepositoryItem::query()
+                ->publicMetadata()
+                ->whereKey($record->repository_item_id)
+                ->first(['id', 'title', 'year']);
+        } catch (Throwable $exception) {
+            // The news surface remains available during a rolling repository
+            // migration, while the link fails closed instead of exposing an
+            // unapproved repository identifier.
+            report($exception);
+        }
+    }
 
     return [
         'id' => (string) $record->id,
-        'slug' => (string) $record->slug,
-        'topic' => (string) $record->category === 'event' ? 'events' : 'research',
-        'featured' => (bool) ($record->show_on_homepage ?? $record->is_featured ?? false),
+        'slug' => $localizedSlug,
+        'topic' => in_array((string) ($record->type ?? $record->category), ['event', 'schedule'], true) ? 'events' : 'research',
+        'featured' => (bool) (($record->show_on_homepage ?? false) || ($record->is_featured ?? false)),
         'language' => $language,
         'published_at' => $publishedAt->toDateString(),
         'published_display' => [
@@ -149,14 +193,32 @@ $newsModelToPublicArticle = static function ($record): array {
             'en' => $publishedAt->format('F j, Y'),
         ],
         'category' => [$language => $categoryLabel],
-        'title' => [$language => (string) $record->title],
+        'title' => [$language => $localizedTitle],
         'excerpt' => [$language => $excerpt],
         'hero' => [
             'image' => ! empty($record->cover_image) ? 'storage/'.$record->cover_image : null,
-            'alt' => [$language => (string) $record->title],
+            'alt' => [$language => (method_exists($record, 'localized') ? ($record->localized('image_alt', $language) ?: $localizedTitle) : $localizedTitle)],
         ],
         'body' => [$language => $blocks],
         'cta' => null,
+        'repository' => $repositoryWork ? [
+            'id' => $repositoryWork->getKey(),
+            'title' => $repositoryWork->title,
+            'year' => $repositoryWork->year,
+        ] : null,
+        'event' => [
+            'starts_at' => $record->starts_at?->toIso8601String(),
+            'ends_at' => $record->ends_at?->toIso8601String(),
+            'starts_display' => $record->starts_at?->timezone($record->timezone ?: 'Asia/Almaty')->translatedFormat('d F Y, H:i'),
+            'ends_display' => $record->ends_at?->timezone($record->timezone ?: 'Asia/Almaty')->translatedFormat('d F Y, H:i'),
+            'venue' => method_exists($record, 'localized') ? trim((string) $record->localized('venue', $language)) ?: null : null,
+            'online_url' => $publicHttpUrl($record->online_url),
+            'registration_url' => $publicHttpUrl($record->registration_url),
+            'registration_required' => (bool) $record->registration_required,
+            'organizer' => $record->organizer,
+            'contact_name' => $record->contact_name,
+        ],
+        'schema_type' => in_array((string) ($record->type ?? ''), ['event', 'schedule'], true) ? 'Event' : 'NewsArticle',
     ];
 };
 
@@ -311,7 +373,7 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'KazUTB провёл международный симпозиум по целостности архивов — площадку для обсуждения практик долговременного сохранения цифровых и гибридных коллекций в университетских библиотеках.'],
+                    ['type' => 'lead', 'text' => 'Казахский университет технологии и бизнеса имени К. Кулажанова провёл международный симпозиум по целостности архивов — площадку для обсуждения практик долговременного сохранения цифровых и гибридных коллекций в университетских библиотеках.'],
                     ['type' => 'h2', 'text' => 'Темы программы'],
                     ['type' => 'p', 'text' => 'Программа объединила библиотекарей, архивистов и исследователей. В центре обсуждения — связность метаданных, устойчивость форматов и контролируемый доступ к институциональному архиву.'],
                     ['type' => 'list', 'items' => [
@@ -323,7 +385,7 @@ $newsSeedProvider = static function (): array {
                     ['type' => 'p', 'text' => 'По итогам симпозиума библиотека публикует методические рекомендации по работе с институциональным архивом и расширяет программу проверенных поступлений в научном репозитории университета.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB университет кітапханаларындағы цифрлық және гибридті жинақтарды ұзақ мерзімді сақтау тәжірибесін талқылауға арналған мұрағат тұтастығы жөніндегі халықаралық симпозиумды өткізді.'],
+                    ['type' => 'lead', 'text' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті университет кітапханаларындағы цифрлық және гибридті жинақтарды ұзақ мерзімді сақтау тәжірибесін талқылауға арналған мұрағат тұтастығы жөніндегі халықаралық симпозиумды өткізді.'],
                     ['type' => 'h2', 'text' => 'Бағдарлама тақырыптары'],
                     ['type' => 'p', 'text' => 'Бағдарлама кітапханашылар, архивистер мен зерттеушілерді біріктірді. Негізгі тақырыптар: метадерек байланыстылығы, формат тұрақтылығы және институционалдық мұрағатқа бақыланатын қолжетімділік.'],
                     ['type' => 'list', 'items' => [
@@ -335,7 +397,7 @@ $newsSeedProvider = static function (): array {
                     ['type' => 'p', 'text' => 'Симпозиум қорытындысы бойынша кітапхана институционалдық мұрағатпен жұмысқа арналған әдістемелік ұсынымдарды жариялайды және университеттің ғылыми репозиторийіндегі тексерілген түсімдер бағдарламасын кеңейтеді.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'KazUTB hosted an international symposium on archival integrity — a working space to discuss long-term preservation practice for digital and hybrid collections in university libraries.'],
+                    ['type' => 'lead', 'text' => 'Kazakh University of Technology and Business named after K. Kulazhanov hosted an international symposium on archival integrity — a working space to discuss long-term preservation practice for digital and hybrid collections in university libraries.'],
                     ['type' => 'h2', 'text' => 'Programme themes'],
                     ['type' => 'p', 'text' => 'The programme brought together librarians, archivists, and researchers. Central themes were metadata continuity, format resilience, and controlled access to the institutional archive.'],
                     ['type' => 'list', 'items' => [
@@ -348,9 +410,9 @@ $newsSeedProvider = static function (): array {
                 ],
             ],
             'cta' => [
-                'ru' => ['heading' => 'Продолжить работу', 'body' => 'Перейдите в научный репозиторий KazUTB, чтобы ознакомиться с проверенными публикациями.', 'label' => 'Открыть репозиторий', 'href' => '/repository'],
-                'kk' => ['heading' => 'Жұмысты жалғастыру', 'body' => 'Тексерілген жарияланымдармен танысу үшін KazUTB ғылыми репозиторийіне өтіңіз.', 'label' => 'Репозиторийді ашу', 'href' => '/repository'],
-                'en' => ['heading' => 'Continue from here', 'body' => 'Open the KazUTB scholarly repository to browse reviewed publications.', 'label' => 'Open the repository', 'href' => '/repository'],
+                'ru' => ['heading' => 'Продолжить работу', 'body' => 'Перейдите в научный репозиторий Казахский университет технологии и бизнеса имени К. Кулажанова, чтобы ознакомиться с проверенными публикациями.', 'label' => 'Открыть репозиторий', 'href' => '/repository'],
+                'kk' => ['heading' => 'Жұмысты жалғастыру', 'body' => 'Тексерілген жарияланымдармен танысу үшін Қ. Құлажанов атындағы Қазақ технология және бизнес университеті ғылыми репозиторийіне өтіңіз.', 'label' => 'Репозиторийді ашу', 'href' => '/repository'],
+                'en' => ['heading' => 'Continue from here', 'body' => 'Open the Kazakh University of Technology and Business named after K. Kulazhanov scholarly repository to browse reviewed publications.', 'label' => 'Open the repository', 'href' => '/repository'],
             ],
         ],
         'catalog-assistance-pilot-2026' => [
@@ -373,9 +435,9 @@ $newsSeedProvider = static function (): array {
                 'en' => 'Library Launches a Pilot Catalog Navigation Assistant',
             ],
             'excerpt' => [
-                'ru' => 'Новая демо-среда помогает читателям быстрее находить книги, ориентироваться в фильтрах и переходить к связанным материалам без лишних кликов.',
-                'kk' => 'Жаңа демо-орта оқырмандарға кітаптарды тезірек табуға, сүзгілерді түсінуге және байланысты материалдарға артық қадамсыз өтуге көмектеседі.',
-                'en' => 'The new demo environment helps readers find books faster, understand filters, and move to related materials with fewer clicks.',
+                'ru' => 'Обновлённый интерфейс помогает читателям быстрее находить книги, ориентироваться в фильтрах и переходить к связанным материалам без лишних кликов.',
+                'kk' => 'Жаңартылған интерфейс оқырмандарға кітаптарды тезірек табуға, сүзгілерді түсінуге және байланысты материалдарға артық қадамсыз өтуге көмектеседі.',
+                'en' => 'The updated interface helps readers find books faster, understand filters, and move to related materials with fewer clicks.',
             ],
             'hero' => [
                 'image' => 'images/news/ai-workshop.jpg',
@@ -387,16 +449,16 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'Пилотный ассистент каталога KazUTB показывает подсказки по поиску, подборкам и фильтрам в едином потоке.'],
-                    ['type' => 'p', 'text' => 'Демо-режим позволяет проверить ключевые сценарии поиска до внедрения обновлённого интерфейса. Команда наблюдает, какие элементы навигации помогают быстрее добираться до книги и как пользователи взаимодействуют с подборками.'],
+                    ['type' => 'lead', 'text' => 'Пилотный ассистент каталога Казахский университет технологии и бизнеса имени К. Кулажанова показывает подсказки по поиску, подборкам и фильтрам в едином потоке.'],
+                    ['type' => 'p', 'text' => 'Обновлённый режим объединяет ключевые сценарии поиска. Команда анализирует, какие элементы навигации помогают быстрее находить книги и работать с подборками.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB каталогының пилоттық көмекшісі іздеу, подборка және сүзгілер бойынша кеңестерді бір сценарийде көрсетеді.'],
-                    ['type' => 'p', 'text' => 'Демо режимі жаңартылған интерфейс енгізілгенге дейін негізгі іздеу сценарийлерін тексеруге мүмкіндік береді. Команда навигацияның қай элементтері кітапқа тезірек жетуге көмектесетінін және оқырмандардың подборкалармен қалай әрекеттесетінін бақылайды.'],
+                    ['type' => 'lead', 'text' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті каталогының пилоттық көмекшісі іздеу, подборка және сүзгілер бойынша кеңестерді бір сценарийде көрсетеді.'],
+                    ['type' => 'p', 'text' => 'Жаңартылған режим негізгі іздеу сценарийлерін біріктіреді. Команда кітаптарды жылдам табуға және жинақтармен жұмыс істеуге көмектесетін навигация элементтерін талдайды.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'The KazUTB pilot catalog assistant surfaces search tips, shortlist actions, and filter guidance in one flow.'],
-                    ['type' => 'p', 'text' => 'The demo mode makes it possible to validate the core search journeys before the refreshed interface ships. The team is observing which navigation elements help readers reach a book faster and how shortlist actions are used.'],
+                    ['type' => 'lead', 'text' => 'The Kazakh University of Technology and Business named after K. Kulazhanov pilot catalog assistant surfaces search tips, shortlist actions, and filter guidance in one flow.'],
+                    ['type' => 'p', 'text' => 'The updated experience brings the core search journeys together. The team reviews which navigation elements help readers find books and use reading lists efficiently.'],
                 ],
             ],
             'cta' => [
@@ -452,9 +514,9 @@ $newsSeedProvider = static function (): array {
                 ],
             ],
             'cta' => [
-                'ru' => ['heading' => 'Смотреть коллекцию', 'body' => 'Переходите к демо-подборке материалов и изучайте новые темы в каталоге.', 'label' => 'Открыть подборку', 'href' => '/catalog'],
-                'kk' => ['heading' => 'Коллекцияны көру', 'body' => 'Демо-жинақтағы материалдарға өтіп, каталогтағы жаңа тақырыптарды зерттеңіз.', 'label' => 'Подборканы ашу', 'href' => '/catalog'],
-                'en' => ['heading' => 'View the collection', 'body' => 'Jump into the demo bundle and explore new topics in the catalog.', 'label' => 'Open the bundle', 'href' => '/catalog'],
+                'ru' => ['heading' => 'Смотреть коллекцию', 'body' => 'Откройте подборку материалов и изучайте новые темы в каталоге.', 'label' => 'Открыть подборку', 'href' => '/catalog'],
+                'kk' => ['heading' => 'Жинақты көру', 'body' => 'Материалдар жинағын ашып, каталогтағы жаңа тақырыптарды зерттеңіз.', 'label' => 'Жинақты ашу', 'href' => '/catalog'],
+                'en' => ['heading' => 'View the collection', 'body' => 'Open the collection and explore new topics in the catalog.', 'label' => 'Open the collection', 'href' => '/catalog'],
             ],
         ],
         'eurasian-manuscripts-integration' => [
@@ -491,22 +553,22 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'Библиотека завершила базовый этап цифровой интеграции коллекции евразийских рукописей XIX века в институциональный архив KazUTB.'],
+                    ['type' => 'lead', 'text' => 'Библиотека завершила базовый этап цифровой интеграции коллекции евразийских рукописей XIX века в институциональный архив Казахский университет технологии и бизнеса имени К. Кулажанова.'],
                     ['type' => 'p', 'text' => 'Материалы прошли проверку метаданных, получили устойчивые идентификаторы и связаны с каталогом. Читатели и преподаватели могут обращаться к коллекции через обычный академический поиск.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'Кітапхана XIX ғасырдың еуразиялық қолжазбалар жинағын KazUTB институционалдық мұрағатына цифрлық интеграциялаудың базалық кезеңін аяқтады.'],
+                    ['type' => 'lead', 'text' => 'Кітапхана XIX ғасырдың еуразиялық қолжазбалар жинағын Қ. Құлажанов атындағы Қазақ технология және бизнес университеті институционалдық мұрағатына цифрлық интеграциялаудың базалық кезеңін аяқтады.'],
                     ['type' => 'p', 'text' => 'Материалдар метадеректер тексеруінен өтті, тұрақты идентификаторларды алды және каталогпен байланыстырылды. Оқырмандар мен оқытушылар жинаққа қалыпты академиялық іздеу арқылы өте алады.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'The library has completed the foundation stage of digital integration for the 19th-century Eurasian manuscript collection into the KazUTB institutional archive.'],
+                    ['type' => 'lead', 'text' => 'The library has completed the foundation stage of digital integration for the 19th-century Eurasian manuscript collection into the Kazakh University of Technology and Business named after K. Kulazhanov institutional archive.'],
                     ['type' => 'p', 'text' => 'Materials have been validated against metadata standards, assigned stable identifiers, and linked to the catalog. Readers and faculty can now reach the collection through ordinary academic search.'],
                 ],
             ],
             'cta' => [
-                'ru' => ['heading' => 'Открыть коллекцию', 'body' => 'Каталог KazUTB содержит проиндексированные материалы — используйте тематическую навигацию по УДК.', 'label' => 'Открыть каталог', 'href' => '/catalog'],
-                'kk' => ['heading' => 'Жинақты ашу', 'body' => 'KazUTB каталогында индекстелген материалдар бар — ӘОЖ бойынша тақырыптық навигацияны пайдаланыңыз.', 'label' => 'Каталогты ашу', 'href' => '/catalog'],
-                'en' => ['heading' => 'Open the collection', 'body' => 'The KazUTB catalog contains the indexed materials — use UDC subject navigation to explore.', 'label' => 'Open the catalog', 'href' => '/catalog'],
+                'ru' => ['heading' => 'Открыть коллекцию', 'body' => 'Каталог Казахский университет технологии и бизнеса имени К. Кулажанова содержит проиндексированные материалы — используйте тематическую навигацию по УДК.', 'label' => 'Открыть каталог', 'href' => '/catalog'],
+                'kk' => ['heading' => 'Жинақты ашу', 'body' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті каталогында индекстелген материалдар бар — ӘОЖ бойынша тақырыптық навигацияны пайдаланыңыз.', 'label' => 'Каталогты ашу', 'href' => '/catalog'],
+                'en' => ['heading' => 'Open the collection', 'body' => 'The Kazakh University of Technology and Business named after K. Kulazhanov catalog contains the indexed materials — use UDC subject navigation to explore.', 'label' => 'Open the catalog', 'href' => '/catalog'],
             ],
         ],
         'digital-access-partner-institutions' => [
@@ -543,15 +605,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'Библиотека расширила программу цифрового доступа для партнёрских университетов. Политика доступа и журнал обращений остаются под полным контролем KazUTB.'],
+                    ['type' => 'lead', 'text' => 'Библиотека расширила программу цифрового доступа для партнёрских университетов. Политика доступа и журнал обращений остаются под полным контролем Казахский университет технологии и бизнеса имени К. Кулажанова.'],
                     ['type' => 'p', 'text' => 'Обновлённые потоки доступа поддерживают существующие уровни контроля и работают только в рамках подтверждённых академических соглашений.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'Кітапхана серіктес университеттер үшін цифрлық қолжетімділік бағдарламасын кеңейтті. Қолжетімділік саясаты мен өтініш журналы толығымен KazUTB бақылауында қалады.'],
+                    ['type' => 'lead', 'text' => 'Кітапхана серіктес университеттер үшін цифрлық қолжетімділік бағдарламасын кеңейтті. Қолжетімділік саясаты мен өтініш журналы толығымен Қ. Құлажанов атындағы Қазақ технология және бизнес университеті бақылауында қалады.'],
                     ['type' => 'p', 'text' => 'Жаңартылған қолжетімділік ағындары қолданыстағы бақылау деңгейлерін қолдайды және тек расталған академиялық келісімдер шеңберінде жұмыс істейді.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'The library has expanded its digital-access programme for partner universities. Access policy and the request journal remain fully under KazUTB control.'],
+                    ['type' => 'lead', 'text' => 'The library has expanded its digital-access programme for partner universities. Access policy and the request journal remain fully under Kazakh University of Technology and Business named after K. Kulazhanov control.'],
                     ['type' => 'p', 'text' => 'Updated access flows respect existing control levels and operate only within confirmed academic agreements.'],
                 ],
             ],
@@ -595,15 +657,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'Фонд реставрационной лаборатории KazUTB пополнился серией исторических журналов поступлений и вспомогательных карточек учёта.'],
+                    ['type' => 'lead', 'text' => 'Фонд реставрационной лаборатории Казахский университет технологии и бизнеса имени К. Кулажанова пополнился серией исторических журналов поступлений и вспомогательных карточек учёта.'],
                     ['type' => 'p', 'text' => 'Материалы проходят первичную консервацию, атрибуцию и подготовку к оцифровке. После завершения обработки описания будут связаны с публичным каталогом и новостным архивом библиотеки.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB қалпына келтіру зертханасының қоры тарихи түсім журналдары мен қосалқы есеп карточкаларымен толықты.'],
+                    ['type' => 'lead', 'text' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті қалпына келтіру зертханасының қоры тарихи түсім журналдары мен қосалқы есеп карточкаларымен толықты.'],
                     ['type' => 'p', 'text' => 'Материалдар бастапқы консервациядан, атрибуциядан және цифрландыруға дайындаудан өтуде. Өңдеу аяқталғаннан кейін сипаттамалар ашық каталогпен және кітапхананың жаңалықтар мұрағатымен байланысады.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'The KazUTB restoration lab has received a set of historical acquisition ledgers and supporting catalog cards.'],
+                    ['type' => 'lead', 'text' => 'The Kazakh University of Technology and Business named after K. Kulazhanov restoration lab has received a set of historical acquisition ledgers and supporting catalog cards.'],
                     ['type' => 'p', 'text' => 'The materials are undergoing initial conservation, attribution, and digitisation preparation. Once processed, their descriptions will be linked into the public catalog and the library news archive.'],
                 ],
             ],
@@ -647,15 +709,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'KazUTB обновил регламент межбиблиотечного обмена для международных и межвузовских запросов.'],
+                    ['type' => 'lead', 'text' => 'Казахский университет технологии и бизнеса имени К. Кулажанова обновил регламент межбиблиотечного обмена для международных и межвузовских запросов.'],
                     ['type' => 'p', 'text' => 'Новая редакция фиксирует единые сроки подтверждения, перечень ответственных сотрудников и требования к сопровождению цифровых копий. Это снижает задержки и делает обслуживание предсказуемее для партнёрских учреждений.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB халықаралық және жоғары оқу орындары арасындағы сұранымдар үшін кітапханааралық алмасу регламентін жаңартты.'],
+                    ['type' => 'lead', 'text' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті халықаралық және жоғары оқу орындары арасындағы сұранымдар үшін кітапханааралық алмасу регламентін жаңартты.'],
                     ['type' => 'p', 'text' => 'Жаңа редакция растаудың бірыңғай мерзімдерін, жауапты қызметкерлер тізімін және цифрлық көшірмелерді сүйемелдеу талаптарын бекітеді. Бұл кідірістерді азайтып, серіктес ұйымдар үшін қызмет көрсетуді болжамды етеді.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'KazUTB has updated its interlibrary loan governance for international and inter-university requests.'],
+                    ['type' => 'lead', 'text' => 'Kazakh University of Technology and Business named after K. Kulazhanov has updated its interlibrary loan governance for international and inter-university requests.'],
                     ['type' => 'p', 'text' => 'The revised guidance defines confirmation timelines, accountable roles, and requirements for handling digital copies. This reduces delays and makes service expectations more predictable for partner institutions.'],
                 ],
             ],
@@ -699,15 +761,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'KazUTB завершила весенний цикл исследований пользовательского опыта каталога.'],
+                    ['type' => 'lead', 'text' => 'Казахский университет технологии и бизнеса имени К. Кулажанова завершила весенний цикл исследований пользовательского опыта каталога.'],
                     ['type' => 'p', 'text' => 'Команда проанализировала пути поиска по ключевым исследовательским сценариям и обновила приоритеты улучшений для интерфейсов фильтрации, выдачи и перехода к связанным материалам.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB каталог пайдаланушы тәжірибесін зерттеудің көктемгі циклін аяқтады.'],
+                    ['type' => 'lead', 'text' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті каталог пайдаланушы тәжірибесін зерттеудің көктемгі циклін аяқтады.'],
                     ['type' => 'p', 'text' => 'Команда зерттеу сценарийлері бойынша іздеу маршруттарын талдап, сүзгілеу, нәтиже беру және байланысты материалдарға өту интерфейстерін жетілдіру басымдықтарын жаңартты.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'KazUTB has completed its spring cycle of catalog user-experience research.'],
+                    ['type' => 'lead', 'text' => 'Kazakh University of Technology and Business named after K. Kulazhanov has completed its spring cycle of catalog user-experience research.'],
                     ['type' => 'p', 'text' => 'The team analysed search journeys across core research scenarios and refreshed improvement priorities for filtering, result ranking, and related-material navigation interfaces.'],
                 ],
             ],
@@ -751,15 +813,15 @@ $newsSeedProvider = static function (): array {
             ],
             'body' => [
                 'ru' => [
-                    ['type' => 'lead', 'text' => 'KazUTB начала новый цикл приёма материалов в институциональный репозиторий.'],
+                    ['type' => 'lead', 'text' => 'Казахский университет технологии и бизнеса имени К. Кулажанова начала новый цикл приёма материалов в институциональный репозиторий.'],
                     ['type' => 'p', 'text' => 'Материалы проходят проверку метаданных, правового статуса и качества описания. После модерации записи публикуются с устойчивыми идентификаторами и маршрутом к защищенному просмотру.'],
                 ],
                 'kk' => [
-                    ['type' => 'lead', 'text' => 'KazUTB институционалдық репозиторийге материал қабылдаудың жаңа циклін бастады.'],
+                    ['type' => 'lead', 'text' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті институционалдық репозиторийге материал қабылдаудың жаңа циклін бастады.'],
                     ['type' => 'p', 'text' => 'Материалдар метадерек, құқықтық мәртебе және сипаттама сапасы бойынша тексеріледі. Модерациядан кейін жазбалар тұрақты идентификаторлармен және қорғалған оқу маршрутымен жарияланады.'],
                 ],
                 'en' => [
-                    ['type' => 'lead', 'text' => 'KazUTB has launched a new institutional repository intake cycle.'],
+                    ['type' => 'lead', 'text' => 'Kazakh University of Technology and Business named after K. Kulazhanov has launched a new institutional repository intake cycle.'],
                     ['type' => 'p', 'text' => 'Submissions are reviewed for metadata quality, rights status, and descriptive completeness. After moderation, records are published with persistent identifiers and a controlled-reading route.'],
                 ],
             ],
@@ -839,59 +901,52 @@ $newsSeedProvider = static function (): array {
     return ['articles' => $articles, 'ordered' => $orderedSlugs];
 };
 
-// Phase 3 Cluster B.1 — seeded public leadership content for /leadership.
-//
-// Scoped strictly to this page; structure mirrors $newsSeedProvider so a
-// future backend phase can replace the closure with a DB-backed source.
-// Content is role-first (no invented personal names). Real names, titles,
-// bios, and portrait assets are populated by library leadership once
-// approved per Cluster B Content Contract §4 (ownership matrix) and §5
-// (trilingual requirements).
-$leadershipSeedProvider = static function (): array {
+// Public leadership content for /leadership. Profiles are published only
+// when confirmed by an official university source.
+$leadershipPublicProvider = static function (): array {
     $header = [
         'ru' => [
             'eyebrow' => 'Руководство библиотеки',
-            'headline' => 'Руководство KazUTB',
-            'lede' => 'Руководство библиотеки отвечает за институциональный фонд, электронные коллекции, научный архив и читательские сервисы KazUTB. Контакты и маршруты обращения ведутся через официальные каналы университета.',
+            'headline' => 'Руководство библиотеки',
+            'lede' => 'На странице указаны сведения, подтверждённые официальной страницей научной библиотеки университета. Для обращений используйте официальные контакты.',
         ],
         'kk' => [
             'eyebrow' => 'Кітапхана басшылығы',
-            'headline' => 'KazUTB басшылығы',
-            'lede' => 'Кітапхана басшылығы KazUTB-дің институционалдық қорын, электрондық жинақтарын, ғылыми мұрағатын және оқырман сервистерін үйлестіреді. Байланыс пен өтініш маршруттары университеттің ресми арналары арқылы жүргізіледі.',
+            'headline' => 'Кітапхана басшылығы',
+            'lede' => 'Бұл бетте университеттің ғылыми кітапханасының ресми бетімен расталған мәліметтер көрсетілген. Өтініштер үшін ресми байланыс арналарын пайдаланыңыз.',
         ],
         'en' => [
             'eyebrow' => 'Library Leadership',
-            'headline' => 'Leadership of KazUTB',
-            'lede' => 'Library leadership stewards the institutional collection, digital materials, scholarly archive, and reader services of KazUTB. Contact and inquiry routes are maintained through official university channels.',
+            'headline' => 'Library leadership',
+            'lede' => 'This page shows information confirmed by the university’s official scientific-library page. Use the official contact routes for inquiries.',
         ],
     ];
 
     $mandate = [
         'ru' => [
-            'eyebrow' => 'Институциональный мандат',
-            'title' => 'Ответственность библиотеки',
-            'paragraph' => 'Руководство библиотеки отвечает за сохранность и развитие институционального фонда, качество метаданных каталога, контролируемый доступ к электронным материалам, ведение научного репозитория университета и поддержку читателей в рабочих маршрутах. Решения согласуются с академической и административной политикой университета.',
-            'reports_to_label' => 'Подчинённость',
-            'reports_to_value' => 'Администрация КазУТБ',
+            'eyebrow' => null,
+            'title' => null,
+            'paragraph' => null,
+            'reports_to_label' => null,
+            'reports_to_value' => null,
         ],
         'kk' => [
-            'eyebrow' => 'Институционалдық мандат',
-            'title' => 'Кітапхананың жауапкершілігі',
-            'paragraph' => 'Кітапхана басшылығы институционалдық қордың сақталуы мен дамуына, каталог метадерегінің сапасына, электрондық материалдарға бақыланатын қолжетімділікке, университеттің ғылыми репозиторийін жүргізуге және оқырмандарды жұмыс маршруттарында қолдауға жауапты. Шешімдер университеттің академиялық және әкімшілік саясатымен үйлестіріледі.',
-            'reports_to_label' => 'Бағыныстылық',
-            'reports_to_value' => 'КазУТБ әкімшілігі',
+            'eyebrow' => null,
+            'title' => null,
+            'paragraph' => null,
+            'reports_to_label' => null,
+            'reports_to_value' => null,
         ],
         'en' => [
-            'eyebrow' => 'Institutional mandate',
-            'title' => 'Scope of library responsibility',
-            'paragraph' => 'Library leadership is responsible for preservation and development of the institutional collection, catalog metadata quality, controlled access to digital materials, stewardship of the university scholarly repository, and support for readers throughout their workflows. Decisions are aligned with the academic and administrative policy of the university.',
-            'reports_to_label' => 'Reports to',
-            'reports_to_value' => 'KazUTB university administration',
+            'eyebrow' => null,
+            'title' => null,
+            'paragraph' => null,
+            'reports_to_label' => null,
+            'reports_to_value' => null,
         ],
     ];
 
-    // v1 directory: primarily role-based slots. Confirmed public profile data
-    // can be provided per role when approved by library leadership.
+    // Confirmed by the university's official scientific-library page.
     $profiles = [
         [
             'slug' => 'director',
@@ -900,12 +955,12 @@ $leadershipSeedProvider = static function (): array {
             'full_name' => [
                 'ru' => 'Панкей Ж.',
                 'kk' => 'Панкей Ж.',
-                'en' => 'Pankey Zh.',
+                'en' => 'Панкей Ж.',
             ],
             'portrait_initials' => [
-                'ru' => 'Д',
-                'kk' => 'Д',
-                'en' => 'D',
+                'ru' => 'ПЖ',
+                'kk' => 'ПЖ',
+                'en' => 'ПЖ',
             ],
             'role_title' => [
                 'ru' => 'Директор библиотеки',
@@ -913,64 +968,20 @@ $leadershipSeedProvider = static function (): array {
                 'en' => 'Library Director',
             ],
             'role_scope_line' => [
-                'ru' => 'Общее руководство и стратегия',
-                'kk' => 'Жалпы басшылық және стратегия',
-                'en' => 'Overall leadership and strategy',
+                'ru' => null,
+                'kk' => null,
+                'en' => null,
             ],
             'role_description' => [
-                'ru' => 'Отвечает за стратегию развития библиотеки, институциональный фонд и согласование академической и административной политики. Представляет библиотеку во внутренних и внешних академических процессах.',
-                'kk' => 'Кітапхананың даму стратегиясы, институционалдық қор және академиялық пен әкімшілік саясатты үйлестіру үшін жауап береді. Кітапхананы ішкі және сыртқы академиялық процестерде таныстырады.',
-                'en' => 'Responsible for library strategy, the institutional collection, and alignment of academic and administrative policy. Represents the library in internal and external academic processes.',
+                'ru' => null,
+                'kk' => null,
+                'en' => null,
             ],
-        ],
-        [
-            'slug' => 'digital-collections',
-            'order' => 2,
-            'portrait' => null,
-            'portrait_initials' => [
-                'ru' => 'ЦК',
-                'kk' => 'ЦЖ',
-                'en' => 'DC',
-            ],
-            'role_title' => [
-                'ru' => 'Заведующий электронными коллекциями',
-                'kk' => 'Электрондық жинақтар жетекшісі',
-                'en' => 'Head of Digital Collections',
-            ],
-            'role_scope_line' => [
-                'ru' => 'Электронные ресурсы и репозиторий',
-                'kk' => 'Электрондық ресурстар және репозиторий',
-                'en' => 'Digital materials and repository',
-            ],
-            'role_description' => [
-                'ru' => 'Ведёт работу с электронными материалами, лицензируемыми ресурсами и институциональным научным репозиторием. Отвечает за качество метаданных и корректную работу контролируемого читательского доступа.',
-                'kk' => 'Электрондық материалдармен, лицензияланған ресурстармен және институционалдық ғылыми репозиториймен жұмысты жүргізеді. Метадерек сапасы мен бақыланатын оқырман қолжетімділігінің дұрыс жұмысы үшін жауапты.',
-                'en' => 'Leads work with digital materials, licensed resources, and the institutional scholarly repository. Responsible for metadata quality and correct operation of controlled reader access.',
-            ],
-        ],
-        [
-            'slug' => 'reader-services',
-            'order' => 3,
-            'portrait' => null,
-            'portrait_initials' => [
-                'ru' => 'ЧС',
-                'kk' => 'ОС',
-                'en' => 'RS',
-            ],
-            'role_title' => [
-                'ru' => 'Координатор читательских сервисов',
-                'kk' => 'Оқырман сервистерінің үйлестірушісі',
-                'en' => 'Reader Services Coordinator',
-            ],
-            'role_scope_line' => [
-                'ru' => 'Выдача, возврат и сопровождение читателей',
-                'kk' => 'Беру, қайтару және оқырмандарды қолдау',
-                'en' => 'Circulation and reader support',
-            ],
-            'role_description' => [
-                'ru' => 'Координирует повседневные читательские процессы: выдачу и возврат, работу с подборками, консультации преподавателей и студентов, а также маршруты обращения к библиотекарю.',
-                'kk' => 'Күнделікті оқырман процестерін үйлестіреді: беру мен қайтару, іріктемелермен жұмыс, оқытушылар мен студенттерге кеңес беру және кітапханашыға жүгіну маршруттары.',
-                'en' => 'Coordinates day-to-day reader workflows: circulation, shortlist and reservation support, consultations for faculty and students, and routes of inquiry to the librarian-on-duty.',
+            'source_url' => 'https://www.kaztbu.edu.kz/biblioteka',
+            'source_label' => [
+                'ru' => 'Официальный источник',
+                'kk' => 'Ресми дереккөз',
+                'en' => 'Official source',
             ],
         ],
     ];
@@ -979,21 +990,21 @@ $leadershipSeedProvider = static function (): array {
         'ru' => [
             'eyebrow' => 'Связаться с библиотекой',
             'heading' => 'Общие обращения и академические запросы',
-            'body' => 'Для общих вопросов, обращений преподавателей и внешних академических запросов используйте официальные контакты KazUTB.',
+            'body' => 'Для общих вопросов, обращений преподавателей и внешних академических запросов используйте официальные контакты библиотеки.',
             'label' => 'Перейти к контактам',
             'href' => '/contacts',
         ],
         'kk' => [
             'eyebrow' => 'Кітапханамен байланысу',
             'heading' => 'Жалпы өтініштер мен академиялық сұраулар',
-            'body' => 'Жалпы сұрақтар, оқытушылардың өтініштері және сыртқы академиялық сұраулар бойынша KazUTB-дің ресми байланыс арналарын пайдаланыңыз.',
+            'body' => 'Жалпы сұрақтар, оқытушылардың өтініштері және сыртқы академиялық сұраулар бойынша кітапхананың ресми байланыс арналарын пайдаланыңыз.',
             'label' => 'Байланыс бетіне өту',
             'href' => '/contacts',
         ],
         'en' => [
             'eyebrow' => 'Contact the library',
             'heading' => 'General inquiries and academic requests',
-            'body' => 'For general questions, faculty inquiries, and external academic requests, please use the official contact routes of KazUTB.',
+            'body' => 'For general questions, faculty inquiries, and external academic requests, please use the library’s official contact routes.',
             'label' => 'Open contacts',
             'href' => '/contacts',
         ],
@@ -1004,46 +1015,41 @@ $leadershipSeedProvider = static function (): array {
         'mandate' => $mandate,
         'profiles' => $profiles,
         'support_cta' => $supportCta,
-        'last_reviewed_at' => '2026-04-22',
+        'last_reviewed_at' => null,
     ];
 };
 
-// Phase 3 Cluster B.2 — seeded public library-rules content for /rules.
-//
-// Scoped strictly to this page; structure mirrors $newsSeedProvider and
-// $leadershipSeedProvider so a future backend phase can replace the
-// closure with a DB-backed policy source. Section order is frozen per
-// Cluster B Content Contract §2 and the anchor IDs (#general, #borrowing,
-// #digital, #conduct, #penalties) are a public contract — they MUST remain
-// stable.
-$rulesSeedProvider = static function (): array {
+// Public guidance for /rules. Exact loan limits, dates, penalties, and access
+// terms are intentionally omitted until an approved policy source exists.
+// The stable section anchors remain available for inbound links.
+$rulesPublicProvider = static function (): array {
     $header = [
         'ru' => [
-            'eyebrow' => 'Официальный документ библиотеки',
+            'eyebrow' => 'Пользование библиотекой',
             'headline' => 'Правила пользования библиотекой',
             'subtitle_secondary_lang' => 'Library Usage Rules',
-            'preamble' => 'Настоящие правила регулируют пользование помещениями, фондами и электронными ресурсами KazUTB. Документ обеспечивает равный доступ к коллекциям, сохранность фонда и академическую среду, пригодную для учебной и исследовательской работы.',
-            'effective_label' => 'Действует с',
-            'effective_date' => '2026-04-01',
-            'reviewed_label' => 'Последняя проверка',
+            'preamble' => 'Здесь собраны общие ориентиры по работе с фондом и электронными ресурсами. Срок возврата и доступные действия для конкретной выдачи отображаются в личном кабинете; особые условия можно уточнить у библиотеки.',
+            'effective_label' => null,
+            'effective_date' => null,
+            'reviewed_label' => null,
         ],
         'kk' => [
-            'eyebrow' => 'Кітапхананың ресми құжаты',
+            'eyebrow' => 'Кітапхананы пайдалану',
             'headline' => 'Кітапхананы пайдалану ережелері',
             'subtitle_secondary_lang' => 'Library Usage Rules',
-            'preamble' => 'Осы ережелер KazUTB ғимараттарын, қорларын және электрондық ресурстарын пайдалану тәртібін реттейді. Құжат жинаққа тең қолжетімділікті, қордың сақталуын және оқу мен ғылыми жұмысқа қолайлы академиялық ортаны қамтамасыз етеді.',
-            'effective_label' => 'Күшіне енген күні',
-            'effective_date' => '2026-04-01',
-            'reviewed_label' => 'Соңғы тексеру',
+            'preamble' => 'Бұл бетте кітапхана қорын және электрондық ресурстарды пайдалану жөніндегі жалпы нұсқаулар берілген. Нақты берілімнің қайтару мерзімі мен қолжетімді әрекеттері жеке кабинетте көрсетіледі; ерекше шарттарды кітапханадан нақтылауға болады.',
+            'effective_label' => null,
+            'effective_date' => null,
+            'reviewed_label' => null,
         ],
         'en' => [
-            'eyebrow' => 'Official library policy document',
+            'eyebrow' => 'Using the library',
             'headline' => 'Library Usage Rules',
             'subtitle_secondary_lang' => 'Правила пользования библиотекой',
-            'preamble' => 'These rules govern use of the facilities, collections, and digital resources of KazUTB. The document supports equitable access to the collection, preservation of holdings, and an academic environment suitable for study and research.',
-            'effective_label' => 'Effective from',
-            'effective_date' => '2026-04-01',
-            'reviewed_label' => 'Last reviewed',
+            'preamble' => 'This page provides general guidance for using the collection and digital resources. The due date and available actions for a specific loan are shown in the reader account; ask the library about any special conditions.',
+            'effective_label' => null,
+            'effective_date' => null,
+            'reviewed_label' => null,
         ],
     ];
 
@@ -1055,7 +1061,7 @@ $rulesSeedProvider = static function (): array {
                 ['href' => '#borrowing', 'label' => '2. Выдача и возврат'],
                 ['href' => '#digital', 'label' => '3. Электронный доступ'],
                 ['href' => '#conduct', 'label' => '4. Правила поведения'],
-                ['href' => '#penalties', 'label' => '5. Нарушения и взыскания'],
+                ['href' => '#penalties', 'label' => '5. Вопросы и поддержка'],
             ],
         ],
         'kk' => [
@@ -1065,7 +1071,7 @@ $rulesSeedProvider = static function (): array {
                 ['href' => '#borrowing', 'label' => '2. Беру және қайтару'],
                 ['href' => '#digital', 'label' => '3. Электрондық қолжетімділік'],
                 ['href' => '#conduct', 'label' => '4. Мінез-құлық ережелері'],
-                ['href' => '#penalties', 'label' => '5. Бұзушылықтар мен шаралар'],
+                ['href' => '#penalties', 'label' => '5. Сұрақтар мен қолдау'],
             ],
         ],
         'en' => [
@@ -1075,7 +1081,7 @@ $rulesSeedProvider = static function (): array {
                 ['href' => '#borrowing', 'label' => '2. Borrowing and returns'],
                 ['href' => '#digital', 'label' => '3. Digital access'],
                 ['href' => '#conduct', 'label' => '4. Code of conduct'],
-                ['href' => '#penalties', 'label' => '5. Violations and penalties'],
+                ['href' => '#penalties', 'label' => '5. Questions and support'],
             ],
         ],
     ];
@@ -1085,36 +1091,36 @@ $rulesSeedProvider = static function (): array {
             'number' => '1',
             'eyebrow' => 'Раздел 1',
             'title' => 'Общие положения',
-            'lede' => 'KazUTB обслуживает академическое сообщество университета и обеспечивает доступ к печатным и электронным коллекциям через единые институциональные правила.',
+            'lede' => 'Каталог открыт для просмотра без авторизации. Для персональных операций используется учётная запись читателя.',
             'items' => [
-                'Библиотека обслуживает студентов, преподавателей, научных сотрудников и авторизованных исследователей KazUTB.',
-                'Действующее удостоверение университета служит основным читательским документом; использование чужого удостоверения не допускается.',
-                'Читательские права не передаются третьим лицам, включая членов семьи.',
-                'Сотрудники библиотеки вправе запросить предъявление удостоверения и подтверждение академического статуса.',
+                'Ищите издания и проверяйте наличие в публичном каталоге.',
+                'Вход требуется только для действий, связанных с учётной записью читателя или ограниченным материалом.',
+                'Не передавайте данные своей учётной записи другим людям.',
+                'Если нужное действие не отображается, уточните условия через официальные контакты библиотеки.',
             ],
         ],
         'kk' => [
             'number' => '1',
             'eyebrow' => '1-бөлім',
             'title' => 'Жалпы ережелер',
-            'lede' => 'KazUTB университеттің академиялық қауымдастығына қызмет көрсетеді және баспа мен электрондық жинақтарға бірыңғай институционалдық ережелер арқылы қол жеткізуді қамтамасыз етеді.',
+            'lede' => 'Каталогты авторизациясыз көруге болады. Жеке әрекеттер үшін оқырманның есептік жазбасы пайдаланылады.',
             'items' => [
-                'Кітапхана KazUTB студенттеріне, оқытушыларына, ғылыми қызметкерлеріне және уәкілетті зерттеушілеріне қызмет көрсетеді.',
-                'Университеттің қолданыстағы жеке куәлігі оқырманның негізгі құжаты болып табылады; басқа адамның куәлігін пайдалануға тыйым салынады.',
-                'Оқырман құқықтары үшінші тұлғаларға, оның ішінде отбасы мүшелеріне берілмейді.',
-                'Кітапхана қызметкерлері жеке куәлікті көрсетуді және академиялық мәртебені растауды сұрауға құқылы.',
+                'Басылымдарды іздеп, олардың қолжетімділігін ашық каталогтан тексеріңіз.',
+                'Авторизация оқырманның есептік жазбасына немесе қолжетімділігі шектеулі материалға қатысты әрекеттер үшін ғана қажет.',
+                'Есептік жазбаңыздың деректерін басқа адамдарға бермеңіз.',
+                'Қажетті әрекет көрсетілмесе, кітапхананың ресми байланыс арналары арқылы шарттарды нақтылаңыз.',
             ],
         ],
         'en' => [
             'number' => '1',
             'eyebrow' => 'Section 1',
             'title' => 'General provisions',
-            'lede' => 'KazUTB serves the university academic community and provides access to print and digital collections under a unified set of institutional rules.',
+            'lede' => 'The catalogue is available without signing in. A reader account is used for personal actions.',
             'items' => [
-                'The library serves enrolled students, faculty, research staff, and authorized researchers of KazUTB.',
-                'A valid university ID serves as the primary library credential; use of another person\'s ID is not permitted.',
-                'Library privileges are non-transferable, including to family members.',
-                'Library staff may request presentation of a valid ID and confirmation of academic status.',
+                'Search for titles and check availability in the public catalogue.',
+                'Sign-in is required only for actions linked to a reader account or a restricted material.',
+                'Do not share your account credentials with other people.',
+                'If an action is not shown, confirm the applicable conditions through the library’s official contacts.',
             ],
         ],
     ];
@@ -1124,120 +1130,66 @@ $rulesSeedProvider = static function (): array {
             'number' => '2',
             'eyebrow' => 'Раздел 2',
             'title' => 'Выдача и возврат',
-            'lede' => 'Лимиты выдачи, сроки пользования и продления зависят от академического статуса читателя. Возврат в срок — базовое условие равного доступа для других читателей.',
+            'lede' => 'Для каждой выдачи система показывает фактический срок возврата и доступные читателю действия.',
             'groups' => [
                 [
-                    'audience' => 'Студенты бакалавриата',
+                    'audience' => 'Текущая выдача',
                     'icon' => 'menu_book',
                     'rows' => [
-                        ['label' => 'Одновременно', 'value' => 'до 5 единиц'],
-                        ['label' => 'Срок выдачи', 'value' => '14 дней'],
-                        ['label' => 'Продление', 'value' => '1 раз, если нет очереди'],
-                    ],
-                ],
-                [
-                    'audience' => 'Магистранты и докторанты',
-                    'icon' => 'school',
-                    'rows' => [
-                        ['label' => 'Одновременно', 'value' => 'до 10 единиц'],
-                        ['label' => 'Срок выдачи', 'value' => '21 день'],
-                        ['label' => 'Продление', 'value' => '2 раза, если нет очереди'],
-                    ],
-                ],
-                [
-                    'audience' => 'Преподаватели и научные сотрудники',
-                    'icon' => 'auto_stories',
-                    'rows' => [
-                        ['label' => 'Одновременно', 'value' => 'до 15 единиц'],
-                        ['label' => 'Срок выдачи', 'value' => '30 дней'],
-                        ['label' => 'Продление', 'value' => '2 раза, если нет очереди'],
+                        ['label' => 'Срок возврата', 'value' => 'В личном кабинете'],
+                        ['label' => 'Продление', 'value' => 'Если действие доступно'],
+                        ['label' => 'Бронирование', 'value' => 'По фактическому наличию'],
                     ],
                 ],
             ],
             'notes' => [
-                'Редкие, справочные и учебно-обязательные издания могут выдаваться только в читальном зале.',
-                'Продление невозможно, если книга уже забронирована другим читателем.',
-                'Читатель обязан проверить физическое состояние издания при получении.',
+                'Наличие экземпляров проверяйте в каталоге непосредственно перед обращением.',
+                'Условия конкретного экземпляра могут отличаться; интерфейс показывает только доступные для него действия.',
+                'По вопросам выдачи и возврата используйте официальные контакты библиотеки.',
             ],
         ],
         'kk' => [
             'number' => '2',
             'eyebrow' => '2-бөлім',
             'title' => 'Беру және қайтару',
-            'lede' => 'Беру лимиттері, пайдалану мерзімі және ұзарту оқырманның академиялық мәртебесіне байланысты. Уақытында қайтару — басқа оқырмандарға тең қолжетімділіктің негізгі шарты.',
+            'lede' => 'Әр берілім үшін жүйе нақты қайтару мерзімін және оқырманға қолжетімді әрекеттерді көрсетеді.',
             'groups' => [
                 [
-                    'audience' => 'Бакалавриат студенттері',
+                    'audience' => 'Ағымдағы берілім',
                     'icon' => 'menu_book',
                     'rows' => [
-                        ['label' => 'Бір мезгілде', 'value' => '5 данаға дейін'],
-                        ['label' => 'Беру мерзімі', 'value' => '14 күн'],
-                        ['label' => 'Ұзарту', 'value' => 'кезек болмаса — 1 рет'],
-                    ],
-                ],
-                [
-                    'audience' => 'Магистранттар мен докторанттар',
-                    'icon' => 'school',
-                    'rows' => [
-                        ['label' => 'Бір мезгілде', 'value' => '10 данаға дейін'],
-                        ['label' => 'Беру мерзімі', 'value' => '21 күн'],
-                        ['label' => 'Ұзарту', 'value' => 'кезек болмаса — 2 рет'],
-                    ],
-                ],
-                [
-                    'audience' => 'Оқытушылар мен ғылыми қызметкерлер',
-                    'icon' => 'auto_stories',
-                    'rows' => [
-                        ['label' => 'Бір мезгілде', 'value' => '15 данаға дейін'],
-                        ['label' => 'Беру мерзімі', 'value' => '30 күн'],
-                        ['label' => 'Ұзарту', 'value' => 'кезек болмаса — 2 рет'],
+                        ['label' => 'Қайтару мерзімі', 'value' => 'Жеке кабинетте'],
+                        ['label' => 'Ұзарту', 'value' => 'Әрекет қолжетімді болса'],
+                        ['label' => 'Брондау', 'value' => 'Нақты қолжетімділік бойынша'],
                     ],
                 ],
             ],
             'notes' => [
-                'Сирек, анықтамалық және міндетті оқу басылымдары тек оқу залында беріледі.',
-                'Егер кітапты басқа оқырман брондаған болса, ұзарту мүмкін емес.',
-                'Оқырман басылымның физикалық күйін алған кезде тексеруге міндетті.',
+                'Кітапханаға жүгінер алдында даналардың бар-жоғын каталогтан тексеріңіз.',
+                'Нақты дананың шарттары өзгеше болуы мүмкін; интерфейс сол дана үшін қолжетімді әрекеттерді ғана көрсетеді.',
+                'Беру және қайтару туралы сұрақтар бойынша кітапхананың ресми байланыс арналарын пайдаланыңыз.',
             ],
         ],
         'en' => [
             'number' => '2',
             'eyebrow' => 'Section 2',
             'title' => 'Borrowing and returns',
-            'lede' => 'Borrowing limits, loan periods, and renewals depend on the reader\'s academic status. Timely return is the baseline condition for equitable access for other readers.',
+            'lede' => 'For each loan, the system shows the actual due date and the actions available to the reader.',
             'groups' => [
                 [
-                    'audience' => 'Undergraduate students',
+                    'audience' => 'Current loan',
                     'icon' => 'menu_book',
                     'rows' => [
-                        ['label' => 'At one time', 'value' => 'up to 5 items'],
-                        ['label' => 'Loan period', 'value' => '14 days'],
-                        ['label' => 'Renewals', 'value' => '1, if not reserved by another reader'],
-                    ],
-                ],
-                [
-                    'audience' => 'Master\'s and doctoral students',
-                    'icon' => 'school',
-                    'rows' => [
-                        ['label' => 'At one time', 'value' => 'up to 10 items'],
-                        ['label' => 'Loan period', 'value' => '21 days'],
-                        ['label' => 'Renewals', 'value' => '2, if not reserved by another reader'],
-                    ],
-                ],
-                [
-                    'audience' => 'Faculty and research staff',
-                    'icon' => 'auto_stories',
-                    'rows' => [
-                        ['label' => 'At one time', 'value' => 'up to 15 items'],
-                        ['label' => 'Loan period', 'value' => '30 days'],
-                        ['label' => 'Renewals', 'value' => '2, if not reserved by another reader'],
+                        ['label' => 'Due date', 'value' => 'In the reader account'],
+                        ['label' => 'Renewal', 'value' => 'When the action is available'],
+                        ['label' => 'Reservation', 'value' => 'Based on current availability'],
                     ],
                 ],
             ],
             'notes' => [
-                'Rare, reference, and core-curriculum items may be consulted in the reading room only.',
-                'Renewal is not available when the item is already reserved by another reader.',
-                'Readers are expected to check the physical condition of an item at the time of checkout.',
+                'Check current copy availability in the catalogue before contacting the library.',
+                'Conditions may differ for a specific copy; the interface shows only the actions available for it.',
+                'Use the library’s official contacts for questions about borrowing and returns.',
             ],
         ],
     ];
@@ -1247,39 +1199,36 @@ $rulesSeedProvider = static function (): array {
             'number' => '3',
             'eyebrow' => 'Раздел 3',
             'title' => 'Электронный доступ',
-            'lede' => 'Электронные материалы и лицензионные базы данных предоставляются для академического и некоммерческого использования через институциональную аутентификацию.',
+            'lede' => 'Способ доступа определяется для каждого опубликованного электронного материала или внешнего ресурса отдельно.',
             'items' => [
-                'Электронные материалы библиотеки открываются в контролируемом просмотрщике без возможности скачивания.',
-                'Лицензионные базы данных и электронные журналы используются исключительно в академических и некоммерческих целях.',
-                'Массовое скачивание, автоматизированная выгрузка и систематическое копирование содержимого запрещены и могут привести к блокировке доступа университета.',
-                'Удалённый доступ предоставляется только через официальную институциональную аутентификацию (SSO KazUTB).',
-                'Передача учётных данных, в том числе в пределах одной рабочей группы, не допускается.',
+                'Карточка материала показывает доступное действие: чтение, переход к источнику или запрос доступа.',
+                'Карточка внешнего ресурса показывает подтверждённые условия доступа и авторизации.',
+                'Если ресурс недоступен по результатам проверки, переход к нему блокируется.',
+                'Не передавайте данные своей учётной записи другим людям.',
             ],
         ],
         'kk' => [
             'number' => '3',
             'eyebrow' => '3-бөлім',
             'title' => 'Электрондық қолжетімділік',
-            'lede' => 'Электрондық материалдар мен лицензияланған дерекқорлар институционалдық аутентификация арқылы академиялық және коммерциялық емес мақсатта ұсынылады.',
+            'lede' => 'Қолжетімділік тәсілі әр жарияланған электрондық материал немесе сыртқы ресурс үшін жеке анықталады.',
             'items' => [
-                'Кітапхананың электрондық материалдары жүктеу мүмкіндігінсіз бақыланатын қарау құралында ашылады.',
-                'Лицензияланған дерекқорлар мен электрондық журналдар тек академиялық және коммерциялық емес мақсатта пайдаланылады.',
-                'Жаппай жүктеу, автоматтандырылған көшіру және мазмұнды жүйелі түрде сақтау шектеулі және университеттің қол жеткізу құқығының тоқтатылуына әкелуі мүмкін.',
-                'Қашықтан қолжетімділік тек ресми институционалдық аутентификация арқылы (KazUTB SSO) беріледі.',
-                'Есептік жазба деректерін беруге, оның ішінде бір жұмыс тобы шегінде беруге тыйым салынады.',
+                'Материал карточкасында қолжетімді әрекет көрсетіледі: оқу, дереккөзге өту немесе қолжетімділік сұрау.',
+                'Сыртқы ресурс карточкасында расталған қолжетімділік және авторизация шарттары көрсетіледі.',
+                'Тексеру нәтижесі бойынша ресурс қолжетімсіз болса, оған өту бұғатталады.',
+                'Есептік жазбаңыздың деректерін басқа адамдарға бермеңіз.',
             ],
         ],
         'en' => [
             'number' => '3',
             'eyebrow' => 'Section 3',
             'title' => 'Digital access',
-            'lede' => 'Digital materials and licensed databases are provided for academic and non-commercial use via institutional authentication.',
+            'lede' => 'The access method is determined separately for each published digital material or external resource.',
             'items' => [
-                'Library digital materials are opened in a controlled viewer with no download path.',
-                'Licensed databases and e-journals are used strictly for academic and non-commercial purposes.',
-                'Bulk downloading, automated harvesting, and systematic copying of content are prohibited and may result in suspension of university-wide access.',
-                'Remote access is available only through the official institutional authentication (KazUTB SSO).',
-                'Sharing of credentials, including within a working group, is not permitted.',
+                'The material card shows the available action: read, open the source, or request access.',
+                'An external resource card shows its confirmed access and authentication conditions.',
+                'If a resource is unavailable according to its latest check, the outbound action is blocked.',
+                'Do not share your account credentials with other people.',
             ],
         ],
     ];
@@ -1289,42 +1238,36 @@ $rulesSeedProvider = static function (): array {
             'number' => '4',
             'eyebrow' => 'Раздел 4',
             'title' => 'Правила поведения',
-            'lede' => 'В библиотеке поддерживается академическая среда, уважительное отношение к персоналу и сохранность фонда.',
+            'lede' => 'При работе с фондом сохраняйте материалы и учитывайте указания сотрудников в конкретной зоне обслуживания.',
             'items' => [
-                'В читальных зонах сохраняется тихий режим работы; для совместного обсуждения используются выделенные пространства.',
-                'Приём пищи запрещён; допускается вода в закрытой ёмкости вне читальных зон.',
-                'Мобильные устройства переводятся в беззвучный режим; разговоры по телефону — вне читальных зон.',
-                'Материалы не помечаются, не подчёркиваются и не складываются корешком наружу; бережное обращение обязательно.',
-                'Любые формы притеснения и нарушения академической среды не допускаются.',
-                'Требования сотрудников библиотеки в рамках настоящих правил обязательны к исполнению.',
+                'Обращайтесь с библиотечными материалами бережно и сообщайте сотруднику о замеченных повреждениях.',
+                'Не делайте пометок и не повреждайте печатные издания.',
+                'Соблюдайте спокойную рабочую обстановку и уважайте других посетителей.',
+                'Уточняйте правила конкретного помещения или пункта обслуживания у сотрудника библиотеки.',
             ],
         ],
         'kk' => [
             'number' => '4',
             'eyebrow' => '4-бөлім',
             'title' => 'Мінез-құлық ережелері',
-            'lede' => 'Кітапханада академиялық орта, қызметкерлерге құрметпен қарау және қордың сақталуы қолдау табады.',
+            'lede' => 'Кітапхана қорымен жұмыс істегенде материалдарды сақтаңыз және нақты қызмет көрсету аймағындағы қызметкерлердің нұсқауларын ескеріңіз.',
             'items' => [
-                'Оқу аймақтарында тыныш режим сақталады; бірлескен талқылау үшін арнайы кеңістіктер пайдаланылады.',
-                'Тамақтануға тыйым салынады; оқу аймақтарынан тыс жерде жабық ыдыстағы суға рұқсат етіледі.',
-                'Мобильді құрылғылар үнсіз режимге ауыстырылады; телефонмен сөйлесу тек оқу аймақтарынан тыс жерде рұқсат етіледі.',
-                'Материалдарға белгі қою, астын сызу және жырынды сыртқа қаратып жинауға тыйым салынады; ұқыпты пайдалану міндетті.',
-                'Қысым көрсету мен академиялық ортаны бұзудың кез келген түрі рұқсат етілмейді.',
-                'Кітапхана қызметкерлерінің осы ережелер шеңберіндегі талаптары міндетті түрде орындалуға тиіс.',
+                'Кітапхана материалдарын ұқыпты пайдаланыңыз және байқалған зақым туралы қызметкерге хабарлаңыз.',
+                'Баспа басылымдарына белгі қоймаңыз және оларды зақымдамаңыз.',
+                'Тыныш жұмыс ортасын сақтап, басқа келушілерге құрметпен қараңыз.',
+                'Нақты бөлме немесе қызмет көрсету орнының тәртібін кітапхана қызметкерінен нақтылаңыз.',
             ],
         ],
         'en' => [
             'number' => '4',
             'eyebrow' => 'Section 4',
             'title' => 'Code of conduct',
-            'lede' => 'The library maintains an academic environment, respectful interaction with staff, and preservation of the collection.',
+            'lede' => 'When using the collection, protect the materials and follow staff guidance for the specific service area.',
             'items' => [
-                'Reading areas are quiet zones; designated spaces are provided for group discussion.',
-                'Eating is not permitted; water in a closed container is allowed outside reading areas.',
-                'Mobile devices are kept on silent mode; phone calls are taken outside reading areas.',
-                'Do not mark, underline, or shelve items spine-out; careful handling is required.',
-                'Harassment and any behavior that degrades the academic environment are not tolerated.',
-                'Requests from library staff made within these rules are to be followed.',
+                'Handle library materials carefully and tell a staff member about any damage you notice.',
+                'Do not mark or damage printed items.',
+                'Maintain a calm working environment and respect other visitors.',
+                'Ask a library staff member about the rules for a specific room or service point.',
             ],
         ],
     ];
@@ -1333,101 +1276,83 @@ $rulesSeedProvider = static function (): array {
         'ru' => [
             'number' => '5',
             'eyebrow' => 'Раздел 5',
-            'title' => 'Нарушения и взыскания',
-            'lede' => 'При нарушениях применяются пропорциональные меры, направленные на восстановление доступа и сохранность фонда, а не на наказание.',
+            'title' => 'Вопросы и поддержка',
+            'lede' => 'Точный порядок решения вопроса зависит от конкретной выдачи, материала или ресурса и уточняется библиотекой.',
             'items' => [
-                'Задержка возврата приводит к временной приостановке прав на новые выдачи до возврата издания.',
-                'Повреждение издания возмещается по текущей восстановительной стоимости, определяемой библиотекой.',
-                'Утеря издания возмещается по восстановительной стоимости либо равноценной заменой, согласованной с библиотекой.',
-                'Нарушения электронного доступа (массовое скачивание, передача учётных данных, коммерческое использование) влекут временное приостановление доступа и эскалацию в университет.',
-                'Повторные или умышленные нарушения рассматриваются вместе с администрацией университета.',
+                'По просроченной выдаче ориентируйтесь на фактический срок в личном кабинете и обратитесь в библиотеку.',
+                'При утрате или повреждении издания согласуйте дальнейшие действия с сотрудником библиотеки.',
+                'По вопросам доступа к электронному материалу или внешнему ресурсу сообщите название и адрес его карточки.',
             ],
-            'suspension_ladder_label' => 'Шкала приостановки доступа',
-            'suspension_ladder' => [
-                ['level' => 'Напоминание', 'detail' => 'Первое обращение сотрудника библиотеки, без ограничений доступа.'],
-                ['level' => 'Временная приостановка', 'detail' => 'Приостановка новых выдач и брони до устранения нарушения.'],
-                ['level' => 'Эскалация', 'detail' => 'Передача вопроса в администрацию университета при повторных или серьёзных нарушениях.'],
-            ],
-            'appeal_label' => 'Право обжалования',
-            'appeal_text' => 'Читатель вправе обратиться к руководству библиотеки через страницу /leadership или на официальную почту, указанную на странице /contacts, для пересмотра применённой меры.',
+            'suspension_ladder_label' => '',
+            'suspension_ladder' => [],
+            'appeal_label' => 'Обратная связь',
+            'appeal_text' => 'Используйте официальные контакты библиотеки; для авторизованных читателей также доступен канал обращений в личном кабинете.',
         ],
         'kk' => [
             'number' => '5',
             'eyebrow' => '5-бөлім',
-            'title' => 'Бұзушылықтар мен шаралар',
-            'lede' => 'Бұзушылықтар болған жағдайда жаза емес, қолжетімділікті қалпына келтіруге және қордың сақталуына бағытталған мөлшерлес шаралар қолданылады.',
+            'title' => 'Сұрақтар мен қолдау',
+            'lede' => 'Мәселені шешудің нақты тәртібі тиісті берілімге, материалға немесе ресурсқа байланысты және кітапханадан нақтыланады.',
             'items' => [
-                'Қайтарудың кешіктірілуі басылым қайтарылғанға дейін жаңа беруге арналған құқықтардың уақытша тоқтатылуына әкеледі.',
-                'Басылымның зақымдалуы кітапхана белгілеген қалпына келтіру құнымен өтеледі.',
-                'Басылымның жоғалуы қалпына келтіру құнымен немесе кітапханамен келісілген тең бағалы алмастырумен өтеледі.',
-                'Электрондық қолжетімділіктің бұзылуы (жаппай жүктеу, есептік деректерді беру, коммерциялық пайдалану) қолжетімділіктің уақытша тоқтатылуына және университетке эскалацияға әкеледі.',
-                'Қайталанатын немесе қасақана бұзушылықтар университет әкімшілігімен бірге қаралады.',
+                'Мерзімі өткен берілім бойынша жеке кабинеттегі нақты мерзімді тексеріп, кітапханаға хабарласыңыз.',
+                'Басылым жоғалған немесе зақымдалған жағдайда кейінгі әрекеттерді кітапхана қызметкерімен келісіңіз.',
+                'Электрондық материалға немесе сыртқы ресурсқа қолжетімділік туралы сұрақта оның атауы мен карточка мекенжайын көрсетіңіз.',
             ],
-            'suspension_ladder_label' => 'Қолжетімділікті тоқтата тұру сатылары',
-            'suspension_ladder' => [
-                ['level' => 'Ескерту', 'detail' => 'Кітапхана қызметкерінің бірінші хабарласуы, қолжетімділік шектелмейді.'],
-                ['level' => 'Уақытша тоқтата тұру', 'detail' => 'Бұзушылық жойылғанға дейін жаңа беру мен брондауды тоқтата тұру.'],
-                ['level' => 'Эскалация', 'detail' => 'Қайталанатын немесе елеулі бұзушылықтар кезінде мәселе университет әкімшілігіне беріледі.'],
-            ],
-            'appeal_label' => 'Шағымдану құқығы',
-            'appeal_text' => 'Оқырман қолданылған шараны қайта қарау үшін /leadership бетінде немесе /contacts бетінде көрсетілген ресми пошта арқылы кітапхана басшылығына жүгінуге құқылы.',
+            'suspension_ladder_label' => '',
+            'suspension_ladder' => [],
+            'appeal_label' => 'Кері байланыс',
+            'appeal_text' => 'Кітапхананың ресми байланыс арналарын пайдаланыңыз; авторизацияланған оқырмандар өтінішті жеке кабинет арқылы да жібере алады.',
         ],
         'en' => [
             'number' => '5',
             'eyebrow' => 'Section 5',
-            'title' => 'Violations and penalties',
-            'lede' => 'Responses are proportionate and aimed at restoring access and preserving the collection, not at punishment.',
+            'title' => 'Questions and support',
+            'lede' => 'The exact way to resolve an issue depends on the specific loan, material, or resource and is confirmed by the library.',
             'items' => [
-                'Overdue returns result in a temporary hold on new checkouts until the item is returned.',
-                'Damage is settled at the current replacement value determined by the library.',
-                'Loss is settled at the replacement value or by an equivalent replacement agreed with the library.',
-                'Digital-access violations (bulk downloading, credential sharing, commercial use) lead to temporary suspension of access and escalation to the university.',
-                'Repeated or intentional violations are reviewed jointly with the university administration.',
+                'For an overdue loan, use the actual due date in the reader account and contact the library.',
+                'If an item is lost or damaged, agree on the next steps with a library staff member.',
+                'For a digital material or external resource access question, include its title and card address.',
             ],
-            'suspension_ladder_label' => 'Access suspension ladder',
-            'suspension_ladder' => [
-                ['level' => 'Reminder', 'detail' => 'First notice from library staff, no access restriction.'],
-                ['level' => 'Temporary hold', 'detail' => 'Hold on new checkouts and reservations until the issue is resolved.'],
-                ['level' => 'Escalation', 'detail' => 'Matter referred to the university administration for repeated or serious violations.'],
-            ],
-            'appeal_label' => 'Right of appeal',
-            'appeal_text' => 'Readers may request review of a measure through the /leadership page or by writing to the official address listed on /contacts.',
+            'suspension_ladder_label' => '',
+            'suspension_ladder' => [],
+            'appeal_label' => 'Feedback',
+            'appeal_text' => 'Use the library’s official contacts; signed-in readers can also use the message channel in their account.',
         ],
     ];
 
     $footerMeta = [
         'ru' => [
-            'eyebrow' => 'Вопросы по документу',
-            'heading' => 'Вопросы по настоящим правилам',
-            'body' => 'По вопросам толкования настоящих правил, предложений по уточнению или обжалования применённых мер обращайтесь в библиотеку.',
+            'eyebrow' => 'Связь с библиотекой',
+            'heading' => 'Нужно уточнить условие?',
+            'body' => 'Для точного ответа укажите издание, материал или ресурс и опишите нужное действие.',
             'contacts_label' => 'Перейти к контактам',
             'contacts_href' => '/contacts',
             'leadership_label' => 'Руководство библиотеки',
             'leadership_href' => '/leadership',
-            'version_label' => 'Версия документа',
-            'version_value' => 'v1.0 (2026-04-22)',
+            'version_label' => null,
+            'version_value' => null,
         ],
         'kk' => [
-            'eyebrow' => 'Құжат бойынша сұрақтар',
-            'heading' => 'Осы ережелер бойынша сұрақтар',
-            'body' => 'Осы ережелерді түсіндіру, нақтылау бойынша ұсыныстар немесе қолданылған шараларды шағымдану мәселелері бойынша кітапханаға жүгініңіз.',
+            'eyebrow' => 'Кітапханамен байланыс',
+            'heading' => 'Шартты нақтылау керек пе?',
+            'body' => 'Нақты жауап алу үшін басылымды, материалды немесе ресурсты көрсетіп, қажетті әрекетті сипаттаңыз.',
             'contacts_label' => 'Байланыс бетіне өту',
             'contacts_href' => '/contacts',
             'leadership_label' => 'Кітапхана басшылығы',
             'leadership_href' => '/leadership',
-            'version_label' => 'Құжат нұсқасы',
-            'version_value' => 'v1.0 (2026-04-22)',
+            'version_label' => null,
+            'version_value' => null,
         ],
         'en' => [
-            'eyebrow' => 'Questions about this document',
-            'heading' => 'Questions about these rules',
-            'body' => 'For questions of interpretation, suggestions for clarification, or appeals of applied measures, please contact the library.',
+            'eyebrow' => 'Contact the library',
+            'heading' => 'Need to confirm a condition?',
+            'body' => 'For an exact answer, identify the title, material, or resource and describe the action you need.',
             'contacts_label' => 'Open contacts',
             'contacts_href' => '/contacts',
             'leadership_label' => 'Library leadership',
             'leadership_href' => '/leadership',
-            'version_label' => 'Document version',
-            'version_value' => 'v1.0 (2026-04-22)',
+            'version_label' => null,
+            'version_value' => null,
         ],
     ];
 
@@ -1440,31 +1365,38 @@ $rulesSeedProvider = static function (): array {
         'conduct' => $conduct,
         'penalties' => $penalties,
         'footer_meta' => $footerMeta,
-        'last_reviewed_at' => '2026-04-22',
+        'last_reviewed_at' => null,
     ];
 };
 
-// Public homepage (PROJECT_CONTEXT §17).
+// Public homepage (PROJECT_CONTEXT 17).
 //
 // Supplies the data-backed homepage sections: the new-additions rail comes
 // from CatalogReadService, and the per-UDC counts shown on the faculty and
 // collection cards are read from the same service. Counts are cached because
 // they are one query per index; when the catalog schema is absent the map
 // stays empty and the cards render without a count rather than inventing one.
-Route::get('/', function (CatalogReadService $catalogReadService) {
+Route::get('/', function (CatalogReadService $catalogReadService, PublicPortalStatistics $publicPortalStatistics) {
     $newArrivals = [];
     $homepageNews = collect();
+    $latestRepositoryWorks = collect();
+    $publicStats = [];
     try {
-        // includeTotal is on so the service behaves the same way in every
-        // environment: without it the sqlite path skips its demo fallback and
-        // the rail silently renders empty in tests while working in the browser.
-        $result = $catalogReadService->search(
+        $publicStats = $publicPortalStatistics->snapshot();
+    } catch (Throwable) {
+        // A missing source suppresses its public figure; it never triggers a
+        // configured or marketing fallback.
+    }
+    try {
+        // Include the total so the same canonical read path drives the rail in
+        // every environment; an unavailable source still yields an empty rail.
+        $result = Cache::remember('homepage.new_arrivals', now()->addMinutes(5), fn (): array => $catalogReadService->search(
             limit: 10,
             sort: 'recently_added',
             includeTotal: true,
             includeLocations: false,
             completeOnly: true,
-        );
+        ));
         $newArrivals = is_array($result['data'] ?? null) ? $result['data'] : [];
     } catch (Throwable) {
         // The homepage must render even with the catalog schema absent.
@@ -1511,7 +1443,11 @@ Route::get('/', function (CatalogReadService $catalogReadService) {
     $facultyStats = [];
     foreach ($facultyDeskDefinitions as $deskKey => $institution) {
         try {
-            $books = $catalogReadService->popularByInstitution($institution);
+            $books = Cache::remember(
+                'homepage.faculty_books.'.$institution,
+                now()->addMinutes(15),
+                fn (): array => $catalogReadService->popularByInstitution($institution),
+            );
             $tones = ['sand', 'ink', 'clay', 'forest', 'sage'];
             $facultyBooks[$deskKey] = collect($books)
                 ->values()
@@ -1521,7 +1457,11 @@ Route::get('/', function (CatalogReadService $catalogReadService) {
                     return $book;
                 })
                 ->all();
-            $facultyStats[$deskKey] = $catalogReadService->institutionCopiesCount($institution);
+            $facultyStats[$deskKey] = Cache::remember(
+                'homepage.faculty_copies.'.$institution,
+                now()->addMinutes(15),
+                fn (): int => $catalogReadService->institutionCopiesCount($institution),
+            );
         } catch (Throwable) {
             $facultyBooks[$deskKey] = [];
             $facultyStats[$deskKey] = 0;
@@ -1533,13 +1473,30 @@ Route::get('/', function (CatalogReadService $catalogReadService) {
             $homepageNews = News::query()
                 ->published()
                 ->homepage()
-                ->language(app()->getLocale())
-                ->latest('publish_at')
-                ->limit(3)
+                ->when(Schema::hasColumn('news', 'visibility'), fn ($query) => $query->where('visibility', 'public'))
+                ->when(Schema::hasColumn('news', 'type'), fn ($query) => $query->whereNotIn('type', ['event', 'schedule']))
+                ->when(Schema::hasColumn('news', 'homepage_until'), fn ($query) => $query->where(fn ($nested) => $nested->whereNull('homepage_until')->orWhere('homepage_until', '>', now('UTC'))))
+                ->when(Schema::hasColumn('news', 'is_pinned'), fn ($query) => $query->orderByDesc('is_pinned')->orderByDesc('homepage_priority'))
+                ->latest(Schema::hasColumn('news', 'published_at') ? 'published_at' : 'publish_at')
+                ->limit(6)
                 ->get();
         }
     } catch (Throwable) {
         // A content-store outage must not make the public homepage unavailable.
+    }
+
+    try {
+        if (Schema::hasTable('repository_items')) {
+            $latestRepositoryWorks = RepositoryItem::query()
+                ->published()
+                ->publicMetadata()
+                ->orderByDesc('published_at')
+                ->orderByDesc('created_at')
+                ->limit(4)
+                ->get();
+        }
+    } catch (Throwable) {
+        // Repository readiness must not become a homepage availability risk.
     }
 
     return view('welcome', [
@@ -1548,23 +1505,24 @@ Route::get('/', function (CatalogReadService $catalogReadService) {
         'facultyBooks' => $facultyBooks,
         'facultyStats' => $facultyStats,
         'homepageNews' => $homepageNews,
+        'latestRepositoryWorks' => $latestRepositoryWorks,
+        'publicStats' => $publicStats,
     ]);
 });
 
 Route::get('/catalog', function (Request $request, CatalogReadService $catalogReadService) {
-    $uiSort = (string) $request->query('sort', 'relevance');
+    $uiSort = (string) $request->query('sort', 'popular');
     $materialType = (string) $request->query('material_type', 'all');
-    $yearBounds = ['min' => 1950, 'max' => (int) date('Y')];
+    $yearBounds = ['min' => (int) date('Y'), 'max' => (int) date('Y')];
     try {
         $yearBounds = $catalogReadService->yearBounds();
     } catch (Throwable) {
-        // Keep the demo catalog visible even when the database schema is empty.
+        // With no catalogue source, keep a neutral one-year control range.
     }
     $apiSortMap = [
-        'relevance' => 'popular',
         'title' => 'title',
         'year_desc' => 'newest',
-        'year_asc' => 'newest',
+        'year_asc' => 'oldest',
         'popular' => 'popular',
         'newest' => 'newest',
         'author' => 'author',
@@ -1597,10 +1555,6 @@ Route::get('/catalog', function (Request $request, CatalogReadService $catalogRe
         includeUdcCode: $request->user() !== null,
     );
 
-    if ($uiSort === 'year_asc' && is_array($catalogBootstrap['data'] ?? null)) {
-        usort($catalogBootstrap['data'], static fn (array $left, array $right): int => ((int) ($left['publicationYear'] ?? 0)) <=> ((int) ($right['publicationYear'] ?? 0)));
-    }
-
     return view('catalog', [
         'catalogBootstrap' => $catalogBootstrap,
         'catalogYearBounds' => $yearBounds,
@@ -1612,13 +1566,13 @@ Route::get('/catalog', function (Request $request, CatalogReadService $catalogRe
 });
 
 Route::get('/book/{isbn}', function (Request $request, string $isbn, BookDetailReadService $bookDetailReadService) {
-    $bookBootstrap = null;
     try {
         $bookBootstrap = $bookDetailReadService->findByIdentifier($isbn, $request->user());
-    } catch (Throwable) {
-        // Keep the detail shell renderable when the catalog schema is absent
-        // (e.g. sqlite test env); the page falls back to /api/v1/book-db.
+    } catch (Throwable $exception) {
+        report($exception);
+        abort(503, 'The catalogue is temporarily unavailable.');
     }
+    abort_if($bookBootstrap === null, 404);
 
     return view('book', [
         'bookIsbn' => $isbn,
@@ -1673,21 +1627,6 @@ Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
 // locale resolution also applies to the localized 404 response.
 Route::fallback(static fn () => abort(404))->name('web.fallback');
 
-// RBAC demo sign-in. Logs in a seeded account carrying a real Spatie role, so
-// role/permission middleware and policies behave exactly as they would for a
-// production user. Gated by APP_DEMO_LOGIN_ENABLED — the route 404s when the
-// flag is off, so a production deployment does not merely hide the cards but
-// removes the endpoint.
-//
-// Both authorization stacks are populated: Auth::login() drives the Spatie
-// `role:`/`permission:` middleware and the policies, while session('library.user')
-// keeps the existing shells (EnsureMemberReader, EnsureLibrarianStaff,
-// EnsureAdminStaff) and the SPA bootstrap working unchanged.
-Route::post('/login/demo/{role}', [WebAuthController::class, 'demo'])
-    ->middleware('throttle:login')
-    ->where('role', 'student|teacher|librarian|director|senior_librarian|acquisitions|cataloguer|bibliographer|admin')
-    ->name('login.demo');
-
 Route::get('/login', function (Request $request) use ($postLoginDestination) {
     $lang = app()->getLocale();
     $lang = in_array($lang, ['ru', 'kk', 'en'], true) ? $lang : 'kk';
@@ -1698,75 +1637,28 @@ Route::get('/login', function (Request $request) use ($postLoginDestination) {
         return redirect($lang === 'kk' ? $destination : ($destination.'?lang='.$lang));
     }
 
-    $demoEnabled = (bool) config('demo_auth.enabled');
-    $demoIdentities = [];
-    if ($demoEnabled) {
-        $demoTranslations = [
-            'student' => [
-                'ru' => ['label' => 'Студент', 'description' => 'Демо-доступ — поиск, каталог, подборка, кабинет'],
-                'kk' => ['label' => 'Студент', 'description' => 'Демо-қолжетімділік — іздеу, каталог, іріктеме, кабинет'],
-                'en' => ['label' => 'Student', 'description' => 'Demo access — search, catalog, shortlist, account'],
-            ],
-            'teacher' => [
-                'ru' => ['label' => 'Преподаватель', 'description' => 'Демо-доступ — силлабус, подборка, рабочий стол'],
-                'kk' => ['label' => 'Оқытушы', 'description' => 'Демо-қолжетімділік — силлабус, іріктеме, жұмыс аймағы'],
-                'en' => ['label' => 'Faculty', 'description' => 'Demo access — syllabus, shortlist, teaching workspace'],
-            ],
-            'librarian' => [
-                'ru' => ['label' => 'Библиотекарь', 'description' => 'Демо-доступ — выдача, возврат, фонд, рецензирование'],
-                'kk' => ['label' => 'Кітапханашы', 'description' => 'Демо-қолжетімділік — беру, қайтару, қор, сараптау'],
-                'en' => ['label' => 'Librarian', 'description' => 'Demo access — circulation, returns, holdings, review'],
-            ],
-            'admin' => [
-                'ru' => ['label' => 'Администратор', 'description' => 'Демо-доступ — управление, настройки, отчёты'],
-                'kk' => ['label' => 'Әкімші', 'description' => 'Демо-қолжетімділік — басқару, баптаулар, есептер'],
-                'en' => ['label' => 'Administrator', 'description' => 'Demo access — management, settings, reports'],
-            ],
-        ];
-
-        foreach (config('demo_auth.identities', []) as $slug => $identity) {
-            $localizedIdentity = $demoTranslations[$slug][$lang] ?? null;
-
-            $demoIdentities[] = [
-                'slug' => $slug,
-                'label' => $localizedIdentity['label'] ?? ($identity['label'] ?? $slug),
-                'description' => $localizedIdentity['description'] ?? ($identity['description'] ?? ''),
-                'icon' => $identity['icon'] ?? '👤',
-                'role' => $identity['role'] ?? 'reader',
-                'login' => $identity['login'] ?? '',
-                'quickFillLogin' => $identity['quick_fill_login'] ?? ($identity['login'] ?? ''),
-                'email' => $identity['email'] ?? '',
-                'password' => $identity['password'] ?? '',
-            ];
-        }
-    }
-
     $copy = [
         'ru' => [
-            'title' => 'Вход — KazUTB',
-            'brand' => 'KazUTB',
+            'title' => 'Вход — Казахский университет технологии и бизнеса имени К. Кулажанова',
+            'brand' => 'Казахский университет технологии и бизнеса имени К. Кулажанова',
             'legacyHero' => 'Вход в библиотечную систему',
             'displayHeadline' => 'Сохраняем знания, поддерживаем исследования.',
             'lead' => 'Единая точка входа в цифровую библиотеку Казахского университета технологии и бизнеса: каталог, электронные коллекции и научный репозиторий.',
             'accessHeading' => 'Защищённый доступ',
-            'accessValue' => 'Авторизация выполняется через корпоративную учётную запись университета. Соединение с библиотекой зашифровано.',
+            'accessValue' => 'Вход доступен только с корпоративной учётной записью университета. Действия в системе регистрируются в журнале безопасности.',
             'supportHeading' => 'Поддержка',
             'supportValue' => 'Возникли сложности со входом? Напишите в службу поддержки: support@kazutb.edu.kz.',
-            'formTitle' => 'Вход в библиотеку',
-            'formSubtitle' => 'Используйте корпоративные учётные данные университета, чтобы открыть каталог, электронные материалы и личный кабинет.',
+            'formTitle' => 'Добро пожаловать',
+            'formSubtitle' => 'Введите корпоративный логин и пароль университета, чтобы продолжить.',
             'loginLabel' => 'Корпоративный логин',
-            'loginPlaceholder' => 'Логин или корпоративный email',
+            'loginPlaceholder' => 'Имя пользователя или университетский email',
             'passwordLabel' => 'Пароль',
             'passwordPlaceholder' => '••••••••••••',
             'forgot' => 'Забыли пароль?',
             'keepSigned' => 'Оставаться в системе 30 дней',
             'submit' => 'Войти',
-            'divider' => 'или войдите через',
-            'sso' => 'Институциональный SSO',
             'securityNotice' => 'Несанкционированный доступ запрещён. Действия в системе фиксируются в журнале безопасности согласно политике университета.',
-            'demoTitle' => 'Быстрый вход',
-            'demoSub' => 'Для проверки можно использовать подготовленные демо-профили.',
-            'footerLegal' => '© '.date('Y').' KazUTB. Все права защищены.',
+            'footerLegal' => ' '.date('Y').' Казахский университет технологии и бизнеса имени К. Кулажанова. Все права защищены.',
             'footerLinks' => [
                 ['label' => 'О библиотеке', 'href' => '/about'],
                 ['label' => 'Правила библиотеки', 'href' => '/rules'],
@@ -1775,30 +1667,26 @@ Route::get('/login', function (Request $request) use ($postLoginDestination) {
             ],
         ],
         'kk' => [
-            'title' => 'Кіру — KazUTB',
-            'brand' => 'KazUTB',
+            'title' => 'Кіру — Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
+            'brand' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
             'legacyHero' => 'Кітапхана жүйесіне кіру',
             'displayHeadline' => 'Білімді сақтаймыз, зерттеуді қолдаймыз.',
             'lead' => 'Қазақ технология және бизнес университетінің цифрлық кітапханасына бірыңғай кіру нүктесі: каталог, электрондық жинақтар және ғылыми репозиторий.',
             'accessHeading' => 'Қорғалған қолжетімділік',
-            'accessValue' => 'Авторизация университеттің корпоративтік есептік жазбасы арқылы орындалады. Кітапханамен байланыс шифрланған.',
+            'accessValue' => 'Кіру тек университеттің корпоративтік есептік жазбасымен қолжетімді. Жүйедегі әрекеттер қауіпсіздік журналында тіркеледі.',
             'supportHeading' => 'Қолдау',
             'supportValue' => 'Кіру кезінде қиындық туындады ма? Қолдау қызметіне жазыңыз: support@kazutb.edu.kz.',
-            'formTitle' => 'Кітапханаға кіру',
-            'formSubtitle' => 'Каталогты, электрондық материалдарды және жеке кабинетті ашу үшін университеттің корпоративтік деректерін пайдаланыңыз.',
+            'formTitle' => 'Қош келдіңіз',
+            'formSubtitle' => 'Жалғастыру үшін университеттің корпоративтік логині мен құпиясөзін енгізіңіз.',
             'loginLabel' => 'Корпоративтік логин',
-            'loginPlaceholder' => 'Логин немесе корпоративтік email',
+            'loginPlaceholder' => 'Пайдаланушы аты немесе университеттік email',
             'passwordLabel' => 'Құпиясөз',
             'passwordPlaceholder' => '••••••••••••',
             'forgot' => 'Құпиясөзді ұмыттыңыз ба?',
             'keepSigned' => 'Жүйеде 30 күн қалу',
             'submit' => 'Кіру',
-            'divider' => 'немесе мына арқылы кіріңіз',
-            'sso' => 'Институционалдық SSO',
             'securityNotice' => 'Рұқсатсыз кіруге тыйым салынады. Жүйедегі әрекеттер университет саясатына сәйкес қауіпсіздік журналында тіркеледі.',
-            'demoTitle' => 'Жедел кіру',
-            'demoSub' => 'Тексеру үшін дайын демо-профильдерді қолдануға болады.',
-            'footerLegal' => '© '.date('Y').' KazUTB. Барлық құқықтар қорғалған.',
+            'footerLegal' => ' '.date('Y').' Қ. Құлажанов атындағы Қазақ технология және бизнес университеті. Барлық құқықтар қорғалған.',
             'footerLinks' => [
                 ['label' => 'Кітапхана туралы', 'href' => '/about'],
                 ['label' => 'Кітапхана ережелері', 'href' => '/rules'],
@@ -1807,30 +1695,26 @@ Route::get('/login', function (Request $request) use ($postLoginDestination) {
             ],
         ],
         'en' => [
-            'title' => 'Sign in — KazUTB',
-            'brand' => 'KazUTB',
+            'title' => 'Sign in — Kazakh University of Technology and Business named after K. Kulazhanov',
+            'brand' => 'Kazakh University of Technology and Business named after K. Kulazhanov',
             'legacyHero' => 'Sign in to the library system',
             'displayHeadline' => 'Preserving Knowledge, Empowering Research.',
             'lead' => 'A single entry point to the digital library of the Kazakh University of Technology and Business: catalog, digital collections, and the scholarly repository.',
             'accessHeading' => 'Secure Access',
-            'accessValue' => 'Authentication runs through your corporate university account. Your connection to the library is encrypted.',
+            'accessValue' => 'Sign-in is available only with a university corporate account. Activity is recorded in the security audit log.',
             'supportHeading' => 'Support',
             'supportValue' => 'Having trouble signing in? Contact the help desk at support@kazutb.edu.kz.',
-            'formTitle' => 'Sign in to the Library',
-            'formSubtitle' => 'Use your corporate university credentials to open the catalog, digital materials, and your member dashboard.',
+            'formTitle' => 'Welcome back',
+            'formSubtitle' => 'Enter your university login and password to continue.',
             'loginLabel' => 'Corporate login',
-            'loginPlaceholder' => 'Login or corporate email',
+            'loginPlaceholder' => 'Username or university email',
             'passwordLabel' => 'Password',
             'passwordPlaceholder' => '••••••••••••',
             'forgot' => 'Forgot password?',
             'keepSigned' => 'Keep me signed in for 30 days',
             'submit' => 'Sign in',
-            'divider' => 'or access via',
-            'sso' => 'Institutional SSO',
             'securityNotice' => 'Unauthorized access is prohibited. All activity is logged for security and auditing purposes as per institutional policy.',
-            'demoTitle' => 'Quick access',
-            'demoSub' => 'Prepared demo identities remain available for QA and review.',
-            'footerLegal' => '© '.date('Y').' KazUTB. All rights reserved.',
+            'footerLegal' => ' '.date('Y').' Kazakh University of Technology and Business named after K. Kulazhanov. All rights reserved.',
             'footerLinks' => [
                 ['label' => 'About the Library', 'href' => '/about'],
                 ['label' => 'Library Rules', 'href' => '/rules'],
@@ -1840,16 +1724,10 @@ Route::get('/login', function (Request $request) use ($postLoginDestination) {
         ],
     ];
 
-    return view('auth', [
-        'demoEnabled' => $demoEnabled,
-        'demoIdentities' => $demoIdentities,
+    return response()->view('auth', [
         'copy' => $copy,
         'lang' => $lang,
-        // RBAC quick-login cards — separate from the legacy $demoIdentities
-        // block above, which posts to the session-array login path.
-        'rbacDemoEnabled' => (bool) config('demo_users.enabled'),
-        'rbacDemoIdentities' => config('demo_users.identities', []),
-    ]);
+    ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
 })->name('login');
 
 // Consolidated pages: /services removed — redirect to prevent 404s.
@@ -1866,10 +1744,10 @@ Route::get('/services', fn () => redirect('/', 301));
 $eventsSeedProvider = static function (): array {
     $chrome = [
         'ru' => [
-            'title' => 'События — KazUTB',
+            'title' => 'События — Казахский университет технологии и бизнеса имени К. Кулажанова',
             'hero_eyebrow' => 'Публичная программа',
             'hero_title' => 'Календарь событий',
-            'hero_body' => 'Расписание симпозиумов, семинаров и книжных выставок KazUTB. Присоединяйтесь к академическому сообществу университета.',
+            'hero_body' => 'Расписание симпозиумов, семинаров и книжных выставок Казахский университет технологии и бизнеса имени К. Кулажанова. Присоединяйтесь к академическому сообществу университета.',
             'event_details_cta' => 'Подробнее о событии',
             'page_status' => 'Страница :page из :last · всего событий: :total',
             'previous_page' => 'Предыдущая страница',
@@ -1877,10 +1755,10 @@ $eventsSeedProvider = static function (): array {
             'load_more' => 'Показать больше событий',
         ],
         'kk' => [
-            'title' => 'Іс-шаралар — KazUTB',
+            'title' => 'Іс-шаралар — Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
             'hero_eyebrow' => 'Көпшілік бағдарламасы',
             'hero_title' => 'Іс-шаралар күнтізбесі',
-            'hero_body' => 'KazUTB ұйымдастыратын симпозиумдар, семинарлар мен кітап көрмелерінің кестесі. Университеттің академиялық қауымдастығына қосылыңыз.',
+            'hero_body' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті ұйымдастыратын симпозиумдар, семинарлар мен кітап көрмелерінің кестесі. Университеттің академиялық қауымдастығына қосылыңыз.',
             'event_details_cta' => 'Іс-шара туралы толығырақ',
             'page_status' => ':total іс-шара · :last беттің :page-беті',
             'previous_page' => 'Алдыңғы бет',
@@ -1888,10 +1766,10 @@ $eventsSeedProvider = static function (): array {
             'load_more' => 'Қосымша іс-шараларды көрсету',
         ],
         'en' => [
-            'title' => 'Events — KazUTB',
+            'title' => 'Events — Kazakh University of Technology and Business named after K. Kulazhanov',
             'hero_eyebrow' => 'Public Programme',
             'hero_title' => 'Public Events Index',
-            'hero_body' => 'A curated calendar of upcoming symposiums, seminars, and book exhibits hosted by the KazUTB. Join our academic community.',
+            'hero_body' => 'A curated calendar of upcoming symposiums, seminars, and book exhibits hosted by the Kazakh University of Technology and Business named after K. Kulazhanov. Join our academic community.',
             'event_details_cta' => 'Event details',
             'page_status' => 'Page :page of :last · :total events total',
             'previous_page' => 'Previous page',
@@ -2485,45 +2363,44 @@ $eventsSeedProvider = static function (): array {
     ];
 };
 
-$upcomingEventsOnly = static function (array $events): array {
-    $today = Carbon::today(config('app.timezone', 'UTC'))->toDateString();
-
-    $events['items'] = array_values(array_filter(
-        $events['items'] ?? [],
-        static fn (array $event): bool => ($event['iso_date'] ?? '') >= $today,
-    ));
-
-    usort(
-        $events['items'],
-        static fn (array $left, array $right): int => strcmp((string) ($left['iso_date'] ?? ''), (string) ($right['iso_date'] ?? '')),
-    );
-
-    return $events;
-};
-
-Route::get('/news', function (Request $request) use ($newsSeedProvider, $newsModelToPublicArticle) {
-    $seed = $newsSeedProvider();
-    $language = in_array(app()->getLocale(), ['ru', 'kk', 'en'], true) ? app()->getLocale() : 'ru';
+Route::get('/news', function (Request $request) use ($newsModelToPublicArticle) {
     $topic = (string) $request->query('topic', 'all');
-    $topic = in_array($topic, ['all', 'events', 'research'], true) ? $topic : 'all';
+    $topic = in_array($topic, ['all', 'research'], true) ? $topic : 'all';
     $page = max(1, (int) $request->query('page', 1));
+    $newsTypes = array_values(array_diff(News::TYPES, ['event', 'schedule']));
+    $requestedType = (string) $request->query('type', '');
+    $requestedType = in_array($requestedType, $newsTypes, true) ? $requestedType : null;
+    $search = mb_substr(trim((string) $request->query('q', '')), 0, 200);
+    $categoryFilter = preg_match('/^[a-z0-9-]{1,100}$/', (string) $request->query('category', '')) ? (string) $request->query('category') : null;
+    $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->query('from', '')) ? (string) $request->query('from') : null;
+    $to = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->query('to', '')) ? (string) $request->query('to') : null;
     $perPage = 5;
-    $seedArticles = array_map(
-        static fn (string $slug) => $seed['articles'][$slug],
-        $seed['ordered']
-    );
-
     $databaseArticles = collect();
-    $managedNewsExists = false;
+    $filterCategories = collect();
     try {
         if (Schema::hasTable('news')) {
             // Once the managed table exists it is authoritative, including
             // when it is intentionally empty.
-            $managedNewsExists = true;
+            if (Schema::hasTable('news_categories')) {
+                $filterCategories = NewsCategory::query()->where('active', true)->orderBy('sort_order')->get();
+            }
+            $visibilities = ['public'];
+            if ($request->user()) {
+                $visibilities[] = 'members';
+            }
+            if ($request->user()?->can('news.view_internal')) {
+                $visibilities[] = 'staff';
+            }
             $databaseArticles = News::query()
                 ->published()
-                ->where('language', $language)
-                ->latest('publish_at')
+                ->when(Schema::hasColumn('news', 'visibility'), fn ($query) => $query->whereIn('visibility', $visibilities))
+                ->when(Schema::hasColumn('news', 'type'), fn ($query) => $query->whereNotIn('type', ['event', 'schedule']))
+                ->when($requestedType, fn ($query) => $query->where('type', $requestedType))
+                ->when($categoryFilter, fn ($query) => $query->whereHas('newsCategory', fn ($category) => $category->where('slug', $categoryFilter)))
+                ->when($search !== '', fn ($query) => $query->search($search))
+                ->when($from, fn ($query) => $query->whereDate(DB::raw('COALESCE(starts_at, published_at)'), '>=', $from))
+                ->when($to, fn ($query) => $query->whereDate(DB::raw('COALESCE(starts_at, published_at)'), '<=', $to))
+                ->latest(Schema::hasColumn('news', 'published_at') ? 'published_at' : 'publish_at')
                 ->get()
                 ->map($newsModelToPublicArticle);
         }
@@ -2532,12 +2409,9 @@ Route::get('/news', function (Request $request) use ($newsSeedProvider, $newsMod
         abort(503, 'News is temporarily unavailable.');
     }
 
-    $articles = $managedNewsExists
-        ? collect(array_merge($seedArticles, $databaseArticles->values()->all()))
-            ->unique('slug')
-            ->values()
-            ->all()
-        : $seedArticles;
+    // A missing or intentionally empty content store is an empty public news
+    // list. Demo fixtures must never become production publications.
+    $articles = $databaseArticles->values()->all();
     if ($topic !== 'all') {
         $articles = array_values(array_filter(
             $articles,
@@ -2558,27 +2432,59 @@ Route::get('/news', function (Request $request) use ($newsSeedProvider, $newsMod
         'newsArticles' => $articles,
         'currentPage' => $page,
         'lastPage' => $lastPage,
+        'newsTotal' => $total,
         'showCanonicalHero' => $page === 1,
+        'filterCategories' => $filterCategories,
+        'newsTypes' => $newsTypes,
     ]);
 });
 
-Route::get('/news/{slug}', function (Request $request, string $slug) use ($newsSeedProvider, $newsModelToPublicArticle) {
-    $seed = $newsSeedProvider();
-    $seedArticle = $seed['articles'][$slug] ?? null;
+Route::get('/news/{slug}', function (Request $request, string $slug) use ($newsModelToPublicArticle) {
     $databaseArticle = null;
     $databaseRecord = null;
-    $managedNewsExists = false;
+    $visibilities = ['public'];
+    if ($request->user()) {
+        $visibilities[] = 'members';
+    }
+    if ($request->user()?->can('news.view_internal')) {
+        $visibilities[] = 'staff';
+    }
+
     try {
         if (Schema::hasTable('news')) {
             // The database becomes the sole source as soon as the migration
             // exists; deleted or unknown articles must not fall back to seeds.
-            $managedNewsExists = true;
-            $databaseRecord = News::query()->published()->where('slug', $slug)->first();
-            if ($databaseRecord !== null && $databaseRecord->language !== app()->getLocale()) {
-                return redirect()->route('news.show', [
-                    'slug' => $slug,
-                    'lang' => $databaseRecord->language,
-                ]);
+            $locale = in_array(app()->getLocale(), ['kk', 'ru', 'en'], true) ? app()->getLocale() : 'kk';
+            $databaseRecord = News::query()->published()->when(Schema::hasColumn('news', 'visibility'), fn ($query) => $query->whereIn('visibility', $visibilities))->where(function ($query) use ($slug): void {
+                $query->where('slug', $slug);
+                if (Schema::hasColumn('news', 'slug_kk')) {
+                    $query->orWhere('slug_kk', $slug)->orWhere('slug_ru', $slug)->orWhere('slug_en', $slug);
+                }
+            })->first();
+            if (! $databaseRecord && Schema::hasTable('news_slug_redirects')) {
+                $redirect = NewsSlugRedirect::query()->with('news')->where('locale', $locale)->where('old_slug', $slug)->first();
+                $redirectRecord = $redirect?->news;
+                $redirectIsVisible = $redirectRecord
+                    && News::query()->published()->whereKey($redirectRecord->getKey())
+                        ->when(Schema::hasColumn('news', 'visibility'), fn ($query) => $query->whereIn('visibility', $visibilities))
+                        ->exists();
+                if ($redirectIsVisible) {
+                    $section = in_array((string) $redirectRecord->type, ['event', 'schedule'], true) ? 'events' : 'news';
+                    $target = '/'.$section.'/'.rawurlencode($redirectRecord->localizedSlug($locale));
+                    if ($locale !== 'kk') {
+                        $target .= '?'.http_build_query(['lang' => $locale]);
+                    }
+
+                    return redirect($target, 301);
+                }
+            }
+            if ($databaseRecord && in_array((string) $databaseRecord->type, ['event', 'schedule'], true)) {
+                $target = '/events/'.rawurlencode($databaseRecord->localizedSlug($locale));
+                if ($locale !== 'kk') {
+                    $target .= '?'.http_build_query(['lang' => $locale]);
+                }
+
+                return redirect($target, 301);
             }
             $databaseArticle = $databaseRecord ? $newsModelToPublicArticle($databaseRecord) : null;
         }
@@ -2586,25 +2492,20 @@ Route::get('/news/{slug}', function (Request $request, string $slug) use ($newsS
         report($exception);
         abort(503, 'News is temporarily unavailable.');
     }
-    abort_unless($databaseArticle !== null || $seedArticle !== null, 404);
+    abort_unless($databaseArticle !== null && $databaseRecord !== null, 404);
 
-    $article = $databaseArticle ?? $seedArticle;
-    if ($managedNewsExists && $databaseRecord !== null) {
-        $related = News::query()
-            ->published()
-            ->where('language', $databaseRecord->language)
-            ->whereKeyNot($databaseRecord->getKey())
-            ->latest('publish_at')
-            ->limit(3)
-            ->get()
-            ->map($newsModelToPublicArticle)
-            ->all();
-    } else {
-        $related = array_values(array_filter(
-            array_map(static fn (string $relatedSlug) => $seed['articles'][$relatedSlug], $seed['ordered']),
-            static fn (array $candidate) => $candidate['slug'] !== $slug,
-        ));
-    }
+    $article = $databaseArticle;
+    app(NewsAnalyticsService::class)->recordView($databaseRecord, $request);
+    $related = News::query()
+        ->published()
+        ->whereKeyNot($databaseRecord->getKey())
+        ->when(Schema::hasColumn('news', 'visibility'), fn ($query) => $query->whereIn('visibility', $visibilities))
+        ->when(Schema::hasColumn('news', 'type'), fn ($query) => $query->whereNotIn('type', ['event', 'schedule']))
+        ->latest(Schema::hasColumn('news', 'published_at') ? 'published_at' : 'publish_at')
+        ->limit(3)
+        ->get()
+        ->map($newsModelToPublicArticle)
+        ->all();
 
     return view('news.show', [
         'activePage' => 'news',
@@ -2613,20 +2514,35 @@ Route::get('/news/{slug}', function (Request $request, string $slug) use ($newsS
     ]);
 })->where('slug', '[a-z0-9-]+')->name('news.show');
 
-// Phase 3 Cluster B.6 — seeded public contacts content for /contacts.
-//
-// Scoped strictly to this page; structure mirrors $rulesSeedProvider and
-// $leadershipSeedProvider so a future backend phase can replace the
-// closure with a DB-backed source.
-//
-// NOTE: the fund-guidance section was removed from the page on request, so
-// `wayfinding_title`, `wayfinding_body`, `map_label`, `map_caption`,
-// `room_prefix` and `fund_rooms` are no longer rendered anywhere. The data is
-// kept rather than deleted because an earlier phase recorded the three v1 rooms
-// (1/200, 1/202, 1/203) as public wayfinding truth that must remain stable —
-// restoring the section should not mean re-authoring trilingual copy. Delete
-// these keys once that requirement is formally retired.
-$contactsSeedProvider = static function (): array {
+Route::post('/news/{news}/registration-click', function (Request $request, News $news) use ($publicHttpUrl) {
+    $visibilities = ['public'];
+    if ($request->user()) {
+        $visibilities[] = 'members';
+    }
+    if ($request->user()?->can('news.view_internal')) {
+        $visibilities[] = 'staff';
+    }
+
+    $isPublished = News::query()->published()->whereKey($news->getKey())->exists();
+    $isVisible = ! Schema::hasColumn('news', 'visibility')
+        || in_array((string) ($news->visibility ?: 'public'), $visibilities, true);
+    $registrationUrl = $publicHttpUrl($news->registration_url);
+
+    abort_unless(
+        $isPublished
+        && $isVisible
+        && in_array((string) $news->type, ['event', 'schedule'], true)
+        && $registrationUrl !== null,
+        404,
+    );
+    app(NewsAnalyticsService::class)->recordRegistrationClick($news);
+
+    return redirect()->away($registrationUrl);
+})->middleware('throttle:30,1')->name('news.registration-click');
+
+// Editorial contact copy backed by the university's official public pages.
+// Values that the primary source does not confirm are deliberately omitted.
+$contactsProvider = static function (): array {
     /*
      * Reading-room staff shown on /contacts.
      *
@@ -2653,28 +2569,6 @@ $contactsSeedProvider = static function (): array {
                 'en' => 'Library Director',
             ],
         ],
-        [
-            'slug' => 'korpeshova-elmira',
-            'name' => 'Корпешова Эльмира Мауткановна',
-            'initials' => 'КЭ',
-            'photo' => 'images/staff/korpeshova-elmira.jpg',
-            'role' => [
-                'ru' => 'Ведущий библиотекарь',
-                'kk' => 'Жетекші кітапханашы',
-                'en' => 'Lead Librarian',
-            ],
-        ],
-        [
-            'slug' => 'sailaubek-aiman',
-            'name' => 'Сайлаубек Айман Бастарбекқызы',
-            'initials' => 'СА',
-            'photo' => 'images/staff/sailaubek-aiman.jpg',
-            'role' => [
-                'ru' => 'Библиотекарь зала технологического факультета',
-                'kk' => 'Технологиялық факультет залының кітапханашысы',
-                'en' => 'Librarian, Technology Faculty Reading Room',
-            ],
-        ],
     ];
 
     $staffFor = static function (string $lang) use ($staffMembers): array {
@@ -2687,302 +2581,165 @@ $contactsSeedProvider = static function (): array {
         ], $staffMembers);
     };
 
-    $departmentOptions = [
-        'ru' => [
-            'faculty' => 'Преподавателям / исследователям',
-            'student' => 'Студентам / магистрантам',
-            'college' => 'Колледж',
-            'other' => 'Другое / гость',
-        ],
-        'kk' => [
-            'faculty' => 'Оқытушылар / зерттеушілер',
-            'student' => 'Студенттер / магистранттар',
-            'college' => 'Колледж',
-            'other' => 'Басқа / қонақ',
-        ],
-        'en' => [
-            'faculty' => 'Faculty / researchers',
-            'student' => 'Students / master\'s candidates',
-            'college' => 'College',
-            'other' => 'Other / guest',
-        ],
-    ];
-
     $supportChannels = [
         'ru' => [
             [
-                'slug' => 'research',
+                'slug' => 'library',
                 'icon' => 'local_library',
-                'title' => 'Библиотекарь-консультант',
-                'body' => 'Помощь в поиске литературы, работе с подпиской и базами данных, оформлении списков источников и цитирований.',
-                'email' => 'library@kazutb.edu.kz',
-                'phone' => '+7 (7172) 64-58-58',
+                'title' => 'Научная библиотека',
+                'body' => 'Вопросы о фонде, поиске изданий, выдаче и опубликованных электронных ресурсах.',
+                'email' => 'zh.pankey@kaztbu.edu.kz',
+                'phone' => null,
             ],
             [
-                'slug' => 'technical',
-                'icon' => 'computer',
-                'title' => 'Техническая поддержка',
-                'body' => 'Вход через корпоративный аккаунт, доступ к цифровой библиотеке, ошибки в каталоге и кабинете читателя.',
-                'email' => 'support@kazutb.edu.kz',
-                'phone' => '+7 (7172) 64-58-58',
+                'slug' => 'general',
+                'icon' => 'contact_support',
+                'title' => 'Общий контакт университета',
+                'body' => 'Для вопроса о фонде, электронном ресурсе или доступе укажите тему обращения, название материала и, при наличии, текст ошибки.',
+                'email' => 'info@kaztbu.edu.kz',
+                'phone' => '+7 (7172) 69-70-60',
             ],
         ],
         'kk' => [
             [
-                'slug' => 'research',
+                'slug' => 'library',
                 'icon' => 'local_library',
-                'title' => 'Кітапханашы-кеңесші',
-                'body' => 'Әдебиет іздеу, жазылымдар мен дерекқорлармен жұмыс, дереккөздер тізімі мен сілтемелерді ресімдеуге көмек.',
-                'email' => 'library@kazutb.edu.kz',
-                'phone' => '+7 (7172) 64-58-58',
+                'title' => 'Ғылыми кітапхана',
+                'body' => 'Қор, басылымдарды іздеу, беру және жарияланған электрондық ресурстар туралы сұрақтар.',
+                'email' => 'zh.pankey@kaztbu.edu.kz',
+                'phone' => null,
             ],
             [
-                'slug' => 'technical',
-                'icon' => 'computer',
-                'title' => 'Техникалық қолдау',
-                'body' => 'Корпоративтік аккаунт арқылы кіру, цифрлық кітапханаға қолжетімділік, каталог пен оқырман кабинетіндегі қателер.',
-                'email' => 'support@kazutb.edu.kz',
-                'phone' => '+7 (7172) 64-58-58',
+                'slug' => 'general',
+                'icon' => 'contact_support',
+                'title' => 'Университеттің жалпы байланыс арнасы',
+                'body' => 'Қор, электрондық ресурс немесе қолжетімділік туралы сұрақта өтініш тақырыбын, материал атауын және бар болса қате мәтінін көрсетіңіз.',
+                'email' => 'info@kaztbu.edu.kz',
+                'phone' => '+7 (7172) 69-70-60',
             ],
         ],
         'en' => [
             [
-                'slug' => 'research',
+                'slug' => 'library',
                 'icon' => 'local_library',
-                'title' => 'Librarian consultation',
-                'body' => 'Help with finding literature, working with subscriptions and databases, preparing reference lists and citations.',
-                'email' => 'library@kazutb.edu.kz',
-                'phone' => '+7 (7172) 64-58-58',
+                'title' => 'Scientific Library',
+                'body' => 'Questions about the collection, finding and borrowing editions, and published electronic resources.',
+                'email' => 'zh.pankey@kaztbu.edu.kz',
+                'phone' => null,
             ],
             [
-                'slug' => 'technical',
-                'icon' => 'computer',
-                'title' => 'Technical support',
-                'body' => 'Institutional sign-in, access to the digital library, and issues in the catalog or reader workspace.',
-                'email' => 'support@kazutb.edu.kz',
-                'phone' => '+7 (7172) 64-58-58',
+                'slug' => 'general',
+                'icon' => 'contact_support',
+                'title' => 'General university contact',
+                'body' => 'For a collection, electronic-resource, or access question, include the subject, material title, and any error message.',
+                'email' => 'info@kaztbu.edu.kz',
+                'phone' => '+7 (7172) 69-70-60',
             ],
         ],
     ];
 
-    $fundRooms = [
-        'ru' => [
-            [
-                'room' => '1/200',
-                'floor' => 'Корпус 1 · 2 этаж',
-                'fund_label' => 'Технологический фонд',
-                'short_description' => 'Учебная и научная литература по инженерным, ИТ и прикладным направлениям.',
-                'access_note' => 'Открытый доступ для читателей университета.',
-            ],
-            [
-                'room' => '1/202',
-                'floor' => 'Корпус 1 · 2 этаж',
-                'fund_label' => 'Фонд колледжа',
-                'short_description' => 'Учебные материалы и методические пособия для программ колледжа КазУТБ.',
-                'access_note' => 'Приоритетный доступ для студентов колледжа.',
-            ],
-            [
-                'room' => '1/203',
-                'floor' => 'Корпус 1 · 2 этаж',
-                'fund_label' => 'Экономический фонд',
-                'short_description' => 'Литература по экономике, менеджменту, финансам и праву.',
-                'access_note' => 'Открытый доступ для читателей университета.',
-            ],
-        ],
-        'kk' => [
-            [
-                'room' => '1/200',
-                'floor' => '1-корпус · 2-қабат',
-                'fund_label' => 'Технологиялық қор',
-                'short_description' => 'Инженерлік, IT және қолданбалы бағыттар бойынша оқу және ғылыми әдебиет.',
-                'access_note' => 'Университет оқырмандары үшін ашық қолжетімділік.',
-            ],
-            [
-                'room' => '1/202',
-                'floor' => '1-корпус · 2-қабат',
-                'fund_label' => 'Колледж қоры',
-                'short_description' => 'ҚазУТБ колледжі бағдарламалары үшін оқу материалдары мен әдістемелік құралдар.',
-                'access_note' => 'Колледж студенттеріне басым қолжетімділік.',
-            ],
-            [
-                'room' => '1/203',
-                'floor' => '1-корпус · 2-қабат',
-                'fund_label' => 'Экономикалық қор',
-                'short_description' => 'Экономика, менеджмент, қаржы және құқық бойынша әдебиет.',
-                'access_note' => 'Университет оқырмандары үшін ашық қолжетімділік.',
-            ],
-        ],
-        'en' => [
-            [
-                'room' => '1/200',
-                'floor' => 'Building 1 · Level 2',
-                'fund_label' => 'Technology fund',
-                'short_description' => 'Teaching and research materials for engineering, IT, and applied programmes.',
-                'access_note' => 'Open access for university readers.',
-            ],
-            [
-                'room' => '1/202',
-                'floor' => 'Building 1 · Level 2',
-                'fund_label' => 'College fund',
-                'short_description' => 'Teaching materials and methodological guides for KazUTB college programmes.',
-                'access_note' => 'Priority access for college students.',
-            ],
-            [
-                'room' => '1/203',
-                'floor' => 'Building 1 · Level 2',
-                'fund_label' => 'Economics fund',
-                'short_description' => 'Literature for economics, management, finance, and law programmes.',
-                'access_note' => 'Open access for university readers.',
-            ],
-        ],
-    ];
-
+    // The official library page confirms the 08:30–17:30 interval but is
+    // internally inconsistent about Saturday. Keep the confirmed interval,
+    // link to the primary source, and ask visitors to verify the day before
+    // travelling rather than publishing a guessed weekly schedule.
     $hoursRows = [
         'ru' => [
-            ['days' => 'Пн – Пт', 'hours' => '09:00 – 18:00'],
-            ['days' => 'Сб', 'hours' => '10:00 – 15:00'],
-            ['days' => 'Вс', 'hours' => 'Закрыто'],
+            ['days' => 'Подтверждённый интервал', 'hours' => '08:30 – 17:30'],
+            ['days' => 'Перед визитом', 'hours' => 'Уточните рабочие дни на официальной странице'],
         ],
         'kk' => [
-            ['days' => 'Дс – Жм', 'hours' => '09:00 – 18:00'],
-            ['days' => 'Сб', 'hours' => '10:00 – 15:00'],
-            ['days' => 'Жс', 'hours' => 'Жабық'],
+            ['days' => 'Расталған уақыт аралығы', 'hours' => '08:30 – 17:30'],
+            ['days' => 'Келмес бұрын', 'hours' => 'Жұмыс күндерін ресми беттен нақтылаңыз'],
         ],
         'en' => [
-            ['days' => 'Mon – Fri', 'hours' => '09:00 – 18:00'],
-            ['days' => 'Sat', 'hours' => '10:00 – 15:00'],
-            ['days' => 'Sun', 'hours' => 'Closed'],
+            ['days' => 'Confirmed time window', 'hours' => '08:30 – 17:30'],
+            ['days' => 'Before visiting', 'hours' => 'Confirm working days on the official page'],
         ],
     ];
 
     return [
         'ru' => [
             'hero_eyebrow' => 'Связаться с библиотекой',
-            'hero_title_a' => 'Прямые обращения',
-            'hero_title_b' => 'и академическая поддержка.',
-            'hero_body' => 'Свяжитесь с командой KazUTB — консультации по фонду, помощь с цифровой подпиской, техническая поддержка доступа и административные вопросы.',
-            'support_heading' => 'Каналы поддержки',
+            'hero_title_a' => 'Официальные контакты',
+            'hero_title_b' => 'университета.',
+            'hero_body' => 'Используйте подтверждённые контактные данные. В обращении укажите тему, название материала или ресурса и, при наличии, текст ошибки.',
+            'support_heading' => 'Контактные каналы',
             'support_channels' => $supportChannels['ru'],
-            'form_title' => 'Отправить запрос',
-            'form_note' => 'Заполните форму — она откроет письмо в почтовом клиенте с темой запроса. Мы отвечаем в рабочие часы библиотеки.',
-            'form_label_name' => 'Имя и фамилия',
-            'form_placeholder_name' => 'например, Айгерим Омарова',
-            'form_label_email' => 'Академическая почта',
-            'form_placeholder_email' => 'username@kazutb.edu.kz',
-            'form_label_department' => 'Факультет / категория',
-            'form_placeholder_department' => 'Выберите вариант',
-            'form_departments' => $departmentOptions['ru'],
-            'form_label_message' => 'Сообщение',
-            'form_placeholder_message' => 'Опишите ваш запрос как можно подробнее…',
-            'form_submit' => 'Отправить запрос',
             'location_title' => 'Физический адрес',
             'location_address_line_a' => 'Астана, ул. Кайыма Мухамедханова, 37A',
-            'location_address_line_b' => 'Главный корпус КазУТБ · Читательские залы — 2 этаж, корпус 1',
-            'location_phone' => '+7 (7172) 64-58-58',
-            'location_email' => 'library@kazutb.edu.kz',
+            'location_address_line_b' => 'Главный учебный корпус Казахского университета технологии и бизнеса имени К. Кулажанова.',
+            'location_phone' => '+7 (7172) 69-70-60',
+            'location_email' => 'info@kaztbu.edu.kz',
             'location_directions_cta' => 'Открыть в Google Maps',
             'hours_label' => 'Режим работы',
             'hours_rows' => $hoursRows['ru'],
-            'wayfinding_title' => 'Фонды и навигация по залам',
-            'wayfinding_body' => 'В главном корпусе университета работают три читательских фонда, каждый поддерживает свою академическую программу. Ниже — коды залов, их тематическое назначение и условия доступа.',
-            'map_label' => 'Главный корпус КазУТБ, Астана',
-            'map_caption' => 'Статический ориентир: читательские залы и фонды расположены на 2 этаже корпуса 1.',
-            'room_prefix' => 'Зал',
-            'fund_rooms' => $fundRooms['ru'],
+            'hours_source_label' => 'Официальная страница научной библиотеки',
+            'hours_source_url' => 'https://www.kaztbu.edu.kz/biblioteka',
+            'fund_rooms' => [],
             'visit_title' => 'Перед визитом',
-            'visit_body' => 'Перед первым посещением рекомендуем ознакомиться с правилами работы библиотеки и узнать, к кому обращаться по профильным вопросам.',
+            'visit_body' => 'Перед посещением ознакомьтесь с общими условиями пользования и уточните рабочий день по официальному источнику.',
             'visit_link_rules_title' => 'Правила библиотеки',
-            'visit_link_rules_body' => 'Условия записи, выдачи, пользования фондом и доступа к цифровым ресурсам.',
+            'visit_link_rules_body' => 'Общие ориентиры по выдаче, работе с фондом и электронному доступу.',
             'visit_link_leadership_title' => 'Руководство библиотеки',
-            'visit_link_leadership_body' => 'Роли и зоны ответственности — для профильных запросов и эскалации.',
+            'visit_link_leadership_body' => 'Подтверждённые сведения о руководителе библиотеки.',
             'staff_heading' => 'Сотрудники библиотеки',
-            'staff_note' => 'Обратитесь к сотруднику зала за помощью в поиске издания, работе с каталогом и оформлением выдачи. Роли и зоны ответственности руководства — на странице «Руководство библиотеки».',
+            'staff_note' => 'Обратитесь к сотруднику зала за помощью в поиске издания, работе с каталогом и оформлении выдачи.',
             'staff' => $staffFor('ru'),
         ],
         'kk' => [
             'hero_eyebrow' => 'Кітапханамен байланысу',
-            'hero_title_a' => 'Тікелей сұраулар',
-            'hero_title_b' => 'және академиялық қолдау.',
-            'hero_body' => 'KazUTB командасына хабарласыңыз — қор бойынша кеңестер, цифрлық жазылыммен көмек, қолжетімділіктің техникалық қолдауы және әкімшілік сұрақтар.',
-            'support_heading' => 'Қолдау арналары',
+            'hero_title_a' => 'Университеттің',
+            'hero_title_b' => 'ресми байланыс арналары.',
+            'hero_body' => 'Расталған байланыс деректерін пайдаланыңыз. Өтініште тақырыпты, материалдың немесе ресурстың атауын және бар болса қате мәтінін көрсетіңіз.',
+            'support_heading' => 'Байланыс арналары',
             'support_channels' => $supportChannels['kk'],
-            'form_title' => 'Сұрау жіберу',
-            'form_note' => 'Форманы толтырыңыз — ол пошта клиентінде тақырыбы көрсетілген хатты ашады. Біз кітапхананың жұмыс сағаттарында жауап береміз.',
-            'form_label_name' => 'Аты-жөні',
-            'form_placeholder_name' => 'мысалы, Айгерім Омарова',
-            'form_label_email' => 'Академиялық пошта',
-            'form_placeholder_email' => 'username@kazutb.edu.kz',
-            'form_label_department' => 'Факультет / санат',
-            'form_placeholder_department' => 'Нұсқаны таңдаңыз',
-            'form_departments' => $departmentOptions['kk'],
-            'form_label_message' => 'Хабарлама',
-            'form_placeholder_message' => 'Сұрауыңызды мүмкіндігінше толық сипаттаңыз…',
-            'form_submit' => 'Сұрау жіберу',
             'location_title' => 'Физикалық мекенжай',
             'location_address_line_a' => 'Астана, Қайым Мұхамедханов көшесі, 37A',
-            'location_address_line_b' => 'ҚазУТБ басты корпусы · Оқу залдары — 2-қабат, 1-корпус',
-            'location_phone' => '+7 (7172) 64-58-58',
-            'location_email' => 'library@kazutb.edu.kz',
+            'location_address_line_b' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университетінің бас оқу корпусы.',
+            'location_phone' => '+7 (7172) 69-70-60',
+            'location_email' => 'info@kaztbu.edu.kz',
             'location_directions_cta' => 'Google Maps-те ашу',
             'hours_label' => 'Жұмыс режимі',
             'hours_rows' => $hoursRows['kk'],
-            'wayfinding_title' => 'Қорлар және залдар бойынша навигация',
-            'wayfinding_body' => 'Университеттің басты корпусында үш оқу қоры жұмыс істейді, әрқайсысы өз академиялық бағдарламасын қолдайды. Төменде — залдардың кодтары, тақырыптық бағыты және қолжетімділік шарттары.',
-            'map_label' => 'ҚазУТБ басты корпусы, Астана',
-            'map_caption' => 'Статикалық ориентир: оқу залдары мен қорлар 1-корпустың 2-қабатында орналасқан.',
-            'room_prefix' => 'Зал',
-            'fund_rooms' => $fundRooms['kk'],
+            'hours_source_label' => 'Ғылыми кітапхананың ресми беті',
+            'hours_source_url' => 'https://www.kaztbu.edu.kz/biblioteka',
+            'fund_rooms' => [],
             'visit_title' => 'Келмес бұрын',
-            'visit_body' => 'Алғашқы келер алдында кітапхана жұмысының ережелерімен танысып, бағытты сұрақтар бойынша кімге жүгіну керегін білген жөн.',
+            'visit_body' => 'Келмес бұрын жалпы пайдалану шарттарымен танысып, жұмыс күнін ресми дереккөзден нақтылаңыз.',
             'visit_link_rules_title' => 'Кітапхана ережелері',
-            'visit_link_rules_body' => 'Тіркелу, беру, қорды пайдалану және цифрлық ресурстарға қолжетімділік шарттары.',
+            'visit_link_rules_body' => 'Беру, қорды пайдалану және электрондық қолжетімділік жөніндегі жалпы нұсқаулар.',
             'visit_link_leadership_title' => 'Кітапхана басшылығы',
-            'visit_link_leadership_body' => 'Рөлдер мен жауапкершілік аймақтары — бағытты сұраулар мен эскалация үшін.',
+            'visit_link_leadership_body' => 'Кітапхана басшысы туралы расталған мәліметтер.',
             'staff_heading' => 'Кітапхана қызметкерлері',
-            'staff_note' => 'Басылымды іздеу, каталогпен жұмыс және беруді рәсімдеу бойынша көмек алу үшін зал қызметкеріне хабарласыңыз. Басшылықтың рөлдері мен жауапкершілік аймақтары «Кітапхана басшылығы» бетінде.',
+            'staff_note' => 'Басылымды іздеу, каталогпен жұмыс және беруді рәсімдеу бойынша көмек алу үшін зал қызметкеріне хабарласыңыз.',
             'staff' => $staffFor('kk'),
         ],
         'en' => [
             'hero_eyebrow' => 'Contact the library',
-            'hero_title_a' => 'Direct Inquiries',
-            'hero_title_b' => '& Academic Support.',
-            'hero_body' => 'Connect with the KazUTB team — collection consultations, digital subscription help, access troubleshooting, and administrative inquiries.',
-            'support_heading' => 'Support Channels',
+            'hero_title_a' => 'Official University',
+            'hero_title_b' => 'Contact Details.',
+            'hero_body' => 'Use the confirmed contact details. Include the subject, material or resource title, and any error message in your inquiry.',
+            'support_heading' => 'Contact channels',
             'support_channels' => $supportChannels['en'],
-            'form_title' => 'Submit an Inquiry',
-            'form_note' => 'Fill in the form — it opens a pre-filled email in your mail client. We respond during library working hours.',
-            'form_label_name' => 'Full name',
-            'form_placeholder_name' => 'e.g. Aigerim Omarova',
-            'form_label_email' => 'Academic email',
-            'form_placeholder_email' => 'username@kazutb.edu.kz',
-            'form_label_department' => 'Department / category',
-            'form_placeholder_department' => 'Select an option',
-            'form_departments' => $departmentOptions['en'],
-            'form_label_message' => 'Message',
-            'form_placeholder_message' => 'Please describe your inquiry in as much detail as possible…',
-            'form_submit' => 'Send inquiry',
             'location_title' => 'Physical Location',
             'location_address_line_a' => '37A Kayym Mukhamedkhanov Street, Astana',
-            'location_address_line_b' => 'KazUTB main building · Reading rooms — 2nd floor, Building 1',
-            'location_phone' => '+7 (7172) 64-58-58',
-            'location_email' => 'library@kazutb.edu.kz',
+            'location_address_line_b' => 'Main academic building of the Kazakh University of Technology and Business named after K. Kulazhanov.',
+            'location_phone' => '+7 (7172) 69-70-60',
+            'location_email' => 'info@kaztbu.edu.kz',
             'location_directions_cta' => 'Open in Google Maps',
             'hours_label' => 'Opening hours',
             'hours_rows' => $hoursRows['en'],
-            'wayfinding_title' => 'Fund Guidance & Wayfinding',
-            'wayfinding_body' => 'Three reading funds operate on the 2nd floor of the main building, each supporting a specific academic programme. Codes, thematic coverage, and access notes are listed below.',
-            'map_label' => 'KazUTB main building, Astana',
-            'map_caption' => 'Static reference: reading rooms and funds are on the 2nd floor of Building 1.',
-            'room_prefix' => 'Room',
-            'fund_rooms' => $fundRooms['en'],
+            'hours_source_label' => 'Official Scientific Library page',
+            'hours_source_url' => 'https://www.kaztbu.edu.kz/biblioteka',
+            'fund_rooms' => [],
             'visit_title' => 'Before you visit',
-            'visit_body' => 'Before a first visit we recommend reviewing the library usage rules and checking who to contact for specialised questions.',
+            'visit_body' => 'Before visiting, review the general usage guidance and confirm the working day through the official source.',
             'visit_link_rules_title' => 'Library usage rules',
-            'visit_link_rules_body' => 'Registration, loans, use of the collection, and access to digital resources.',
+            'visit_link_rules_body' => 'General guidance on loans, collection use, and digital access.',
             'visit_link_leadership_title' => 'Library leadership',
-            'visit_link_leadership_body' => 'Roles and areas of responsibility — for specialised inquiries and escalation.',
+            'visit_link_leadership_body' => 'Confirmed information about the library director.',
             'staff_heading' => 'Library staff',
-            'staff_note' => 'Ask the reading-room librarian for help finding an edition, working with the catalog, and arranging a loan. Leadership roles and areas of responsibility are listed on the Library leadership page.',
+            'staff_note' => 'Ask a library staff member for help finding an edition, working with the catalogue, and arranging a loan.',
             'staff' => $staffFor('en'),
         ],
     ];
@@ -2992,27 +2749,59 @@ Route::get('/about', function () {
     return view('about', ['activePage' => 'about']);
 });
 
-// Phase 3 Cluster B.6 — canonical-exact /contacts page.
-// Replaces the previous shared-view activePage='contacts' branch on
-// resources/views/about.blade.php with a standalone canonical page that
-// mirrors docs/design-exports/contacts_canonical. The fund-guidance block
-// (v1 rooms 1/200, 1/202, 1/203 + map placeholder) was removed on request;
-// see the note on $contactsSeedProvider for why its copy is retained.
-Route::get('/contacts', function () use ($contactsSeedProvider) {
+Route::get('/contacts', function () use ($contactsProvider) {
     return view('contacts', [
         'activePage' => 'contacts',
-        'contacts' => $contactsSeedProvider(),
+        'contacts' => $contactsProvider(),
     ]);
 });
 
 // Phase 3 Cluster C.1 — standalone public events index surface.
-// Mirrors docs/design-exports/events_index_canonical — header + vertical
-// event card list (1/4 date rail + 3/4 content with venue + details link)
-// + Load More. Content is driven by $eventsSeedProvider (trilingual).
-Route::get('/events', function () use ($eventsSeedProvider, $upcomingEventsOnly) {
+// Layout copy remains trilingual, while every public event card comes only
+// from the managed publication store.
+Route::get('/events', function (Request $request) use ($eventsSeedProvider, $publicHttpUrl) {
+    $events = $eventsSeedProvider();
+    $events['items'] = [];
+
+    try {
+        if (Schema::hasTable('news') && Schema::hasColumn('news', 'type')) {
+            $locale = in_array(app()->getLocale(), ['kk', 'ru', 'en'], true) ? app()->getLocale() : 'kk';
+            $query = mb_substr(trim((string) $request->query('q', '')), 0, 120);
+            $category = preg_replace('/[^a-z0-9_-]/', '', mb_strtolower((string) $request->query('category', '')));
+            $now = now('UTC');
+
+            $events['items'] = News::query()
+                ->published()
+                ->when(Schema::hasColumn('news', 'visibility'), fn ($builder) => $builder->where('visibility', 'public'))
+                ->whereIn('type', ['event', 'schedule'])
+                ->where(function ($builder) use ($now): void {
+                    $builder
+                        ->where('ends_at', '>=', $now)
+                        ->orWhere(function ($withoutEnd) use ($now): void {
+                            $withoutEnd->whereNull('ends_at')->where('starts_at', '>=', $now);
+                        });
+                })
+                ->when($category !== '', fn ($builder) => $builder->whereHas('newsCategory', fn ($categoryQuery) => $categoryQuery->where('slug', $category)))
+                ->when($query !== '', fn ($builder) => $builder->search($query))
+                ->orderBy('starts_at')
+                ->get()
+                ->map(function (News $item) use ($locale, $publicHttpUrl): array {
+                    $start = $item->starts_at ?? $item->published_at ?? now('UTC');
+                    $venue = trim((string) $item->localized('venue', $locale));
+                    $onlineUrl = $publicHttpUrl($item->online_url);
+
+                    return ['slug' => $item->localizedSlug($locale), 'iso_date' => $start->toDateString(), 'featured' => (bool) $item->is_featured, 'category_slug' => $item->newsCategory?->slug ?? $item->type, 'i18n' => [$locale => ['category' => __('news.types.'.$item->type), 'date_month_day' => $start->translatedFormat('d F'), 'date_year_time' => $start->translatedFormat('Y · H:i'), 'title' => $item->localized('title', $locale), 'description' => $item->localized('excerpt', $locale), 'venue' => $venue !== '' ? $venue : ($onlineUrl !== null ? __('news.public.online') : null)]]];
+                })
+                ->all();
+        }
+    } catch (Throwable $exception) {
+        report($exception);
+        abort(503, 'Events are temporarily unavailable.');
+    }
+
     return view('events.index', [
         'activePage' => 'events',
-        'events' => $upcomingEventsOnly($eventsSeedProvider()),
+        'events' => $events,
     ]);
 });
 
@@ -3095,10 +2884,10 @@ $eventDetailProvider = static function (): array {
                     'about' => [
                         'Симпозиум объединяет научные библиотеки и исследовательские центры вокруг практических подходов к цифровому сохранению. Сессия посвящена тому, как академическая библиотека обеспечивает целостность и доступность цифровых научных материалов в долгосрочной перспективе.',
                         'Участники рассмотрят методологии миграции форматов, политики долгосрочного хранения, работу с метаданными и этические аспекты сохранения рожденного-цифровым контента — от институциональных репозиториев до массивов научных данных.',
-                        'Также будут представлены текущие инициативы KazUTB по выстраиванию надежного цифрового хранилища, чтобы изменчивость цифровых носителей не приводила к потере научного наследия университета.',
+                        'Также будут представлены текущие инициативы Казахский университет технологии и бизнеса имени К. Кулажанова по выстраиванию надежного цифрового хранилища, чтобы изменчивость цифровых носителей не приводила к потере научного наследия университета.',
                     ],
                     'agenda' => [
-                        ['time' => '10:00', 'title' => 'Приветственное слово', 'note' => 'Руководство библиотеки KazUTB'],
+                        ['time' => '10:00', 'title' => 'Приветственное слово', 'note' => 'Руководство библиотеки Казахский университет технологии и бизнеса имени К. Кулажанова'],
                         ['time' => '10:15', 'title' => 'Ключевой доклад: хрупкость цифрового', 'note' => 'Обзор текущего состояния цифрового сохранения в академических библиотеках и переход от пассивного хранения к активной кураторской работе.'],
                         ['time' => '11:30', 'title' => 'Кофе-брейк и обсуждение', 'note' => 'Главный читальный зал, корпус 1'],
                         ['time' => '11:45', 'title' => 'Панельная дискуссия и вопросы', 'note' => 'Модератор — руководитель научной библиотеки'],
@@ -3122,10 +2911,10 @@ $eventDetailProvider = static function (): array {
                     'about' => [
                         'Симпозиум ғылыми кітапханалар мен зерттеу орталықтарын цифрлық сақтаудың тәжірибелік тәсілдері төңірегінде біріктіреді. Сессия академиялық кітапхананың цифрлық ғылыми материалдардың тұтастығы мен қолжетімділігін ұзақ мерзімде қалай қамтамасыз ететініне арналған.',
                         'Қатысушылар форматтарды көшіру әдіснамасын, ұзақ мерзімді сақтау саясатын, метадеректермен жұмысты және цифрлық мазмұнды сақтаудың этикалық аспектілерін — институционалдық репозиторийлерден бастап ғылыми деректер массивтеріне дейін — қарастырады.',
-                        'Сондай-ақ KazUTB-дің сенімді цифрлық қоймасын құру жөніндегі ағымдағы бастамалары ұсынылады, бұл цифрлық тасымалдағыштардың өзгермелілігі университеттің ғылыми мұрасын жоғалтуға әкелмеуі үшін жасалады.',
+                        'Сондай-ақ Қ. Құлажанов атындағы Қазақ технология және бизнес университеті-дің сенімді цифрлық қоймасын құру жөніндегі ағымдағы бастамалары ұсынылады, бұл цифрлық тасымалдағыштардың өзгермелілігі университеттің ғылыми мұрасын жоғалтуға әкелмеуі үшін жасалады.',
                     ],
                     'agenda' => [
-                        ['time' => '10:00', 'title' => 'Сәлемдеу сөзі', 'note' => 'KazUTB кітапханасының басшылығы'],
+                        ['time' => '10:00', 'title' => 'Сәлемдеу сөзі', 'note' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті кітапханасының басшылығы'],
                         ['time' => '10:15', 'title' => 'Негізгі баяндама: цифрлықтың сынғыштығы', 'note' => 'Академиялық кітапханалардағы цифрлық сақтаудың қазіргі жағдайына шолу және пассивті сақтаудан белсенді кураторлық жұмысқа өту.'],
                         ['time' => '11:30', 'title' => 'Кофе-брейк және талқылау', 'note' => 'Басты оқу залы, 1-корпус'],
                         ['time' => '11:45', 'title' => 'Панельдік талқылау және сұрақтар', 'note' => 'Модератор — ғылыми кітапхана басшысы'],
@@ -3149,10 +2938,10 @@ $eventDetailProvider = static function (): array {
                     'about' => [
                         'This symposium brings research libraries and scholarly centres together around practical approaches to digital preservation. The session focuses on how an academic library maintains the integrity and accessibility of born-digital scholarly materials over the long term.',
                         'Participants will examine format migration methodologies, long-term retention policy, metadata workflows, and the ethical considerations of preserving born-digital content — from institutional repositories to research data sets.',
-                        'The KazUTB will also present its ongoing initiatives to build a robust digital vault, so that the volatility of digital carriers does not lead to the loss of the university\'s scholarly record.',
+                        'The Kazakh University of Technology and Business named after K. Kulazhanov will also present its ongoing initiatives to build a robust digital vault, so that the volatility of digital carriers does not lead to the loss of the university\'s scholarly record.',
                     ],
                     'agenda' => [
-                        ['time' => '10:00', 'title' => 'Opening remarks', 'note' => 'KazUTB Library leadership'],
+                        ['time' => '10:00', 'title' => 'Opening remarks', 'note' => 'Kazakh University of Technology and Business named after K. Kulazhanov Library leadership'],
                         ['time' => '10:15', 'title' => 'Keynote: The fragility of the digital', 'note' => 'An overview of the current state of digital preservation in academic libraries and the shift from passive storage to active curation.'],
                         ['time' => '11:30', 'title' => 'Coffee break & networking', 'note' => 'Main Reading Room, Building 1'],
                         ['time' => '11:45', 'title' => 'Panel discussion & Q&A', 'note' => 'Moderated by the Head of Research Library'],
@@ -3190,7 +2979,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Координатор научных коммуникаций',
-                        'role' => 'Отдел научных коммуникаций · KazUTB',
+                        'role' => 'Отдел научных коммуникаций · Казахский университет технологии и бизнеса имени К. Кулажанова',
                         'bio' => 'Курирует работу с подписными базами данных, поддержку авторов университета и политику публикационной этики.',
                     ],
                     'materials' => [
@@ -3215,7 +3004,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Ғылыми коммуникациялар үйлестірушісі',
-                        'role' => 'Ғылыми коммуникациялар бөлімі · KazUTB',
+                        'role' => 'Ғылыми коммуникациялар бөлімі · Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
                         'bio' => 'Жазылымдық дерекқорлармен жұмысты, университет авторларына қолдауды және жариялау этикасы саясатын үйлестіреді.',
                     ],
                     'materials' => [
@@ -3240,7 +3029,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Scholarly Communications Coordinator',
-                        'role' => 'Scholarly Communications Office · KazUTB',
+                        'role' => 'Scholarly Communications Office · Kazakh University of Technology and Business named after K. Kulazhanov',
                         'bio' => 'Leads work with subscribed databases, author support for the university, and publication ethics policy.',
                     ],
                     'materials' => [
@@ -3255,13 +3044,13 @@ $eventDetailProvider = static function (): array {
             'date_time_range' => 'All day',
             'i18n' => [
                 'ru' => [
-                    'subtitle' => 'Кураторская экспозиция редких изданий и отреставрированных научных материалов фонда KazUTB.',
+                    'subtitle' => 'Кураторская экспозиция редких изданий и отреставрированных научных материалов фонда Казахский университет технологии и бизнеса имени К. Кулажанова.',
                     'secondary_category' => 'Наследие',
                     'date_time_range' => 'Весь день · 10:00 – 17:00',
                     'capacity_label' => 'Без предварительной записи',
                     'capacity_note' => 'Открыто для всех читателей университета',
                     'about' => [
-                        'Экспозиция объединяет редкие издания, ценные научные коллекции и отреставрированные материалы, которые формируют историческое ядро технологического фонда KazUTB.',
+                        'Экспозиция объединяет редкие издания, ценные научные коллекции и отреставрированные материалы, которые формируют историческое ядро технологического фонда Казахский университет технологии и бизнеса имени К. Кулажанова.',
                         'Приоритетные направления: ранняя инженерная литература, учебные пособия по прикладным наукам и региональная история. Для каждого раздела предусмотрено отдельное кураторское сопровождение.',
                     ],
                     'agenda' => [
@@ -3271,7 +3060,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Куратор технологического фонда',
-                        'role' => 'Отдел редких изданий · KazUTB',
+                        'role' => 'Отдел редких изданий · Казахский университет технологии и бизнеса имени К. Кулажанова',
                         'bio' => 'Сопровождает работу с редкими изданиями, реставрацию и описание научного наследия университета.',
                     ],
                     'materials' => [
@@ -3280,13 +3069,13 @@ $eventDetailProvider = static function (): array {
                     ],
                 ],
                 'kk' => [
-                    'subtitle' => 'KazUTB қорындағы сирек басылымдар мен қалпына келтірілген ғылыми материалдардың кураторлық экспозициясы.',
+                    'subtitle' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті қорындағы сирек басылымдар мен қалпына келтірілген ғылыми материалдардың кураторлық экспозициясы.',
                     'secondary_category' => 'Мұра',
                     'date_time_range' => 'Толық күн · 10:00 – 17:00',
                     'capacity_label' => 'Алдын ала жазылусыз',
                     'capacity_note' => 'Университеттің барлық оқырмандарына ашық',
                     'about' => [
-                        'Экспозиция KazUTB технологиялық қорының тарихи өзегін құрайтын сирек басылымдарды, құнды ғылыми жинақтарды және қалпына келтірілген материалдарды біріктіреді.',
+                        'Экспозиция Қ. Құлажанов атындағы Қазақ технология және бизнес университеті технологиялық қорының тарихи өзегін құрайтын сирек басылымдарды, құнды ғылыми жинақтарды және қалпына келтірілген материалдарды біріктіреді.',
                         'Басым бағыттар: ерте инженерлік әдебиет, қолданбалы ғылымдар бойынша оқу құралдары және өңірлік тарих. Әр бөлімге бөлек кураторлық сүйемелдеу көзделген.',
                     ],
                     'agenda' => [
@@ -3296,7 +3085,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Технологиялық қордың кураторы',
-                        'role' => 'Сирек басылымдар бөлімі · KazUTB',
+                        'role' => 'Сирек басылымдар бөлімі · Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
                         'bio' => 'Сирек басылымдармен жұмысты, қалпына келтіруді және университет ғылыми мұрасын сипаттауды сүйемелдейді.',
                     ],
                     'materials' => [
@@ -3305,13 +3094,13 @@ $eventDetailProvider = static function (): array {
                     ],
                 ],
                 'en' => [
-                    'subtitle' => 'A curated exhibition of rare editions and restored scholarly materials from the KazUTB collections.',
+                    'subtitle' => 'A curated exhibition of rare editions and restored scholarly materials from the Kazakh University of Technology and Business named after K. Kulazhanov collections.',
                     'secondary_category' => 'Heritage',
                     'date_time_range' => 'All day · 10:00 – 17:00',
                     'capacity_label' => 'No prior registration',
                     'capacity_note' => 'Open to all university readers',
                     'about' => [
-                        'The exhibition brings together rare editions, valuable scholarly collections, and restored materials that form the historical core of the KazUTB Technology Fund.',
+                        'The exhibition brings together rare editions, valuable scholarly collections, and restored materials that form the historical core of the Kazakh University of Technology and Business named after K. Kulazhanov Technology Fund.',
                         'Priority areas: early engineering literature, applied-science textbooks, and regional history. Each section has dedicated curatorial support.',
                     ],
                     'agenda' => [
@@ -3321,7 +3110,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Curator, Technology Fund',
-                        'role' => 'Rare Editions Department · KazUTB',
+                        'role' => 'Rare Editions Department · Kazakh University of Technology and Business named after K. Kulazhanov',
                         'bio' => 'Supports work with rare editions, restoration, and descriptive cataloguing of the university\'s scholarly heritage.',
                     ],
                     'materials' => [
@@ -3342,7 +3131,7 @@ $eventDetailProvider = static function (): array {
                     'capacity_label' => '30 мест',
                     'capacity_note' => 'Приоритет — студенты старших курсов и магистранты',
                     'about' => [
-                        'Мастер-класс для студентов старших курсов и магистрантов KazUTB, которые готовят дипломные работы и диссертации. Фокус — на корректной работе с источниками и цитированием.',
+                        'Мастер-класс для студентов старших курсов и магистрантов Казахский университет технологии и бизнеса имени К. Кулажанова, которые готовят дипломные работы и диссертации. Фокус — на корректной работе с источниками и цитированием.',
                         'Участники научатся эффективно использовать подписные базы данных университета, различать первичные и вторичные источники, корректно оформлять ссылки и подготавливать итоговый библиографический список.',
                     ],
                     'agenda' => [
@@ -3352,7 +3141,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Библиотекарь-методист',
-                        'role' => 'Фонд колледжа · KazUTB',
+                        'role' => 'Фонд колледжа · Казахский университет технологии и бизнеса имени К. Кулажанова',
                         'bio' => 'Отвечает за информационную грамотность и поддержку студентов при подготовке итоговых работ.',
                     ],
                     'materials' => [
@@ -3367,7 +3156,7 @@ $eventDetailProvider = static function (): array {
                     'capacity_label' => '30 орын',
                     'capacity_note' => 'Басымдық — жоғары курс студенттері мен магистранттарға',
                     'about' => [
-                        'Диплом жұмыстары мен диссертация дайындайтын KazUTB жоғары курс студенттері мен магистранттарына арналған мастер-класс. Негізгі назар — дереккөздермен және сілтемелермен дұрыс жұмыс істеуге.',
+                        'Диплом жұмыстары мен диссертация дайындайтын Қ. Құлажанов атындағы Қазақ технология және бизнес университеті жоғары курс студенттері мен магистранттарына арналған мастер-класс. Негізгі назар — дереккөздермен және сілтемелермен дұрыс жұмыс істеуге.',
                         'Қатысушылар университеттің жазылымдық дерекқорларын тиімді пайдалануды, бастапқы және қосымша дереккөздерді ажыратуды, сілтемелерді дұрыс рәсімдеуді және қорытынды библиографиялық тізімді дайындауды үйренеді.',
                     ],
                     'agenda' => [
@@ -3377,7 +3166,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Кітапханашы-әдіскер',
-                        'role' => 'Колледж қоры · KazUTB',
+                        'role' => 'Колледж қоры · Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
                         'bio' => 'Ақпараттық сауаттылыққа және қорытынды жұмыстарды дайындау кезінде студенттерді қолдауға жауапты.',
                     ],
                     'materials' => [
@@ -3392,7 +3181,7 @@ $eventDetailProvider = static function (): array {
                     'capacity_label' => '30 seats',
                     'capacity_note' => 'Priority for senior and master\'s candidates',
                     'about' => [
-                        'A workshop for senior and master\'s candidates at KazUTB preparing graduating projects and theses. The focus is on working correctly with sources and references.',
+                        'A workshop for senior and master\'s candidates at Kazakh University of Technology and Business named after K. Kulazhanov preparing graduating projects and theses. The focus is on working correctly with sources and references.',
                         'Participants will learn how to use the university\'s subscribed databases effectively, distinguish primary from secondary sources, format references correctly, and assemble the final bibliography.',
                     ],
                     'agenda' => [
@@ -3402,7 +3191,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Reference and Instruction Librarian',
-                        'role' => 'College Fund · KazUTB',
+                        'role' => 'College Fund · Kazakh University of Technology and Business named after K. Kulazhanov',
                         'bio' => 'Responsible for information literacy and support for students preparing graduating projects.',
                     ],
                     'materials' => [
@@ -3433,7 +3222,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Координатор центра академического письма',
-                        'role' => 'KazUTB · Исследовательская поддержка',
+                        'role' => 'Казахский университет технологии и бизнеса имени К. Кулажанова · Исследовательская поддержка',
                         'bio' => 'Консультирует авторов по подготовке рукописей, академическому стилю и публикационной стратегии.',
                     ],
                     'materials' => [
@@ -3458,7 +3247,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Академиялық жазу орталығының үйлестірушісі',
-                        'role' => 'KazUTB · Зерттеу қолдауы',
+                        'role' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті · Зерттеу қолдауы',
                         'bio' => 'Авторларға қолжазба дайындау, академиялық стиль және жариялау стратегиясы бойынша кеңес береді.',
                     ],
                     'materials' => [
@@ -3483,7 +3272,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Coordinator, Academic Writing Centre',
-                        'role' => 'KazUTB · Research Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Research Support',
                         'bio' => 'Advises authors on manuscript preparation, academic style, and publication strategy.',
                     ],
                     'materials' => [
@@ -3514,7 +3303,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Специалист по цифровым исследовательским сервисам',
-                        'role' => 'Цифровая лаборатория · KazUTB',
+                        'role' => 'Цифровая лаборатория · Казахский университет технологии и бизнеса имени К. Кулажанова',
                         'bio' => 'Сопровождает учебные проекты по работе с данными и исследовательскими цифровыми инструментами.',
                     ],
                     'materials' => [
@@ -3539,7 +3328,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Цифрлық зерттеу сервистері бойынша маман',
-                        'role' => 'Цифрлық зертхана · KazUTB',
+                        'role' => 'Цифрлық зертхана · Қ. Құлажанов атындағы Қазақ технология және бизнес университеті',
                         'bio' => 'Деректермен және зерттеу цифрлық құралдарымен жұмыс істеуге арналған оқу жобаларын сүйемелдейді.',
                     ],
                     'materials' => [
@@ -3564,7 +3353,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Digital Research Services Specialist',
-                        'role' => 'Digital Lab · KazUTB',
+                        'role' => 'Digital Lab · Kazakh University of Technology and Business named after K. Kulazhanov',
                         'bio' => 'Supports coursework that relies on data handling and research-oriented digital tools.',
                     ],
                     'materials' => [
@@ -3595,7 +3384,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Руководитель направления цифровых коллекций',
-                        'role' => 'KazUTB · Метаданные и интеграция',
+                        'role' => 'Казахский университет технологии и бизнеса имени К. Кулажанова · Метаданные и интеграция',
                         'bio' => 'Координирует описание редких коллекций и интеграцию библиотечных записей в цифровые сервисы университета.',
                     ],
                     'materials' => [
@@ -3620,7 +3409,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Цифрлық жинақтар бағытының жетекшісі',
-                        'role' => 'KazUTB · Метадеректер және интеграция',
+                        'role' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университеті · Метадеректер және интеграция',
                         'bio' => 'Сирек жинақтарды сипаттауды және кітапхана жазбаларын университеттің цифрлық сервистеріне біріктіруді үйлестіреді.',
                     ],
                     'materials' => [
@@ -3645,7 +3434,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Head of Digital Collections',
-                        'role' => 'KazUTB · Metadata & Integration',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Metadata & Integration',
                         'bio' => 'Coordinates rare-collection description and the integration of library records into the university’s digital services.',
                     ],
                     'materials' => [
@@ -3676,7 +3465,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Координатор читательских сервисов',
-                        'role' => 'KazUTB · Public Services',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Public Services',
                         'bio' => 'Отвечает за публичные сервисы библиотеки, маршруты адаптации студентов и поддержку первого обращения.',
                     ],
                     'materials' => [
@@ -3701,7 +3490,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Оқырман сервистерінің үйлестірушісі',
-                        'role' => 'KazUTB · Public Services',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Public Services',
                         'bio' => 'Кітапхананың жария сервистеріне, студенттерді бейімдеу маршруттарына және алғашқы сұрауларды қолдауға жауап береді.',
                     ],
                     'materials' => [
@@ -3726,7 +3515,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Reader Services Coordinator',
-                        'role' => 'KazUTB · Public Services',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Public Services',
                         'bio' => 'Leads public-facing library services, student onboarding routes, and first-contact support.',
                     ],
                     'materials' => [
@@ -3757,7 +3546,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Специалист по цифровым данным',
-                        'role' => 'KazUTB · Research Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Research Support',
                         'bio' => 'Помогает исследовательским группам упорядочивать данные, описывать их и готовить к публикации.',
                     ],
                     'materials' => [
@@ -3782,7 +3571,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Цифрлық деректер бойынша маман',
-                        'role' => 'KazUTB · Research Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Research Support',
                         'bio' => 'Зерттеу топтарына деректерді реттеуге, сипаттауға және жариялауға дайындауға көмектеседі.',
                     ],
                     'materials' => [
@@ -3807,7 +3596,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Digital Data Specialist',
-                        'role' => 'KazUTB · Research Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Research Support',
                         'bio' => 'Helps research groups organise, describe, and prepare data for publication.',
                     ],
                     'materials' => [
@@ -3838,7 +3627,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Консультант по научным публикациям',
-                        'role' => 'KazUTB · Publishing Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Publishing Support',
                         'bio' => 'Сопровождает авторов в вопросах публикаций, журналов и требований к оформлению статей.',
                     ],
                     'materials' => [
@@ -3863,7 +3652,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Ғылыми жарияланымдар жөніндегі кеңесші',
-                        'role' => 'KazUTB · Publishing Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Publishing Support',
                         'bio' => 'Авторларды жарияланым, журнал таңдау және мақала рәсімдеу талаптары бойынша сүйемелдейді.',
                     ],
                     'materials' => [
@@ -3888,7 +3677,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Scholarly Publishing Consultant',
-                        'role' => 'KazUTB · Publishing Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Publishing Support',
                         'bio' => 'Supports authors on publishing routes, journals, and article formatting requirements.',
                     ],
                     'materials' => [
@@ -3919,7 +3708,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Координатор цифровых сервисов',
-                        'role' => 'KazUTB · Public Services',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Public Services',
                         'bio' => 'Показывает пользователям быстрые сценарии работы с каталогом, избранным и читательским кабинетом.',
                     ],
                     'materials' => [
@@ -3944,7 +3733,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Цифрлық сервистер үйлестірушісі',
-                        'role' => 'KazUTB · Public Services',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Public Services',
                         'bio' => 'Пайдаланушыларға каталог, избранное және оқырман кабинетімен жұмыс істеудің жылдам сценарийлерін көрсетеді.',
                     ],
                     'materials' => [
@@ -3969,7 +3758,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Digital Services Coordinator',
-                        'role' => 'KazUTB · Public Services',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Public Services',
                         'bio' => 'Shows readers quick workflows for the catalog, favorites, and the reader dashboard.',
                     ],
                     'materials' => [
@@ -4000,7 +3789,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Специалист по поисковым сервисам',
-                        'role' => 'KazUTB · Discovery',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Discovery',
                         'bio' => 'Помогает читателям строить короткие и точные пути от поиска к книге.',
                     ],
                     'materials' => [
@@ -4025,7 +3814,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Іздеу сервистері бойынша маман',
-                        'role' => 'KazUTB · Discovery',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Discovery',
                         'bio' => 'Оқырмандарға іздеуден кітапқа дейін қысқа әрі нақты жол құруға көмектеседі.',
                     ],
                     'materials' => [
@@ -4050,7 +3839,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Discovery Services Specialist',
-                        'role' => 'KazUTB · Discovery',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Discovery',
                         'bio' => 'Helps readers build shorter, sharper paths from search to book.',
                     ],
                     'materials' => [
@@ -4081,7 +3870,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Библиографический консультант',
-                        'role' => 'KazUTB · Writing Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Writing Support',
                         'bio' => 'Помогает с цитированием, оформлением списков литературы и ссылочными менеджерами.',
                     ],
                     'materials' => [
@@ -4106,7 +3895,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Библиографиялық кеңесші',
-                        'role' => 'KazUTB · Writing Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Writing Support',
                         'bio' => 'Дәйексөз келтіру, әдебиеттер тізімі және reference manager құралдары бойынша көмектеседі.',
                     ],
                     'materials' => [
@@ -4131,7 +3920,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Bibliographic Consultant',
-                        'role' => 'KazUTB · Writing Support',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Writing Support',
                         'bio' => 'Helps with citations, reference lists, and reference manager tools.',
                     ],
                     'materials' => [
@@ -4162,7 +3951,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Координатор репозитория',
-                        'role' => 'KazUTB · Repository Services',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Repository Services',
                         'bio' => 'Сопровождает публикацию материалов в научном репозитории и следит за качеством записей.',
                     ],
                     'materials' => [
@@ -4187,7 +3976,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Репозиторий үйлестірушісі',
-                        'role' => 'KazUTB · Repository Services',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Repository Services',
                         'bio' => 'Ғылыми репозиторийге материал жариялауды сүйемелдейді және жазбалардың сапасын бақылайды.',
                     ],
                     'materials' => [
@@ -4212,7 +4001,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Repository Coordinator',
-                        'role' => 'KazUTB · Repository Services',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Repository Services',
                         'bio' => 'Supports publishing materials in the scholarly repository and keeps records in shape.',
                     ],
                     'materials' => [
@@ -4243,7 +4032,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Куратор читательских программ',
-                        'role' => 'KazUTB · Community',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Community',
                         'bio' => 'Организует тематические чтения, подборки и открытые библиотечные встречи.',
                     ],
                     'materials' => [
@@ -4268,7 +4057,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Оқырман бағдарламаларының кураторы',
-                        'role' => 'KazUTB · Community',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Community',
                         'bio' => 'Тақырыптық оқуларды, подборкаларды және ашық кітапхана кездесулерін ұйымдастырады.',
                     ],
                     'materials' => [
@@ -4293,7 +4082,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Reader Program Curator',
-                        'role' => 'KazUTB · Community',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Community',
                         'bio' => 'Runs themed reading sessions, bundles, and open library meetups.',
                     ],
                     'materials' => [
@@ -4324,7 +4113,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Куратор цифровых выставок',
-                        'role' => 'KazUTB · Exhibitions',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Exhibitions',
                         'bio' => 'Собирает цифровые витрины и связывает их с каталогом и архивом.',
                     ],
                     'materials' => [
@@ -4349,7 +4138,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Цифрлық көрмелер кураторы',
-                        'role' => 'KazUTB · Exhibitions',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Exhibitions',
                         'bio' => 'Цифрлық витриналарды жинайды және оларды каталогпен және архивпен байланыстырады.',
                     ],
                     'materials' => [
@@ -4374,7 +4163,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Digital Exhibitions Curator',
-                        'role' => 'KazUTB · Exhibitions',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Exhibitions',
                         'bio' => 'Builds digital showcases and connects them to the catalog and archive.',
                     ],
                     'materials' => [
@@ -4405,7 +4194,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Координатор студенческой поддержки',
-                        'role' => 'KazUTB · Student Success',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Student Success',
                         'bio' => 'Помогает студентам ориентироваться в библиотечных сервисах перед сессией.',
                     ],
                     'materials' => [
@@ -4430,7 +4219,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Студенттік қолдау үйлестірушісі',
-                        'role' => 'KazUTB · Student Success',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Student Success',
                         'bio' => 'Студенттерге сессия алдында кітапхана сервистерін түсінуге көмектеседі.',
                     ],
                     'materials' => [
@@ -4455,7 +4244,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Student Support Coordinator',
-                        'role' => 'KazUTB · Student Success',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Student Success',
                         'bio' => 'Helps students navigate library services before the exam period.',
                     ],
                     'materials' => [
@@ -4486,7 +4275,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Руководитель сервисных улучшений',
-                        'role' => 'KazUTB · Product & UX',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Product & UX',
                         'bio' => 'Координирует развитие каталога, витрин и быстрых библиотечных сценариев.',
                     ],
                     'materials' => [
@@ -4511,7 +4300,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Сервистік жетілдіру жетекшісі',
-                        'role' => 'KazUTB · Product & UX',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Product & UX',
                         'bio' => 'Каталог, витрина және жылдам кітапхана сценарийлерін дамытуды үйлестіреді.',
                     ],
                     'materials' => [
@@ -4536,7 +4325,7 @@ $eventDetailProvider = static function (): array {
                     ],
                     'speaker' => [
                         'name' => 'Service Improvement Lead',
-                        'role' => 'KazUTB · Product & UX',
+                        'role' => 'Kazakh University of Technology and Business named after K. Kulazhanov · Product & UX',
                         'bio' => 'Coordinates the evolution of catalog, showcase, and fast library workflows.',
                     ],
                     'materials' => [
@@ -4554,70 +4343,89 @@ $eventDetailProvider = static function (): array {
     ];
 };
 
-// Phase 3 Cluster C.2 — standalone public event detail surface.
-// Mirrors docs/design-exports/event_detail_canonical — breadcrumb + hero
-// (title, lead, meta grid, placeholder visual) + main grid (About +
-// Agenda on the left; Speaker + Materials + Share on the right) +
-// Related Events bento. Content joins $eventsSeedProvider (index) and
-// $eventDetailProvider (rich body per slug). Unknown slug → 404.
-Route::get('/events/{slug}', function (string $slug) use ($eventsSeedProvider, $eventDetailProvider, $upcomingEventsOnly) {
-    $index = $eventsSeedProvider();
-    $detailSeed = $eventDetailProvider();
-
-    $base = null;
-    foreach ($index['items'] as $candidate) {
-        if ($candidate['slug'] === $slug) {
-            $base = $candidate;
-            break;
+// Phase 3 Cluster C.2 — standalone public event detail surface. Only a real,
+// published managed record may resolve; fixture slugs and unknown slugs are 404.
+Route::get('/events/{slug}', function (Request $request, string $slug) use ($newsModelToPublicArticle) {
+    try {
+        if (! Schema::hasTable('news') || ! Schema::hasColumn('news', 'type')) {
+            abort(404);
         }
+
+        $visibilities = ['public'];
+        if ($request->user()) {
+            $visibilities[] = 'members';
+        }
+        if ($request->user()?->can('news.view_internal')) {
+            $visibilities[] = 'staff';
+        }
+        $record = News::query()->published()->whereIn('visibility', $visibilities)->whereIn('type', ['event', 'schedule'])->where(function ($query) use ($slug): void {
+            $query->where('slug', $slug)->orWhere('slug_kk', $slug)->orWhere('slug_ru', $slug)->orWhere('slug_en', $slug);
+        })->first();
+        if ($record) {
+            app(NewsAnalyticsService::class)->recordView($record, $request);
+
+            $now = now('UTC');
+            $related = News::query()
+                ->published()
+                ->when(Schema::hasColumn('news', 'visibility'), fn ($builder) => $builder->whereIn('visibility', $visibilities))
+                ->whereIn('type', ['event', 'schedule'])
+                ->whereKeyNot($record->getKey())
+                ->where(function ($builder) use ($now): void {
+                    $builder
+                        ->where('ends_at', '>=', $now)
+                        ->orWhere(function ($withoutEnd) use ($now): void {
+                            $withoutEnd->whereNull('ends_at')->where('starts_at', '>=', $now);
+                        });
+                })
+                ->orderBy('starts_at')
+                ->limit(3)
+                ->get()
+                ->map($newsModelToPublicArticle)
+                ->all();
+
+            return view('news.show', [
+                'activePage' => 'events',
+                'article' => $newsModelToPublicArticle($record),
+                'relatedArticles' => $related,
+            ]);
+        }
+
+        abort(404);
+    } catch (Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+        throw $exception;
+    } catch (Throwable $exception) {
+        report($exception);
+        abort(503, 'Events are temporarily unavailable.');
     }
-    abort_unless($base !== null, 404);
-    abort_unless(isset($detailSeed['details'][$slug]), 404);
-
-    $detail = $detailSeed['details'][$slug];
-    $upcomingIndex = $upcomingEventsOnly($index);
-    $related = array_values(array_filter(
-        $upcomingIndex['items'],
-        static fn (array $candidate) => $candidate['slug'] !== $slug,
-    ));
-
-    return view('events.show', [
-        'activePage' => 'events',
-        'event' => $base,
-        'detail' => $detail,
-        'chrome' => $detailSeed['chrome'],
-        'indexChrome' => $index['chrome'],
-        'relatedEvents' => array_slice($related, 0, 3),
-    ]);
 })->where('slug', '[a-z0-9-]+');
 
 // Phase 3 Cluster B.1 — standalone public leadership surface.
 // Content is driven by $leadershipSeedProvider (trilingual, role-first).
-// Per Cluster B Content Contract §8 this route is NOT added to the primary
+// Per Cluster B Content Contract 8 this route is NOT added to the primary
 // navbar; global access is via the footer and (later) the Institutional
 // Directory block on /about.
-Route::get('/leadership', function () use ($leadershipSeedProvider) {
+Route::get('/leadership', function () use ($leadershipPublicProvider) {
     return view('leadership', [
         'activePage' => 'leadership',
-        'leadership' => $leadershipSeedProvider(),
+        'leadership' => $leadershipPublicProvider(),
     ]);
 });
 
 // Phase 3 Cluster B.2 — standalone public library-rules surface.
-// Content is driven by $rulesSeedProvider (trilingual; frozen section
-// order + stable anchor IDs per Cluster B Content Contract §2). Per
-// contract §8 this route is NOT added to the primary navbar; global
+// Content is driven by $rulesPublicProvider (trilingual; stable section
+// order + stable anchor IDs per Cluster B Content Contract 2). Per
+// contract 8 this route is NOT added to the primary navbar; global
 // access is via the footer.
-Route::get('/rules', function () use ($rulesSeedProvider) {
+Route::get('/rules', function () use ($rulesPublicProvider) {
     return view('rules', [
         'activePage' => 'rules',
-        'rules' => $rulesSeedProvider(),
+        'rules' => $rulesPublicProvider(),
     ]);
 });
 
 Route::get('/resources', function () {
     $externalResourceService = app(ExternalResourceService::class);
-    $resources = $externalResourceService->list();
+    $resources = $externalResourceService->directory();
     $categories = $externalResourceService->categories();
 
     return view('resources', [
@@ -4626,20 +4434,34 @@ Route::get('/resources', function () {
         'categories' => $categories,
     ]);
 });
+Route::get('/resources/{slug}', PublicExternalResourceController::class)
+    ->where('slug', '[a-z0-9][a-z0-9_-]*')
+    ->middleware('throttle:external-resources')
+    ->name('resources.show');
+Route::get('/resources/{externalResource}/open', ExternalResourceRedirectController::class)
+    ->whereNumber('externalResource')
+    ->middleware('throttle:external-resources')
+    ->name('external-resources.open');
 
 Route::get('/for-teachers', fn () => redirect('/resources', 301));
 
-// Scholarly repository — canonical public surface (Master.md §20.3).
-// Guests browse published work metadata from the repository_items table; the
-// stored full text is streamed only to viewers holding repository.read_full and
-// is never published as a storage URL. Canonical detail key is the numeric id.
+// Scholarly repository — canonical public surface (Master.md 20.3).
+// Guests browse director-approved metadata. Only policy-authorised PDFs are
+// streamed; drafts stay hidden, embargo/restriction closes the file, and a
+// withdrawal remains as a metadata tombstone. Canonical detail key is numeric.
 Route::get('/repository', [PublicRepositoryController::class, 'index'])->name('repository.index');
 Route::get('/repository/{item}', [PublicRepositoryController::class, 'show'])
     ->whereNumber('item')
+    ->middleware('throttle:repository-read')
     ->name('repository.show');
 Route::get('/repository/{item}/download', [PublicRepositoryController::class, 'download'])
     ->whereNumber('item')
+    ->middleware('throttle:repository-read')
     ->name('repository.download');
+Route::get('/repository/{item}/view', [PublicRepositoryController::class, 'view'])
+    ->whereNumber('item')
+    ->middleware('throttle:repository-read')
+    ->name('repository.view');
 
 // Compatibility branch for the retired config-backed slugs (config/repository_works.php).
 // Those works have no repository_items row, so the only honest destination is the
@@ -4693,9 +4515,41 @@ Route::prefix('internal')->middleware(['library.auth'])->group(function () use (
 // user's Spatie roles and permissions. The permission boundary also admits
 // future staff roles such as cataloguer without granting access to members.
 Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'operational.staff'])->name('librarian.')->group(function (): void {
+    Route::get('/profile', [LibrarianProfileController::class, 'show'])
+        ->middleware('private.response')->name('profile.show');
+    Route::patch('/profile/preferences', [LibrarianProfileController::class, 'updatePreferences'])
+        ->middleware(['private.response', 'throttle:10,1'])->name('profile.preferences');
+    Route::middleware(['permission:circulation.issue|circulation.return', 'private.response'])->group(function (): void {
+        Route::get('/readers', [LibrarianDirectoryReaderController::class, 'index'])->name('readers.index');
+        Route::post('/readers/active-directory', [LibrarianDirectoryReaderController::class, 'provision'])
+            ->middleware('throttle:10,1')->name('readers.active-directory.provision');
+    });
+    Route::prefix('workspace')->name('workspace.')->middleware('private.response')->group(function (): void {
+        Route::get('/search', [LibrarianWorkspaceController::class, 'search'])->middleware('permission:catalog.search')->name('search');
+        Route::get('/tasks', [LibrarianWorkspaceController::class, 'tasks'])->middleware('permission:tasks.view')->name('tasks');
+        Route::post('/tasks', [LibrarianWorkspaceController::class, 'storeTask'])->middleware('permission:tasks.manage_own|tasks.assign')->name('tasks.store');
+        Route::patch('/tasks/{task}', [LibrarianWorkspaceController::class, 'updateTask'])->middleware('permission:tasks.manage_own|tasks.assign')->name('tasks.update');
+        Route::get('/calendar', [LibrarianWorkspaceController::class, 'calendar'])->middleware('permission:calendar.view')->name('calendar');
+        Route::get('/fund-movements', [LibrarianWorkspaceController::class, 'movements'])->middleware('permission:catalog.search|copies.edit')->name('movements');
+        Route::get('/orders', [LibrarianWorkspaceController::class, 'orders'])->middleware('permission:acquisitions.view')->name('orders');
+        Route::post('/orders', [LibrarianWorkspaceController::class, 'storeOrder'])->middleware('permission:acquisitions.create_order|acquisitions.manage')->name('orders.store');
+        Route::patch('/orders/{order}/items/{item}/receive', [LibrarianWorkspaceController::class, 'receiveOrderItem'])->middleware('permission:acquisitions.receive|acquisitions.manage')->name('orders.items.receive');
+        Route::get('/edd', [LibrarianWorkspaceController::class, 'deliveries'])->middleware('permission:edd.view')->name('edd');
+        Route::post('/edd', [LibrarianWorkspaceController::class, 'storeDelivery'])->middleware('permission:edd.manage')->name('edd.store');
+        Route::get('/periodicals', [LibrarianWorkspaceController::class, 'periodicals'])->middleware('permission:periodicals.view')->name('periodicals');
+        Route::post('/periodicals', [LibrarianWorkspaceController::class, 'storePeriodical'])->middleware('permission:periodicals.manage')->name('periodicals.store');
+        Route::post('/periodicals/{subscription}/issues', [LibrarianWorkspaceController::class, 'receiveIssue'])->middleware('permission:periodicals.manage')->name('periodicals.issues.store');
+    });
     Route::get('/', LibrarianDashboardController::class)->name('overview');
+    Route::post('/executive/alerts/acknowledge', [LibrarianExecutiveDashboardController::class, 'acknowledge'])
+        ->middleware(['permission:reports.view_full', 'private.response'])->name('executive.alerts.acknowledge');
+    Route::post('/executive/alerts/assign', [LibrarianExecutiveDashboardController::class, 'assign'])
+        ->middleware(['permission:tasks.assign', 'private.response'])->name('executive.alerts.assign');
+    Route::get('/executive/export/{format}', [LibrarianExecutiveDashboardController::class, 'export'])
+        ->whereIn('format', ['csv', 'pdf', 'xlsx', 'docx'])
+        ->middleware(['permission:reports.view_full', 'private.response'])->name('executive.export');
 
-    // Cataloguing (Master.md §6-§11).
+    // Cataloguing (Master.md 6-11).
     Route::get('/catalog', [LibrarianCatalogController::class, 'index'])
         ->middleware('permission:catalog.search|catalog.view_full_metadata|catalog.create_record|catalog.edit_record')
         ->name('catalog.index');
@@ -4721,7 +4575,7 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         Route::get('/catalog/{record}/edit', [LibrarianCatalogController::class, 'edit'])->name('catalog.edit');
         Route::match(['PUT', 'PATCH'], '/catalog/{record}', [LibrarianCatalogController::class, 'update'])->name('catalog.update');
 
-        // Attachments edited from the same form as the metadata (§10.4, §18).
+        // Attachments edited from the same form as the metadata (10.4, 18).
         Route::get('/catalog/record-search', [LibrarianCatalogAttachmentController::class, 'recordSearch'])
             ->name('catalog.record-search');
         Route::post('/catalog/{record}/materials', [LibrarianCatalogAttachmentController::class, 'storeMaterial'])
@@ -4739,20 +4593,26 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         ->middleware('permission:catalog.delete_record')
         ->name('catalog.destroy');
 
-    // Copies / inventory (Master.md §12).
+    // Copies / inventory (Master.md 12).
     Route::middleware('permission:copies.create|copies.edit')->group(function (): void {
         Route::get('/copies', [LibrarianCopyController::class, 'index'])->name('copies.index');
         Route::get('/copies/create', [LibrarianCopyController::class, 'create'])->name('copies.create');
         Route::post('/copies', [LibrarianCopyController::class, 'store'])->middleware('permission:copies.create')->name('copies.store');
+        Route::post('/copies/barcode-batches/preview', [LibrarianCopyController::class, 'batchPreview'])->middleware('permission:barcodes.print_batch')->name('copies.barcode-batches.preview');
+        Route::post('/copies/barcode-batches/prepare', [LibrarianCopyController::class, 'batchPrepare'])->middleware('permission:barcodes.print_batch')->name('copies.barcode-batches.prepare');
+        Route::post('/copies/barcode-batches/printed', [LibrarianCopyController::class, 'batchMarkPrinted'])->middleware('permission:barcodes.print_batch')->name('copies.barcode-batches.printed');
         Route::get('/copies/{copy}', [LibrarianCopyController::class, 'show'])->name('copies.show');
-        Route::get('/copies/{copy}/label', [LibrarianCopyController::class, 'label'])->name('copies.label');
+        Route::get('/copies/{copy}/label', [LibrarianCopyController::class, 'label'])->middleware('permission:barcodes.print')->name('copies.label');
         Route::get('/copy-labels', [LibrarianCopyController::class, 'labels'])->middleware('permission:barcodes.print_batch')->name('copies.labels');
+        Route::post('/copies/{copy}/barcode', [LibrarianCopyController::class, 'assignBarcode'])->middleware('permission:copies.edit')->name('copies.barcode.assign');
+        Route::post('/copies/{copy}/barcode/confirm', [LibrarianCopyController::class, 'confirmBarcode'])->middleware('permission:copies.edit')->name('copies.barcode.confirm');
+        Route::post('/copies/{copy}/barcode/printed', [LibrarianCopyController::class, 'markLabelPrinted'])->middleware('permission:barcodes.print')->name('copies.barcode.printed');
         Route::get('/copies/{copy}/edit', [LibrarianCopyController::class, 'edit'])->middleware('permission:copies.edit')->name('copies.edit');
         Route::match(['PUT', 'PATCH'], '/copies/{copy}', [LibrarianCopyController::class, 'update'])->middleware('permission:copies.edit')->name('copies.update');
         Route::post('/copies/{copy}/status', [LibrarianCopyController::class, 'changeStatus'])->middleware('permission:copies.edit')->name('copies.status');
     });
 
-    // Circulation desk (Master.md §14).
+    // Circulation desk (Master.md 14).
     Route::middleware('permission:circulation.issue|circulation.return')->group(function (): void {
         Route::get('/circulation', [LibrarianCirculationController::class, 'dashboard'])->name('circulation');
         Route::get('/circulation/issue', [LibrarianCirculationController::class, 'issueForm'])->name('circulation.issue');
@@ -4763,7 +4623,7 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         Route::get('/circulation/reader-lookup', [LibrarianCirculationController::class, 'readerLookup'])->name('circulation.reader-lookup');
         Route::get('/circulation/copy-lookup', [LibrarianCirculationController::class, 'copyLookup'])->name('circulation.copy-lookup');
         Route::patch('/circulation/readers/{reader}', [LibrarianCirculationController::class, 'updateReader'])->name('circulation.reader.update');
-        // §9.4 — printable reader card with the scannable barcode.
+        // 9.4 — printable reader card with the scannable barcode.
         Route::get('/readers/{reader}/card', [LibrarianCirculationController::class, 'readerCard'])->name('readers.card');
     });
     Route::get('/circulation/history', [LibrarianCirculationController::class, 'history'])
@@ -4785,7 +4645,7 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         Route::post('/incidents/{incident}/assign', [LibrarianIncidentController::class, 'assign'])->middleware('permission:incidents.review')->name('incidents.assign');
     });
 
-    // Attendance (§9.4) — card scan at the entrance, independent of loans.
+    // Attendance (9.4) — card scan at the entrance, independent of loans.
     Route::middleware('permission:visits.record')->group(function (): void {
         Route::get('/visits', [LibrarianVisitController::class, 'index'])->name('visits.index');
         Route::get('/visits/lookup', [LibrarianVisitController::class, 'lookup'])->name('visits.lookup');
@@ -4798,17 +4658,19 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         Route::get('/inventory/{inventory}', [LibrarianInventoryController::class, 'show'])->name('inventory.show');
         Route::post('/inventory/{inventory}/start', [LibrarianInventoryController::class, 'start'])->middleware('permission:inventory.create')->name('inventory.start');
         Route::post('/inventory/{inventory}/scan', [LibrarianInventoryController::class, 'scan'])->middleware('permission:inventory.scan')->name('inventory.scan');
+        Route::post('/inventory/{inventory}/verify', [LibrarianInventoryController::class, 'verify'])->middleware('permission:inventory.scan')->name('inventory.verify');
+        Route::post('/inventory/{inventory}/copies/{copy}/location', [LibrarianInventoryController::class, 'confirmLocation'])->middleware('permission:inventory.scan')->name('inventory.location.confirm');
         Route::post('/inventory/{inventory}/complete', [LibrarianInventoryController::class, 'complete'])->middleware('permission:inventory.review')->name('inventory.complete');
         Route::post('/inventory/{inventory}/approve', [LibrarianInventoryController::class, 'approve'])->middleware('permission:inventory.approve')->name('inventory.approve');
         Route::get('/inventory/{inventory}/export', [LibrarianInventoryController::class, 'export'])->name('inventory.export');
     });
 
-    // Reservation queue (Master.md §13).
+    // Reservation queue (Master.md 13).
     Route::middleware('permission:reservation.confirm')->group(function (): void {
         Route::get('/reservations', [LibrarianReservationController::class, 'index'])->name('reservations.index');
         Route::post('/reservations/{reservation}/confirm', [LibrarianReservationController::class, 'confirm'])->name('reservations.confirm');
         Route::post('/reservations/{reservation}/ready', [LibrarianReservationController::class, 'markReady'])->name('reservations.ready');
-        // §8.3 — extend the pickup hold; the service refuses when anyone is queued.
+        // 8.3 — extend the pickup hold; the service refuses when anyone is queued.
         Route::post('/reservations/{reservation}/extend', [LibrarianReservationController::class, 'extend'])->name('reservations.extend');
         Route::post('/reservations/{reservation}/transfer', [LibrarianReservationController::class, 'requestTransfer'])->middleware('permission:reservation.manage_transfer')->name('reservations.transfer.request');
         Route::post('/transfers/{transfer}/approve', [LibrarianReservationController::class, 'approveTransfer'])->middleware('permission:reservation.manage_transfer')->name('transfers.approve');
@@ -4816,23 +4678,23 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         Route::post('/transfers/{transfer}/receive', [LibrarianReservationController::class, 'receiveTransfer'])->middleware('permission:reservation.manage_transfer')->name('transfers.receive');
         Route::post('/transfers/{transfer}/cancel', [LibrarianReservationController::class, 'cancelTransfer'])->middleware('permission:reservation.manage_transfer')->name('transfers.cancel');
         Route::post('/reservations/{reservation}/cancel', [LibrarianReservationController::class, 'cancel'])->middleware('permission:reservation.cancel_any')->name('reservations.cancel');
-        // §8 — releasing someone else's hold early is a cancellation in effect.
+        // 8 — releasing someone else's hold early is a cancellation in effect.
         Route::post('/reservations/{reservation}/pass-to-next', [LibrarianReservationController::class, 'passToNext'])->middleware('permission:reservation.cancel_any')->name('reservations.pass-to-next');
     });
 
-    // Fines and debts (Master.md §14.4-14.5).
+    // Fines and debts (Master.md 14.4-14.5).
     Route::middleware('permission:fines.view')->group(function (): void {
         Route::get('/fines', [LibrarianFineController::class, 'index'])->name('fines.index');
         Route::post('/fines/{fine}/resolve', [LibrarianFineController::class, 'resolve'])->middleware('permission:fines.manage')->name('fines.resolve');
     });
 
-    // Data quality workbench (Master.md §11).
-    // The cataloguer is the primary user of this workbench (ДИР §6) but must
+    // Data quality workbench (Master.md 11).
+    // The cataloguer is the primary user of this workbench (ДИР 6) but must
     // not reach the transitional /internal/* tools that `data_cleanup.access`
     // also gates, so cataloguing rights admit them here directly.
     Route::middleware('permission:data_cleanup.access|catalog.edit_record')->group(function (): void {
         Route::get('/data-cleanup', [LibrarianDataCleanupController::class, 'index'])->name('data-cleanup');
-        // One-at-a-time retyping console for cp1251 glyph damage (ДИР §6).
+        // One-at-a-time retyping console for cp1251 glyph damage (ДИР 6).
         Route::get('/data-cleanup/retype', [LibrarianDataCleanupController::class, 'retype'])
             ->name('data-cleanup.retype');
         Route::post('/data-cleanup/retype/{record}', [LibrarianDataCleanupController::class, 'storeRetype'])
@@ -4875,38 +4737,102 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         Route::post('/imports/batches/{batch}/execute', [LibrarianDataQualityController::class, 'executeImport'])->middleware('permission:data_quality.import')->name('imports.execute');
     });
 
-    // Scientific repository moderation (Master.md §20).
-    Route::middleware('permission:repository.upload|repository.approve|repository.publish')->group(function (): void {
+    Route::middleware('permission:digital.upload|digital.review_metadata|digital.review_rights|digital.approve|digital.publish')->group(function (): void {
+        Route::get('/digital-materials', [LibrarianDigitalMaterialController::class, 'index'])->name('digital-materials.index');
+        Route::get('/digital-materials/{material}/edit', [LibrarianDigitalMaterialController::class, 'edit'])->name('digital-materials.edit');
+        Route::patch('/digital-materials/{material}', [LibrarianDigitalMaterialController::class, 'update'])->name('digital-materials.update');
+        Route::post('/digital-materials/{material}/transition', [LibrarianDigitalMaterialController::class, 'transition'])->name('digital-materials.transition');
+    });
+
+    // Scientific repository moderation (Master.md 20).
+    Route::middleware('permission:repository.upload|repository.review_metadata|repository.review_rights|repository.request_changes|repository.approve|repository.publish|repository.withdraw')->group(function (): void {
         Route::get('/repository', [LibrarianRepositoryController::class, 'index'])->name('repository');
         Route::get('/repository/create', [LibrarianRepositoryController::class, 'create'])->middleware('permission:repository.upload')->name('repository.create');
         Route::post('/repository', [LibrarianRepositoryController::class, 'store'])->middleware('permission:repository.upload')->name('repository.store');
         Route::get('/repository/{item}/edit', [LibrarianRepositoryController::class, 'edit'])->name('repository.edit');
+        Route::get('/repository/{item}/file', [LibrarianRepositoryController::class, 'file'])->name('repository.file');
         Route::match(['PUT', 'PATCH'], '/repository/{item}', [LibrarianRepositoryController::class, 'update'])
-            ->middleware('permission:repository.upload|repository.approve')
+            ->middleware('permission:repository.upload|repository.edit')
             ->name('repository.update');
+        Route::post('/repository/{item}/revisions', [LibrarianRepositoryController::class, 'revise'])
+            ->middleware('permission:repository.manage_versions')
+            ->name('repository.revisions.store');
         Route::post('/repository/{item}/transition', [LibrarianRepositoryController::class, 'transition'])->name('repository.transition');
     });
 
-    // News desk — edit_own scope (Master.md §16, §22).
+    // News desk — edit_own scope (Master.md 16, 22).
     Route::middleware('permission:news.create|news.edit_own')->group(function (): void {
         Route::get('/news', [LibrarianNewsController::class, 'index'])->name('news.index');
         Route::get('/news/create', [LibrarianNewsController::class, 'create'])->middleware('permission:news.create')->name('news.create');
         Route::post('/news', [LibrarianNewsController::class, 'store'])->middleware('permission:news.create')->name('news.store');
         Route::get('/news/{news}/edit', [LibrarianNewsController::class, 'edit'])->name('news.edit');
+        Route::get('/news/{news}/preview', [LibrarianNewsController::class, 'preview'])->middleware(['signed', 'private.response'])->name('news.preview');
         Route::match(['PUT', 'PATCH'], '/news/{news}', [LibrarianNewsController::class, 'update'])->name('news.update');
+        Route::post('/news/{news}/autosave', [LibrarianNewsController::class, 'autosave'])->middleware('throttle:12,1')->name('news.autosave');
+        Route::post('/news/{news}/transition', [LibrarianNewsController::class, 'transition'])->middleware('permission:news.submit_for_review|news.review|news.request_changes|news.approve|news.schedule|news.publish|news.archive|news.cancel')->name('news.transition');
+        Route::post('/news/{news}/emergency-publish', [LibrarianNewsController::class, 'emergencyPublish'])->middleware('permission:news.publish_emergency')->name('news.emergency-publish');
+        Route::get('/news-calendar', [LibrarianNewsController::class, 'calendar'])->middleware('permission:news.view_internal')->name('news.calendar');
+    });
+    Route::prefix('annual-content-plans')->name('news.plans.')->middleware('permission:news.manage_annual_plan')->group(function (): void {
+        Route::get('/', [LibrarianAnnualContentPlanController::class, 'index'])->name('index');
+        Route::post('/', [LibrarianAnnualContentPlanController::class, 'store'])->name('store');
+        Route::get('/{plan}', [LibrarianAnnualContentPlanController::class, 'show'])->name('show');
+        Route::post('/{plan}/transition', [LibrarianAnnualContentPlanController::class, 'transition'])->name('transition');
+        Route::post('/{plan}/items', [LibrarianAnnualContentPlanController::class, 'storeItem'])->name('items.store');
+        Route::post('/items/{item}/complete', [LibrarianAnnualContentPlanController::class, 'completeItem'])->name('items.complete');
     });
 
-    // Operational reports (Historical §22.2) — the reports.view_ops scope.
-    Route::middleware('permission:reports.view_ops|reports.view_full')->group(function (): void {
-        Route::get('/reports', [LibrarianReportController::class, 'index'])->name('reports.index');
-        Route::get('/reports/{type}/export', [LibrarianReportController::class, 'export'])->middleware('permission:reports.export')->name('reports.export');
+    // Unified reports. Definition-level authorization in the controllers is
+    // intentional: acquisitions, finance, quality and analytics specialists
+    // receive only their own aggregate dataset, never the blanket ops scope.
+    Route::middleware('private.response')->group(function (): void {
+        Route::prefix('/reports/official')->name('reports.official.')->group(function (): void {
+            Route::get('/', [LibrarianOfficialReportController::class, 'index'])->name('index');
+            Route::post('/', [LibrarianOfficialReportController::class, 'store'])->name('store');
+            Route::get('/exports/{export}', [LibrarianOfficialReportController::class, 'exportStatus'])->middleware('throttle:120,1')->name('exports.status');
+            Route::post('/exports/{export}/retry', [LibrarianOfficialReportController::class, 'retryExport'])->middleware('throttle:10,1')->name('exports.retry');
+            Route::get('/exports/{export}/download', [LibrarianOfficialReportController::class, 'downloadExport'])->middleware('private.response')->name('exports.download');
+            Route::get('/{snapshot}', [LibrarianOfficialReportController::class, 'show'])->name('show');
+            Route::post('/{snapshot}/submit', [LibrarianOfficialReportController::class, 'submit'])->name('submit');
+            Route::post('/{snapshot}/approve', [LibrarianOfficialReportController::class, 'approve'])->name('approve');
+            Route::post('/{snapshot}/reject', [LibrarianOfficialReportController::class, 'reject'])->name('reject');
+            Route::post('/{snapshot}/archive', [LibrarianOfficialReportController::class, 'archive'])->name('archive');
+            Route::post('/{snapshot}/revisions', [LibrarianOfficialReportController::class, 'revise'])->name('revisions.store');
+            Route::delete('/{snapshot}', [LibrarianOfficialReportController::class, 'destroy'])->name('destroy');
+            Route::get('/{snapshot}/source', [LibrarianOfficialReportController::class, 'source'])->middleware('private.response')->name('source');
+            Route::post('/{snapshot}/exports', [LibrarianOfficialReportController::class, 'export'])->middleware('throttle:10,1')->name('exports.store');
+        });
+        Route::get('/reports', [LibrarianReportController::class, 'index'])->middleware('throttle:30,1')->name('reports.index');
+        Route::get('/reports/{type}/export/{format?}', [LibrarianReportController::class, 'export'])->middleware(['permission:reports.export', 'throttle:10,1'])->name('reports.export');
+        Route::get('/reports/{type}/print', [LibrarianReportController::class, 'print'])->middleware(['permission:reports.export', 'throttle:10,1'])->name('reports.print');
     });
 
-    // Reader inquiries (Historical §5.11: view + resolve, no delete).
-    Route::middleware('permission:messages.view_all')->group(function (): void {
+    // External-resource approval desk. Unlike /admin, this route is reachable
+    // by the library director and exposes no contract files or internal notes.
+    Route::get('/external-resources/review', [AdminExternalResourceController::class, 'reviewQueue'])
+        ->middleware('permission:external_resources.review|external_resources.publish')
+        ->name('external-resources.review');
+    Route::post('/external-resources/{externalResource}/workflow', [AdminExternalResourceController::class, 'workflow'])
+        ->middleware('permission:external_resources.review|external_resources.publish')
+        ->name('external-resources.workflow');
+
+    // Reader inquiries (Historical 5.11: view + resolve, no delete).
+    Route::middleware('permission:messages.view_all|messages.view_assigned')->group(function (): void {
         Route::get('/messages', [LibrarianMessageController::class, 'index'])->name('messages.index');
         Route::get('/messages/{message}', [LibrarianMessageController::class, 'show'])->name('messages.show');
-        Route::patch('/messages/{message}', [LibrarianMessageController::class, 'update'])->middleware('permission:messages.resolve')->name('messages.update');
+        Route::post('/messages/{message}/take', [LibrarianMessageController::class, 'take'])->name('messages.take');
+        Route::patch('/messages/{message}/assignment', [LibrarianMessageController::class, 'assign'])->name('messages.assign');
+        Route::patch('/messages/{message}/priority', [LibrarianMessageController::class, 'priority'])->name('messages.priority');
+        Route::post('/messages/{message}/reply', [LibrarianMessageController::class, 'reply'])->name('messages.reply');
+        Route::post('/messages/{message}/clarification', [LibrarianMessageController::class, 'clarification'])->name('messages.clarification');
+        Route::post('/messages/{message}/notes', [LibrarianMessageController::class, 'note'])->name('messages.notes');
+        Route::post('/messages/{message}/prepare-response', [LibrarianMessageController::class, 'prepare'])->name('messages.prepare');
+        Route::post('/messages/{message}/approve-response', [LibrarianMessageController::class, 'approve'])->name('messages.approve');
+        Route::post('/messages/{message}/return-response', [LibrarianMessageController::class, 'returnResponse'])->name('messages.return-response');
+        Route::post('/messages/{message}/reject', [LibrarianMessageController::class, 'reject'])->name('messages.reject');
+        Route::post('/messages/{message}/close', [LibrarianMessageController::class, 'close'])->name('messages.close');
+        Route::post('/messages/{message}/reopen', [LibrarianMessageController::class, 'reopen'])->name('messages.reopen');
+        Route::get('/messages/{message}/attachments/{attachment}', [LibrarianMessageController::class, 'attachment'])->name('messages.attachments.show');
     });
 });
 
@@ -4915,19 +4841,19 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
 // redirected to their own operational shells via the standard 403 flow.
 // The transitional /account route is retained and unchanged for now.
 Route::prefix('dashboard')->middleware(['auth', 'library.auth', 'member.reader', 'private.response'])->name('member.')->group(function (): void {
-    // Personal cabinet (Master.md §15) — every screen is backed by the
+    // Personal cabinet (Master.md 15) — every screen is backed by the
     // canonical circulation schema and scoped to the signed-in reader inside
     // CabinetController, never merely by what the view chooses to render.
     Route::get('/', [MemberCabinetController::class, 'dashboard'])->name('dashboard');
 
-    // §15.2 / §5.3 — materials on hand and reader-initiated renewal.
+    // 15.2 / 5.3 — materials on hand and reader-initiated renewal.
     Route::get('/loans', [MemberCabinetController::class, 'loans'])->name('loans');
     Route::get('/card', [MemberCabinetController::class, 'ticket'])->name('card');
     Route::post('/card/printed', [MemberCabinetController::class, 'cardPrinted'])->middleware('throttle:20,1')->name('card.printed');
     Route::redirect('/ticket', '/dashboard/card')->name('ticket.legacy');
     Route::post('/loans/{loan}/renew', [MemberCabinetController::class, 'renewLoan'])->middleware('throttle:10,1')->name('loans.renew');
 
-    // §13.1, §15.3 — the reader's own reservation queue.
+    // 13.1, 15.3 — the reader's own reservation queue.
     Route::get('/reservations', [MemberCabinetController::class, 'reservations'])->name('reservations');
     Route::post('/reservations', [MemberCabinetController::class, 'storeReservation'])
         ->middleware('permission:reservation.create')
@@ -4947,13 +4873,13 @@ Route::prefix('dashboard')->middleware(['auth', 'library.auth', 'member.reader',
     Route::post('/collections/{collection}/follow', [MemberCollectionController::class, 'follow'])->name('collections.follow');
     Route::post('/collections/{collection}/copy', [MemberCollectionController::class, 'copy'])->name('collections.copy');
 
-    // §15.4 — closed loans; §15.5 — the reader's own debts (read-only).
+    // 15.4 — closed loans; 15.5 — the reader's own debts (read-only).
     Route::get('/history', [MemberCabinetController::class, 'history'])->name('history');
     Route::get('/fines', [MemberCabinetController::class, 'fines'])->name('fines');
     Route::get('/incidents', [MemberIncidentController::class, 'index'])->name('incidents.index');
     Route::get('/incidents/{incident}', [MemberIncidentController::class, 'show'])->name('incidents.show');
 
-    // In-app reader notifications (Master.md §15.6) — real ReaderNotification feed.
+    // In-app reader notifications (Master.md 15.6) — real ReaderNotification feed.
     Route::get('/notifications', [MemberNotificationController::class, 'index'])->name('notifications');
     Route::post('/notifications/read-all', [MemberNotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('/notifications/{notification}/read', [MemberNotificationController::class, 'markRead'])->name('notifications.read');
@@ -4966,7 +4892,12 @@ Route::prefix('dashboard')->middleware(['auth', 'library.auth', 'member.reader',
     Route::get('/messages/{message}', [MemberPortalController::class, 'message'])->name('messages.show');
 
     Route::post('/messages', [ContactMessageSubmissionController::class, 'store'])
+        ->middleware(['permission:messages.submit', 'throttle:5,10'])
         ->name('messages.store');
+    Route::post('/messages/{message}/reply', [ContactMessageSubmissionController::class, 'reply'])->middleware(['permission:messages.reply_own', 'throttle:10,10'])->name('messages.reply');
+    Route::post('/messages/{message}/reopen', [ContactMessageSubmissionController::class, 'reopen'])->middleware(['permission:messages.reply_own', 'throttle:3,60'])->name('messages.reopen');
+    Route::post('/messages/{message}/feedback', [ContactMessageSubmissionController::class, 'feedback'])->middleware('permission:messages.reply_own')->name('messages.feedback');
+    Route::get('/messages/{message}/attachments/{attachment}', [ContactMessageSubmissionController::class, 'attachment'])->middleware('permission:messages.view_own')->name('messages.attachments.show');
 });
 
 Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->name('admin.')->group(function (): void {
@@ -5020,26 +4951,38 @@ Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->n
     Route::get('/news/export', [AdminNewsController::class, 'export'])
         ->middleware(['permission:reports.export', 'permission:news.edit_any'])
         ->name('news.export');
+    Route::get('/news-categories', [AdminNewsController::class, 'categories'])->middleware('permission:news.manage_categories')->name('news.categories');
+    Route::post('/news-categories', [AdminNewsController::class, 'storeCategory'])->middleware('permission:news.manage_categories')->name('news.categories.store');
+    Route::patch('/news-categories/{category}', [AdminNewsController::class, 'updateCategory'])->middleware('permission:news.manage_categories')->name('news.categories.update');
+    Route::get('/news-analytics', [AdminNewsController::class, 'analytics'])->middleware('permission:news.view_analytics')->name('news.analytics');
     Route::get('/news', [AdminNewsController::class, 'index'])->middleware('permission:news.edit_any|news.edit_own')->name('news.index');
     Route::get('/news/create', [AdminNewsController::class, 'create'])->middleware('permission:news.create')->name('news.create');
     Route::post('/news', [AdminNewsController::class, 'store'])->middleware('permission:news.create')->name('news.store');
     Route::get('/news/{news}/edit', [AdminNewsController::class, 'edit'])->middleware('permission:news.edit_any|news.edit_own')->name('news.edit');
     Route::match(['PUT', 'PATCH'], '/news/{news}', [AdminNewsController::class, 'update'])->middleware('permission:news.edit_any|news.edit_own')->name('news.update');
-    Route::delete('/news/{news}', [AdminNewsController::class, 'destroy'])->middleware('permission:news.delete')->name('news.destroy');
+    Route::post('/news/{news}/autosave', [AdminNewsController::class, 'autosave'])->middleware(['permission:news.edit_any|news.edit_own', 'throttle:12,1'])->name('news.autosave');
+    Route::post('/news/{news}/transition', [AdminNewsController::class, 'transition'])->middleware('permission:news.submit_for_review|news.review|news.request_changes|news.approve|news.schedule|news.publish|news.archive|news.cancel')->name('news.transition');
+    Route::post('/news/{news}/emergency-publish', [AdminNewsController::class, 'emergencyPublish'])->middleware('permission:news.publish_emergency')->name('news.emergency-publish');
+    Route::delete('/news/{news}', [AdminNewsController::class, 'destroy'])->middleware('permission:news.delete_draft')->name('news.destroy');
 
     Route::get('/messages/export', [ContactMessageController::class, 'export'])
-        ->middleware(['permission:reports.export', 'permission:messages.view_all'])
+        ->middleware(['permission:reports.export', 'permission:messages.view_analytics'])
         ->name('messages.export');
-    Route::middleware('permission:messages.view_all')->group(function (): void {
-        Route::get('/messages/{message}/attachments/{index}', [ContactMessageController::class, 'attachment'])
-            ->whereNumber('index')
-            ->name('messages.attachments');
+    Route::middleware('permission:messages.view_assigned')->group(function (): void {
         Route::get('/messages', [ContactMessageController::class, 'index'])->name('messages.index');
         Route::get('/messages/{message}', [ContactMessageController::class, 'show'])->name('messages.show');
+        Route::get('/messages/{message}/attachments/{attachment}', [ContactMessageController::class, 'attachment'])->name('messages.attachments.show');
         Route::get('/feedback', [ContactMessageController::class, 'index'])->name('feedback');
     });
-    Route::patch('/messages/{message}', [ContactMessageController::class, 'update'])->middleware('permission:messages.resolve')->name('messages.update');
-    Route::delete('/messages/{message}', [ContactMessageController::class, 'destroy'])->middleware('permission:messages.delete')->name('messages.destroy');
+    Route::patch('/messages/{message}', [ContactMessageController::class, 'update'])->middleware('permission:messages.assign|messages.reassign|messages.change_priority')->name('messages.update');
+    Route::get('/message-categories', [ContactMessageController::class, 'categories'])->middleware('permission:messages.manage_categories')->name('messages.categories');
+    Route::post('/message-categories', [ContactMessageController::class, 'storeCategory'])->middleware('permission:messages.manage_categories')->name('messages.categories.store');
+    Route::patch('/message-categories/{category}', [ContactMessageController::class, 'updateCategory'])->middleware('permission:messages.manage_categories')->name('messages.categories.update');
+    Route::delete('/message-categories/{category}', [ContactMessageController::class, 'destroyCategory'])->middleware('permission:messages.manage_categories')->name('messages.categories.destroy');
+    Route::get('/message-routing', [ContactMessageController::class, 'routing'])->middleware('permission:messages.manage_routing')->name('messages.routing');
+    Route::post('/message-routing', [ContactMessageController::class, 'storeRouting'])->middleware('permission:messages.manage_routing')->name('messages.routing.store');
+    Route::patch('/message-routing/{rule}', [ContactMessageController::class, 'updateRouting'])->middleware('permission:messages.manage_routing')->name('messages.routing.update');
+    Route::get('/message-analytics', [ContactMessageController::class, 'analytics'])->middleware('permission:messages.view_analytics')->name('messages.analytics');
 
     Route::middleware('permission:reports.view_full')->group(function (): void {
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
@@ -5053,9 +4996,24 @@ Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->n
         Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
         Route::patch('/settings', [SettingController::class, 'update'])->name('settings.update');
         Route::patch('/settings/notifications', [SettingController::class, 'updateNotifications'])->name('settings.notifications');
-        Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
-        Route::post('/integrations/check', [IntegrationController::class, 'check'])->name('integrations.check');
+        Route::get('/system', [SystemController::class, 'index'])->name('system.index');
+        Route::post('/system/backups', [SystemController::class, 'createBackup'])->middleware('throttle:2,10')->name('system.backups.create');
+        Route::post('/system/backups/{backup}/restore-test', [SystemController::class, 'restoreTest'])->middleware('throttle:1,10')->name('system.backups.restore-test');
     });
+
+    Route::middleware('permission:integrations.view')->group(function (): void {
+        Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
+        Route::get('/integrations/{integration}', [IntegrationController::class, 'show'])->name('integrations.show');
+    });
+    Route::post('/integrations/check', [IntegrationController::class, 'check'])->middleware(['permission:integrations.health', 'throttle:10,1'])->name('integrations.check');
+    Route::post('/integrations/{integration}/health', [IntegrationController::class, 'health'])->middleware(['permission:integrations.health', 'throttle:10,1'])->name('integrations.health');
+    Route::post('/integrations/{integration}/toggle', [IntegrationController::class, 'toggle'])->middleware(['permission:integrations.manage', 'throttle:10,1'])->name('integrations.toggle');
+    Route::post('/integrations/{integration}/dry-run', [IntegrationController::class, 'dryRun'])->middleware(['permission:integrations.sync', 'throttle:5,1'])->name('integrations.dry-run');
+    Route::post('/integrations/{integration}/sync', [IntegrationController::class, 'startSync'])->middleware(['permission:integrations.sync', 'throttle:5,1'])->name('integrations.sync');
+    Route::post('/integrations/{integration}/reconcile', [IntegrationController::class, 'reconcile'])->middleware(['permission:integrations.reconcile', 'throttle:5,1'])->name('integrations.reconcile');
+    Route::post('/integrations/{integration}/mappings', [IntegrationController::class, 'storeMapping'])->middleware('permission:integrations.manage_mapping')->name('integrations.mappings.store');
+    Route::post('/integrations/{integration}/outbox/{message}/retry', [IntegrationController::class, 'retry'])->middleware(['permission:integrations.retry', 'throttle:10,1'])->name('integrations.outbox.retry');
+    Route::post('/integrations/{integration}/conflicts/{conflict}/resolve', [IntegrationController::class, 'resolveConflict'])->middleware('permission:integrations.resolve_conflicts')->name('integrations.conflicts.resolve');
 
     Route::middleware('permission:branches.manage')->group(function (): void {
         Route::get('/branches', [BranchController::class, 'index'])->name('branches.index');
@@ -5067,6 +5025,9 @@ Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->n
         Route::delete('/funds/{fund}', [FundController::class, 'destroy'])->name('funds.destroy');
     });
 
+    Route::post('/external-resources/{externalResource}/workflow', [AdminExternalResourceController::class, 'workflow'])
+        ->middleware('permission:external_resources.manage|external_resources.publish')
+        ->name('external-resources.workflow');
     Route::resource('external-resources', AdminExternalResourceController::class)
         ->except('show')
         ->middleware('permission:external_resources.manage');
@@ -5079,7 +5040,6 @@ Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->n
         ->name('data-cleanup');
 });
 
-// SPA shell — React Router handles client-side routing under /app
-Route::get('/app/{any?}', function () {
-    return view('spa');
-})->where('any', '.*');
+// Retired prototype React catalog shell. Keep a permanent redirect for old
+// bookmarks while the only canonical public catalog remains /catalog.
+Route::get('/app/{any?}', fn () => redirect('/catalog', 301))->where('any', '.*');

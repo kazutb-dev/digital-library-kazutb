@@ -17,7 +17,7 @@ use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Reservation lifecycle (Master.md §13): a reader reserves an EDITION, the
+ * Reservation lifecycle (Master.md 13): a reader reserves an EDITION, the
  * system works with copies. Covers all three canonical scenarios — free copy,
  * queue, and no-show expiry — plus the return-desk handoff to the queue.
  */
@@ -41,7 +41,7 @@ class ReservationQueueService
                 throw CirculationException::because('reader_blocked', ['reason' => (string) $profile->block_reason]);
             }
 
-            // §13.3: no duplicate active reservation on the same edition.
+            // 13.3: no duplicate active reservation on the same edition.
             $duplicate = Reservation::query()
                 ->where('user_id', $reader->getKey())
                 ->where('bibliographic_record_id', $record->getKey())
@@ -143,11 +143,11 @@ class ReservationQueueService
                 actionType: 'reservation.create',
                 entityType: 'reservation',
                 entityId: $reservation->getKey(),
-                newValues: [
+                oldValues: ['exists' => false],
+                newValues: ['exists' => true] + $this->reservationSnapshot($reservation),
+                metadata: [
                     'reader_id' => $reader->getKey(),
                     'record_id' => $record->getKey(),
-                    'assigned_copy_id' => $reservation->assigned_copy_id,
-                    'queue_sequence' => $reservation->queue_sequence,
                 ],
                 scope: 'library',
                 actor: $actor ?? $reader,
@@ -168,7 +168,7 @@ class ReservationQueueService
     }
 
     /**
-     * §8 action "assign a copy": when $chosenCopy is given the librarian has
+     * 8 action "assign a copy": when $chosenCopy is given the librarian has
      * picked a specific copy by hand instead of letting the system take the
      * first free one.
      */
@@ -179,6 +179,7 @@ class ReservationQueueService
             if (! in_array($reservation->status, ['pending', 'queued'], true)) {
                 throw CirculationException::because('reservation_not_pending');
             }
+            $oldValues = $this->reservationSnapshot($reservation);
 
             // A hand-picked copy replaces whatever the system pinned earlier,
             // so the librarian's choice wins even on an already-assigned row.
@@ -210,7 +211,8 @@ class ReservationQueueService
                 actionType: 'reservation.confirm',
                 entityType: 'reservation',
                 entityId: $reservation->getKey(),
-                newValues: ['assigned_copy_id' => $reservation->assigned_copy_id],
+                oldValues: $oldValues,
+                newValues: $this->reservationSnapshot($reservation->fresh()),
                 scope: 'library',
                 actor: $staff,
             );
@@ -241,6 +243,7 @@ class ReservationQueueService
             if (! in_array($reservation->status, ['confirmed', 'in_transit'], true) || $reservation->assigned_copy_id === null) {
                 throw CirculationException::because('reservation_not_confirmable');
             }
+            $oldValues = $this->reservationSnapshot($reservation);
 
             $lifespanDays = (int) Setting::valueFor('reservation_hold_days', Setting::valueFor('reservation_lifespan_days', 1));
             $this->states->transition($reservation, 'ready_for_pickup', 'reservation.ready', $staff, changes: [
@@ -255,7 +258,8 @@ class ReservationQueueService
                 actionType: 'reservation.ready',
                 entityType: 'reservation',
                 entityId: $reservation->getKey(),
-                newValues: ['expires_at' => $reservation->expires_at?->toIso8601String()],
+                oldValues: $oldValues,
+                newValues: $this->reservationSnapshot($reservation->fresh()),
                 scope: 'library',
                 actor: $staff,
             );
@@ -288,6 +292,7 @@ class ReservationQueueService
             if (! $byStaff && (int) $reservation->user_id !== (int) $actor->getKey()) {
                 throw CirculationException::because('reservation_not_own');
             }
+            $oldValues = $this->reservationSnapshot($reservation);
 
             $transfer = CopyTransfer::query()
                 ->where('reservation_id', $reservation->getKey())
@@ -299,10 +304,12 @@ class ReservationQueueService
                 throw CirculationException::because('transfer_already_sent');
             }
             if ($transfer !== null) {
+                $transferBefore = $transfer->only(['status', 'cancel_reason']);
                 $transfer->update(['status' => 'cancelled', 'cancel_reason' => $reason ?? 'Reservation cancelled']);
                 $this->audit->logRequired(
                     actionType: 'transfer.cancel', entityType: 'copy_transfer', entityId: $transfer->getKey(),
-                    newValues: ['status' => 'cancelled'], reason: $reason, scope: 'library', actor: $actor,
+                    oldValues: $transferBefore,
+                    newValues: $transfer->only(['status', 'cancel_reason']), reason: $reason, scope: 'library', actor: $actor,
                 );
             }
 
@@ -322,7 +329,10 @@ class ReservationQueueService
                 actionType: 'reservation.cancel',
                 entityType: 'reservation',
                 entityId: $reservation->getKey(),
-                newValues: ['cancelled_by' => $byStaff ? 'staff' : 'reader'],
+                oldValues: $oldValues,
+                newValues: $this->reservationSnapshot($reservation->fresh()) + [
+                    'cancelled_by_role' => $byStaff ? 'staff' : 'reader',
+                ],
                 reason: $reason,
                 scope: 'library',
                 actor: $actor,
@@ -344,7 +354,7 @@ class ReservationQueueService
     }
 
     /**
-     * §8.3 — stretch the pickup hold by another lifespan window. Allowed only
+     * 8.3 — stretch the pickup hold by another lifespan window. Allowed only
      * when nobody is next in line: the queue outranks a reader who has not
      * turned up yet.
      */
@@ -404,7 +414,7 @@ class ReservationQueueService
     }
 
     /**
-     * §8 action "hand it to the next in line": the current holder has declined
+     * 8 action "hand it to the next in line": the current holder has declined
      * or failed to appear and the librarian releases the copy early, without
      * waiting for the hold to lapse. Refuses when nobody is waiting — use
      * cancel() for that, which returns the copy to the shelf.
@@ -419,6 +429,7 @@ class ReservationQueueService
             if (! $this->insights->hasWaitingQueue($reservation)) {
                 throw CirculationException::because('reservation_no_next_in_queue');
             }
+            $oldValues = $this->reservationSnapshot($reservation);
 
             $copy = BookCopy::query()->whereKey($reservation->assigned_copy_id)->lockForUpdate()->first();
 
@@ -437,7 +448,8 @@ class ReservationQueueService
                 actionType: 'reservation.pass_to_next',
                 entityType: 'reservation',
                 entityId: $reservation->getKey(),
-                newValues: ['released_copy_id' => $copy?->getKey()],
+                oldValues: $oldValues,
+                newValues: $this->reservationSnapshot($reservation->fresh()) + ['released_copy_id' => $copy?->getKey()],
                 reason: $reason,
                 scope: 'library',
                 actor: $staff,
@@ -463,7 +475,7 @@ class ReservationQueueService
     }
 
     /**
-     * §8.2 — record or clear the manual "this copy is travelling from branch X"
+     * 8.2 — record or clear the manual "this copy is travelling from branch X"
      * marker. Informational only: no stock is moved and no workflow starts.
      */
     public function setTransferNote(Reservation $reservation, User $staff, ?int $branchId): Reservation
@@ -489,6 +501,7 @@ class ReservationQueueService
      */
     public function fulfill(Reservation $reservation, User $staff, Loan $loan): Reservation
     {
+        $oldValues = $this->reservationSnapshot($reservation);
         $this->states->transition($reservation, 'fulfilled', 'reservation.fulfilled', $staff, changes: [
             'queue_position' => null, 'fulfilled_at' => now(), 'expires_at' => null,
         ]);
@@ -497,7 +510,8 @@ class ReservationQueueService
             actionType: 'reservation.fulfill',
             entityType: 'reservation',
             entityId: $reservation->getKey(),
-            newValues: ['loan_id' => $loan->getKey()],
+            oldValues: $oldValues,
+            newValues: $this->reservationSnapshot($reservation->fresh()) + ['loan_id' => $loan->getKey()],
             scope: 'library',
             actor: $staff,
         );
@@ -506,7 +520,7 @@ class ReservationQueueService
     }
 
     /**
-     * Return-desk handoff (§13.2 scenario 2): the first queued reservation
+     * Return-desk handoff (13.2 scenario 2): the first queued reservation
      * for this edition claims the returned copy and becomes ready for pickup.
      * Returns false when nobody is waiting.
      */
@@ -545,12 +559,21 @@ class ReservationQueueService
         if ($resolutionReason !== null) {
             // Strict FIFO: do not silently skip an ineligible first reader.
             // Hold the returned copy for an explicit staff decision instead.
+            $oldValues = [
+                'reservation' => $this->reservationSnapshot($next),
+                'copy' => $copy->only(['status', 'condition']),
+            ];
             $next->update(['requires_resolution' => true, 'resolution_reason' => $resolutionReason]);
             $copy->update(['status' => 'reserved_stock']);
             $this->states->record($next, 'reservation.requires_resolution', $staff, new: ['reason' => $resolutionReason]);
             $this->audit->logRequired(
                 actionType: 'reservation.requires_resolution', entityType: 'reservation', entityId: $next->getKey(),
-                newValues: ['reason' => $resolutionReason, 'copy_id' => $copy->getKey()], scope: 'library', actor: $staff,
+                oldValues: $oldValues,
+                newValues: [
+                    'reservation' => $this->reservationSnapshot($next->fresh()),
+                    'copy' => $copy->fresh()->only(['status', 'condition']),
+                    'reason' => $resolutionReason,
+                ], scope: 'library', actor: $staff,
             );
             if ($reader !== null) {
                 $this->notifications->sendLocalized(
@@ -583,7 +606,7 @@ class ReservationQueueService
     }
 
     /**
-     * Scheduled sweep (§13.2 scenario 3): expired pickup holds are released —
+     * Scheduled sweep (13.2 scenario 3): expired pickup holds are released —
      * the copy goes to the next reader in the queue or back to the shelf.
      *
      * @return array{expired: int}
@@ -629,16 +652,24 @@ class ReservationQueueService
                         if ($copy?->activeLoan()->exists()) {
                             return;
                         }
+                        $oldValues = [
+                            'reservation' => $this->reservationSnapshot($locked),
+                            'copy' => $copy?->only(['status', 'condition']),
+                        ];
                         $this->states->transition($locked, 'expired', 'reservation.expired', ['name' => 'Scheduler', 'role' => 'system'], changes: [
                             'assigned_copy_id' => null, 'expired_at' => now(), 'expires_at' => null,
                         ]);
                         $expired++;
 
-                        $this->audit->log(
+                        $this->audit->logRequired(
                             actionType: 'reservation.expire',
                             entityType: 'reservation',
                             entityId: $locked->getKey(),
-                            newValues: ['expired_at' => now()->toIso8601String()],
+                            oldValues: $oldValues,
+                            newValues: [
+                                'reservation' => $this->reservationSnapshot($locked->fresh()),
+                                'copy' => $copy?->fresh()?->only(['status', 'condition']),
+                            ],
                             scope: 'library',
                             actor: ['name' => 'Scheduler', 'role' => 'system'],
                         );
@@ -717,6 +748,24 @@ class ReservationQueueService
                 $copy->update(['status' => 'available']);
             }
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function reservationSnapshot(Reservation $reservation): array
+    {
+        return [
+            'status' => $reservation->status,
+            'assigned_copy_id' => $reservation->assigned_copy_id,
+            'queue_position' => $reservation->queue_position,
+            'queue_sequence' => $reservation->queue_sequence,
+            'requires_resolution' => (bool) $reservation->requires_resolution,
+            'resolution_reason' => $reservation->resolution_reason,
+            'ready_at' => $reservation->ready_at?->toIso8601String(),
+            'expires_at' => $reservation->expires_at?->toIso8601String(),
+            'fulfilled_at' => $reservation->fulfilled_at?->toIso8601String(),
+            'cancelled_at' => $reservation->cancelled_at?->toIso8601String(),
+            'expired_at' => $reservation->expired_at?->toIso8601String(),
+        ];
     }
 
     private function nextReservationNumber(): string

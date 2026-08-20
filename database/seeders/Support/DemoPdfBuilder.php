@@ -114,7 +114,7 @@ final class DemoPdfBuilder
             'lines' => [
                 $title,
                 '',
-                'KazUTB',
+                'Scientific Library',
                 'Sample digital material for the controlled reading room.',
                 '',
                 'This file is generated demo data. It is not a real publication.',
@@ -199,7 +199,7 @@ final class DemoPdfBuilder
         $infoId = max(array_keys($objects)) + 1;
         $offsets[$infoId] = strlen($pdf);
         $pdf .= sprintf(
-            "%d 0 obj\n<< /Title (%s) /Producer (KazUTB demo seeder) >>\nendobj\n",
+            "%d 0 obj\n<< /Title (%s) /Producer (Scientific Library development seeder) >>\nendobj\n",
             $infoId,
             $this->escapeText($documentTitle),
         );

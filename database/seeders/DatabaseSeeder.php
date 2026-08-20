@@ -19,12 +19,15 @@ class DatabaseSeeder extends Seeder
         $this->call([
             PermissionSeeder::class,
             RoleSeeder::class,
+            NewsCategorySeeder::class,
+            MessageCategorySeeder::class,
             DemoUserSeeder::class,
             SettingsSeeder::class,
             LibraryStructureSeeder::class,
             ExternalResourceSeeder::class,
             UdcCodeSeeder::class,
             LibraryCatalogSeeder::class,
+            RepositorySeeder::class,
         ]);
     }
 }

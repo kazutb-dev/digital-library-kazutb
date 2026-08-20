@@ -19,6 +19,11 @@ services:
     # Do NOT expose port to host in production
     expose:
       - "5432"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -41,23 +46,78 @@ services:
       APP_KEY: "${APP_KEY:?Set APP_KEY}"
       APP_DEBUG: "false"
       APP_URL: "${APP_URL:?Set APP_URL}"
+      APP_LOCALE: "${APP_LOCALE:-ru}"
+      APP_FALLBACK_LOCALE: "${APP_FALLBACK_LOCALE:-ru}"
       APP_LIVE_SYNC: "false"
       LOG_CHANNEL: stack
       LOG_LEVEL: "${LOG_LEVEL:-error}"
+      LIBRARY_TIMEZONE: "${LIBRARY_TIMEZONE:-Asia/Almaty}"
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_DATABASE: "${POSTGRES_DB}"
-      DB_USERNAME: "${POSTGRES_USER}"
-      DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      # Never expose PostgreSQL bootstrap/admin credentials to web or workers.
+      DB_USERNAME: "${DB_USERNAME:?Set the least-privilege runtime DB_USERNAME}"
+      DB_PASSWORD: "${DB_PASSWORD:?Set the least-privilege runtime DB_PASSWORD}"
       SESSION_DRIVER: database
       SESSION_LIFETIME: "${SESSION_LIFETIME:-120}"
       CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      FILESYSTEM_DISK: local
+      REPOSITORY_READ_RATE_LIMIT: "${REPOSITORY_READ_RATE_LIMIT:-120}"
+      REPOSITORY_USAGE_RETENTION_DAYS: "${REPOSITORY_USAGE_RETENTION_DAYS:-1095}"
+      DB_QUEUE_RETRY_AFTER: "${DB_QUEUE_RETRY_AFTER:-360}"
+      REPORTS_OFFICIAL_RETENTION_YEARS: "${REPORTS_OFFICIAL_RETENTION_YEARS:-10}"
+      REPORTS_EXPORT_RETENTION_DAYS: "${REPORTS_EXPORT_RETENTION_DAYS:-365}"
+      REPORTS_MAX_CUSTOM_PERIOD_DAYS: "${REPORTS_MAX_CUSTOM_PERIOD_DAYS:-366}"
+      REPORTS_MAX_LIVE_ROWS: "${REPORTS_MAX_LIVE_ROWS:-10000}"
+      REPORTS_MAX_EXPORT_BYTES: "${REPORTS_MAX_EXPORT_BYTES:-52428800}"
+      REPORTS_EXPORT_LEASE_SECONDS: "${REPORTS_EXPORT_LEASE_SECONDS:-300}"
+      REPORTS_EXPORT_DISPATCH_BATCH: "${REPORTS_EXPORT_DISPATCH_BATCH:-100}"
+      REPORTS_EXPORT_USER_ACTIVE_LIMIT: "${REPORTS_EXPORT_USER_ACTIVE_LIMIT:-4}"
+      REPORTS_EXPIRED_SNAPSHOT_ACTION: "${REPORTS_EXPIRED_SNAPSHOT_ACTION:-preserve}"
+      EXTERNAL_RESOURCE_EXPIRY_NOTICE_DAYS: "${EXTERNAL_RESOURCE_EXPIRY_NOTICE_DAYS:-0,1,7,14,30,60,90}"
+      EXTERNAL_RESOURCE_ANALYTICS_RETENTION_DAYS: "${EXTERNAL_RESOURCE_ANALYTICS_RETENTION_DAYS:-395}"
+      EXTERNAL_RESOURCE_PUBLIC_RATE_LIMIT: "${EXTERNAL_RESOURCE_PUBLIC_RATE_LIMIT:-120}"
+      EXTERNAL_RESOURCE_HEALTH_TIMEOUT: "${EXTERNAL_RESOURCE_HEALTH_TIMEOUT:-8}"
+      EXTERNAL_RESOURCE_HEALTH_CONNECT_TIMEOUT: "${EXTERNAL_RESOURCE_HEALTH_CONNECT_TIMEOUT:-4}"
+      MAIL_MAILER: "${MAIL_MAILER:-log}"
+      MAIL_SCHEME: "${MAIL_SCHEME:-}"
+      MAIL_HOST: "${MAIL_HOST:-127.0.0.1}"
+      MAIL_PORT: "${MAIL_PORT:-2525}"
+      MAIL_USERNAME: "${MAIL_USERNAME:-}"
+      MAIL_PASSWORD: "${MAIL_PASSWORD:-}"
+      MAIL_FROM_ADDRESS: "${MAIL_FROM_ADDRESS:-noreply@library.kazutb.kz}"
+      MAIL_FROM_NAME: "${MAIL_FROM_NAME:-KazUTB Digital Library}"
       EXTERNAL_AUTH_LOGIN_URL: "${EXTERNAL_AUTH_LOGIN_URL:?Set EXTERNAL_AUTH_LOGIN_URL}"
+      EXTERNAL_AUTH_LOGOUT_URL: "${EXTERNAL_AUTH_LOGOUT_URL:?Set EXTERNAL_AUTH_LOGOUT_URL}"
       EXTERNAL_AUTH_DEVICE_NAME: "${EXTERNAL_AUTH_DEVICE_NAME:-web}"
+      AD_ENABLED: "${AD_ENABLED:-false}"
+      AD_HOST: "${AD_HOST:-}"
+      AD_PORT: "${AD_PORT:-636}"
+      AD_USE_SSL: "${AD_USE_SSL:-true}"
+      AD_TIMEOUT: "${AD_TIMEOUT:-5}"
+      AD_BIND_DN: "${AD_BIND_DN:-}"
+      AD_BIND_PASSWORD: "${AD_BIND_PASSWORD:-}"
+      AD_BASE_DN: "${AD_BASE_DN:-}"
+      AD_LOGIN_FIELD: "${AD_LOGIN_FIELD:-samaccountname}"
+      AD_USER_FILTER: "${AD_USER_FILTER:-(&(objectCategory=person)(objectClass=user))}"
+      AD_REQUIRE_CERT: "${AD_REQUIRE_CERT:-true}"
+      AD_CA_CERT_PATH: "${AD_CA_CERT_PATH:-/app/docker/certs/kaztbu-dc1-ca.crt}"
+      INTEGRATION_ALLOWED_TOKENS: "${INTEGRATION_ALLOWED_TOKENS:?Set INTEGRATION_ALLOWED_TOKENS}"
     ports:
       - "0.0.0.0:${APP_PORT:-80}:80"
-    # In production: no bind-mount; image contains baked assets
+      - "0.0.0.0:${APP_HTTPS_PORT:-443}:443"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    # Repository PDFs are private application data, not baked image assets.
+    # Keep them on a named volume so deploys/restarts cannot discard originals.
+    volumes:
+      - repository_private_data:/app/storage/app/private
+      - public_uploads_data:/app/storage/app/public
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost/api/v1/catalog-db?limit=1 || exit 1"]
       interval: 20s
@@ -68,6 +128,32 @@ services:
         limits:
           memory: 512M
 
+  # Explicit deployment-only identity; excluded unless the maintenance profile
+  # is requested. It has application-schema DDL but no cluster admin rights.
+  migrator:
+    image: ${APP_IMAGE:-library-app}:${APP_VERSION:-latest}
+    profiles: ["maintenance"]
+    working_dir: /app
+    entrypoint: ["php"]
+    environment:
+      APP_ENV: production
+      APP_KEY: "${APP_KEY:?Set APP_KEY}"
+      APP_DEBUG: "false"
+      APP_CONFIG_CACHE: /tmp/library-migrator-config.php
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: "${POSTGRES_DB}"
+      DB_USERNAME: "${MIGRATION_DB_USERNAME:?Set MIGRATION_DB_USERNAME}"
+      DB_PASSWORD: "${MIGRATION_DB_PASSWORD:?Set MIGRATION_DB_PASSWORD}"
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+
 volumes:
   postgres_prod_data:
     name: library_prod_postgres_data
+  repository_private_data:
+    name: library_prod_repository_private_data
+  public_uploads_data:
+    name: library_prod_public_uploads_data

@@ -8,7 +8,7 @@ use App\Models\Catalog\Reservation;
 use Illuminate\Support\Collection;
 
 /**
- * Read-side helpers for the reservation screens (§8): how deep the waiting
+ * Read-side helpers for the reservation screens (8): how deep the waiting
  * line is, a rough availability estimate for queued readers, and the log of
  * notifications already delivered for a reservation.
  *
@@ -95,7 +95,7 @@ class ReservationInsightService
             return null;
         }
 
-        // §9.3 — the turnover assumption must match the period actually
+        // 9.3 — the turnover assumption must match the period actually
         // written to loans for this edition, which now scales with copy count.
         $loanPeriod = $this->loanPeriods->daysForCopyCount($copies);
 
@@ -140,7 +140,7 @@ class ReservationInsightService
     }
 
     /**
-     * §8.3 — a pickup hold may only be extended when nobody is next in line.
+     * 8.3 — a pickup hold may only be extended when nobody is next in line.
      */
     public function hasWaitingQueue(Reservation $reservation): bool
     {

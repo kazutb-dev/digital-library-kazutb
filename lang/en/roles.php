@@ -21,7 +21,7 @@ return [
         'student' => 'Student',
         'teacher' => 'Faculty member',
         'librarian' => 'Librarian',
-        'admin' => 'Administrator',
+        'admin' => 'Full administrator',
         'senior_librarian' => 'Senior librarian',
         'acquisitions' => 'Acquisitions librarian',
         'cataloguer' => 'Cataloguer',
@@ -49,7 +49,7 @@ return [
     'delivered' => [
         'director' => 'reports under "Reports": library attendance (by day and by branch), issue and return dynamics, popular titles, fund usage, acquisitions, and catalogue quality — all exportable to CSV.',
         'senior_librarian' => 'the full librarian toolset, extended reservation actions (assigning a specific copy, extending a pickup hold, passing it to the next reader), visit recording, and operational reports.',
-        'cataloguer' => 'record cataloguing and copy editing, the UDC reference, and a hint showing how the number of registered copies determines the reader loan period (§9.3).',
+        'cataloguer' => 'record cataloguing and copy editing, the UDC reference, and a hint showing how the number of registered copies determines the reader loan period (9.3).',
     ],
     'upcoming_label' => 'Next phase',
     'upcoming' => [

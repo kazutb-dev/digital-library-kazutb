@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\CirculationException;
 use App\Models\ActivityLog;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
@@ -136,8 +137,12 @@ class LoanPeriodScaleTest extends TestCase
             'Reading-room material is a different axis from scarcity.',
         );
 
-        $loan = $this->circulation->issue($this->reader, $copy, $this->adminUser);
-        $this->assertSame(now()->addDay()->toDateString(), $loan->due_at->toDateString());
+        try {
+            $this->circulation->issue($this->reader, $copy, $this->adminUser);
+            $this->fail('Reading-room stock must not leave the reading room.');
+        } catch (CirculationException $exception) {
+            $this->assertSame('reading_room_home_issue_forbidden', $exception->reasonCode);
+        }
     }
 
     public function test_the_scale_is_retunable_from_settings_without_touching_code(): void
@@ -176,7 +181,7 @@ class LoanPeriodScaleTest extends TestCase
             ->where('entity_id', (string) $loan->getKey())
             ->firstOrFail();
 
-        $this->assertSame(3, (int) data_get($entry->new_values, 'loan_period_days'));
+        $this->assertSame(3, (int) data_get($entry->new_values, 'loan.loan_period_days'));
     }
 
     /**
@@ -192,8 +197,9 @@ class LoanPeriodScaleTest extends TestCase
             ->create($this->reader, $record);
 
         // 2 copies → scarce tier → 3 days. Position 1 ÷ 2 copies → ceil(1.5) = 2.
-        $this->assertSame(1, $reservation->queue_position);
-        $this->assertSame(2, app(ReservationInsightService::class)->estimatedDaysUntilAvailable($reservation));
+        $insights = app(ReservationInsightService::class);
+        $this->assertSame(1, $insights->queuePosition($reservation));
+        $this->assertSame(2, $insights->estimatedDaysUntilAvailable($reservation));
     }
 
     /**

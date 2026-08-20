@@ -37,12 +37,23 @@ class LocalizationArchitectureTest extends TestCase
         $this->assertSame('kk', app()->getLocale());
     }
 
+    public function test_every_primary_public_page_uses_kazakh_without_a_language_parameter(): void
+    {
+        foreach (['/', '/login', '/catalog', '/resources', '/news', '/events', '/about', '/leadership', '/rules', '/contacts'] as $path) {
+            $this->flushSession();
+
+            $this->get($path)
+                ->assertOk()
+                ->assertSee('<html lang="kk"', false);
+        }
+    }
+
     public function test_guest_locale_switch_persists_and_rejects_open_redirects(): void
     {
         $this->from('/catalog?q=қазақ')->post('/locale', [
             'locale' => 'ru',
             'return_to' => '/catalog?q=қазақ',
-        ])->assertRedirect('/catalog?q=қазақ')->assertSessionHas('locale', 'ru');
+        ])->assertRedirect('/catalog?q='.rawurlencode('қазақ'))->assertSessionHas('locale', 'ru');
 
         $this->get('/catalog?q=қазақ')
             ->assertOk()
@@ -74,26 +85,27 @@ class LocalizationArchitectureTest extends TestCase
             ->assertSee('data-locale-switcher', false);
     }
 
-    public function test_guest_locale_becomes_preference_when_account_has_no_choice(): void
+    public function test_account_without_a_preference_uses_kazakh_without_persisting_a_fake_choice(): void
     {
-        config(['demo_users.enabled' => true]);
-        $member = $this->makeControlPlaneUser('member', [
-            'email' => config('demo_users.identities.student.email'),
-            'locale' => null,
-        ]);
+        $member = $this->makeControlPlaneUser('member', ['locale' => null]);
 
-        $this->withSession(['locale' => 'en'])
-            ->post('/login/demo/student')
-            ->assertRedirect('/dashboard');
+        $this->signInToLibraryAs($member)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('<html lang="kk"', false);
 
-        $this->assertSame('en', $member->refresh()->locale);
-        $this->get('/dashboard')->assertOk()->assertSee('<html lang="en"', false);
+        $this->assertNull($member->refresh()->locale);
+    }
 
-        $this->post('/logout')->assertRedirect('/login');
+    public function test_guest_locale_cookie_is_respected_on_active_directory_login_page(): void
+    {
         $this->withCookie(LocaleResolver::COOKIE, 'en')
             ->get('/login')
             ->assertOk()
-            ->assertSee('<html lang="en"', false);
+            ->assertSee('<html lang="en"', false)
+            ->assertSee('Welcome back')
+            ->assertSee('Corporate login')
+            ->assertDontSee('data-demo-slug', false);
     }
 
     public function test_canonical_shells_render_their_locale_without_prohibited_brand(): void

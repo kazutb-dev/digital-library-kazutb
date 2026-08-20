@@ -9,12 +9,16 @@ class EncodingInspector
 
     /** @var array<string, list<string>> */
     private const AMBIGUOUS_GLYPHS = [
-        'є' => ['ә', 'е'],
+        'є' => ['ә', 'ғ', 'е'],
         'ѓ' => ['ғ'],
         'ќ' => ['қ'],
         '±' => ['ұ'],
         'µ' => ['ө', 'ё'],
         'ў' => ['ү'],
+        'Є' => ['Ә', 'Ғ', 'Е'],
+        'Ѓ' => ['Ғ'],
+        'Ќ' => ['Қ'],
+        'Ў' => ['Ү'],
     ];
 
     /**
@@ -29,7 +33,12 @@ class EncodingInspector
             'encoding.null_byte' => str_contains($value, "\0"),
             'encoding.control_character' => preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $value) === 1,
             'encoding.non_breaking_space' => str_contains($value, "\u{00A0}"),
-            'encoding.mojibake' => preg_match('/(?:Р[А-Яа-я]|С[А-Яа-я]|Ð.|Ñ.)/u', $value) === 1,
+            // Typical UTF-8 decoded as a single-byte encoding. Do not match
+            // ordinary Russian words beginning with Р/С (the former pattern
+            // did and produced thousands of false positives).
+            'encoding.mojibake' => preg_match('/(?:Ð.|Ñ.|Ã.|Â.|Р[ЂЃ‚„…†‡€‰Љ‹ЊЌЋЏђѓљњќћџ]|С[ЂЃ‚„…†‡€‰Љ‹ЊЌЋЏђѓљњќћџ])/u', $value) === 1,
+            'encoding.html_entity' => preg_match('/&(?:[a-z][a-z0-9]+|#\d+|#x[0-9a-f]+);/iu', $value) === 1,
+            'encoding.question_replacement' => preg_match('/[\p{Cyrillic}]\?[\p{Cyrillic}]/u', $value) === 1,
             'encoding.mixed_alphabet' => preg_match('/(?=[\p{Cyrillic}\p{Latin}]*\p{Cyrillic})(?=[\p{Cyrillic}\p{Latin}]*\p{Latin})[\p{Cyrillic}\p{Latin}]{4,}/u', $value) === 1,
         ];
 
@@ -92,7 +101,7 @@ class EncodingInspector
     ): array {
         return [
             'code' => $code,
-            'severity' => in_array($code, ['encoding.null_byte', 'encoding.replacement_character'], true) ? 'high' : 'medium',
+            'severity' => in_array($code, ['encoding.null_byte', 'encoding.replacement_character', 'encoding.question_replacement'], true) ? 'high' : 'medium',
             'field' => $field,
             'value' => $value,
             'description' => __('data_quality.rules.'.$code),

@@ -38,7 +38,6 @@ class BookDetailDbTest extends TestCase
                     'isbn' => ['raw', 'isValid'],
                     'copies' => ['available', 'total'],
                     'availability' => ['isAvailable', 'availableCopies', 'totalCopies', 'locations'],
-                    'quality' => ['needsReview', 'reviewReasonCodes'],
                     'udc' => ['raw', 'source'],
                     'source',
                 ],
@@ -46,6 +45,7 @@ class BookDetailDbTest extends TestCase
 
         $this->assertSame($isbn, $response->json('data.isbn.raw'));
         $this->assertIsArray($response->json('data.availability.locations'));
+        $response->assertJsonMissingPath('data.quality');
     }
 
     public function test_book_db_endpoint_returns_404_for_missing_book(): void

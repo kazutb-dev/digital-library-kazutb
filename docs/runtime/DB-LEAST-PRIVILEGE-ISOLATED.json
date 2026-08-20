@@ -1,0 +1,46 @@
+{
+    "generated_at_utc": "2026-08-20T07:47:33+00:00",
+    "identity": {
+        "database": "digital_library_privilege_20260820_test",
+        "username": "library_runtime_privilege_test"
+    },
+    "role_flags": {
+        "rolsuper": false,
+        "rolcreatedb": false,
+        "rolcreaterole": false,
+        "rolreplication": false,
+        "rolbypassrls": false
+    },
+    "negative_attempts": {
+        "create_table": {
+            "denied": true,
+            "sqlstate": "42501"
+        },
+        "alter_table": {
+            "denied": true,
+            "sqlstate": "42501"
+        },
+        "truncate_table": {
+            "denied": true,
+            "sqlstate": "42501"
+        },
+        "create_database": {
+            "denied": true,
+            "sqlstate": "42501"
+        },
+        "create_role": {
+            "denied": true,
+            "sqlstate": "42501"
+        },
+        "alter_role": {
+            "denied": true,
+            "sqlstate": "42501"
+        },
+        "drop_database": {
+            "denied": true,
+            "sqlstate": "42501"
+        }
+    },
+    "all_negative_attempts_denied": true,
+    "all_dangerous_flags_false": true
+}

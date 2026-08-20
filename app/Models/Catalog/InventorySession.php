@@ -14,7 +14,7 @@ class InventorySession extends Model
     public const STATUSES = ['draft', 'running', 'review', 'completed', 'approved', 'cancelled'];
 
     protected $fillable = [
-        'session_number', 'branch_id', 'fund_id', 'room', 'shelf_range', 'inventory_date',
+        'session_number', 'branch_id', 'fund_id', 'room', 'section', 'shelf_range', 'pilot_limit', 'inventory_date',
         'responsible_id', 'status', 'expected_count', 'found_count', 'missing_count',
         'misplaced_count', 'unknown_count', 'duplicate_count', 'started_at', 'completed_at',
         'approved_at', 'approved_by',
@@ -26,7 +26,7 @@ class InventorySession extends Model
             'inventory_date' => 'date', 'started_at' => 'datetime', 'completed_at' => 'datetime',
             'approved_at' => 'datetime', 'expected_count' => 'integer', 'found_count' => 'integer',
             'missing_count' => 'integer', 'misplaced_count' => 'integer',
-            'unknown_count' => 'integer', 'duplicate_count' => 'integer',
+            'unknown_count' => 'integer', 'duplicate_count' => 'integer', 'pilot_limit' => 'integer',
         ];
     }
 

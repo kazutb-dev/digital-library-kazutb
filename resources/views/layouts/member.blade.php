@@ -7,7 +7,7 @@
   $profileLabel = __('shell.member.profile_types.'.(in_array($profileType, ['student', 'teacher', 'employee'], true) ? $profileType : 'student'));
   $initial = mb_strtoupper(mb_substr((string) $displayName, 0, 1));
 
-  // Real unread in-app notification count (Master.md §15.6) for the bell/badge.
+  // Real unread in-app notification count (Master.md 15.6) for the bell/badge.
   $memberUnreadNotifications = 0;
   $memberAccessibility = [];
   if (auth()->check() && \Illuminate\Support\Facades\Schema::hasTable('reader_notifications')) {

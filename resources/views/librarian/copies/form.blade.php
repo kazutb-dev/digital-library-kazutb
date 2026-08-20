@@ -13,7 +13,6 @@
     @php
         $copyConditions = \App\Models\Catalog\BookCopy::CONDITIONS;
         $copyAccessRestrictions = \App\Models\Catalog\BookCopy::ACCESS_RESTRICTIONS;
-        $copyStatuses = \App\Models\Catalog\BookCopy::STATUSES;
 
         $editedCopy = $editing ? $copy : null;
 
@@ -136,7 +135,8 @@
 
                 <label class="block">
                     <span class="admin-label">{{ __('librarian.copies.fields.barcode') }}</span>
-                    <input class="admin-input font-mono" type="text" name="barcode" maxlength="64" value="{{ $value('barcode') }}">
+                    <input class="admin-input font-mono" type="text" name="barcode" maxlength="64" value="{{ $value('barcode') }}" @isset($copy) readonly aria-readonly="true" @endisset>
+                    @isset($copy)<p class="mt-1 text-xs text-slate-500">{{ __('librarian.copies.marking.controlled_change_hint') }}</p>@endisset
                     @error('barcode')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
                 </label>
 
@@ -171,17 +171,13 @@
                 </label>
 
                 @if ($editing)
-                    <label class="block">
+                    <div class="block">
                         <span class="admin-label">{{ __('librarian.copies.fields.status') }}</span>
-                        <select class="admin-input" name="status" required>
-                            @foreach ($copyStatuses as $status)
-                                <option value="{{ $status }}" @selected($value('status') === $status)>
-                                    {{ __('librarian.copies.statuses.'.$status) }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <input type="hidden" name="status" value="{{ $value('status') }}">
+                        <div class="admin-input bg-surface-container-low" aria-readonly="true">{{ __('librarian.copies.statuses.'.$value('status')) }}</div>
+                        <p class="mt-1 text-xs text-slate-500">{{ __('librarian.copies.status_controlled_change_hint') }}</p>
                         @error('status')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
-                    </label>
+                    </div>
                 @endif
             </div>
         </section>
@@ -216,6 +212,18 @@
                 </label>
 
                 <label class="block">
+                    <span class="admin-label">{{ __('librarian.copies.fields.room') }}</span>
+                    <input class="admin-input" type="text" name="room" maxlength="100" value="{{ $value('room') }}">
+                    @error('room')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                </label>
+
+                <label class="block">
+                    <span class="admin-label">{{ __('librarian.copies.fields.section') }}</span>
+                    <input class="admin-input" type="text" name="section" maxlength="100" value="{{ $value('section') }}">
+                    @error('section')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                </label>
+
+                <label class="block">
                     <span class="admin-label">{{ __('librarian.copies.fields.shelf_location') }}</span>
                     <input class="admin-input" type="text" name="shelf_location" maxlength="255" value="{{ $value('shelf_location') }}">
                     @error('shelf_location')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
@@ -238,7 +246,12 @@
 
                 <label class="block">
                     <span class="admin-label">{{ __('librarian.copies.fields.acquisition_source') }}</span>
-                    <input class="admin-input" type="text" name="acquisition_source" maxlength="255" value="{{ $value('acquisition_source') }}">
+                    <select class="admin-input" name="acquisition_source">
+                        <option value="">{{ __('common.fields.none') }}</option>
+                        @foreach(\App\Models\Catalog\BookCopy::ACQUISITION_SOURCES as $source)
+                            <option value="{{ $source }}" @selected($value('acquisition_source') === $source)>{{ __('librarian.copies.acquisition_sources.'.$source) }}</option>
+                        @endforeach
+                    </select>
                     @error('acquisition_source')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
                 </label>
 

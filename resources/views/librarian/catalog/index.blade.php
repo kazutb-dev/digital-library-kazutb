@@ -136,7 +136,7 @@
         </div>
     </form>
 
-    {{-- ДИР §6.3 "массовое редактирование". Selection lives in this form, so
+    {{-- ДИР 6.3 "массовое редактирование". Selection lives in this form, so
          the checkboxes in the table below submit with it. Only shared,
          non-identifying fields are offered. --}}
     @can('catalog.edit_record')
@@ -207,7 +207,7 @@
     @endcan
 
     <section class="admin-card overflow-hidden p-0">
-        <div class="overflow-x-auto">
+        <div class="hidden overflow-x-auto md:block">
             <table class="admin-table min-w-[1180px]">
                 <thead>
                     <tr>
@@ -224,6 +224,7 @@
                         <th>{{ __('librarian.catalog.fields.udc_code') }}</th>
                         <th>{{ __('librarian.nav.copies') }}</th>
                         <th>{{ __('common.fields.status') }}</th>
+                        <th>{{ __('data_quality.title') }}</th>
                         <th>{{ __('common.fields.updated_at') }}</th>
                         <th class="text-right">{{ __('common.fields.actions') }}</th>
                     </tr>
@@ -234,6 +235,8 @@
                             $extraAuthors = count($record->additional_authors ?? []);
                             $totalCopies = (int) ($record->copies_count ?? 0);
                             $availableCopies = (int) ($record->available_copies_count ?? 0);
+                            $recordQuality = $qualityByRecord->get((string) $record->id, collect());
+                            $importantQuality = $recordQuality->whereIn('severity', ['critical', 'high']);
                             // Only meaningful while working the language queue.
                             $confidence = ($filters['review'] ?? null) === 'language_mismatch'
                                 ? $record->kazakhTitleConfidence()
@@ -310,6 +313,13 @@
                                     <x-admin.status-badge status="active" :label="__('librarian.catalog.complete_badge')" />
                                 @endif
                             </td>
+                            <td>
+                                @if($recordQuality->isEmpty())
+                                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><span class="material-symbols-outlined text-[16px]">check_circle</span>{{ __('data_quality.record.clean') }}</span>
+                                @else
+                                    <a class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800" href="{{ route('librarian.data-quality.index', ['q' => $record->title]) }}"><span class="material-symbols-outlined text-[16px]">warning</span>{{ $recordQuality->count() }}@if($importantQuality->isNotEmpty()) · {{ $importantQuality->count() }} {{ __('data_quality.stats.high_objects') }}@endif</a>
+                                @endif
+                            </td>
                             <td class="whitespace-nowrap text-slate-600">{{ $record->updated_at?->format('d.m.Y') ?? '—' }}</td>
                             <td>
                                 <div class="flex justify-end gap-1">
@@ -338,7 +348,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ auth()->user()?->can('catalog.edit_record') ? 11 : 10 }}" class="py-16 text-center">
+                            <td colspan="{{ auth()->user()?->can('catalog.edit_record') ? 12 : 11 }}" class="py-16 text-center">
                                 <span class="material-symbols-outlined mb-2 block text-4xl text-slate-300">menu_book</span>
                                 <span class="text-sm text-slate-500">{{ __('librarian.catalog.empty') }}</span>
                             </td>
@@ -346,6 +356,57 @@
                     @endforelse
                 </tbody>
             </table>
+        </div>
+
+        <div class="divide-y divide-slate-200 md:hidden">
+            @forelse ($records as $record)
+                @php
+                    $totalCopies = (int) ($record->copies_count ?? 0);
+                    $availableCopies = (int) ($record->available_copies_count ?? 0);
+                    $recordQuality = $qualityByRecord->get((string) $record->id, collect());
+                    $importantQuality = $recordQuality->whereIn('severity', ['critical', 'high']);
+                @endphp
+                <article class="space-y-3 p-4" data-testid="catalog-record-card">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            @can('catalog.edit_record')
+                                <a class="block break-words text-sm font-semibold text-primary hover:text-secondary" href="{{ route('librarian.catalog.edit', $record) }}">{{ $record->title }}</a>
+                            @else
+                                <strong class="block break-words text-sm text-primary">{{ $record->title }}</strong>
+                            @endcan
+                            <span class="mt-1 block break-words text-xs text-slate-500">{{ $record->primary_author ?: '—' }}</span>
+                            @if ($record->isbn)<span class="mt-1 block break-all font-mono text-[11px] text-slate-400">ISBN {{ $record->isbn }}</span>@endif
+                        </div>
+                        @can('catalog.edit_record')
+                            <input type="checkbox" class="mt-1 shrink-0 rounded border-slate-300" form="bulk-edit-form" name="ids[]" value="{{ $record->id }}" data-bulk-checkbox aria-label="{{ $record->title }}">
+                        @endcan
+                    </div>
+                    <dl class="grid grid-cols-2 gap-3 text-xs">
+                        <div><dt class="text-slate-500">{{ __('librarian.catalog.fields.publication_year') }}</dt><dd class="mt-1 text-slate-700">{{ $record->publication_year ?: '—' }}</dd></div>
+                        <div><dt class="text-slate-500">{{ __('librarian.nav.copies') }}</dt><dd class="mt-1"><span class="font-semibold {{ $availableCopies > 0 ? 'text-emerald-700' : 'text-slate-500' }}">{{ $availableCopies }}</span><span class="text-slate-400"> / {{ $totalCopies }}</span></dd></div>
+                        <div><dt class="text-slate-500">{{ __('librarian.catalog.fields.language') }}</dt><dd class="mt-1 text-slate-700">{{ __('librarian.catalog.languages.'.$record->language) }}</dd></div>
+                        <div><dt class="text-slate-500">{{ __('librarian.catalog.fields.udc_code') }}</dt><dd class="mt-1 break-all font-mono text-slate-700">{{ $record->udc_code ?: '—' }}</dd></div>
+                    </dl>
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($record->is_draft)
+                            <x-admin.status-badge status="pending" :label="__('librarian.catalog.draft_badge')" />
+                        @else
+                            <x-admin.status-badge status="active" :label="__('librarian.catalog.complete_badge')" />
+                        @endif
+                        @if($recordQuality->isEmpty())
+                            <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><span class="material-symbols-outlined text-[16px]">check_circle</span>{{ __('data_quality.record.clean') }}</span>
+                        @else
+                            <a class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800" href="{{ route('librarian.data-quality.index', ['q' => $record->title]) }}"><span class="material-symbols-outlined text-[16px]">warning</span>{{ $recordQuality->count() }}@if($importantQuality->isNotEmpty()) · {{ $importantQuality->count() }} {{ __('data_quality.stats.high_objects') }}@endif</a>
+                        @endif
+                    </div>
+                    <div class="flex justify-end gap-2 border-t border-slate-100 pt-3">
+                        @can('catalog.edit_record')<a class="admin-btn admin-btn-secondary" href="{{ route('librarian.catalog.edit', $record) }}">{{ __('common.actions.edit') }}</a>@endcan
+                        @can('copies.create')<a class="admin-btn admin-btn-secondary" href="{{ route('librarian.copies.create', ['record' => $record->id]) }}">{{ __('librarian.catalog.add_copy') }}</a>@endcan
+                    </div>
+                </article>
+            @empty
+                <p class="p-8 text-center text-sm text-slate-500">{{ __('librarian.catalog.empty') }}</p>
+            @endforelse
         </div>
 
         <x-admin.pagination :paginator="$records" />

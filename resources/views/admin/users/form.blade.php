@@ -120,7 +120,7 @@
                     <span class="admin-label">{{ __('admin.users.fields.locale') }}</span>
                     <select class="admin-input" name="locale" required>
                         @foreach (['ru', 'kk', 'en'] as $locale)
-                            <option value="{{ $locale }}" @selected(old('locale', $managedUser->locale ?: 'kk') === $locale)>
+                            <option value="{{ $locale }}" @selected(old('locale', $managedUser->locale ?: 'ru') === $locale)>
                                 {{ __('common.languages.'.$locale) }}
                             </option>
                         @endforeach

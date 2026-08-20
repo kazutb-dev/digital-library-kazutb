@@ -20,6 +20,8 @@ class StoredUploadTest extends TestCase
     public function test_failed_storage_write_is_never_accepted_as_a_path(): void
     {
         $file = Mockery::mock(UploadedFile::class);
+        $file->shouldReceive('getClientOriginalExtension')->once()->andReturn('jpg');
+        $file->shouldReceive('getMimeType')->once()->andReturn('image/jpeg');
         $file->shouldReceive('store')
             ->once()
             ->with('news-covers', 'public')

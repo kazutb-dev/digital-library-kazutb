@@ -2,11 +2,35 @@
 
 namespace Tests\Feature\Api;
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class AuthSessionLifecycleTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Schema::create('activity_logs', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('actor_id')->nullable();
+            $table->string('actor_name');
+            $table->string('actor_role')->nullable();
+            $table->timestampTz('occurred_at');
+            $table->string('action_type', 64);
+            $table->string('entity_type', 191);
+            $table->string('entity_id', 191);
+            $table->json('old_values')->nullable();
+            $table->json('new_values')->nullable();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('reason')->nullable();
+            $table->string('scope', 32);
+            $table->json('metadata')->nullable();
+        });
+    }
+
     public function test_logout_clears_session_and_returns_success(): void
     {
         $sessionUser = [
@@ -39,6 +63,27 @@ class AuthSessionLifecycleTest extends TestCase
             ->postJson('/api/v1/logout');
 
         $response->assertStatus(401)->assertJsonPath('authenticated', false);
+    }
+
+    public function test_web_logout_form_clears_session_and_redirects_to_login(): void
+    {
+        $response = $this
+            ->withSession([
+                'library.user' => [
+                    'id' => 'u-web',
+                    'name' => 'Web User',
+                    'email' => 'web.user@example.com',
+                    'login' => 'web.user',
+                    'ad_login' => 'web.user',
+                    'role' => 'director',
+                ],
+                'library.crm_token' => 'fake-token',
+            ])
+            ->post('/logout');
+
+        $response->assertRedirect('/login');
+        $response->assertSessionMissing('library.user');
+        $response->assertSessionMissing('library.crm_token');
     }
 
     public function test_me_after_logout_returns_unauthenticated(): void

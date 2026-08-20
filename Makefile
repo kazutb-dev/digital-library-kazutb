@@ -7,7 +7,7 @@
 #  Local: make install | make test | make build
 # ──────────────────────────────────────────────────────────────
 
-.PHONY: help install dev-up dev-down dev-logs dev-shell dev-migrate dev-seed \
+.PHONY: help install dev-up dev-down dev-logs dev-shell dev-migrate dev-seed dev-fresh \
         prod-up prod-down prod-build prod-deploy \
         test test-unit test-e2e build lint \
 	db-status fresh migrate vendor-pdfjs \
@@ -45,11 +45,10 @@ lint: ## Run pint (PHP) linter
 	./vendor/bin/pint --test
 
 test: ## Run PHPUnit tests
-	php artisan config:clear --ansi
-	php artisan test
+	php vendor/bin/phpunit --configuration phpunit.xml
 
 test-unit: ## Run only unit tests
-	php artisan test --testsuite=Unit
+	php vendor/bin/phpunit --configuration phpunit.xml --testsuite=Unit
 
 test-e2e: ## Run Playwright e2e tests
 	npm run test:e2e
@@ -76,8 +75,9 @@ dev-migrate: ## Run migrations in DEV container
 dev-seed: ## Seed database in DEV container
 	docker compose -f docker-compose.dev.yml exec app php artisan db:seed
 
-dev-fresh: ## Drop and re-migrate + seed in DEV
-	docker compose -f docker-compose.dev.yml exec app php artisan migrate:fresh --seed
+dev-fresh: ## Disabled: use the guarded isolated PostgreSQL test runner
+	@echo "Direct migrate:fresh targets are disabled. Use TEST_DB_DATABASE=<name>_test ./scripts/dev/test-postgres.sh."
+	@exit 64
 
 # ── PROD environment (Docker) ──────────────────────────────────
 prod-build: ## Build production Docker image
@@ -90,10 +90,9 @@ prod-up: ## Start PROD stack (background)
 prod-down: ## Stop PROD stack
 	docker compose -f docker-compose.prod.yml down
 
-prod-deploy: prod-build prod-up ## Build and deploy PROD
-	docker compose -f docker-compose.prod.yml exec app php artisan migrate --force
-	docker compose -f docker-compose.prod.yml exec app php artisan optimize
-	@echo "$(GREEN)PROD deployed and optimized.$(RESET)"
+prod-deploy: prod-build ## Build only; production promotion follows the approved recovery/deployment runbook
+	@echo "Production image built. No migrations were applied and no service was started."
+	@echo "Validate a backup restore, schema compatibility, effective runtime DB and rollback plan before make prod-up."
 
 # ── DB helpers ─────────────────────────────────────────────────
 db-status: ## Show migration status (local artisan)
@@ -102,8 +101,9 @@ db-status: ## Show migration status (local artisan)
 migrate: ## Run migrations locally
 	php artisan migrate
 
-fresh: ## Fresh migrate + seed locally (DEV only)
-	php artisan migrate:fresh --seed
+fresh: ## Disabled: use the guarded isolated PostgreSQL test runner
+	@echo "Direct migrate:fresh targets are disabled. Use TEST_DB_DATABASE=<name>_test ./scripts/dev/test-postgres.sh."
+	@exit 64
 
 # ── Audit helpers (non-destructive) ───────────────────────────
 audit-infra: ## Run host/runtime/backup discovery audit

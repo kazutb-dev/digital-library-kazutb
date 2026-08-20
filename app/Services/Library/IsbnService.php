@@ -15,7 +15,7 @@ class IsbnService
     private const HTTP_TIMEOUT = 8;
 
     /**
-     * Normalize an ISBN string: strip hyphens, spaces, lowercase x → X.
+     * Normalize an ISBN string: strip hyphens, spaces, lowercase x — X.
      */
     public function normalize(string $isbn): string
     {

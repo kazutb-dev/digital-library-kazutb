@@ -15,6 +15,11 @@ final class LocaleResolver
 
     public function resolve(Request $request): string
     {
+        $queryLocale = $request->query('lang');
+        if ($this->isSupported($queryLocale)) {
+            return $this->normalize($queryLocale);
+        }
+
         $userLocale = $request->user()?->locale;
         if ($this->isSupported($userLocale)) {
             return $this->normalize($userLocale);

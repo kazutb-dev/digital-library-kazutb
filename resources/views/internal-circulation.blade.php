@@ -77,7 +77,7 @@
 </head>
 <body>
   <div class="page-header">
-    <h1>📚 Circulation Desk</h1>
+    <h1> Circulation Desk</h1>
     <p>Выдача и возврат книг, просмотр задолженностей читателей</p>
   </div>
 
@@ -151,7 +151,7 @@
       </div>
 
       <div id="reader-loans-container">
-        <div class="empty-msg">Введите Reader ID и нажмите «Загрузить» для просмотра выдач.</div>
+        <div class="empty-msg">Введите Reader ID и нажмите Загрузить» для просмотра выдач.</div>
       </div>
     </div>
   </div>
@@ -216,7 +216,7 @@
         const data = await resp.json();
 
         if (resp.ok && data.success) {
-          showStatus('checkout-status', 'ok', `✓ Выдача оформлена. Loan ID: ${data.data.id}. Возврат до: ${formatDate(data.data.dueAt)}`);
+          showStatus('checkout-status', 'ok', ` Выдача оформлена. Loan ID: ${data.data.id}. Возврат до: ${formatDate(data.data.dueAt)}`);
           document.getElementById('checkout-reader-id').value = '';
           document.getElementById('checkout-copy-id').value = '';
           document.getElementById('checkout-due-at').value = '';
@@ -250,7 +250,7 @@
         const data = await resp.json();
 
         if (resp.ok && data.success) {
-          showStatus('return-status', 'ok', `✓ Возврат оформлен. Loan ID: ${data.data.id}. Возвращено: ${formatDate(data.data.returnedAt)}`);
+          showStatus('return-status', 'ok', ` Возврат оформлен. Loan ID: ${data.data.id}. Возвращено: ${formatDate(data.data.returnedAt)}`);
           document.getElementById('return-copy-id').value = '';
         } else {
           showStatus('return-status', 'error', `Ошибка: ${data.message || data.error || 'Неизвестная ошибка'}`);
@@ -284,7 +284,7 @@
         const data = await resp.json();
         if (resp.ok && data.data) {
           const loan = data.data;
-          const overdueText = loan.isOverdue ? ' ⚠️ ПРОСРОЧЕНО' : '';
+          const overdueText = loan.isOverdue ? ' ️ ПРОСРОЧЕНО' : '';
           showStatus('copy-check-status', 'warn',
             `Активная выдача: Loan ID ${loan.id}, Reader ${loan.readerId}, до ${formatDate(loan.dueAt)}${overdueText}`);
         } else {
@@ -372,7 +372,7 @@
         container.innerHTML = html;
 
         if (overdue.length > 0) {
-          showStatus('reader-status', 'warn', `⚠️ У читателя ${overdue.length} просроченных выдач!`);
+          showStatus('reader-status', 'warn', `️ У читателя ${overdue.length} просроченных выдач!`);
         }
 
       } catch (err) {
@@ -393,7 +393,7 @@
         const data = await resp.json();
 
         if (resp.ok && data.success) {
-          showStatus('reader-status', 'ok', `✓ Возврат оформлен. Copy: ${copyId.substring(0, 8)}…`);
+          showStatus('reader-status', 'ok', ` Возврат оформлен. Copy: ${copyId.substring(0, 8)}…`);
           lookupReader(); // Refresh the table
         } else {
           showStatus('reader-status', 'error', `Ошибка: ${data.message || data.error}`);
@@ -414,7 +414,7 @@
         const data = await resp.json();
 
         if (resp.ok && data.success) {
-          showStatus('reader-status', 'ok', `✓ Продлено. Новый срок: ${formatDate(data.data.dueAt)}. Продлений: ${data.data.renewCount}/3`);
+          showStatus('reader-status', 'ok', ` Продлено. Новый срок: ${formatDate(data.data.dueAt)}. Продлений: ${data.data.renewCount}/3`);
           lookupReader();
         } else {
           showStatus('reader-status', 'error', `Ошибка: ${data.message || data.error}`);

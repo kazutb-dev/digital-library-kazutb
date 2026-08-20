@@ -10,8 +10,8 @@ use Tests\TestCase;
  * Phase 3 Cluster B.1 — Public Leadership page (/leadership).
  *
  * /leadership renders resources/views/leadership.blade.php extending
- * layouts.public. Content is driven by the $leadershipSeedProvider closure
- * in routes/web.php, with trilingual ru/kk/en parity.
+ * layouts.public. Only claims confirmed by the official library source are
+ * rendered; unsupported mandate, reporting-line, and biography copy stays out.
  *
  * Per Cluster B Content Contract §8 the route is NOT added to the primary
  * navbar; footer exposes a "Руководство / Басшылық / Leadership" link.
@@ -41,51 +41,52 @@ class LeadershipPageTest extends TestCase
 
     public function test_guest_can_access_leadership_page(): void
     {
-        $response = $this->get('/leadership');
+        $response = $this->get('/leadership?lang=kk');
 
         $response->assertOk();
-        $response->assertSee('KazUTB Library', false);
+        $response->assertSee('Кітапхана басшылығы', false);
     }
 
     public function test_leadership_page_renders_all_core_section_markers(): void
     {
-        $response = $this->get('/leadership');
+        $response = $this->get('/leadership?lang=ru');
 
         $response->assertOk();
-        // Frozen section IDs per Cluster B Content Contract §1.
         $response->assertSee('data-section="leadership-header"', false);
-        $response->assertSee('data-section="leadership-mandate"', false);
         $response->assertSee('data-section="leadership-directory"', false);
         $response->assertSee('data-section="leadership-support-cta"', false);
-        // "Reports to" metadata row required by contract §1 §2.
-        $response->assertSee('data-test-id="leadership-reports-to"', false);
-        // last_reviewed_at rendered as a <time> element.
-        $response->assertSee('data-test-id="leadership-last-reviewed"', false);
+        $response->assertDontSee('data-section="leadership-mandate"', false);
+        $response->assertDontSee('data-test-id="leadership-reports-to"', false);
+        $response->assertDontSee('data-test-id="leadership-last-reviewed"', false);
+        $response->assertDontSee('2026-04-22', false);
     }
 
     public function test_leadership_directory_renders_role_profile_cards(): void
     {
-        $response = $this->get('/leadership');
+        $response = $this->get('/leadership?lang=ru');
 
         $response->assertOk();
-        // All three seeded leadership slots present and addressable.
+        // Only the profile confirmed by the official library page is public.
         $response->assertSee('data-leadership-slug="director"', false);
-        $response->assertSee('data-leadership-slug="digital-collections"', false);
-        $response->assertSee('data-leadership-slug="reader-services"', false);
-        // Default (ru) role titles rendered.
+        $this->assertSame(1, substr_count($response->getContent(), 'data-leadership-slug='));
         $response->assertSee('Директор библиотеки', false);
-        $response->assertSee('Заведующий электронными коллекциями', false);
-        $response->assertSee('Координатор читательских сервисов', false);
+        $response->assertSee('Панкей Ж.', false);
+        $response->assertSee('https://www.kaztbu.edu.kz/biblioteka', false);
+        $response->assertSee('Официальный источник', false);
+        $response->assertDontSee('Корпешова', false);
+        $response->assertDontSee('Сайлаубек', false);
+        $response->assertDontSee('/images/staff/', false);
     }
 
     public function test_leadership_page_renders_russian_locale_by_default(): void
     {
-        $response = $this->get('/leadership');
+        $response = $this->get('/leadership?lang=ru');
 
         $response->assertOk();
-        $response->assertSee('Руководство KazUTB', false);
-        $response->assertSee('Ответственность библиотеки', false);
-        $response->assertSee('Администрация КазУТБ', false);
+        $response->assertSee('Руководство библиотеки', false);
+        $response->assertSee('сведения, подтверждённые официальной страницей', false);
+        $response->assertDontSee('Ответственность библиотеки', false);
+        $response->assertDontSee('Администрация университета', false);
         $response->assertSee('Общие обращения и академические запросы', false);
     }
 
@@ -94,9 +95,10 @@ class LeadershipPageTest extends TestCase
         $response = $this->get('/leadership?lang=kk');
 
         $response->assertOk();
-        $response->assertSee('KazUTB басшылығы', false);
+        $response->assertSee('Кітапхана басшылығы', false);
         $response->assertSee('Кітапхана директоры', false);
-        $response->assertSee('КазУТБ әкімшілігі', false);
+        $response->assertSee('Ресми дереккөз', false);
+        $response->assertDontSee('Университет әкімшілігі', false);
         $response->assertSee('Байланыс бетіне өту', false);
     }
 
@@ -105,11 +107,14 @@ class LeadershipPageTest extends TestCase
         $response = $this->get('/leadership?lang=en');
 
         $response->assertOk();
-        $response->assertSee('Leadership of KazUTB', false);
+        $response->assertSee('Library leadership', false);
         $response->assertSee('Library Director', false);
-        $response->assertSee('Head of Digital Collections', false);
-        $response->assertSee('Reader Services Coordinator', false);
-        $response->assertSee('KazUTB university administration', false);
+        $response->assertSee('Панкей Ж.', false);
+        $response->assertSee('Official source', false);
+        $response->assertDontSee('Pankey Zh.', false);
+        $response->assertDontSee('Lead Librarian', false);
+        $response->assertDontSee('Librarian, Technology Faculty Reading Room', false);
+        $response->assertDontSee('University administration', false);
         $response->assertSee('Open contacts', false);
     }
 
@@ -124,7 +129,7 @@ class LeadershipPageTest extends TestCase
 
     public function test_footer_exposes_leadership_link_in_all_locales(): void
     {
-        $this->get('/leadership')->assertOk()->assertSee('/leadership', false);
+        $this->get('/leadership?lang=ru')->assertOk()->assertSee('/leadership?lang=ru', false);
 
         $kkResponse = $this->get('/leadership?lang=kk');
         $kkResponse->assertOk();
@@ -172,12 +177,14 @@ class LeadershipPageTest extends TestCase
 
     public function test_authenticated_reader_can_view_leadership_page(): void
     {
-        $this->loginAs('student');
-
-        $response = $this->get('/leadership?lang=en');
+        $response = $this->withSession(['library.user' => [
+            'id' => 'qa-reader-001',
+            'name' => 'QA Reader',
+            'role' => 'reader',
+        ]])->get('/leadership?lang=en');
 
         $response->assertOk();
-        $response->assertSee('Leadership of KazUTB', false);
+        $response->assertSee('Library leadership', false);
         $response->assertSee('Sign out', false);
     }
 
@@ -187,7 +194,7 @@ class LeadershipPageTest extends TestCase
 
         $this->get('/leadership?lang=en')
             ->assertOk()
-            ->assertSee('Leadership of KazUTB', false);
+            ->assertSee('Library leadership', false);
     }
 
     public function test_admin_can_view_leadership_page(): void
@@ -196,6 +203,6 @@ class LeadershipPageTest extends TestCase
 
         $this->get('/leadership?lang=en')
             ->assertOk()
-            ->assertSee('Leadership of KazUTB', false);
+            ->assertSee('Library leadership', false);
     }
 }

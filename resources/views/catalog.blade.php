@@ -2,7 +2,7 @@
 
 @php
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
 
   $withLang = function (string $path, array $query = []) use ($lang): string {
       $normalizedPath = '/' . ltrim($path, '/');
@@ -26,7 +26,8 @@
   $availableOnly = request()->boolean('available_only');
   $physicalOnly = request()->boolean('physical_only');
   $institution = (string) request()->query('institution', '');
-  $sort = (string) request()->query('sort', 'relevance');
+  $sort = (string) request()->query('sort', 'popular');
+  $sort = in_array($sort, ['popular', 'title', 'year_desc', 'year_asc'], true) ? $sort : 'popular';
   $titleFilter = (string) request()->query('title', '');
   $authorFilter = (string) request()->query('author', '');
   $publisherFilter = (string) request()->query('publisher', '');
@@ -36,10 +37,10 @@
 
   $copy = [
       'ru' => [
-          'title' => 'Каталог книг — Digital Library',
+          'title' => 'Каталог — Научная библиотека',
           'eyebrow' => 'Фонд библиотеки',
           'heading' => 'Каталог университетской библиотеки',
-          'lead' => 'Просматривайте книги, электронные ресурсы и архивные издания с удобными фильтрами по фонду, году, языку и коллекции.',
+          'lead' => 'Ищите и просматривайте записи библиотечного каталога с фильтрами по фонду, году, языку и типу документа.',
           'search_placeholder' => 'Поиск по названию, автору, ISBN или теме...',
           'advanced' => 'Расширенный',
           'seed_summary' => 'Просмотр академических материалов университета.',
@@ -63,7 +64,7 @@
           'results_for' => 'результатов по запросу',
           'sort_by' => 'Сортировка',
           'sort_options' => [
-              'relevance' => 'Релевантность',
+              'popular' => 'По числу выдач',
               'title' => 'По названию',
               'year_desc' => 'Сначала новые',
               'year_asc' => 'Сначала старые',
@@ -123,16 +124,18 @@
               'electronic_only' => 'Только электронная',
               'processing' => 'В обработке',
               'repair' => 'В ремонте',
+              'no_holdings' => 'Без экземпляров',
           ],
           'format_labels' => [
               'print' => 'Печатный',
               'electronic' => 'Электронный',
               'hybrid' => 'Гибридный',
+              'metadata_only' => 'Только запись каталога',
           ],
           'language_labels' => [
-              'ru' => 'RU',
-              'kk' => 'KK',
-              'en' => 'EN',
+              'ru' => 'Русский',
+              'kk' => 'Казахский',
+              'en' => 'Английский',
               'other' => 'Другие',
           ],
           'institution_labels' => [
@@ -141,52 +144,14 @@
               'college_library' => 'Библиотека колледжа',
               'ktslib' => 'Центральная библиотека',
           ],
-          'sample_items' => [
-              [
-                  'badge' => 'Электронный ресурс',
-                  'badge_style' => 'bg-secondary-container text-on-secondary-container',
-                  'title' => 'Advances in Computational Fluid Dynamics: A Multidisciplinary Approach',
-                  'meta' => 'Dr. Almas Kurmanbayev · 2023 · Cambridge University Press',
-                  'body' => 'Междисциплинарное исследование вычислительной гидродинамики и её инженерных применений.',
-                  'primary_cta' => 'Читать онлайн',
-                  'status' => 'Мгновенный доступ',
-                  'status_style' => 'text-secondary',
-                  'icon' => 'visibility',
-                  'image' => '/images/news/default-library.jpg',
-              ],
-              [
-                  'badge' => 'Печатный экземпляр',
-                  'badge_style' => 'bg-surface-container-highest text-on-surface-variant',
-                  'title' => 'Economic Transformations in Post-Soviet Kazakhstan',
-                  'meta' => 'Saule Tleubayeva · 2021 · KazUTB Press',
-                  'body' => 'Аналитический обзор структурных реформ и технологической адаптации в экономике Казахстана.',
-                  'primary_cta' => 'Найти на полке',
-                  'status' => 'Этаж 3, стеллаж B-12',
-                  'status_style' => 'text-on-surface-variant',
-                  'icon' => 'library_books',
-                  'image' => '/images/news/classics-event.jpg',
-              ],
-              [
-                  'badge' => 'Архив',
-                  'badge_style' => 'bg-secondary-container text-on-secondary-container',
-                  'title' => 'Historical Archives of Industrial Design in Central Asia',
-                  'meta' => 'Various Contributors · 1985–1995 · Institutional Archive',
-                  'body' => 'Цифровая коллекция чертежей и проектной документации по промышленному дизайну региона.',
-                  'primary_cta' => 'Запросить просмотр',
-                  'status' => 'Требуется специальный доступ',
-                  'status_style' => 'text-error',
-                  'icon' => 'history_edu',
-                  'image' => '/images/news/campus-library.jpg',
-              ],
-          ],
           'ui' => [
               'electronic' => 'Электронный ресурс',
               'physical' => 'Печатный экземпляр',
               'hybrid_badge' => 'Печатный + электронный',
               'archive' => 'Архив',
-              'read' => 'Читать онлайн',
-              'locate' => 'Найти на полке',
-              'request' => 'Запросить просмотр',
+              'read' => 'Подробнее',
+              'locate' => 'Подробнее',
+              'request' => 'Подробнее',
               'cite' => 'Цитировать',
               'shortlist_add' => 'В подборку',
               'shortlist_saved' => 'В подборке',
@@ -204,16 +169,23 @@
               'empty_hint' => 'Проверьте написание запроса, попробуйте более общие слова или сбросьте фильтры.',
               'results_for' => 'результатов по запросу',
               'copies' => 'Экземпляры',
+              'copies_total' => 'Всего',
+              'copies_available' => 'Доступно',
+              'copies_issued' => 'Выдано',
               'fallback_loaded' => 'Каталог загружен с сохранённой выдачей.',
               'author_unknown' => 'Автор не указан',
-              'description_placeholder' => 'Аннотация будет добавлена после библиографической доработки записи.',
+              'untitled' => 'Без названия',
+              'resource_type_unknown' => 'Документ',
+              'metadata_record' => 'Запись каталога',
+              'view_record' => 'Открыть запись',
+              'copies_unregistered' => 'Экземпляры не зарегистрированы',
               'subjects' => 'Темы',
               'language_label' => 'Язык',
               'institution_label' => 'Фонд',
-              'no_location' => 'Локация уточняется',
+              'no_location' => 'Местонахождение не указано',
               'page_prev' => 'Назад',
               'page_next' => 'Вперёд',
-              'central_library' => 'Центральная библиотека КазТБУ',
+              'central_library' => 'Научная библиотека',
               'technology_library' => 'Технологическая библиотека',
               'economic_library' => 'Экономическая библиотека',
               'college_library' => 'Библиотека колледжа',
@@ -223,10 +195,12 @@
               'status_issued' => 'Все экземпляры выданы',
               'status_processing' => 'В обработке',
               'status_repair' => 'В ремонте',
-              'status_unknown' => 'Нет данных о наличии',
+              'status_electronic' => 'Есть электронная версия',
+              'status_unknown' => 'Экземпляры не зарегистрированы',
               'format_print' => 'Печатный',
               'format_electronic' => 'Электронный',
               'format_hybrid' => 'Гибрид',
+              'format_metadata_only' => 'Только запись каталога',
               'last_copy' => 'Остался последний экземпляр',
               'in_stock' => 'Есть в наличии',
               'absent' => 'Свободных экземпляров нет',
@@ -238,10 +212,10 @@
           ],
       ],
       'kk' => [
-          'title' => 'Кітаптар каталогы — Digital Library',
+          'title' => 'Каталог — Ғылыми кітапхана',
           'eyebrow' => 'Кітапхана қоры',
           'heading' => 'Университет кітапханасының каталогы',
-          'lead' => 'Қор, жарияланған жылы, тіл және коллекция бойынша ыңғайлы сүзгілермен кітаптарды, электрондық ресурстарды және архивтік басылымдарды қарап шығыңыз.',
+          'lead' => 'Қор, жыл, тіл және құжат түрі бойынша сүзгілермен кітапхана каталогының жазбаларын іздеңіз және қараңыз.',
           'search_placeholder' => 'Атауы, авторы, ISBN немесе тақырып бойынша іздеу...',
           'advanced' => 'Кеңейтілген',
           'seed_summary' => 'Университеттің академиялық материалдарын шолу.',
@@ -265,7 +239,7 @@
           'results_for' => 'нәтиже',
           'sort_by' => 'Сұрыптау',
           'sort_options' => [
-              'relevance' => 'Өзектілік',
+              'popular' => 'Берілім саны бойынша',
               'title' => 'Атауы бойынша',
               'year_desc' => 'Жаңа алдымен',
               'year_asc' => 'Ескі алдымен',
@@ -324,16 +298,18 @@
               'electronic_only' => 'Тек электрондық',
               'processing' => 'Өңделуде',
               'repair' => 'Жөндеуде',
+              'no_holdings' => 'Данасыз',
           ],
           'format_labels' => [
               'print' => 'Баспа',
               'electronic' => 'Электрондық',
               'hybrid' => 'Аралас',
+              'metadata_only' => 'Тек каталог жазбасы',
           ],
           'language_labels' => [
-              'ru' => 'RU',
-              'kk' => 'KK',
-              'en' => 'EN',
+              'ru' => 'Орысша',
+              'kk' => 'Қазақша',
+              'en' => 'Ағылшынша',
               'other' => 'Басқа',
           ],
           'institution_labels' => [
@@ -342,52 +318,14 @@
               'college_library' => 'Колледж кітапханасы',
               'ktslib' => 'Орталық кітапхана',
           ],
-          'sample_items' => [
-              [
-                  'badge' => 'Электрондық ресурс',
-                  'badge_style' => 'bg-secondary-container text-on-secondary-container',
-                  'title' => 'Advances in Computational Fluid Dynamics: A Multidisciplinary Approach',
-                  'meta' => 'Dr. Almas Kurmanbayev · 2023 · Cambridge University Press',
-                  'body' => 'Есептеу гидродинамикасы мен оның инженерлік қолданылуы туралы пәнаралық зерттеу.',
-                  'primary_cta' => 'Онлайн оқу',
-                  'status' => 'Бірден қолжетімді',
-                  'status_style' => 'text-secondary',
-                  'icon' => 'visibility',
-                  'image' => '/images/news/default-library.jpg',
-              ],
-              [
-                  'badge' => 'Баспа данасы',
-                  'badge_style' => 'bg-surface-container-highest text-on-surface-variant',
-                  'title' => 'Economic Transformations in Post-Soviet Kazakhstan',
-                  'meta' => 'Saule Tleubayeva · 2021 · KazUTB Press',
-                  'body' => 'Қазақстан экономикасындағы құрылымдық реформалар мен технологиялық бейімделуге арналған шолу.',
-                  'primary_cta' => 'Сөреден табу',
-                  'status' => '3-қабат, B-12 сөресі',
-                  'status_style' => 'text-on-surface-variant',
-                  'icon' => 'library_books',
-                  'image' => '/images/news/classics-event.jpg',
-              ],
-              [
-                  'badge' => 'Архив',
-                  'badge_style' => 'bg-secondary-container text-on-secondary-container',
-                  'title' => 'Historical Archives of Industrial Design in Central Asia',
-                  'meta' => 'Various Contributors · 1985–1995 · Institutional Archive',
-                  'body' => 'Өнеркәсіптік дизайн бойынша сызбалар мен жобалық құжаттаманың цифрлық коллекциясы.',
-                  'primary_cta' => 'Қарауды сұрау',
-                  'status' => 'Арнайы рұқсат қажет',
-                  'status_style' => 'text-error',
-                  'icon' => 'history_edu',
-                  'image' => '/images/news/campus-library.jpg',
-              ],
-          ],
           'ui' => [
               'electronic' => 'Электрондық ресурс',
               'physical' => 'Баспа данасы',
               'hybrid_badge' => 'Баспа + электрондық',
               'archive' => 'Архив',
-              'read' => 'Онлайн оқу',
-              'locate' => 'Сөреден табу',
-              'request' => 'Қарауды сұрау',
+              'read' => 'Толығырақ',
+              'locate' => 'Толығырақ',
+              'request' => 'Толығырақ',
               'cite' => 'Дәйексөз',
               'shortlist_add' => 'Топтамаға',
               'shortlist_saved' => 'Топтамада',
@@ -405,16 +343,23 @@
               'empty_hint' => 'Сұраныстың жазылуын тексеріңіз, жалпырақ сөздерді қолданып көріңіз немесе сүзгілерді тазартыңыз.',
               'results_for' => 'нәтиже',
               'copies' => 'Даналар',
+              'copies_total' => 'Барлығы',
+              'copies_available' => 'Қолжетімді',
+              'copies_issued' => 'Берілген',
               'fallback_loaded' => 'Каталог сақталған нәтижелермен жүктелді.',
               'author_unknown' => 'Автор көрсетілмеген',
-              'description_placeholder' => 'Аннотация библиографиялық толықтырудан кейін қосылады.',
+              'untitled' => 'Атауы жоқ',
+              'resource_type_unknown' => 'Құжат',
+              'metadata_record' => 'Каталог жазбасы',
+              'view_record' => 'Жазбаны ашу',
+              'copies_unregistered' => 'Даналар тіркелмеген',
               'subjects' => 'Тақырыптар',
               'language_label' => 'Тіл',
               'institution_label' => 'Қор',
-              'no_location' => 'Орналасуы нақтылануда',
+              'no_location' => 'Орналасуы көрсетілмеген',
               'page_prev' => 'Артқа',
               'page_next' => 'Алға',
-              'central_library' => 'ҚазТБУ орталық кітапханасы',
+              'central_library' => 'Ғылыми кітапхана',
               'technology_library' => 'Технологиялық кітапхана',
               'economic_library' => 'Экономикалық кітапхана',
               'college_library' => 'Колледж кітапханасы',
@@ -424,10 +369,12 @@
               'status_issued' => 'Барлық дана берілген',
               'status_processing' => 'Өңдеуде',
               'status_repair' => 'Жөндеуде',
-              'status_unknown' => 'Қор туралы дерек жоқ',
+              'status_electronic' => 'Электрондық нұсқасы бар',
+              'status_unknown' => 'Даналар тіркелмеген',
               'format_print' => 'Баспа',
               'format_electronic' => 'Электрондық',
               'format_hybrid' => 'Гибрид',
+              'format_metadata_only' => 'Тек каталог жазбасы',
               'last_copy' => 'Соңғы дана қалды',
               'in_stock' => 'Қорда бар',
               'absent' => 'Бос дана жоқ',
@@ -439,10 +386,10 @@
           ],
       ],
       'en' => [
-          'title' => 'Catalog — Digital Library',
+          'title' => 'Catalog — Scientific Library',
           'eyebrow' => 'Library holdings',
           'heading' => 'University Library Catalog',
-          'lead' => 'Browse books, electronic resources, and archival materials with convenient filters by collection, year, language, and holdings.',
+          'lead' => 'Search and browse library catalog records with filters for collection, year, language, and document type.',
           'search_placeholder' => 'Search by title, author, ISBN, or subject...',
           'advanced' => 'Advanced',
           'seed_summary' => 'Viewing scholarly items across university collections.',
@@ -466,7 +413,7 @@
           'results_for' => 'results for',
           'sort_by' => 'Sort by',
           'sort_options' => [
-              'relevance' => 'Relevance',
+              'popular' => 'By loan count',
               'title' => 'Title',
               'year_desc' => 'Newest First',
               'year_asc' => 'Oldest First',
@@ -526,16 +473,18 @@
               'electronic_only' => 'Electronic only',
               'processing' => 'In processing',
               'repair' => 'In repair',
+              'no_holdings' => 'No copies',
           ],
           'format_labels' => [
               'print' => 'Print',
               'electronic' => 'Electronic',
               'hybrid' => 'Hybrid',
+              'metadata_only' => 'Catalog record only',
           ],
           'language_labels' => [
-              'ru' => 'RU',
-              'kk' => 'KK',
-              'en' => 'EN',
+              'ru' => 'Russian',
+              'kk' => 'Kazakh',
+              'en' => 'English',
               'other' => 'Other',
           ],
           'institution_labels' => [
@@ -544,52 +493,14 @@
               'college_library' => 'College Library',
               'ktslib' => 'Central Library',
           ],
-          'sample_items' => [
-              [
-                  'badge' => 'Electronic Resource',
-                  'badge_style' => 'bg-secondary-container text-on-secondary-container',
-                  'title' => 'Advances in Computational Fluid Dynamics: A Multidisciplinary Approach',
-                  'meta' => 'Dr. Almas Kurmanbayev · 2023 · Cambridge University Press',
-                  'body' => 'A multidisciplinary study of computational fluid dynamics and its engineering applications.',
-                  'primary_cta' => 'Read Online',
-                  'status' => 'Immediate Access',
-                  'status_style' => 'text-secondary',
-                  'icon' => 'visibility',
-                  'image' => '/images/news/default-library.jpg',
-              ],
-              [
-                  'badge' => 'Physical Copy',
-                  'badge_style' => 'bg-surface-container-highest text-on-surface-variant',
-                  'title' => 'Economic Transformations in Post-Soviet Kazakhstan',
-                  'meta' => 'Saule Tleubayeva · 2021 · KazUTB Press',
-                  'body' => 'An analytical review of structural reforms and technological adaptation in Kazakhstan’s economy.',
-                  'primary_cta' => 'Locate on Shelf',
-                  'status' => 'Floor 3, Stack B-12',
-                  'status_style' => 'text-on-surface-variant',
-                  'icon' => 'library_books',
-                  'image' => '/images/news/classics-event.jpg',
-              ],
-              [
-                  'badge' => 'Archive',
-                  'badge_style' => 'bg-secondary-container text-on-secondary-container',
-                  'title' => 'Historical Archives of Industrial Design in Central Asia',
-                  'meta' => 'Various Contributors · 1985–1995 · Institutional Archive',
-                  'body' => 'A digitized collection of industrial design drawings and project documentation.',
-                  'primary_cta' => 'Request Viewing',
-                  'status' => 'Special Permission Required',
-                  'status_style' => 'text-error',
-                  'icon' => 'history_edu',
-                  'image' => '/images/news/campus-library.jpg',
-              ],
-          ],
           'ui' => [
               'electronic' => 'Electronic Resource',
               'physical' => 'Physical Copy',
               'hybrid_badge' => 'Print + digital',
               'archive' => 'Archive',
-              'read' => 'Read Online',
-              'locate' => 'Locate on Shelf',
-              'request' => 'Request Viewing',
+              'read' => 'View details',
+              'locate' => 'View details',
+              'request' => 'View details',
               'cite' => 'Cite Item',
               'shortlist_add' => 'Add to shortlist',
               'shortlist_saved' => 'In shortlist',
@@ -607,16 +518,23 @@
               'empty_hint' => 'Check the spelling, try broader terms, or clear the filters.',
               'results_for' => 'results for',
               'copies' => 'Copies',
+              'copies_total' => 'Total',
+              'copies_available' => 'Available',
+              'copies_issued' => 'On loan',
               'fallback_loaded' => 'Catalog loaded using the preserved result set.',
               'author_unknown' => 'Author not specified',
-              'description_placeholder' => 'Description will appear after bibliographic enrichment.',
+              'untitled' => 'Untitled',
+              'resource_type_unknown' => 'Document',
+              'metadata_record' => 'Catalog record',
+              'view_record' => 'Open record',
+              'copies_unregistered' => 'No copies are registered',
               'subjects' => 'Subjects',
               'language_label' => 'Language',
               'institution_label' => 'Collection',
-              'no_location' => 'Location pending',
+              'no_location' => 'Location not specified',
               'page_prev' => 'Previous',
               'page_next' => 'Next',
-              'central_library' => 'KazTBU Central Library',
+              'central_library' => 'Scientific Library',
               'technology_library' => 'Technology Library',
               'economic_library' => 'Economics Library',
               'college_library' => 'College Library',
@@ -626,10 +544,12 @@
               'status_issued' => 'All copies on loan',
               'status_processing' => 'In processing',
               'status_repair' => 'Under repair',
-              'status_unknown' => 'Holdings data unavailable',
+              'status_electronic' => 'Electronic edition available',
+              'status_unknown' => 'No copies are registered',
               'format_print' => 'Print',
               'format_electronic' => 'Electronic',
               'format_hybrid' => 'Hybrid',
+              'format_metadata_only' => 'Catalog record only',
               'last_copy' => 'Last available copy',
               'in_stock' => 'In stock',
               'absent' => 'No available copies',
@@ -731,7 +651,7 @@
   $initialTotalPages = max((int) ($initialMeta['total_pages'] ?? $initialMeta['totalPages'] ?? (int) ceil(max($initialTotal, 1) / $initialPerPage)), 1);
   $initialFrom = ($initialTotal > 0 && $initialResults !== []) ? (($initialPage - 1) * $initialPerPage) + 1 : 0;
   $initialTo = $initialFrom > 0 ? min($initialFrom + count($initialResults) - 1, $initialTotal) : 0;
-  // A hand-typed ?page=99 must not produce a "previous → 98" link.
+  // A hand-typed ?page=99 must not produce a "previous — 98" link.
   $paginationPage = min($initialPage, $initialTotalPages);
 
   // Numbered pages are real links: every one carries the whole active filter
@@ -773,7 +693,10 @@
 
       return $window;
   };
-  $initialQueryLabel = $q !== '' ? $q : strtoupper($language === '' ? 'all' : $language);
+  $initialLanguageKey = $language === '' || $language === 'all' ? 'all' : $language;
+  $initialQueryLabel = $q !== ''
+      ? $q
+      : ($initialLanguageKey === 'all' ? $copy['any_option'] : ($copy['language_labels'][$initialLanguageKey] ?? $copy['language_labels']['other']));
   $hasAdvancedFilters = $titleFilter !== '' || $authorFilter !== '' || $publisherFilter !== '' || $isbnFilter !== '' || $subjectFilter !== '';
   $formatLocationLabel = static function (array $location) use ($copy): string {
       $serviceCode = strtolower(trim((string) data_get($location, 'servicePoint.code', '')));
@@ -783,20 +706,13 @@
       $unitCode = strtolower(trim((string) data_get($location, 'institutionUnit.code', '')));
 
       $libraryLabel = match (true) {
-          $serviceCode === '1', $campusCode === 'university_economic' => $copy['ui']['economic_library'],
-          $serviceCode === '2', $campusCode === 'university_technological' => $copy['ui']['technology_library'],
-          $serviceCode === '3', $campusCode === 'college_main', $unitCode === 'college' => $copy['ui']['college_library'],
-          $serviceCode === 'kstlib', $campusCode === 'university_central' => $copy['ui']['central_library'],
+          $serviceCode === 'economics-desk', $campusCode === 'economics-desk' => $copy['ui']['economic_library'],
+          $serviceCode === 'technology-desk', $campusCode === 'technology-desk' => $copy['ui']['technology_library'],
+          $serviceCode === 'college', $unitCode === 'college' => $copy['ui']['college_library'],
+          in_array($serviceCode, ['scientific-library', 'reading-room'], true),
+          in_array($campusCode, ['scientific-library', 'reading-room'], true) => $copy['ui']['central_library'],
           default => '',
       };
-
-      if (in_array($serviceCode, ['1', '2', '3'], true)) {
-          return trim($libraryLabel . ' · ' . $copy['ui']['cabinet_short'] . ' ' . $serviceCode);
-      }
-
-      if ($serviceCode === 'kstlib') {
-          return trim($libraryLabel . ' · ' . $copy['ui']['main_cabinet']);
-      }
 
       if ($libraryLabel !== '') {
           return $libraryLabel;
@@ -808,9 +724,28 @@
 
       return $unitName !== '' ? $unitName : $copy['ui']['no_location'];
   };
+  $formatCopyCount = static function (int $count) use ($lang): string {
+      if ($lang === 'kk') {
+          return number_format($count, 0, '.', ' ').' дана';
+      }
+      if ($lang === 'en') {
+          return number_format($count, 0, '.', ',').' '.($count === 1 ? 'copy' : 'copies');
+      }
+
+      $mod10 = $count % 10;
+      $mod100 = $count % 100;
+      $noun = $mod10 === 1 && $mod100 !== 11
+          ? 'экземпляр'
+          : (($mod10 >= 2 && $mod10 <= 4) && ! ($mod100 >= 12 && $mod100 <= 14)
+              ? 'экземпляра'
+              : 'экземпляров');
+
+      return number_format($count, 0, '.', ' ').' '.$noun;
+  };
 @endphp
 
 @section('title', $copy['title'])
+@section('meta_description', $copy['lead'])
 @section('body_class', 'bg-surface text-on-background min-h-screen flex flex-col')
 
 @section('head')
@@ -1350,11 +1285,12 @@
   <div class="public-v2__body">
   <div class="public-v2__inset">
   <div class="catalog-v2__search-block">
-    <div class="public-v2__search">
+    <form class="public-v2__search" action="/catalog" method="GET" role="search">
       <span class="material-symbols-outlined" aria-hidden="true">search</span>
-      <input id="catalog-search-input" value="{{ $q }}" placeholder="{{ $copy['search_placeholder'] }}" type="search" />
+      <input id="catalog-search-input" name="q" value="{{ $q }}" placeholder="{{ $copy['search_placeholder'] }}" aria-label="{{ $copy['search_placeholder'] }}" type="search" />
+      @if($lang !== 'kk')<input type="hidden" name="lang" value="{{ $lang }}" />@endif
       <button type="button" onclick="toggleAdvancedSearch()">{{ $copy['advanced'] }}</button>
-    </div>
+    </form>
     <p id="catalog-summary-text" class="mt-4 text-on-surface-variant text-sm font-label italic">{{ $copy['seed_summary'] }}</p>
 
     <div id="advanced-search-panel" class="advanced-search-panel mt-6 rounded-2xl border border-outline-variant/20 bg-white/90 p-4 md:p-5" @if(! $hasAdvancedFilters) hidden @endif>
@@ -1375,7 +1311,7 @@
           <select id="advanced-resource-type-input" class="w-full px-3 py-2 rounded-lg border border-outline-variant/30 bg-white text-sm">
             <option value="">{{ $copy['any_option'] }}</option>
             @foreach($resourceTypeFacet as $row)
-              <option value="{{ $row['value'] }}" @selected(in_array($row['value'], $resourceTypeSelected, true))>{{ $copy['resource_type_labels'][$row['value']] ?? $row['value'] }}</option>
+              <option value="{{ $row['value'] }}" @selected(in_array($row['value'], $resourceTypeSelected, true))>{{ $copy['resource_type_labels'][$row['value']] ?? $copy['ui']['resource_type_unknown'] }}</option>
             @endforeach
           </select>
         </label>
@@ -1386,7 +1322,7 @@
     </div>
   </div>
   <button id="mobile-filter-toggle" type="button" onclick="toggleFilters()" class="md:hidden mb-6 inline-flex items-center gap-2 px-4 py-2 border border-outline-variant/30 rounded-lg text-sm font-semibold text-primary bg-white">
-    <span class="material-symbols-outlined text-base">tune</span>
+    <span class="material-symbols-outlined text-base" aria-hidden="true">tune</span>
     <span>{{ $copy['filters'] }}</span>
     <span id="filter-count-badge" class="text-secondary">0</span>
   </button>
@@ -1409,7 +1345,7 @@
               <li>
                 <label class="catalog-facet{{ (int) $row['count'] === 0 ? ' is-disabled' : '' }}">
                   <input type="checkbox" class="catalog-facet__input" data-facet="resource_type" value="{{ $row['value'] }}" @checked(in_array($row['value'], $resourceTypeSelected, true)) @disabled((int) $row['count'] === 0) />
-                  <span class="catalog-facet__label">{{ $copy['resource_type_labels'][$row['value']] ?? $row['value'] }}</span>
+                  <span class="catalog-facet__label">{{ $copy['resource_type_labels'][$row['value']] ?? $copy['ui']['resource_type_unknown'] }}</span>
                   <span class="catalog-facet__count">{{ $row['count'] }}</span>
                 </label>
               </li>
@@ -1426,16 +1362,16 @@
           <div class="relative pt-3">
             <div class="h-1 bg-surface-container-high relative rounded-full"></div>
             <div id="year-range-fill" class="absolute top-3 h-1 bg-secondary rounded-full" style="left: 0%; right: 0%;"></div>
-            <input id="year-from-range" class="catalog-range" type="range" min="{{ $yearMin }}" max="{{ $yearMax }}" value="{{ $yearFrom }}" />
-            <input id="year-to-range" class="catalog-range" type="range" min="{{ $yearMin }}" max="{{ $yearMax }}" value="{{ $yearTo }}" />
+            <input id="year-from-range" class="catalog-range" type="range" min="{{ $yearMin }}" max="{{ $yearMax }}" value="{{ $yearFrom }}" aria-label="{{ $copy['publication_date'] }}: {{ $lang === 'en' ? 'from' : ($lang === 'kk' ? 'бастап' : 'от') }}" />
+            <input id="year-to-range" class="catalog-range" type="range" min="{{ $yearMin }}" max="{{ $yearMax }}" value="{{ $yearTo }}" aria-label="{{ $copy['publication_date'] }}: {{ $lang === 'en' ? 'to' : ($lang === 'kk' ? 'дейін' : 'до') }}" />
           </div>
           <div class="flex justify-between text-xs font-label text-on-surface-variant">
             <span id="year-min-label">{{ $yearMin }}</span>
             <span id="year-max-label" class="font-bold text-on-surface">{{ $yearMax }}</span>
           </div>
           <div class="grid grid-cols-2 gap-2">
-            <input id="year-from-input" class="w-full bg-white border border-outline-variant/30 px-3 py-2 text-sm rounded-lg" value="{{ $yearFrom }}" placeholder="{{ $yearMin }}" type="number" min="{{ $yearMin }}" max="{{ $yearMax }}" />
-            <input id="year-to-input" class="w-full bg-white border border-outline-variant/30 px-3 py-2 text-sm rounded-lg" value="{{ $yearTo }}" placeholder="{{ $yearMax }}" type="number" min="{{ $yearMin }}" max="{{ $yearMax }}" />
+            <input id="year-from-input" class="w-full bg-white border border-outline-variant/30 px-3 py-2 text-sm rounded-lg" value="{{ $yearFrom }}" placeholder="{{ $yearMin }}" type="number" min="{{ $yearMin }}" max="{{ $yearMax }}" aria-label="{{ $copy['publication_date'] }}: {{ $lang === 'en' ? 'from' : ($lang === 'kk' ? 'бастап' : 'от') }}" />
+            <input id="year-to-input" class="w-full bg-white border border-outline-variant/30 px-3 py-2 text-sm rounded-lg" value="{{ $yearTo }}" placeholder="{{ $yearMax }}" type="number" min="{{ $yearMin }}" max="{{ $yearMax }}" aria-label="{{ $copy['publication_date'] }}: {{ $lang === 'en' ? 'to' : ($lang === 'kk' ? 'дейін' : 'до') }}" />
           </div>
         </div>
       </div>
@@ -1449,7 +1385,7 @@
           </button>
           @foreach($languageFacet as $row)
             <button type="button" data-lang="{{ $row['value'] }}" class="catalog-chip{{ $language === $row['value'] ? ' is-active' : '' }}" @disabled((int) $row['count'] === 0)>
-              <span class="catalog-chip__label">{{ $copy['language_labels'][$row['value']] ?? strtoupper($row['value']) }}</span>
+              <span class="catalog-chip__label">{{ $copy['language_labels'][$row['value']] ?? $copy['language_labels']['other'] }}</span>
               <span class="catalog-chip__count">{{ $row['count'] }}</span>
             </button>
           @endforeach
@@ -1567,15 +1503,15 @@
 
     <div>
       <div class="public-v2__toolbar">
-        <div id="catalog-results-count" class="text-on-surface-variant text-sm font-label">{{ $copy['showing'] }} <span class="text-on-surface font-bold">{{ $initialFrom }}-{{ $initialTo }}</span> {{ $copy['of'] }} <span class="font-bold">{{ $initialTotal }}</span> {{ $copy['results_for'] }} <span class="font-medium">“{{ $initialQueryLabel }}”</span></div>
+        <div id="catalog-results-count" class="text-on-surface-variant text-sm font-label" aria-live="polite">{{ $copy['showing'] }} <span class="text-on-surface font-bold">{{ $initialFrom }}-{{ $initialTo }}</span> {{ $copy['of'] }} <span class="font-bold">{{ $initialTotal }}</span> {{ $copy['results_for'] }} <span class="font-medium">“{{ $initialQueryLabel }}”</span></div>
         <div class="public-v2__toolbar-actions">
-          <button type="button" class="public-v2__view is-active" data-catalog-view="grid" aria-label="Grid view"><span class="material-symbols-outlined">grid_view</span></button>
-          <button type="button" class="public-v2__view" data-catalog-view="list" aria-label="List view"><span class="material-symbols-outlined">view_list</span></button>
+          <button type="button" class="public-v2__view is-active" data-catalog-view="grid" aria-label="{{ $lang === 'ru' ? 'Вид сеткой' : ($lang === 'kk' ? 'Тор түрі' : 'Grid view') }}" aria-pressed="true"><span class="material-symbols-outlined" aria-hidden="true">grid_view</span></button>
+          <button type="button" class="public-v2__view" data-catalog-view="list" aria-label="{{ $lang === 'ru' ? 'Вид списком' : ($lang === 'kk' ? 'Тізім түрі' : 'List view') }}" aria-pressed="false"><span class="material-symbols-outlined" aria-hidden="true">view_list</span></button>
           <span class="text-xs font-bold uppercase tracking-tighter text-on-surface-variant">{{ $copy['sort_by'] }}</span>
           <div class="relative" data-sort-menu>
-            <button id="sort-menu-button" type="button" onclick="toggleSortMenu()" class="inline-flex items-center gap-2 rounded-xl border border-outline-variant/30 bg-white px-4 py-2 text-sm font-bold text-on-surface shadow-sm hover:border-secondary/40">
+            <button id="sort-menu-button" type="button" onclick="toggleSortMenu()" aria-expanded="false" aria-controls="sort-menu-panel" class="inline-flex items-center gap-2 rounded-xl border border-outline-variant/30 bg-white px-4 py-2 text-sm font-bold text-on-surface shadow-sm hover:border-secondary/40">
               <span id="sort-menu-current">{{ $copy['sort_options'][$sort] ?? reset($copy['sort_options']) }}</span>
-              <span class="material-symbols-outlined text-base">expand_more</span>
+              <span class="material-symbols-outlined text-base" aria-hidden="true">expand_more</span>
             </button>
             <div id="sort-menu-panel" class="sort-menu-panel absolute right-0 mt-2 min-w-52 rounded-xl border border-outline-variant/20 bg-white p-1 shadow-lg z-20" hidden>
               @foreach($copy['sort_options'] as $value => $label)
@@ -1602,7 +1538,8 @@
       <div id="catalog-results-list">
         @forelse($initialResults as $index => $record)
           @php
-            $title = trim((string) ($record['title']['display'] ?? '')) ?: 'Untitled';
+            $title = trim((string) ($record['title']['display'] ?? '')) ?: $copy['ui']['untitled'];
+            $originalTitle = trim((string) ($record['title']['original'] ?? ''));
             $author = trim((string) ($record['primaryAuthor'] ?? '')) ?: $copy['ui']['author_unknown'];
             $year = $record['publicationYear'] ?? '—';
             $publisher = trim((string) ($record['publisher']['name'] ?? ''));
@@ -1610,9 +1547,8 @@
             $udc = trim((string) ($record['udc']['display'] ?? $record['udc']['description'] ?? $record['udc']['raw'] ?? '')) ?: '—';
             $authorMark = trim((string) ($record['authorMark'] ?? '')) ?: '—';
             $resourceType = trim((string) ($record['resourceType'] ?? 'book'));
-            $resourceTypeLabel = $copy['resource_type_labels'][$resourceType] ?? $resourceType;
+            $resourceTypeLabel = $copy['resource_type_labels'][$resourceType] ?? $copy['ui']['resource_type_unknown'];
             $annotationRaw = trim((string) ($record['annotation'] ?? ''));
-            $subtitleRaw = trim((string) ($record['title']['subtitle'] ?? ''));
             $subjectLabels = [];
             foreach (($record['classification'] ?? []) as $subject) {
                 $label = trim((string) ($subject['label'] ?? ''));
@@ -1620,12 +1556,13 @@
                     $subjectLabels[] = $label;
                 }
             }
-            $description = $annotationRaw !== '' && ! str_starts_with($annotationRaw, 'app.')
+            // A subtitle and subject terms are distinct metadata fields. Do
+            // not synthesize an annotation from either of them.
+            $description = $annotationRaw !== '' && ! str_starts_with(strtolower($annotationRaw), 'app.')
                 ? $annotationRaw
-                : ($subtitleRaw !== '' && ! str_starts_with($subtitleRaw, 'app.')
-                    ? $subtitleRaw
-                    : (! empty($subjectLabels) ? implode(' · ', array_slice($subjectLabels, 0, 3)) : $copy['ui']['description_placeholder']));
+                : '';
             $availableCopies = (int) ($record['copies']['available'] ?? 0);
+            $issuedCopies = (int) ($record['copies']['issued'] ?? 0);
             $totalCopies = (int) ($record['copies']['total'] ?? 0);
             // Mirrors deriveMaterialKind() in the client renderer. The declared
             // format wins over copy counts: a record with a full text attached
@@ -1633,26 +1570,31 @@
             // on a shelf.
             $declaredFormat = (string) ($record['indicators']['format'] ?? '');
             $kind = match ($declaredFormat) {
-                'electronic' => 'electronic',
+                'electronic' => 'digital',
                 'hybrid' => 'hybrid',
-                default => $totalCopies > 0 ? ($availableCopies > 0 ? 'physical' : 'archive') : 'electronic',
+                'print' => 'physical',
+                'metadata_only' => 'metadata',
+                default => 'metadata',
             };
-            $badgeStyle = $kind === 'physical' ? 'bg-surface-container-highest text-on-surface-variant' : 'bg-secondary-container text-on-secondary-container';
+            $badgeStyle = in_array($kind, ['physical', 'metadata'], true) ? 'bg-surface-container-highest text-on-surface-variant' : 'bg-secondary-container text-on-secondary-container';
             $badgeLabel = match ($kind) {
                 'physical' => $copy['ui']['physical'],
                 'archive' => $copy['ui']['archive'],
                 'hybrid' => $copy['ui']['hybrid_badge'],
+                'metadata' => $copy['ui']['metadata_record'],
                 default => $copy['ui']['electronic'],
             };
             $primaryLabel = match ($kind) {
                 'physical' => $copy['ui']['locate'],
                 'archive' => $copy['ui']['request'],
+                'metadata' => $copy['ui']['view_record'],
                 default => $copy['ui']['read'],
             };
             $icon = match ($kind) {
                 'physical' => 'library_books',
                 'archive' => 'history_edu',
                 'hybrid' => 'auto_stories',
+                'metadata' => 'description',
                 default => 'visibility',
             };
             $primaryLocation = is_array($record['availability']['locations'][0] ?? null) ? $record['availability']['locations'][0] : [];
@@ -1663,14 +1605,20 @@
                     continue;
                 }
                 $pointLabel = $formatLocationLabel($location);
-                $availabilityByPoint[$pointLabel] = ($availabilityByPoint[$pointLabel] ?? 0)
-                    + (int) data_get($location, 'copies.available', 0);
+                $availabilityByPoint[$pointLabel] ??= ['total' => 0, 'available' => 0, 'issued' => 0];
+                $availabilityByPoint[$pointLabel]['total'] += (int) data_get($location, 'copies.total', 0);
+                $availabilityByPoint[$pointLabel]['available'] += (int) data_get($location, 'copies.available', 0);
+                $availabilityByPoint[$pointLabel]['issued'] += (int) data_get($location, 'copies.issued', 0);
             }
-            $languageLabel = strtoupper(trim((string) ($record['language']['code'] ?? '')));
+            $languageLabel = trim((string) ($record['language']['label'] ?? ''));
+            if ($languageLabel === '') {
+                $languageCode = trim((string) ($record['language']['code'] ?? 'other'));
+                $languageLabel = $copy['language_labels'][$languageCode] ?? $copy['language_labels']['other'];
+            }
             $indicators = is_array($record['indicators'] ?? null) ? $record['indicators'] : [];
             $availabilityIndicator = (string) ($indicators['availability'] ?? 'no_holdings');
             $statusStyle = match ($availabilityIndicator) {
-                'available' => 'text-secondary',
+                'available', 'electronic_only' => 'text-secondary',
                 'issued', 'under_repair' => 'text-error',
                 default => 'text-on-surface-variant',
             };
@@ -1679,13 +1627,18 @@
                 'issued' => $copy['ui']['status_issued'],
                 'in_processing' => $copy['ui']['status_processing'],
                 'under_repair' => $copy['ui']['status_repair'],
+                'electronic_only' => $copy['ui']['status_electronic'],
                 default => $copy['ui']['status_unknown'],
             };
-            $indicatorLabels = [
-                $copy['ui']['format_' . ($indicators['format'] ?? 'print')] ?? $copy['ui']['format_print'],
-                $copy['ui'][$indicators['copySupply'] ?? 'absent'] ?? $copy['ui']['absent'],
-                $copy['ui']['access_' . ($indicators['accessRestriction'] ?? 'free')] ?? $copy['ui']['access_free'],
-            ];
+            $indicatorLabels = match ($kind) {
+                'metadata' => [$copy['ui']['format_metadata_only'], $copy['ui']['copies_unregistered']],
+                'digital' => [$copy['ui']['format_electronic']],
+                default => [
+                    $copy['ui']['format_' . ($indicators['format'] ?? 'print')] ?? $copy['ui']['format_print'],
+                    $copy['ui'][$indicators['copySupply'] ?? 'absent'] ?? $copy['ui']['absent'],
+                    $copy['ui']['access_' . ($indicators['accessRestriction'] ?? 'free')] ?? $copy['ui']['access_free'],
+                ],
+            };
             if (($indicators['popular'] ?? false) === true) {
                 $indicatorLabels[] = $copy['ui']['popular'];
             }
@@ -1709,7 +1662,7 @@
             if ($citeClean($record['primaryAuthor'] ?? '') !== '') {
                 $citeSegments[] = $citeClean($record['primaryAuthor']);
             }
-            $citeSegments[] = $citeClean($title) !== '' ? $citeClean($title) : 'Без названия';
+            $citeSegments[] = $citeClean($title) !== '' ? $citeClean($title) : $copy['ui']['untitled'];
             $citeImprint = implode(', ', array_filter([$citeClean($publisher), $citeClean($year)]));
             if ($citeImprint !== '') {
                 $citeSegments[] = '— '.$citeImprint;
@@ -1724,13 +1677,14 @@
               $coverTones = ['catalog-card-book--navy', 'catalog-card-book--wine', 'catalog-card-book--forest', 'catalog-card-book--wood', 'catalog-card-book--plum'];
               $coverTone = $coverTones[$index % count($coverTones)];
               $coverUrl = trim((string) ($record['coverPath'] ?? $record['coverUrl'] ?? data_get($record, 'cover.medium') ?? data_get($record, 'cover.small') ?? ''));
-              $coverDescription = trim((string) $description) !== '' ? $description : $copy['ui']['description_placeholder'];
+              $coverDescription = trim((string) $description);
               $coverCode = $authorMark !== '—'
                 ? $copy['ui']['author_mark'].': '.$authorMark
                 : ($udc !== '—'
                     ? $copy['ui']['udc'].': '.$udc
                     : ($isbn !== '—' ? $copy['ui']['isbn'].': '.$isbn : '—'));
             @endphp
+            @if($kind !== 'metadata')
             <div class="catalog-card-media w-full sm:w-36 flex-shrink-0">
               <div class="catalog-card-book {{ $coverTone }} {{ $coverUrl !== '' ? 'has-art' : '' }}">
                 <div class="catalog-card-book__stack">
@@ -1738,7 +1692,9 @@
                     <div class="catalog-card-book__page-content">
                       <div>
                         <div class="catalog-card-book__page-label">{{ $publisher !== '' ? $publisher : $badgeLabel }}</div>
-                        <p class="catalog-card-book__page-text">{{ $coverDescription }}</p>
+                        @if($coverDescription !== '')
+                          <p class="catalog-card-book__page-text">{{ $coverDescription }}</p>
+                        @endif
                       </div>
                       <div class="catalog-card-book__page-meta">
                         <div class="catalog-card-book__page-row"><span>{{ $copy['ui']['isbn'] }}</span><strong>{{ $isbn }}</strong></div>
@@ -1771,13 +1727,19 @@
                 </div>
               </div>
             </div>
+            @endif
             <div class="flex-grow">
               <div class="flex justify-between items-start gap-4">
                 <div>
                   <span class="inline-block px-2 py-0.5 {{ $badgeStyle }} text-[10px] font-bold uppercase tracking-wider rounded mb-2">{{ $badgeLabel }}</span>
                   <span class="inline-block px-2 py-0.5 bg-surface-container-high text-primary text-[10px] font-bold uppercase tracking-wider rounded mb-2">{{ $resourceTypeLabel }}</span>
               <a href="{{ $detailHref }}" class="block text-2xl font-newsreader font-semibold text-primary group-hover:text-secondary transition-colors cursor-pointer">{{ $title }}</a>
-                  <p data-catalog-description class="mt-3 text-on-surface-variant text-sm leading-relaxed">{{ $description }}</p>
+                  @if ($originalTitle !== '' && $originalTitle !== $title)
+                    <p class="mt-1 text-xs text-on-surface-variant"><span class="font-semibold">{{ __('librarian.catalog.translations.original') }}:</span> {{ $originalTitle }}</p>
+                  @endif
+                  @if($description !== '')
+                    <p data-catalog-description class="mt-3 text-on-surface-variant text-sm leading-relaxed">{{ $description }}</p>
+                  @endif
                   <p class="mt-3 text-on-surface-variant font-medium">{{ implode(' · ', $metaParts) }}</p>
                 </div>
                 <button
@@ -1796,7 +1758,7 @@
                   data-shortlist-total="{{ $totalCopies }}"
                   data-shortlist-url="{{ e($detailHref) }}"
                   data-shortlist-provider="{{ e($publisher) }}"
-                  data-shortlist-type="{{ $kind === 'electronic' ? 'external_resource' : 'book' }}"
+                  data-shortlist-type="{{ $kind === 'digital' ? 'external_resource' : 'book' }}"
                   aria-label="{{ e($copy['ui']['shortlist_add']) }}"
                   aria-pressed="false"
                   title="{{ e($copy['ui']['shortlist_add']) }}"
@@ -1826,21 +1788,22 @@
                 @if($authorMark !== '—')
                   <span><strong>{{ $copy['ui']['author_mark'] }}:</strong> {{ $authorMark }}</span>
                 @endif
-                @forelse($availabilityByPoint as $pointLabel => $pointAvailable)
-                  <span><strong>{{ $copy['ui']['copies'] }}:</strong> {{ $pointAvailable }} экз. — {{ $pointLabel }}</span>
-                @empty
-                  <span><strong>{{ $copy['ui']['copies'] }}:</strong> {{ $availableCopies }} экз.</span>
-                @endforelse
+                <span><strong>{{ $copy['ui']['copies_total'] }}:</strong> {{ $formatCopyCount($totalCopies) }}</span>
+                <span><strong>{{ $copy['ui']['copies_available'] }}:</strong> {{ number_format($availableCopies, 0, '.', $lang === 'en' ? ',' : ' ') }}</span>
+                <span><strong>{{ $copy['ui']['copies_issued'] }}:</strong> {{ number_format($issuedCopies, 0, '.', $lang === 'en' ? ',' : ' ') }}</span>
+                @foreach($availabilityByPoint as $pointLabel => $pointCounts)
+                  <span><strong>{{ $pointLabel }}:</strong> {{ $formatCopyCount((int) $pointCounts['total']) }}</span>
+                @endforeach
                 <span><strong>{{ $copy['ui']['language_label'] }}:</strong> {{ $languageLabel !== '' ? $languageLabel : '—' }}</span>
                 <span><strong>{{ $copy['ui']['institution_label'] }}:</strong> {{ $locationLabel }}</span>
               </div>
               <div class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                 <a href="{{ $detailHref }}" class="text-sm font-bold text-secondary flex items-center gap-2 group/btn">
-                  <span class="material-symbols-outlined text-lg">{{ $icon }}</span>
+                  <span class="material-symbols-outlined text-lg" aria-hidden="true">{{ $icon }}</span>
                   <span>{{ $primaryLabel }}</span>
                 </a>
                 <button type="button" class="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2" onclick="copyCitation(@js($citation))">
-                  <span class="material-symbols-outlined text-lg">description</span>
+                  <span class="material-symbols-outlined text-lg" aria-hidden="true">description</span>
                   <span>{{ $copy['ui']['cite'] }}</span>
                 </button>
                 <div class="sm:ml-auto text-xs {{ $statusStyle }} font-bold flex items-center gap-1">
@@ -1873,9 +1836,9 @@
         <nav id="catalog-pagination" class="flex items-center gap-2" aria-label="Catalog pagination">
           @if($initialTotalPages > 1)
             @if($paginationPage > 1)
-              <a href="{{ $pageHref($paginationPage - 1) }}" data-page="{{ $paginationPage - 1 }}" class="catalog-page" aria-label="{{ $copy['ui']['page_prev'] }}"><span class="material-symbols-outlined">chevron_left</span></a>
+              <a href="{{ $pageHref($paginationPage - 1) }}" data-page="{{ $paginationPage - 1 }}" class="catalog-page" aria-label="{{ $copy['ui']['page_prev'] }}"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></a>
             @else
-              <span class="catalog-page is-disabled" aria-disabled="true"><span class="material-symbols-outlined">chevron_left</span></span>
+              <span class="catalog-page is-disabled" aria-disabled="true"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></span>
             @endif
             @foreach($pageWindow($paginationPage, $initialTotalPages) as $entry)
               @if($entry === '…')
@@ -1887,9 +1850,9 @@
               @endif
             @endforeach
             @if($paginationPage < $initialTotalPages)
-              <a href="{{ $pageHref($paginationPage + 1) }}" data-page="{{ $paginationPage + 1 }}" class="catalog-page" aria-label="{{ $copy['ui']['page_next'] }}"><span class="material-symbols-outlined">chevron_right</span></a>
+              <a href="{{ $pageHref($paginationPage + 1) }}" data-page="{{ $paginationPage + 1 }}" class="catalog-page" aria-label="{{ $copy['ui']['page_next'] }}"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></a>
             @else
-              <span class="catalog-page is-disabled" aria-disabled="true"><span class="material-symbols-outlined">chevron_right</span></span>
+              <span class="catalog-page is-disabled" aria-disabled="true"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></span>
             @endif
           @endif
         </nav>
@@ -1911,19 +1874,24 @@
       const list = document.getElementById('catalog-results-list');
       const isList = button.dataset.catalogView === 'list';
       list?.classList.toggle('is-list', isList);
-      document.querySelectorAll('[data-catalog-view]').forEach((item) => item.classList.toggle('is-active', item === button));
+      document.querySelectorAll('[data-catalog-view]').forEach((item) => {
+        const active = item === button;
+        item.classList.toggle('is-active', active);
+        item.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
     });
   });
 
   const API_ENDPOINT = '/api/v1/catalog-db';
   const LANG_SUFFIX = @json($langSuffix);
+  const CATALOG_LANG = @json($lang);
   const uiCopy = @json($copy['ui']);
+  const AUTHOR_UNKNOWN = @json($copy['ui']['author_unknown']);
   const SORT_API_MAP = {
-    relevance: 'popular',
+    popular: 'popular',
     title: 'title',
     year_desc: 'newest',
-    year_asc: 'newest',
-    popular: 'popular',
+    year_asc: 'oldest',
     newest: 'newest',
     author: 'author'
   };
@@ -1978,6 +1946,7 @@
 
   function labelFor(axis, value) {
     const map = VALUE_LABELS[axis] || {};
+    if (axis === 'resourceType') return map[value] || uiCopy.resource_type_unknown;
     return map[value] || String(value);
   }
 
@@ -2223,7 +2192,7 @@
     setValue('advanced-resource-type-input', (state.resourceType || [])[0] || '');
 
     const sortSelect = document.getElementById('sort-select');
-    if (sortSelect) sortSelect.value = state.sort || 'relevance';
+    if (sortSelect) sortSelect.value = state.sort || 'popular';
 
     syncFacetControls();
     updateYearRangeVisual();
@@ -2241,7 +2210,7 @@
       isbn: '',
       subject: '',
       language: 'all',
-      sort: 'relevance',
+      sort: 'popular',
       yearFrom: String(YEAR_BOUNDS.min),
       yearTo: String(YEAR_BOUNDS.max),
       availableOnly: false,
@@ -2282,7 +2251,7 @@
     if (clean(parts.author)) {
       segments.push(clean(parts.author));
     }
-    segments.push(clean(parts.title) || uiCopy.untitled || 'Без названия');
+    segments.push(clean(parts.title) || uiCopy.untitled);
 
     const imprint = [clean(parts.publisher), clean(parts.year)].filter(Boolean).join(', ');
     if (imprint) {
@@ -2308,6 +2277,23 @@
     return isMeaningfulText(value) ? String(value).trim() : fallback;
   }
 
+  function formatInteger(value) {
+    return new Intl.NumberFormat(CATALOG_LANG === 'kk' ? 'kk-KZ' : (CATALOG_LANG === 'ru' ? 'ru-RU' : 'en-US'))
+      .format(Number(value || 0));
+  }
+
+  function formatCopyCount(value) {
+    const count = Number(value || 0);
+    if (CATALOG_LANG === 'kk') return `${formatInteger(count)} дана`;
+    if (CATALOG_LANG === 'en') return `${formatInteger(count)} ${count === 1 ? 'copy' : 'copies'}`;
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    const noun = mod10 === 1 && mod100 !== 11
+      ? 'экземпляр'
+      : ((mod10 >= 2 && mod10 <= 4) && !(mod100 >= 12 && mod100 <= 14) ? 'экземпляра' : 'экземпляров');
+    return `${formatInteger(count)} ${noun}`;
+  }
+
   function formatLocationLabel(location) {
     const serviceCode = String(location?.servicePoint?.code || '').trim().toLowerCase();
     const serviceName = String(location?.servicePoint?.name || '').trim();
@@ -2316,22 +2302,14 @@
     const unitCode = String(location?.institutionUnit?.code || '').trim().toLowerCase();
 
     let libraryLabel = '';
-    if (serviceCode === '1' || campusCode === 'university_economic') {
+    if (serviceCode === 'economics-desk' || campusCode === 'economics-desk') {
       libraryLabel = uiCopy.economic_library;
-    } else if (serviceCode === '2' || campusCode === 'university_technological') {
+    } else if (serviceCode === 'technology-desk' || campusCode === 'technology-desk') {
       libraryLabel = uiCopy.technology_library;
-    } else if (serviceCode === '3' || campusCode === 'college_main' || unitCode === 'college') {
+    } else if (serviceCode === 'college' || unitCode === 'college') {
       libraryLabel = uiCopy.college_library;
-    } else if (serviceCode === 'kstlib' || campusCode === 'university_central') {
+    } else if (['scientific-library', 'reading-room'].includes(serviceCode) || ['scientific-library', 'reading-room'].includes(campusCode)) {
       libraryLabel = uiCopy.central_library;
-    }
-
-    if (['1', '2', '3'].includes(serviceCode)) {
-      return `${libraryLabel} · ${uiCopy.cabinet_short} ${serviceCode}`;
-    }
-
-    if (serviceCode === 'kstlib') {
-      return `${libraryLabel} · ${uiCopy.main_cabinet}`;
     }
 
     if (libraryLabel) {
@@ -2429,15 +2407,17 @@
 
   function toggleSortMenu() {
     const panel = document.getElementById('sort-menu-panel');
+    const button = document.getElementById('sort-menu-button');
     if (!panel) return;
     panel.hidden = !panel.hidden;
+    button?.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
   }
 
   function syncSortMenu() {
     const current = document.getElementById('sort-menu-current');
-    const currentValue = window.catalogState.sort || 'relevance';
+    const currentValue = window.catalogState.sort || 'popular';
     if (current) {
-      current.textContent = SORT_LABELS[currentValue] || SORT_LABELS.relevance || 'Relevance';
+      current.textContent = SORT_LABELS[currentValue] || SORT_LABELS.popular || '';
     }
 
     document.querySelectorAll('[data-sort-option]').forEach((button) => {
@@ -2461,17 +2441,9 @@
     // had no hint that an online copy existed.
     if (declaredFormat === 'hybrid') return 'hybrid';
     if (declaredFormat === 'print') return 'physical';
+    if (declaredFormat === 'metadata_only') return 'metadata';
 
-    const subjectText = Array.isArray(item?.classification)
-      ? item.classification.map((subject) => String(subject?.label || '').toLowerCase()).join(' ')
-      : '';
-    const total = Number(item?.copies?.total ?? 0);
-    const available = Number(item?.copies?.available ?? 0);
-
-    if (/dissert|thesis|диссер|archive|архив/.test(subjectText)) return 'archive';
-    if (total > 0 && available === 0) return 'archive';
-    if (total > 0) return 'physical';
-    return 'digital';
+    return 'metadata';
   }
 
   function getMaterialPresentation(kind) {
@@ -2481,6 +2453,17 @@
         badgeLabel: uiCopy.physical,
         primaryLabel: uiCopy.locate,
         primaryIcon: 'library_books',
+        statusClass: 'text-on-surface-variant',
+        statusDot: 'bg-outline',
+      };
+    }
+
+    if (kind === 'metadata') {
+      return {
+        badgeClass: 'bg-surface-container-highest text-on-surface-variant',
+        badgeLabel: uiCopy.metadata_record,
+        primaryLabel: uiCopy.view_record,
+        primaryIcon: 'description',
         statusClass: 'text-on-surface-variant',
         statusDot: 'bg-outline',
       };
@@ -2522,8 +2505,13 @@
 
   function normalizeRecord(item) {
     const kind = deriveMaterialKind(item);
-    const title = formatValue(item?.title?.display || item?.title?.raw, 'Untitled');
-    const author = formatValue(item?.primaryAuthor, uiCopy.author_unknown);
+    const title = formatValue(item?.title?.display || item?.title?.raw, uiCopy.untitled);
+    const originalTitle = formatValue(item?.title?.original, '');
+    // The API deliberately leaves primaryAuthor null when MARC has no usable
+    // responsibility statement. Keep the same honest localized fallback as
+    // the server-rendered card instead of collapsing the author row after the
+    // client refresh.
+    const author = formatValue(item?.primaryAuthor, AUTHOR_UNKNOWN);
     const publicationYear = isMeaningfulText(item?.publicationYear) ? String(item.publicationYear) : '';
     const publisher = formatValue(item?.publisher?.name, '');
     const isbn = formatValue(item?.isbn?.raw);
@@ -2536,20 +2524,27 @@
       (Array.isArray(item?.availability?.locations) ? item.availability.locations : [])
         .reduce((points, holding) => {
           const label = formatLocationLabel(holding);
-          points.set(label, (points.get(label) || 0) + Number(holding?.copies?.available || 0));
+          const current = points.get(label) || { total: 0, available: 0, issued: 0 };
+          current.total += Number(holding?.copies?.total || 0);
+          current.available += Number(holding?.copies?.available || 0);
+          current.issued += Number(holding?.copies?.issued || 0);
+          points.set(label, current);
           return points;
         }, new Map())
         .entries()
-    ).map(([label, available]) => ({ label, available }));
-    const language = formatValue((item?.language?.code || item?.language?.raw || '').toUpperCase(), '—');
+    ).map(([label, counts]) => ({ label, ...counts }));
+    const languageCode = formatValue(item?.language?.code, 'other');
+    const language = formatValue(item?.language?.label || labelFor('language', languageCode), labelFor('language', 'other'));
     const copies = Number(item?.copies?.available ?? 0);
+    const issued = Number(item?.copies?.issued ?? 0);
     const total = Number(item?.copies?.total ?? 0);
     const subjects = Array.isArray(item?.classification)
       ? item.classification.map((subject) => String(subject?.label || '').trim()).filter(Boolean).slice(0, 3)
       : [];
     const annotation = isMeaningfulText(item?.annotation) ? String(item.annotation).trim() : '';
-    const subtitle = isMeaningfulText(item?.title?.subtitle) ? String(item.title.subtitle).trim() : '';
-    const description = annotation || subtitle || (subjects.length ? subjects.join(' · ') : uiCopy.description_placeholder);
+    // Keep annotation truth-preserving: subtitles and subject badges remain
+    // separate fields and must not be presented as descriptive prose.
+    const description = annotation;
     const metaLine = [author, publicationYear, publisher].filter((part) => isMeaningfulText(part));
     const indicators = item?.indicators || {};
     const availabilityLabels = {
@@ -2557,6 +2552,7 @@
       issued: uiCopy.status_issued,
       in_processing: uiCopy.status_processing,
       under_repair: uiCopy.status_repair,
+      electronic_only: uiCopy.status_electronic,
       no_holdings: uiCopy.status_unknown,
     };
     const statusLabel = availabilityLabels[indicators.availability] || uiCopy.status_unknown;
@@ -2565,18 +2561,25 @@
       issued: { statusClass: 'text-error', statusDot: 'bg-error' },
       under_repair: { statusClass: 'text-error', statusDot: 'bg-error' },
       in_processing: { statusClass: 'text-on-surface-variant', statusDot: 'bg-outline' },
+      electronic_only: { statusClass: 'text-secondary', statusDot: 'bg-secondary' },
       no_holdings: { statusClass: 'text-on-surface-variant', statusDot: 'bg-outline' },
     }[indicators.availability] || { statusClass: 'text-on-surface-variant', statusDot: 'bg-outline' };
-    const indicatorLabels = [
-      uiCopy[`format_${indicators.format || 'print'}`] || uiCopy.format_print,
-      uiCopy[indicators.copySupply || 'absent'] || uiCopy.absent,
-      uiCopy[`access_${indicators.accessRestriction || 'free'}`] || uiCopy.access_free,
-      ...(indicators.popular ? [uiCopy.popular] : []),
-      ...(indicators.newArrival ? [uiCopy.new_arrival] : []),
-    ];
+    const indicatorLabels = kind === 'metadata'
+      ? [uiCopy.format_metadata_only, uiCopy.copies_unregistered]
+      : (kind === 'digital'
+        ? [uiCopy.format_electronic]
+        : [
+          uiCopy[`format_${indicators.format || 'print'}`] || uiCopy.format_print,
+          uiCopy[indicators.copySupply || 'absent'] || uiCopy.absent,
+          uiCopy[`access_${indicators.accessRestriction || 'free'}`] || uiCopy.access_free,
+        ]);
+    if (indicators.popular) indicatorLabels.push(uiCopy.popular);
+    if (indicators.newArrival) indicatorLabels.push(uiCopy.new_arrival);
 
     return {
       title,
+      kind,
+      originalTitle: originalTitle !== title ? originalTitle : '',
       author,
       publicationYear: publicationYear || '—',
       publisher,
@@ -2589,6 +2592,7 @@
       authorMark,
       language,
       copies,
+      issued,
       total,
       location,
       availabilityByPoint,
@@ -2626,7 +2630,9 @@
   }
 
   function buildBookMedia(record, index) {
-    const descriptionText = record.description || uiCopy.description_placeholder;
+    if (record.kind === 'metadata') return '';
+
+    const descriptionText = record.description || '';
     const coverCode = record.authorMark !== '—'
       ? `${uiCopy.author_mark}: ${record.authorMark}`
       : (record.udc !== '—'
@@ -2644,7 +2650,7 @@
               <div class="catalog-card-book__page-content">
                 <div>
                   <div class="catalog-card-book__page-label">${escapeHtml(record.publisher || record.badgeLabel)}</div>
-                  <p class="catalog-card-book__page-text">${escapeHtml(descriptionText)}</p>
+                  ${descriptionText ? `<p class="catalog-card-book__page-text">${escapeHtml(descriptionText)}</p>` : ''}
                 </div>
                 <div class="catalog-card-book__page-meta">
                   <div class="catalog-card-book__page-row"><span>${escapeHtml(uiCopy.isbn)}</span><strong>${escapeHtml(record.isbn)}</strong></div>
@@ -2689,7 +2695,8 @@
               <span class="inline-block px-2 py-0.5 ${record.badgeClass} text-[10px] font-bold uppercase tracking-wider rounded mb-2">${escapeHtml(record.badgeLabel)}</span>
               <span class="inline-block px-2 py-0.5 bg-surface-container-high text-primary text-[10px] font-bold uppercase tracking-wider rounded mb-2">${escapeHtml(record.resourceTypeLabel)}</span>
               <a href="${record.detailUrl}" class="block text-2xl font-newsreader font-semibold text-primary group-hover:text-secondary transition-colors cursor-pointer">${escapeHtml(record.title)}</a>
-              <p data-catalog-description class="mt-3 text-on-surface-variant text-sm leading-relaxed">${escapeHtml(record.description)}</p>
+              ${record.originalTitle ? `<p class="mt-1 text-xs text-on-surface-variant"><span class="font-semibold">{{ __('librarian.catalog.translations.original') }}:</span> ${escapeHtml(record.originalTitle)}</p>` : ''}
+              ${record.description ? `<p data-catalog-description class="mt-3 text-on-surface-variant text-sm leading-relaxed">${escapeHtml(record.description)}</p>` : ''}
               <p class="mt-3 text-on-surface-variant font-medium">${escapeHtml(record.metaLine)}</p>
             </div>
             <button
@@ -2708,7 +2715,7 @@
               data-shortlist-total="${escapeHtml(record.total)}"
               data-shortlist-url="${escapeHtml(record.detailUrl)}"
               data-shortlist-provider="${escapeHtml(record.publisher)}"
-              data-shortlist-type="${record.badgeLabel === uiCopy.electronic ? 'external_resource' : 'book'}"
+              data-shortlist-type="${record.kind === 'digital' ? 'external_resource' : 'book'}"
               aria-label="${escapeHtml(uiCopy.shortlist_add)}"
               aria-pressed="false"
               title="${escapeHtml(uiCopy.shortlist_add)}"
@@ -2728,21 +2735,22 @@
             <span><strong>${uiCopy.isbn}:</strong> ${escapeHtml(record.isbn)}</span>
             <span><strong>${uiCopy.udc}:</strong> ${escapeHtml(record.udc)}</span>
             ${record.authorMark !== '—' ? `<span><strong>${escapeHtml(uiCopy.author_mark)}:</strong> ${escapeHtml(record.authorMark)}</span>` : ''}
-            ${(record.availabilityByPoint.length
-              ? record.availabilityByPoint
-              : [{ label: record.location, available: record.copies }])
-              .map((point) => `<span><strong>${escapeHtml(uiCopy.copies)}:</strong> ${escapeHtml(point.available)} экз. — ${escapeHtml(point.label)}</span>`)
+            <span><strong>${escapeHtml(uiCopy.copies_total)}:</strong> ${escapeHtml(formatCopyCount(record.total))}</span>
+            <span><strong>${escapeHtml(uiCopy.copies_available)}:</strong> ${escapeHtml(formatInteger(record.copies))}</span>
+            <span><strong>${escapeHtml(uiCopy.copies_issued)}:</strong> ${escapeHtml(formatInteger(record.issued))}</span>
+            ${record.availabilityByPoint
+              .map((point) => `<span><strong>${escapeHtml(point.label)}:</strong> ${escapeHtml(formatCopyCount(point.total))}</span>`)
               .join('')}
             <span><strong>${escapeHtml(uiCopy.language_label)}:</strong> ${escapeHtml(record.language)}</span>
             <span><strong>${escapeHtml(uiCopy.institution_label)}:</strong> ${escapeHtml(record.location)}</span>
           </div>
           <div class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
             <a href="${record.detailUrl}" class="text-sm font-bold text-secondary flex items-center gap-2 group/btn">
-              <span class="material-symbols-outlined text-lg">${record.primaryIcon}</span>
+              <span class="material-symbols-outlined text-lg" aria-hidden="true">${record.primaryIcon}</span>
               <span>${escapeHtml(record.primaryLabel)}</span>
             </a>
             <button type="button" class="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2" onclick="copyCitation(${escapeHtml(JSON.stringify(record.citation))})">
-              <span class="material-symbols-outlined text-lg">description</span>
+              <span class="material-symbols-outlined text-lg" aria-hidden="true">description</span>
               <span>${escapeHtml(uiCopy.cite)}</span>
             </button>
             <div class="sm:ml-auto text-xs ${record.statusClass} font-bold flex items-center gap-1">
@@ -2759,7 +2767,7 @@
     const identifier = button.dataset.shortlistIdentifier || '';
     return {
       identifier,
-      title: button.dataset.shortlistTitle || identifier || 'Untitled',
+      title: button.dataset.shortlistTitle || identifier || uiCopy.untitled,
       type: button.dataset.shortlistType || 'book',
       author: button.dataset.shortlistAuthor || '',
       publisher: button.dataset.shortlistPublisher || '',
@@ -2933,7 +2941,7 @@
     if (window.catalogState.subject) params.set('subject', window.catalogState.subject);
     if (window.catalogState.udc) params.set('udc', window.catalogState.udc);
     if (window.catalogState.language && window.catalogState.language !== 'all') params.set('language', window.catalogState.language);
-    if (window.catalogState.sort && window.catalogState.sort !== 'relevance') params.set('sort', window.catalogState.sort);
+    if (window.catalogState.sort && window.catalogState.sort !== 'popular') params.set('sort', window.catalogState.sort);
     if (window.catalogState.yearFrom && Number(window.catalogState.yearFrom) !== YEAR_BOUNDS.min) params.set('year_from', window.catalogState.yearFrom);
     if (window.catalogState.yearTo && Number(window.catalogState.yearTo) !== YEAR_BOUNDS.max) params.set('year_to', window.catalogState.yearTo);
     if (window.catalogState.availableOnly) params.set('available_only', '1');
@@ -2947,7 +2955,7 @@
       if (window.catalogState[axis]) params.set(param, window.catalogState[axis]);
     });
     if (window.catalogState.page && window.catalogState.page > 1) params.set('page', String(window.catalogState.page));
-    if (@json($lang) !== 'ru') params.set('lang', @json($lang));
+    if (@json($lang) !== 'kk') params.set('lang', @json($lang));
     return params;
   }
 
@@ -3058,6 +3066,7 @@
   async function loadCatalog() {
     clampYearState();
     const apiParams = new URLSearchParams();
+    apiParams.set('lang', @json($lang));
     if (window.catalogState.q) apiParams.set('q', window.catalogState.q);
     if (window.catalogState.title) apiParams.set('title', window.catalogState.title);
     if (window.catalogState.author) apiParams.set('author', window.catalogState.author);
@@ -3114,10 +3123,6 @@
         return;
       }
 
-      if (window.catalogState.sort === 'year_asc') {
-        data = [...data].sort((left, right) => Number(left?.publicationYear || 0) - Number(right?.publicationYear || 0));
-      }
-
       if (container) {
         // Mirrors the server-rendered no-results branch: a bare "0" with no
         // explanation reads as a broken page rather than an honest no-match.
@@ -3144,7 +3149,8 @@
       const toValue = fromValue > 0 ? Math.min(fromValue + data.length - 1, total) : 0;
       // Mirrors the server's $initialQueryLabel exactly, so the counter does
       // not change wording between first paint and the first XHR.
-      const queryLabel = window.catalogState.q || String(window.catalogState.language || 'all').toUpperCase();
+      const selectedLanguage = String(window.catalogState.language || 'all');
+      const queryLabel = window.catalogState.q || (selectedLanguage === 'all' ? @json($copy['any_option']) : labelFor('language', selectedLanguage));
 
       if (count) {
         count.replaceChildren();
@@ -3309,11 +3315,12 @@
 
   document.querySelectorAll('[data-sort-option]').forEach((button) => {
     button.addEventListener('click', () => {
-      window.catalogState.sort = button.dataset.sortOption || 'relevance';
+      window.catalogState.sort = button.dataset.sortOption || 'popular';
       const select = document.getElementById('sort-select');
       if (select) select.value = window.catalogState.sort;
       document.getElementById('sort-menu-panel')?.setAttribute('hidden', 'hidden');
       document.getElementById('sort-menu-panel').hidden = true;
+      document.getElementById('sort-menu-button')?.setAttribute('aria-expanded', 'false');
       window.catalogState.page = 1;
       syncSortMenu();
       loadCatalog();
@@ -3335,7 +3342,15 @@
     if (panel && !wrapper) {
       panel.hidden = true;
       panel.setAttribute('hidden', 'hidden');
+      document.getElementById('sort-menu-button')?.setAttribute('aria-expanded', 'false');
     }
+  });
+
+  document.getElementById('sort-menu-button')?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const panel = document.getElementById('sort-menu-panel');
+    if (panel) panel.hidden = true;
+    event.currentTarget.setAttribute('aria-expanded', 'false');
   });
 
   ['advanced-title-input', 'advanced-author-input', 'advanced-publisher-input', 'advanced-isbn-input', 'advanced-subject-input'].forEach((id) => {

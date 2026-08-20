@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Librarian;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\RunDataQualityScan;
 use App\Models\ActivityLog;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
@@ -31,6 +32,8 @@ use App\Services\DataQuality\RecordMergeService;
 use App\Support\Csv;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -49,8 +52,19 @@ class DataQualityController extends Controller
             'scan_run_id' => ['nullable', 'integer', 'exists:data_quality_scan_runs,id'],
             'overdue' => ['nullable', 'boolean'],
             'mine' => ['nullable', 'boolean'],
+            'work_type' => ['nullable', Rule::in(['error', 'warning', 'recommendation'])],
+            'priority' => ['nullable', Rule::in(['p1', 'p2', 'p3', 'p4'])],
+            'q' => ['nullable', 'string', 'max:200'],
         ]);
-        $query = DataQualityIssue::query()->with(['assignee', 'scanRun']);
+        $catalogue = $rules->catalogue();
+        $recommendationCodes = collect($catalogue)->filter(fn (array $definition) => ($definition['type'] ?? 'warning') === 'recommendation')->keys()->values();
+        $errorCodes = collect($catalogue)->filter(fn (array $definition) => ($definition['type'] ?? 'warning') === 'error')->keys()->values();
+        $warningCodes = collect($catalogue)->keys()->diff($recommendationCodes)->diff($errorCodes)->values();
+
+        $query = DataQualityIssue::query();
+        if (($filters['status'] ?? null) === null) {
+            $query->actionable();
+        }
         foreach (['entity_type', 'rule_code', 'category', 'severity', 'status', 'assigned_to', 'scan_run_id'] as $field) {
             if (($filters[$field] ?? null) !== null) {
                 $query->where($field, $filters[$field]);
@@ -62,34 +76,109 @@ class DataQualityController extends Controller
         if ($request->boolean('mine')) {
             $query->where('assigned_to', $request->user()->getKey());
         }
+        if (($filters['work_type'] ?? null) === 'recommendation') {
+            $query->whereIn('rule_code', $recommendationCodes);
+        } elseif (($filters['work_type'] ?? null) === 'error') {
+            $query->whereIn('rule_code', $errorCodes);
+        } elseif (($filters['work_type'] ?? null) === 'warning') {
+            $query->whereIn('rule_code', $warningCodes);
+        } elseif (($filters['status'] ?? null) === null) {
+            // The daily inbox contains work that can block accounting or search.
+            // Enrichment recommendations remain available as an explicit tab.
+            $query->whereNotIn('rule_code', $recommendationCodes);
+        }
+        $priorityRules = $this->priorityRules();
+        if ($priority = ($filters['priority'] ?? null)) {
+            $query->whereIn('rule_code', $priorityRules[$priority]);
+        }
+        if ($search = trim((string) ($filters['q'] ?? ''))) {
+            $needle = '%'.mb_strtolower($search).'%';
+            $query->where(function ($builder) use ($needle): void {
+                $builder->whereRaw('LOWER(COALESCE(description, \'\')) LIKE ?', [$needle])
+                    ->orWhereExists(function ($record) use ($needle): void {
+                        $record->selectRaw('1')->from('bibliographic_records')
+                            ->whereRaw('CAST(bibliographic_records.id AS TEXT) = data_quality_issues.entity_id')
+                            ->where('data_quality_issues.entity_type', 'bibliographic_record')
+                            ->where(function ($value) use ($needle): void {
+                                $value->whereRaw('LOWER(title) LIKE ?', [$needle])
+                                    ->orWhereRaw('LOWER(COALESCE(primary_author, \'\')) LIKE ?', [$needle])
+                                    ->orWhereRaw('LOWER(COALESCE(isbn, \'\')) LIKE ?', [$needle]);
+                            });
+                    })
+                    ->orWhereExists(function ($copy) use ($needle): void {
+                        $copy->selectRaw('1')->from('book_copies')
+                            ->whereRaw('CAST(book_copies.id AS TEXT) = data_quality_issues.entity_id')
+                            ->where('data_quality_issues.entity_type', 'book_copy')
+                            ->where(function ($value) use ($needle): void {
+                                $value->whereRaw('LOWER(inventory_number) LIKE ?', [$needle])
+                                    ->orWhereRaw('LOWER(COALESCE(barcode, \'\')) LIKE ?', [$needle]);
+                            });
+                    });
+            });
+        }
 
         $actionable = DataQualityIssue::query()->actionable();
         $totalRecords = BibliographicRecord::query()->where('merge_status', 'active')->count();
+        $latestFullScan = DataQualityScanRun::query()->where('scope', 'all')->where('status', 'completed')->latest('finished_at')->first();
+        $recordsChecked = $latestFullScan
+            ? $totalRecords - BibliographicRecord::query()->where('merge_status', 'active')->where('updated_at', '>', $latestFullScan->finished_at)->count()
+            : 0;
+        $copiesTotal = BookCopy::query()->count();
+        $copiesChecked = $latestFullScan
+            ? $copiesTotal - BookCopy::query()->where('updated_at', '>', $latestFullScan->finished_at)->count()
+            : 0;
         $recordsWithIssues = DataQualityIssue::query()->actionable()
+            ->whereNotIn('rule_code', $recommendationCodes)
             ->where('entity_type', 'bibliographic_record')->distinct()->count('entity_id');
         $resolved = DataQualityIssue::query()->where('status', 'resolved')->count();
         $reopened = DataQualityIssue::query()->where('status', 'reopened')->count();
 
+        $objects = (clone $query)
+            ->select(['entity_type', 'entity_id'])
+            ->selectRaw('MIN(id) AS first_issue_id')
+            ->selectRaw('COUNT(*) AS finding_count')
+            ->selectRaw("MIN(CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END) AS severity_rank")
+            ->selectRaw('MAX(last_detected_at) AS last_detected_at')
+            ->groupBy('entity_type', 'entity_id')
+            ->orderBy('severity_rank')->orderByDesc('last_detected_at')
+            ->paginate(Setting::resultsPerPage())->withQueryString();
+        $this->hydrateObjectRows($objects);
+
+        $attentionBase = DataQualityIssue::query()->actionable()->whereNotIn('rule_code', $recommendationCodes);
+        $recordObjects = (clone $attentionBase)->where('entity_type', 'bibliographic_record')->distinct()->count('entity_id');
+        $copyObjects = (clone $attentionBase)->where('entity_type', 'book_copy')->distinct()->count('entity_id');
+
         return view('librarian.data-quality.index', [
-            'issues' => $query->orderByRaw("CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
-                ->orderBy('due_at')->paginate(Setting::resultsPerPage())->withQueryString(),
+            'objects' => $objects,
             'stats' => [
-                'open' => (clone $actionable)->count(),
-                'critical_high' => (clone $actionable)->whereIn('severity', ['critical', 'high'])->count(),
-                'overdue' => (clone $actionable)->where('due_at', '<', now())->count(),
-                'mine' => (clone $actionable)->where('assigned_to', $request->user()->getKey())->count(),
-                'resolved' => $resolved,
-                'reopened' => $reopened,
-                'clean_percent' => $totalRecords === 0 ? 100 : round((($totalRecords - $recordsWithIssues) / $totalRecords) * 100, 1),
-                'reopened_rate' => ($resolved + $reopened) === 0 ? 0 : round(($reopened / ($resolved + $reopened)) * 100, 1),
+                'records_attention' => $recordObjects,
+                'copies_attention' => $copyObjects,
+                'critical_objects' => $this->countDistinctObjects((clone $attentionBase)->where('severity', 'critical')),
+                'high_objects' => $this->countDistinctObjects((clone $attentionBase)->where('severity', 'high')),
+                'clean_percent' => $latestFullScan && $recordsChecked > 0
+                    ? round((max(0, $recordsChecked - $recordsWithIssues) / $recordsChecked) * 100, 1)
+                    : null,
+                'raw_findings' => (clone $actionable)->count(),
             ],
-            'ruleCatalogue' => $rules->catalogue(),
+            'ruleCatalogue' => $catalogue,
+            'coverage' => [
+                'records_checked' => $recordsChecked,
+                'records_total' => $totalRecords,
+                'copies_checked' => $copiesChecked,
+                'copies_total' => $copiesTotal,
+                'last_scan' => $latestFullScan?->finished_at,
+                'active_rules' => count($catalogue),
+            ],
             'scanRuns' => DataQualityScanRun::query()->latest()->limit(10)->get(),
             'assignees' => User::permission('data_quality.correct')->orderBy('name')->get(),
             'distributions' => [
-                'rules' => DataQualityIssue::query()->actionable()->selectRaw('rule_code, count(*) total')->groupBy('rule_code')->orderByDesc('total')->limit(10)->get(),
-                'entities' => DataQualityIssue::query()->actionable()->selectRaw('entity_type, count(*) total')->groupBy('entity_type')->orderByDesc('total')->get(),
+                'rules' => DataQualityIssue::query()->actionable()->whereNotIn('rule_code', $recommendationCodes)
+                    ->selectRaw("rule_code, count(*) total, count(distinct (entity_type || ':' || entity_id)) objects")
+                    ->groupBy('rule_code')->orderByDesc('objects')->limit(10)->get(),
             ],
+            'priorityCounts' => collect($priorityRules)->map(fn (array $codes) => $this->countDistinctObjects(
+                DataQualityIssue::query()->actionable()->whereIn('rule_code', $codes)
+            )),
         ]);
     }
 
@@ -109,6 +198,21 @@ class DataQualityController extends Controller
                 })
                 ->latest('occurred_at')->limit(100)->get(),
             'assignees' => User::permission('data_quality.correct')->orderBy('name')->get(),
+            'relatedIssues' => DataQualityIssue::query()->actionable()
+                ->where('entity_type', $issue->entity_type)->where('entity_id', $issue->entity_id)
+                ->orderByRaw("CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
+                ->get(),
+            'nextIssue' => DataQualityIssue::query()->actionable()
+                ->whereNotIn('rule_code', collect(app(DataQualityRuleRegistry::class)->catalogue())->filter(fn (array $definition) => ($definition['type'] ?? 'warning') === 'recommendation')->keys())
+                ->where(function ($query) use ($issue): void {
+                    $query->where('entity_type', '>', $issue->entity_type)
+                        ->orWhere(fn ($same) => $same->where('entity_type', $issue->entity_type)->where('entity_id', '>', $issue->entity_id));
+                })->orderBy('entity_type')->orderBy('entity_id')->first(),
+            'canCorrectInline' => $entity && in_array($issue->field_name, match ($issue->entity_type) {
+                'bibliographic_record' => ['title', 'subtitle', 'primary_author', 'publisher', 'publication_year', 'language', 'udc_code', 'author_mark', 'category', 'annotation', 'keywords', 'isbn', 'resource_type', 'notes'],
+                'book_copy' => ['inventory_number', 'barcode', 'branch_id', 'fund_id', 'shelf_location', 'price', 'acquisition_date', 'condition', 'defect_description', 'status'],
+                default => [],
+            }, true),
         ]);
     }
 
@@ -116,6 +220,7 @@ class DataQualityController extends Controller
     {
         $validated = $request->validate(['scope' => ['required', Rule::in(['all', ...array_keys(DataQualityScanner::SCOPES)])]]);
         $run = $scanner->start($validated['scope'], $request->user());
+        RunDataQualityScan::dispatch($run->getKey())->afterCommit();
 
         return back()->with('success', __('data_quality.messages.scan_queued', ['number' => $run->run_number]));
     }
@@ -362,5 +467,51 @@ class DataQualityController extends Controller
         };
 
         return $class ? $class::query()->find($issue->entity_id) : null;
+    }
+
+    private function countDistinctObjects(Builder $query): int
+    {
+        return (int) DB::query()
+            ->fromSub($query->select(['entity_type', 'entity_id'])->distinct(), 'quality_objects')
+            ->count();
+    }
+
+    /** @return array<string,list<string>> */
+    private function priorityRules(): array
+    {
+        return [
+            'p1' => ['copy.inventory.missing', 'copy.status.invalid', 'copy.condition.invalid', 'copy.record.missing', 'copy.location.inactive', 'copy.location.fund_branch_conflict', 'copy.loan_state.conflict', 'copy.reservation_state.conflict', 'bib.physical.no_copies'],
+            'p2' => ['bib.title.missing', 'bib.title.suspicious', 'bib.title.truncated', 'bib.author.missing', 'bib.author.suspicious', 'bib.year.invalid', 'bib.isbn.invalid', 'bib.language.invalid', 'bib.language.possible_mismatch', 'bib.duplicate.exact', 'bib.duplicate.probable', 'bib.duplicate.possible', 'encoding.replacement_character', 'encoding.null_byte', 'encoding.control_character', 'encoding.mojibake', 'encoding.html_entity', 'encoding.question_replacement', 'encoding.mixed_alphabet', 'encoding.legacy_kazakh_glyph'],
+            'p3' => ['bib.udc.missing', 'bib.udc.invalid_format'],
+            'p4' => ['bib.title.spacing', 'bib.author.spacing', 'bib.year.missing', 'bib.isbn.not_normalized', 'bib.author_mark.missing', 'bib.language.legacy_code', 'copy.barcode.missing', 'copy.location.missing', 'encoding.non_breaking_space'],
+        ];
+    }
+
+    private function hydrateObjectRows($objects): void
+    {
+        $rows = $objects->getCollection();
+        if ($rows->isEmpty()) {
+            return;
+        }
+        $recordIds = $rows->where('entity_type', 'bibliographic_record')->pluck('entity_id')->map(fn ($id) => (int) $id);
+        $copyIds = $rows->where('entity_type', 'book_copy')->pluck('entity_id')->map(fn ($id) => (int) $id);
+        $records = BibliographicRecord::query()->withCount('copies')->whereIn('id', $recordIds)->get()->keyBy(fn ($record) => (string) $record->getKey());
+        $copies = BookCopy::query()->with(['bibliographicRecord', 'branch', 'fund'])->whereIn('id', $copyIds)->get()->keyBy(fn ($copy) => (string) $copy->getKey());
+        $entryIssues = DataQualityIssue::query()->whereIn('id', $rows->pluck('first_issue_id'))->get()->keyBy('id');
+        $pairs = $rows->map(fn ($row) => [$row->entity_type, (string) $row->entity_id]);
+        $categories = DataQualityIssue::query()->actionable()->where(function ($query) use ($pairs): void {
+            foreach ($pairs as [$type, $id]) {
+                $query->orWhere(fn ($pair) => $pair->where('entity_type', $type)->where('entity_id', $id));
+            }
+        })->get(['entity_type', 'entity_id', 'category'])->groupBy(fn ($finding) => $finding->entity_type.':'.$finding->entity_id);
+
+        $objects->setCollection($rows->map(function ($row) use ($records, $copies, $categories, $entryIssues) {
+            $row->setAttribute('entity', $row->entity_type === 'bibliographic_record' ? $records->get((string) $row->entity_id) : $copies->get((string) $row->entity_id));
+            $row->setAttribute('entry_issue', $entryIssues->get((int) $row->first_issue_id));
+            $row->setAttribute('categories', $categories->get($row->entity_type.':'.$row->entity_id, collect())->pluck('category')->unique()->values());
+            $row->setAttribute('max_severity', [1 => 'critical', 2 => 'high', 3 => 'medium', 4 => 'low', 5 => 'info'][(int) $row->severity_rank] ?? 'info');
+
+            return $row;
+        }));
     }
 }

@@ -19,6 +19,56 @@ class DigitalMaterialPolicy
         return $user->can('digital.view_cover');
     }
 
+    public function viewMetadata(User $user, mixed $material = null): bool
+    {
+        return $user->canAny(['digital.view_metadata', 'digital.view_cover']);
+    }
+
+    public function preview(User $user, mixed $material = null): bool
+    {
+        return $user->canAny(['digital.preview', 'digital.view_preview']) && $this->accessLevelAllows($user, $material);
+    }
+
+    public function read(User $user, mixed $material = null): bool
+    {
+        return $user->canAny(['digital.read', 'digital.read_full']) && $this->isActive($material) && $this->accessLevelAllows($user, $material);
+    }
+
+    public function download(User $user, mixed $material = null): bool
+    {
+        return $user->can('digital.download') && (bool) $this->attribute($material, 'allow_download') && $this->read($user, $material);
+    }
+
+    public function reviewMetadata(User $user): bool
+    {
+        return $user->can('digital.review_metadata');
+    }
+
+    public function reviewRights(User $user): bool
+    {
+        return $user->can('digital.review_rights');
+    }
+
+    public function process(User $user): bool
+    {
+        return $user->can('digital.process');
+    }
+
+    public function approve(User $user): bool
+    {
+        return $user->can('digital.approve');
+    }
+
+    public function publish(User $user): bool
+    {
+        return $user->can('digital.publish');
+    }
+
+    public function withdraw(User $user): bool
+    {
+        return $user->can('digital.withdraw');
+    }
+
     public function viewPreview(User $user, mixed $material = null): bool
     {
         if (! $user->can('digital.view_preview')) {

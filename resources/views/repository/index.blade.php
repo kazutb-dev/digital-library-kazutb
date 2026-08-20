@@ -1,11 +1,11 @@
-{{-- Public scholarly repository index — Master.md §20.3.
+{{-- Public scholarly repository index — Master.md 20.3.
      Data source: App\Models\Catalog\RepositoryItem (repository_items table),
      served by App\Http\Controllers\RepositoryController::index(). --}}
 @extends('layouts.public')
 
 @php
   $lang = app()->getLocale();
-  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'ru';
+  $lang = in_array($lang, ['kk', 'ru', 'en'], true) ? $lang : 'kk';
   $activePage = $activePage ?? 'repository';
 
   $routeWithLang = static function (string $path, array $query = []) use ($lang): string {
@@ -17,11 +17,34 @@
   };
 
   // Preserve the active facets when switching one of them.
-  $filterUrl = static function (array $overrides) use ($routeWithLang, $activeType, $activeYear, $search): string {
+  $filterUrl = static function (array $overrides) use (
+      $routeWithLang,
+      $activeType,
+      $activeYear,
+      $activeLanguage,
+      $activeAccess,
+      $activeFaculty,
+      $activeDepartment,
+      $activeEducationalProgramme,
+      $activeAuthor,
+      $activeSupervisor,
+      $activeUdc,
+      $activeSort,
+      $search,
+  ): string {
       return $routeWithLang('/repository', array_merge([
           'q' => $search,
           'work_type' => $activeType,
           'year' => $activeYear,
+          'language' => $activeLanguage,
+          'access' => $activeAccess,
+          'faculty' => $activeFaculty,
+          'department' => $activeDepartment,
+          'educational_programme' => $activeEducationalProgramme,
+          'author' => $activeAuthor,
+          'supervisor' => $activeSupervisor,
+          'udc' => $activeUdc,
+          'sort' => $activeSort === 'popular' ? $activeSort : null,
       ], $overrides));
   };
 
@@ -30,9 +53,24 @@
       'title' => 'Научный репозиторий',
       'hero_eyebrow' => 'Институциональный архив',
       'hero_title' => 'Научный репозиторий университета',
-      'hero_body' => 'Дипломные работы, диссертации, статьи и отчёты, прошедшие модерацию библиотеки. Метаданные открыты всем; полный текст доступен авторизованным читателям университета.',
+      'hero_body' => 'Дипломные работы, магистерские и PhD-диссертации, статьи, отчёты, университетские публикации и авторефераты. Метаданные утверждённых работ открыты всем; полный текст — по указанным условиям доступа.',
       'filter_all' => 'Все работы',
       'filter_year_all' => 'Все годы',
+      'filter_language' => 'Язык',
+      'filter_access' => 'Доступ',
+      'filter_faculty' => 'Факультет',
+      'filter_department' => 'Кафедра',
+      'filter_programme' => 'Образовательная программа',
+      'filter_author' => 'Автор',
+      'filter_supervisor' => 'Научный руководитель',
+      'filter_udc' => 'УДК',
+      'filter_sort' => 'Сортировка',
+      'filter_any' => 'Любое значение',
+      'sort_latest' => 'Последние работы',
+      'sort_popular' => 'Популярные',
+      'discover' => 'Быстрый выбор',
+      'discover_open' => 'Открытый доступ',
+      'discover_faculties' => 'Факультеты',
       'search_placeholder' => 'Название, автор или аннотация',
       'search_submit' => 'Найти',
       'search_reset' => 'Сбросить',
@@ -40,9 +78,12 @@
       'works_few' => 'работы',
       'works_many' => 'работ',
       'details' => 'Карточка работы',
-      'access_note' => 'Полный текст — после входа',
+      'access_open' => 'Открыто всем',
+      'access_restricted' => 'Доступ по условиям',
+      'access_note' => 'Метаданные утверждённых работ открыты всем. Доступ к PDF определяется политикой работы; отозванные записи сохраняются без файла.',
       'empty' => 'По заданным условиям опубликованных работ не найдено.',
-      'empty_all' => 'В репозитории пока нет опубликованных работ.',
+      'empty_all' => 'Научный репозиторий формируется.',
+      'empty_all_body' => 'Материалы будут публиковаться после проверки и утверждения библиотекой.',
       'page_prev' => 'Назад',
       'page_next' => 'Вперёд',
     ],
@@ -50,9 +91,24 @@
       'title' => 'Ғылыми репозиторий',
       'hero_eyebrow' => 'Институционалдық мұрағат',
       'hero_title' => 'Университеттің ғылыми репозиторийі',
-      'hero_body' => 'Кітапхана модерациясынан өткен дипломдық жұмыстар, диссертациялар, мақалалар мен есептер. Метадеректер барлығына ашық; толық мәтін университеттің авторизацияланған оқырмандарына қолжетімді.',
+      'hero_body' => 'Дипломдық жұмыстар, магистрлік және PhD диссертациялары, мақалалар, есептер, университет жарияланымдары мен авторефераттар. Бекітілген метадеректер барлығына ашық; толық мәтін көрсетілген шарттарға сай беріледі.',
       'filter_all' => 'Барлық жұмыстар',
       'filter_year_all' => 'Барлық жылдар',
+      'filter_language' => 'Тіл',
+      'filter_access' => 'Қолжетімділік',
+      'filter_faculty' => 'Факультет',
+      'filter_department' => 'Кафедра',
+      'filter_programme' => 'Білім беру бағдарламасы',
+      'filter_author' => 'Автор',
+      'filter_supervisor' => 'Ғылыми жетекші',
+      'filter_udc' => 'ӘОЖ',
+      'filter_sort' => 'Реттеу',
+      'filter_any' => 'Кез келген мән',
+      'sort_latest' => 'Соңғы жұмыстар',
+      'sort_popular' => 'Танымал',
+      'discover' => 'Жылдам таңдау',
+      'discover_open' => 'Ашық қолжетімділік',
+      'discover_faculties' => 'Факультеттер',
       'search_placeholder' => 'Атауы, авторы немесе аңдатпасы',
       'search_submit' => 'Іздеу',
       'search_reset' => 'Тазалау',
@@ -60,9 +116,12 @@
       'works_few' => 'жұмыс',
       'works_many' => 'жұмыс',
       'details' => 'Жұмыс карточкасы',
-      'access_note' => 'Толық мәтін — кіргеннен кейін',
+      'access_open' => 'Барлығына ашық',
+      'access_restricted' => 'Шарттар бойынша қолжетімді',
+      'access_note' => 'Бекітілген жұмыстардың метадеректері барлығына ашық. PDF қолжетімділігі жұмыс саясатына байланысты; кері қайтарылған жазба файлсыз сақталады.',
       'empty' => 'Көрсетілген шарттар бойынша жарияланған жұмыстар табылмады.',
-      'empty_all' => 'Репозиторийде әзірге жарияланған жұмыстар жоқ.',
+      'empty_all' => 'Ғылыми репозиторий қалыптасып жатыр.',
+      'empty_all_body' => 'Материалдар кітапхана тексеріп, бекіткеннен кейін жарияланады.',
       'page_prev' => 'Артқа',
       'page_next' => 'Алға',
     ],
@@ -70,9 +129,24 @@
       'title' => 'Scholarly Repository',
       'hero_eyebrow' => 'Institutional archive',
       'hero_title' => 'University Scholarly Repository',
-      'hero_body' => 'Theses, dissertations, articles, and reports moderated by the library. Metadata is open to everyone; the full text is available to authorised university readers.',
+      'hero_body' => 'Bachelor theses, master and PhD dissertations, articles, reports, university publications, and thesis abstracts. Approved metadata is public; full text follows the stated access conditions.',
       'filter_all' => 'All works',
       'filter_year_all' => 'All years',
+      'filter_language' => 'Language',
+      'filter_access' => 'Access',
+      'filter_faculty' => 'Faculty',
+      'filter_department' => 'Department',
+      'filter_programme' => 'Educational programme',
+      'filter_author' => 'Author',
+      'filter_supervisor' => 'Supervisor',
+      'filter_udc' => 'UDC',
+      'filter_sort' => 'Sort by',
+      'filter_any' => 'Any value',
+      'sort_latest' => 'Latest works',
+      'sort_popular' => 'Popular',
+      'discover' => 'Quick filters',
+      'discover_open' => 'Open access',
+      'discover_faculties' => 'Faculties',
       'search_placeholder' => 'Title, author, or abstract',
       'search_submit' => 'Search',
       'search_reset' => 'Reset',
@@ -80,9 +154,12 @@
       'works_few' => 'works',
       'works_many' => 'works',
       'details' => 'View record',
-      'access_note' => 'Full text after sign-in',
+      'access_open' => 'Open to everyone',
+      'access_restricted' => 'Conditional access',
+      'access_note' => 'Approved metadata is public. PDF access follows each work’s policy; withdrawn records remain as file-free tombstones.',
       'empty' => 'No published works match the selected filters.',
-      'empty_all' => 'The repository has no published works yet.',
+      'empty_all' => 'The scholarly repository is being formed.',
+      'empty_all_body' => 'Materials will be published after library review and approval.',
       'page_prev' => 'Previous',
       'page_next' => 'Next',
     ],
@@ -96,7 +173,19 @@
       return $copy['works_many'];
   };
 
-  $hasFilters = $search !== null || $activeType !== null || $activeYear !== null;
+  $hasFilters = $search !== null
+      || $activeType !== null
+      || $activeYear !== null
+      || $activeLanguage !== null
+      || $activeAccess !== null
+      || $activeFaculty !== null
+      || $activeDepartment !== null
+      || $activeEducationalProgramme !== null
+      || $activeAuthor !== null
+      || $activeSupervisor !== null
+      || $activeUdc !== null
+      || $activeSort === 'popular';
+  $activeAccessCanonical = \App\Models\Catalog\RepositoryItem::normaliseAccessPolicy($activeAccess);
 
   // Windowed page list — two neighbours either side of the current page.
   $currentPage = $items->currentPage();
@@ -114,6 +203,7 @@
 @endphp
 
 @section('title', $copy['title'])
+@section('meta_description', $copy['hero_body'])
 
 @section('content')
   <div class="repository-canonical public-v2 repository-v2" data-section="repository-canonical-page">
@@ -133,6 +223,13 @@
 
     <div class="public-v2__body">
     <div class="public-v2__inset">
+    @if($publishedTotal === 0)
+      <div class="public-v2__empty repository-canonical__empty--initial" data-test-id="repository-canonical-empty">
+        <span class="material-symbols-outlined" aria-hidden="true">article</span>
+        <h3>{{ $copy['empty_all'] }}</h3>
+        <p>{{ $copy['empty_all_body'] }}</p>
+      </div>
+    @else
     <form method="GET" action="/repository" class="repository-canonical__search-form">
       @if($lang !== 'kk')
         <input type="hidden" name="lang" value="{{ $lang }}">
@@ -143,17 +240,123 @@
       @if($activeYear !== null)
         <input type="hidden" name="year" value="{{ $activeYear }}">
       @endif
-      <label class="public-v2__search">
+      <label class="public-v2__search repository-canonical__main-search">
         <span class="material-symbols-outlined" aria-hidden="true">search</span>
         <input type="search" name="q" value="{{ $search }}" placeholder="{{ $copy['search_placeholder'] }}"
                aria-label="{{ $copy['search_placeholder'] }}" data-test-id="repository-canonical-search">
         <button type="submit">{{ $copy['search_submit'] }}</button>
       </label>
-      @if($hasFilters)
-        <a class="repository-canonical__reset" href="{{ $routeWithLang('/repository') }}"
-           data-test-id="repository-canonical-reset">{{ $copy['search_reset'] }}</a>
-      @endif
+      <div class="repository-canonical__facet-grid" data-section="repository-canonical-advanced-filters">
+        <label class="repository-canonical__select-label">
+          <span>{{ $copy['filter_language'] }}</span>
+          <select name="language" data-test-id="repository-filter-language">
+            <option value="">{{ $copy['filter_all'] }}</option>
+            @foreach(['kk', 'ru', 'en'] as $languageKey)
+              <option value="{{ $languageKey }}" @selected($activeLanguage === $languageKey)>{{ __('common.languages.'.$languageKey) }}</option>
+            @endforeach
+          </select>
+        </label>
+        <label class="repository-canonical__select-label">
+          <span>{{ $copy['filter_access'] }}</span>
+          <select name="access" data-test-id="repository-filter-access">
+            <option value="">{{ $copy['filter_all'] }}</option>
+            @foreach(\App\Models\Catalog\RepositoryItem::ACCESS_POLICIES as $policyKey)
+              <option value="{{ $policyKey }}" @selected($activeAccessCanonical === $policyKey)>{{ __('repository.access.'.$policyKey) }}</option>
+            @endforeach
+          </select>
+        </label>
+        <label class="repository-canonical__select-label">
+          <span>{{ $copy['filter_sort'] }}</span>
+          <select name="sort" data-test-id="repository-filter-sort">
+            <option value="latest" @selected($activeSort === 'latest')>{{ $copy['sort_latest'] }}</option>
+            @if($popularAvailable)
+              <option value="popular" @selected($activeSort === 'popular')>{{ $copy['sort_popular'] }}</option>
+            @endif
+          </select>
+        </label>
+        <label class="repository-canonical__select-label">
+          <span>{{ $copy['filter_faculty'] }}</span>
+          <input type="text" name="faculty" value="{{ $activeFaculty }}" list="repository-faculty-options"
+                 maxlength="255" placeholder="{{ $copy['filter_any'] }}" data-test-id="repository-filter-faculty">
+        </label>
+        <label class="repository-canonical__select-label">
+          <span>{{ $copy['filter_department'] }}</span>
+          <input type="text" name="department" value="{{ $activeDepartment }}" list="repository-department-options"
+                 maxlength="255" placeholder="{{ $copy['filter_any'] }}" data-test-id="repository-filter-department">
+        </label>
+        <label class="repository-canonical__select-label">
+          <span>{{ $copy['filter_programme'] }}</span>
+          <input type="text" name="educational_programme" value="{{ $activeEducationalProgramme }}" list="repository-programme-options"
+                 maxlength="255" placeholder="{{ $copy['filter_any'] }}" data-test-id="repository-filter-programme">
+        </label>
+        <label class="repository-canonical__select-label">
+          <span>{{ $copy['filter_author'] }}</span>
+          <input type="text" name="author" value="{{ $activeAuthor }}" list="repository-author-options"
+                 maxlength="255" placeholder="{{ $copy['filter_any'] }}" data-test-id="repository-filter-author">
+        </label>
+        <label class="repository-canonical__select-label">
+          <span>{{ $copy['filter_supervisor'] }}</span>
+          <input type="text" name="supervisor" value="{{ $activeSupervisor }}" list="repository-supervisor-options"
+                 maxlength="255" placeholder="{{ $copy['filter_any'] }}" data-test-id="repository-filter-supervisor">
+        </label>
+        <label class="repository-canonical__select-label">
+          <span>{{ $copy['filter_udc'] }}</span>
+          <input type="text" name="udc" value="{{ $activeUdc }}" list="repository-udc-options"
+                 maxlength="64" placeholder="{{ $copy['filter_any'] }}" data-test-id="repository-filter-udc">
+        </label>
+      </div>
+
+      <datalist id="repository-faculty-options">
+        @foreach($facultyOptions as $option)<option value="{{ $option }}"></option>@endforeach
+      </datalist>
+      <datalist id="repository-department-options">
+        @foreach($departmentOptions as $option)<option value="{{ $option }}"></option>@endforeach
+      </datalist>
+      <datalist id="repository-programme-options">
+        @foreach($educationalProgrammeOptions as $option)<option value="{{ $option }}"></option>@endforeach
+      </datalist>
+      <datalist id="repository-author-options">
+        @foreach($authorOptions as $option)<option value="{{ $option }}"></option>@endforeach
+      </datalist>
+      <datalist id="repository-supervisor-options">
+        @foreach($supervisorOptions as $option)<option value="{{ $option }}"></option>@endforeach
+      </datalist>
+      <datalist id="repository-udc-options">
+        @foreach($udcOptions as $option)<option value="{{ $option }}"></option>@endforeach
+      </datalist>
+
+      <div class="repository-canonical__form-actions">
+        <button class="repository-canonical__apply" type="submit" data-test-id="repository-filter-submit">{{ $copy['search_submit'] }}</button>
+        @if($hasFilters)
+          <a class="repository-canonical__reset" href="{{ $routeWithLang('/repository') }}"
+             data-test-id="repository-canonical-reset">{{ $copy['search_reset'] }}</a>
+        @endif
+      </div>
     </form>
+
+    <nav class="repository-canonical__discovery" aria-label="{{ $copy['discover'] }}" data-section="repository-canonical-discovery">
+      <span class="repository-canonical__discovery-label">{{ $copy['discover'] }}</span>
+      <a href="{{ $filterUrl(['sort' => null]) }}"
+         class="repository-canonical__chip {{ $activeSort === 'latest' ? 'repository-canonical__chip--active' : '' }}">
+        {{ $copy['sort_latest'] }}
+      </a>
+      @if($popularAvailable)
+        <a href="{{ $filterUrl(['sort' => 'popular']) }}"
+           class="repository-canonical__chip {{ $activeSort === 'popular' ? 'repository-canonical__chip--active' : '' }}">
+          {{ $copy['sort_popular'] }}
+        </a>
+      @endif
+      <a href="{{ $filterUrl(['access' => 'full_public']) }}"
+         class="repository-canonical__chip {{ $activeAccessCanonical === 'full_public' ? 'repository-canonical__chip--active' : '' }}">
+        {{ $copy['discover_open'] }}
+      </a>
+      @foreach($facultyOptions->take(8) as $facultyOption)
+        <a href="{{ $filterUrl(['faculty' => $facultyOption]) }}"
+           class="repository-canonical__chip {{ $activeFaculty === $facultyOption ? 'repository-canonical__chip--active' : '' }}">
+          <span class="visually-hidden">{{ $copy['discover_faculties'] }}: </span>{{ $facultyOption }}
+        </a>
+      @endforeach
+    </nav>
 
     <nav class="repository-canonical__filters" data-section="repository-canonical-filters" aria-label="{{ $copy['filter_all'] }}">
       <a href="{{ $filterUrl(['work_type' => null]) }}"
@@ -196,6 +399,7 @@
         @php
           $authors = collect($item->authors ?? [])->filter()->values();
           $keywords = collect($item->keywords ?? [])->filter()->values();
+          $isPublicFullText = $item->status === 'published' && $item->effectiveAccessPolicy() === 'full_public' && ! $item->embargoIsActive();
         @endphp
         <article class="repository-canonical__card" data-work-id="{{ $item->getKey() }}" data-work-type="{{ $item->work_type }}">
           <aside class="repository-canonical__rail">
@@ -222,8 +426,8 @@
               </ul>
               <div class="repository-canonical__card-actions">
                 <span class="repository-canonical__lock">
-                  <span class="material-symbols-outlined" aria-hidden="true">lock</span>
-                  {{ $copy['access_note'] }}
+                  <span class="material-symbols-outlined" aria-hidden="true">{{ $isPublicFullText ? 'lock_open' : 'lock' }}</span>
+                  {{ $isPublicFullText ? $copy['access_open'] : $copy['access_restricted'] }}
                 </span>
                 <a class="repository-canonical__details-link"
                    href="{{ $routeWithLang('/repository/' . $item->getKey()) }}"
@@ -268,6 +472,7 @@
       <p>{{ $copy['access_note'] }}</p>
     </aside>
     </div>
+    @endif
     </div>
     </div>
   </div>
@@ -329,14 +534,81 @@
   }
 
   .repository-canonical__search-form {
-    display: flex;
-    align-items: center;
+    display: grid;
     gap: 16px;
-    flex-wrap: wrap;
+    margin-bottom: 24px;
   }
 
-  .repository-canonical__search-form .public-v2__search {
-    flex: 1 1 320px;
+  .repository-canonical__main-search {
+    width: 100%;
+  }
+
+  .repository-canonical__facet-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+    gap: 14px;
+  }
+
+  .repository-canonical__select-label {
+    display: grid;
+    gap: 5px;
+    min-width: 170px;
+    color: #43474e;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+
+  .repository-canonical__select-label select,
+  .repository-canonical__select-label input {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid #c4cccc;
+    border-radius: 6px;
+    background: #fff;
+    padding: 0 34px 0 12px;
+    color: #191c1d;
+    font: 500 13px 'Manrope', sans-serif;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .repository-canonical__form-actions,
+  .repository-canonical__discovery {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .repository-canonical__apply {
+    min-height: 42px;
+    border: 0;
+    border-radius: 6px;
+    padding: 0 22px;
+    background: #006a6a;
+    color: #fff;
+    font: 700 13px 'Manrope', sans-serif;
+    cursor: pointer;
+  }
+
+  .repository-canonical__apply:hover,
+  .repository-canonical__apply:focus-visible {
+    background: #004f50;
+  }
+
+  .repository-canonical__discovery {
+    margin: 0 0 20px;
+  }
+
+  .repository-canonical__discovery-label {
+    width: 100%;
+    color: #43474e;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
   }
 
   .repository-canonical__reset {
@@ -654,6 +926,10 @@
     border-radius: 8px;
     padding: 32px;
     margin: 0;
+  }
+
+  .repository-canonical__empty--initial {
+    padding: 40px 24px;
   }
 </style>
 @endsection

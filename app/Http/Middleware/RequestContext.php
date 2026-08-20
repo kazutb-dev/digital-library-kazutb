@@ -26,7 +26,7 @@ class RequestContext
             'method' => $request->method(),
             'path' => '/'.ltrim($request->path(), '/'),
             'actor_id' => $actor?->getKey(),
-            'actor_role' => $actor?->getRoleNames()->first() ?: $sessionRole,
+            'actor_role' => $actor?->effectiveRole() ?: $sessionRole,
         ]);
 
         $response = $next($request);

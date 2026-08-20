@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * Attendance recording (ДИР §9.4). A card scan at the entrance produces a
+ * Attendance recording (ДИР 9.4). A card scan at the entrance produces a
  * visit; nothing about circulation is touched.
  *
  * This is the software entry point only — a physical turnstile or kiosk can

@@ -1,33 +1,73 @@
 @php
-    $lang = in_array(app()->getLocale(), ['ru', 'kk', 'en'], true) ? app()->getLocale() : 'ru';
+    $lang = in_array(app()->getLocale(), ['ru', 'kk', 'en'], true) ? app()->getLocale() : 'kk';
     $bookBootstrap = is_array($bookBootstrap ?? null) ? $bookBootstrap : null;
     $bookTitle = trim((string) data_get($bookBootstrap, 'title.display', data_get($bookBootstrap, 'title.raw', '')));
+    $bookTitleSuffix = __('brand.library.name');
     $bookPageTitle = [
-        'ru' => 'Библиографическая запись — Digital Library',
-        'kk' => 'Библиографиялық жазба — Digital Library',
-        'en' => 'Bibliographic record — Digital Library',
-    ][$lang] ?? 'Библиографическая запись — Digital Library';
+        'ru' => 'Библиографическая запись',
+        'kk' => 'Библиографиялық жазба',
+        'en' => 'Bibliographic record',
+    ][$lang].' — '.$bookTitleSuffix;
     if ($bookTitle !== '') {
-        $bookPageTitle = $bookTitle . ' — Digital Library';
+        $bookPageTitle = $bookTitle.' — '.$bookTitleSuffix;
     }
+    $bookMetaDescription = [
+        'ru' => $bookTitle !== ''
+            ? $bookTitle.' — наличие и библиографическое описание в каталоге научной библиотеки.'
+            : 'Карточка издания в каталоге научной библиотеки.',
+        'kk' => $bookTitle !== ''
+            ? $bookTitle.' — ғылыми кітапхана каталогындағы библиографиялық сипаттама және қолжетімділік.'
+            : 'Ғылыми кітапхана каталогындағы басылым карточкасы.',
+        'en' => $bookTitle !== ''
+            ? $bookTitle.' — bibliographic details and availability in the Scientific Library catalogue.'
+            : 'Publication details in the Scientific Library catalogue.',
+    ][$lang];
     $catalogHref = $lang === 'kk' ? '/catalog' : ('/catalog?lang=' . $lang);
     $loginHref = $lang === 'kk' ? '/login' : ('/login?lang=' . $lang);
+    $bookCanonicalQuery = [];
+    foreach (request()->query() as $key => $value) {
+        $normalisedKey = mb_strtolower((string) $key);
+        if ($normalisedKey === 'lang'
+            || str_starts_with($normalisedKey, 'utm_')
+            || in_array($normalisedKey, ['gclid', 'fbclid', 'yclid'], true)
+            || ! is_scalar($value)
+            || trim((string) $value) === '') {
+            continue;
+        }
+        $bookCanonicalQuery[(string) $key] = (string) $value;
+    }
+    ksort($bookCanonicalQuery);
+    $bookCanonicalPath = '/'.ltrim(request()->path(), '/');
+    $bookUrlForLocale = static function (string $locale) use ($bookCanonicalPath, $bookCanonicalQuery): string {
+        $query = $bookCanonicalQuery;
+        if ($locale !== 'kk') {
+            $query['lang'] = $locale;
+        }
 
-    // Reservation entry point (Master.md §13.1, §31.1). The control is rendered
+        return url($bookCanonicalPath).($query === [] ? '' : '?'.http_build_query($query));
+    };
+
+    // Reservation entry point (Master.md 13.1, 31.1). The control is rendered
     // only when there is a real canonical record to reserve AND the signed-in
     // account is an ordinary reader holding `reservation.create` — the same
     // gate the POST route enforces, so the button is never a dead end.
     $reserveRecordId = data_get($bookBootstrap, 'id');
     $sessionRole = mb_strtolower(trim((string) data_get(session('library.user'), 'role', '')));
     // Drafts are excluded here because CabinetController::storeReservation()
-    // aborts 404 on them (§9.1). Without this the button rendered on every
+    // aborts 404 on them (9.1). Without this the button rendered on every
     // incomplete record — the bulk of the imported catalogue — and dead-ended.
     $canReserveRecord = $reserveRecordId !== null
-        && ! (bool) data_get($bookBootstrap, 'quality.needsReview', false)
+        && (bool) data_get($bookBootstrap, 'viewer.canReserve', false)
         && $sessionRole === 'reader'
         && (bool) auth()->user()?->can('reservation.create');
-    $queueEnabled = (bool) \App\Models\Setting::valueFor('reservation_queue_enabled', true);
-    $pickupBranches = \App\Models\Branch::query()->active()->ordered()->get(['id', 'name']);
+    $queueEnabled = ! \Illuminate\Support\Facades\Schema::hasTable('settings')
+        || (bool) \App\Models\Setting::valueFor('reservation_queue_enabled', true);
+    $pickupBranches = \Illuminate\Support\Facades\Schema::hasTable('branches')
+        ? \App\Models\Branch::query()->active()->ordered()->get(['id', 'name'])
+        : collect();
+    $canReserveRecord = $canReserveRecord && $pickupBranches->isNotEmpty();
+    $showGuestReserveLogin = session('library.user') === null
+        && (bool) data_get($bookBootstrap, 'viewer.reservationEligible', false);
 @endphp
 <!DOCTYPE html>
 <html lang="{{ $lang }}">
@@ -36,6 +76,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
     <title>{{ $bookPageTitle }}</title>
+    <meta name="description" content="{{ $bookMetaDescription }}" />
+    <link rel="canonical" href="{{ $bookUrlForLocale($lang) }}" />
+    @foreach(['kk', 'ru', 'en'] as $alternateLocale)
+        <link rel="alternate" hreflang="{{ $alternateLocale }}" href="{{ $bookUrlForLocale($alternateLocale) }}" />
+    @endforeach
+    <link rel="alternate" hreflang="x-default" href="{{ $bookUrlForLocale('kk') }}" />
     @include('partials.favicons')
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script>
@@ -955,8 +1001,8 @@
 
         .book-detail-shell .catalog-card-media {
             width: 100%;
-            max-width: 10rem;
-            min-height: 17rem;
+            max-width: 15rem;
+            min-height: 25.5rem;
             align-self: stretch;
             margin-inline: auto;
             overflow: visible;
@@ -967,7 +1013,7 @@
         .book-detail-shell .catalog-card-book {
             position: relative;
             width: 100%;
-            min-height: 17rem;
+            min-height: 25.5rem;
             height: 100%;
             perspective: 1800px;
         }
@@ -976,7 +1022,7 @@
             position: relative;
             width: 100%;
             height: 100%;
-            min-height: 17rem;
+            min-height: 25.5rem;
             transform-style: preserve-3d;
         }
 
@@ -1152,7 +1198,7 @@
             border-radius: 999px;
             background: rgba(255,255,255,0.12);
             color: rgba(255,255,255,0.88);
-            font-size: 0.52rem;
+            font-size: 0.58rem;
             font-weight: 800;
             letter-spacing: 0.1em;
             text-transform: uppercase;
@@ -1165,8 +1211,8 @@
             margin: 0.5rem 0 0;
             color: #f4dda2;
             font-family: 'Newsreader', serif;
-            font-size: 1.3rem;
-            line-height: 1;
+            font-size: 1.62rem;
+            line-height: 1.02;
             letter-spacing: -0.02em;
             display: -webkit-box;
             -webkit-box-orient: vertical;
@@ -1180,7 +1226,7 @@
         .book-detail-shell .catalog-card-book__author {
             margin: 0.35rem 0 0;
             color: rgba(255,255,255,0.82);
-            font-size: 0.72rem;
+            font-size: 0.88rem;
             line-height: 1.35;
             display: -webkit-box;
             -webkit-box-orient: vertical;
@@ -1204,9 +1250,36 @@
             border-radius: 999px;
             background: rgba(255,255,255,0.12);
             color: rgba(255,255,255,0.9);
-            font-size: 0.52rem;
+            font-size: 0.66rem;
             font-weight: 700;
             line-height: 1.1;
+        }
+
+        .book-detail-shell #detail-metadata-panel .meta-list {
+            font-size: 1rem;
+        }
+
+        .book-detail-shell #detail-availability-summary p,
+        .book-detail-shell #detail-availability-summary strong,
+        .book-detail-shell #detail-metadata-panel .meta-list,
+        .book-detail-shell #access-formats p,
+        .book-detail-shell #access-formats h3,
+        .book-detail-shell #detail-abstract > div {
+            font-size: 1.05rem;
+        }
+
+        .book-detail-shell #detail-abstract > div {
+            max-width: 64ch;
+        }
+
+        .book-detail-shell .book-intro-panel {
+            display: grid;
+            gap: 1.25rem;
+        }
+
+        .book-detail-shell .book-detail-columns {
+            display: grid;
+            gap: 1.25rem;
         }
 
         .book-detail-shell .catalog-card-book--navy .catalog-card-book__cover {
@@ -2114,15 +2187,16 @@
 
         @media (max-width: 560px) {
             body.site-shell.book-detail-shell .page {
-                padding: 56px var(--page-pad) 56px;
+                padding: 88px var(--page-pad) 56px;
             }
         }
     </style>
 </head>
 <body class="site-shell book-detail-shell">
+    <a class="skip-link" href="#main-content">{{ ['ru' => 'К основному содержанию', 'kk' => 'Негізгі мазмұнға өту', 'en' => 'Skip to main content'][$lang] }}</a>
     @include('partials.navbar', ['activePage' => 'catalog'])
 
-    <main class="page">
+    <main class="page" id="main-content" tabindex="-1">
         <div class="container">
             <div class="sr-only">{{ ['ru' => 'Просмотр книги', 'kk' => 'Кітапты қарау', 'en' => 'Book view'][$lang] }}</div>
             @if (session('success'))
@@ -2161,64 +2235,77 @@
         const BOOK_DB_API_ENDPOINT = '/api/v1/book-db/';
         const BOOK_BOOTSTRAP = @json($bookBootstrap);
         const BOOK_LANG = @json($lang);
+        const BOOK_TITLE_SUFFIX = @json($bookTitleSuffix);
         const CATALOG_URL = @json($catalogHref);
         const LOGIN_URL = @json($loginHref);
         const IS_AUTHENTICATED = @json(session('library.user') !== null);
         const BOOK_I18N_MAP = {
             ru: {
-                notFound: 'Книга не найдена', genericError: 'Ошибка', backToCatalog: 'Вернуться в каталог', untitled: 'Без названия', unknownAuthor: 'Неизвестный автор',
+                notFound: 'Книга не найдена', genericError: 'Ошибка', loadFailed: 'Не удалось загрузить сведения о книге. Попробуйте позже.', backToCatalog: 'Вернуться в каталог', untitled: 'Без названия', unknownAuthor: 'Неизвестный автор',
                 publisherMissing: 'Издатель не указан', isbnMissing: 'ISBN не указан', yearMissing: 'Год не указан', languageMissing: 'Язык неизвестен',
                 unit: 'Подразделение', campus: 'Корпус', servicePoint: 'Библиотечная точка', hallSigla: 'Зал / сигла хранения', exactShelf: 'Полка / стеллаж / секция', available: 'Доступно сейчас', locationsUnavailable: 'Информация о местах хранения недоступна', dueDate: 'Вернуть до', activeLoan: 'Эта книга у вас на руках',
-                reviewPrefix: '⚠ Данные этого документа проходят проверку:', trainingTracks: '📚 Направления подготовки', showAllBooks: 'Показать все книги', home: 'Главная', catalog: 'Каталог', abstract: 'Аннотация', subjectTerms: 'Предметные рубрики', languageMedia: 'Язык и носитель', editionLabel: 'Редакция', editionMissing: 'Не указана', callNumber: 'Шифр хранения',
-                coverTop: 'Каталог', availableNow: '✓ Доступно сейчас', unavailableNow: '✗ Недоступно', invalidIsbn: 'ISBN не валиден', authors: 'Авторы', author: 'Автор', publicationYear: 'Год издания', language: 'Язык',
-                availableShort: 'Доступно', copySummary: '{available}', copyAvailable: 'Экземпляр доступен для выдачи', copyAvailableBody: 'Сейчас доступно: {available} экз.',
+                home: 'Главная', catalog: 'Каталог', abstract: 'Аннотация', subjectTerms: 'Предметные рубрики', languageMedia: 'Язык и носитель', editionLabel: 'Редакция', editionMissing: 'Не указана', callNumber: 'Шифр хранения',
+                coverTop: 'Каталог', availableNow: ' Доступно сейчас', unavailableNow: ' Недоступно', invalidIsbn: 'ISBN не валиден', authors: 'Авторы', author: 'Автор', publicationYear: 'Год издания', language: 'Язык',
+                availableShort: 'Доступно', totalCopies: 'Всего экземпляров', issuedCopies: 'Выдано', copySummary: '{available}', copyAvailable: 'Экземпляр доступен для выдачи', copyAvailableBody: 'Сейчас доступно: {available}.',
                 allCheckedOut: 'Все экземпляры выданы', allCheckedOutBody: 'Свободных экземпляров сейчас нет.', inStock: 'В наличии', unavailable: 'Недоступно',
                 reserve: 'Забронировать', joinQueue: 'Встать в очередь', pickup: 'Место получения', signInToReserve: 'Войдите для бронирования', shortlistAdd: '☆ В подборку', shortlistAdded: '★ В подборке', cite: 'Цитировать', characteristics: 'Характеристики',
-                publisher: 'Издательство', publicationLanguage: 'Язык издания', resourceType: 'Тип ресурса', authorMark: 'Авторский знак', keywords: 'Ключевые слова', relatedMaterials: 'Связанные материалы', similarByUdc: 'Похожие материалы в этом разделе', availableNowLabel: 'Доступно сейчас', availabilityByPoint: 'Наличие по пунктам выдачи', locationLabel: 'Локация', accessAndFormat: 'Доступ и формат',
-                digitalMaterials: '💻 Электронные материалы', open: 'Открыть', login: 'Войти', checking: '⏳ Проверка...', reservedReady: '✓ Уже забронировано', reserving: '⏳ Бронирование...', noCopies: 'Нет экземпляров', reservationUnavailable: 'Бронирование недоступно',
-                reservedState: '✓ Забронировано ({status})', readyForPickup: 'готово к выдаче', waiting: 'ожидание', reserveSuccess: 'Книга успешно забронирована!', validUntil: 'Действует до {date}.', followStatus: 'Следите за статусом в кабинете.', description: 'Аннотация', metadata: 'Метаданные', licensedResources: 'Лицензированные ссылки и ресурсы', similarResources: 'Похожие академические ресурсы', browseMore: 'Смотреть ещё', readOnline: 'Цифровой доступ', requestAccess: 'Запросить доступ', statusInStorage: 'Статус в фонде', allCollections: 'Основная коллекция', generatedSummary: '{title} — издание {publisher}. Язык: {language}. УДК: {udc}. Автор: {author}. Доступно сейчас: {available} экз.', udcPending: 'УДК уточняется', metadataPending: 'Метаданные уточняются: {items}', classificationPending: 'Академический профиль уточняется', locationPending: 'Локация уточняется', physicalAvailable: 'Физический экземпляр доступен для выдачи', physicalUnavailable: 'Физический фонд есть, но свободных экземпляров сейчас нет', physicalPending: 'Сведения о физическом фонде ещё уточняются', digitalOpen: 'Цифровой просмотр открыт', digitalRestricted: 'Цифровой доступ ограничен', digitalCampus: 'Только из сети университета', digitalAuthenticated: 'После входа в кабинет', udcSourceLabel: 'Источник УДК', profileLabel: 'Профиль',
+                publisher: 'Издательство', originalTitle: 'Оригинальное название', publicationLanguage: 'Язык издания', resourceType: 'Тип ресурса', authorMark: 'Авторский знак', keywords: 'Ключевые слова', relatedMaterials: 'Связанные материалы', similarByUdc: 'Похожие материалы в этом разделе', availableNowLabel: 'Доступно сейчас', availabilityByPoint: 'Наличие по пунктам выдачи', locationLabel: 'Локация', accessAndFormat: 'Доступ и формат',
+                digitalMaterials: ' Электронные материалы', open: 'Открыть', login: 'Войти', checking: ' Проверка...', reservedReady: ' Уже забронировано', reserving: ' Бронирование...', noCopies: 'Нет экземпляров', reservationUnavailable: 'Бронирование недоступно',
+                reservedState: ' Забронировано ({status})', readyForPickup: 'готово к выдаче', waiting: 'ожидание', reserveSuccess: 'Книга успешно забронирована!', validUntil: 'Действует до {date}.', followStatus: 'Следите за статусом в кабинете.', description: 'Аннотация', metadata: 'Метаданные', licensedResources: 'Лицензированные ссылки и ресурсы', similarResources: 'Похожие академические ресурсы', browseMore: 'Смотреть ещё', statusInStorage: 'Статус в фонде', allCollections: 'Основная коллекция', physicalAvailable: 'Физический экземпляр доступен для выдачи', physicalUnavailable: 'Физический фонд есть, но свободных экземпляров сейчас нет', digitalOpen: 'Цифровой просмотр открыт', digitalRestricted: 'Цифровой доступ ограничен', digitalCampus: 'Только из сети университета', digitalAuthenticated: 'После входа в кабинет',
                 licenseTerms: 'Условия использования', accessFormats: 'Форматы доступа', printCopy: 'Печатный экземпляр', digitalVersion: 'Электронная версия', digitalChecking: 'Проверяем наличие электронной версии…', digitalNone: 'Электронной версии у этого издания пока нет.', digitalNoDownload: 'Скачивание запрещено правообладателем — доступно только чтение онлайн.', digitalFullscreen: 'Открыть на весь экран', digitalLevelPublic: 'Открыто всем', digitalLevelReaders: 'Для читателей библиотеки', digitalClose: 'Закрыть просмотрщик', reserveFailed: 'Не удалось создать бронирование.', networkError: 'Ошибка сети. Попробуйте ещё раз.',
-                digitalRead: 'Читать онлайн', digitalExternal: 'Открыть у источника', digitalDownload: 'Скачать', digitalSignIn: 'Войти для доступа', exactLocationPending: 'Точное расположение уточняется у библиотекаря'
+                digitalRead: 'Читать онлайн', digitalExternal: 'Открыть у источника', digitalDownload: 'Скачать', digitalSignIn: 'Войти для доступа'
             },
             kk: {
-                notFound: 'Кітап табылмады', genericError: 'Қате', backToCatalog: 'Каталогқа оралу', untitled: 'Атауы жоқ', unknownAuthor: 'Автор белгісіз',
+                notFound: 'Кітап табылмады', genericError: 'Қате', loadFailed: 'Кітап туралы мәліметтерді жүктеу мүмкін болмады. Кейінірек қайталап көріңіз.', backToCatalog: 'Каталогқа оралу', untitled: 'Атауы жоқ', unknownAuthor: 'Автор белгісіз',
                 publisherMissing: 'Баспа көрсетілмеген', isbnMissing: 'ISBN көрсетілмеген', yearMissing: 'Жылы көрсетілмеген', languageMissing: 'Тілі белгісіз',
                 unit: 'Бөлім', campus: 'Корпус', servicePoint: 'Кітапхана нүктесі', hallSigla: 'Зал / сақтау сигласы', exactShelf: 'Сөре / стеллаж / секция', available: 'Қазір қолжетімді', locationsUnavailable: 'Сақталу орындары туралы ақпарат жоқ', dueDate: 'Қайтару мерзімі', activeLoan: 'Бұл кітап сізде',
-                reviewPrefix: '⚠ Бұл құжаттың деректері тексерілуде:', trainingTracks: '📚 Дайындық бағыттары', showAllBooks: 'Осы бағыттағы барлық кітаптарды көрсету', home: 'Басты бет', catalog: 'Каталог', abstract: 'Аңдатпа', subjectTerms: 'Пәндік айдарлар', languageMedia: 'Тіл және тасымалдағыш', editionLabel: 'Басылым', editionMissing: 'Көрсетілмеген', callNumber: 'Сақтау шифры',
-                coverTop: 'Каталог', availableNow: '✓ Қазір қолжетімді', unavailableNow: '✗ Қолжетімсіз', invalidIsbn: 'ISBN жарамсыз', authors: 'Авторлар', author: 'Автор', publicationYear: 'Басылым жылы', language: 'Тіл',
-                availableShort: 'Қолжетімді', copySummary: '{available}', copyAvailable: 'Данасы берілуге қолжетімді', copyAvailableBody: 'Қазір қолжетімді: {available} дана.',
+                home: 'Басты бет', catalog: 'Каталог', abstract: 'Аңдатпа', subjectTerms: 'Пәндік айдарлар', languageMedia: 'Тіл және тасымалдағыш', editionLabel: 'Басылым', editionMissing: 'Көрсетілмеген', callNumber: 'Сақтау шифры',
+                coverTop: 'Каталог', availableNow: ' Қазір қолжетімді', unavailableNow: ' Қолжетімсіз', invalidIsbn: 'ISBN жарамсыз', authors: 'Авторлар', author: 'Автор', publicationYear: 'Басылым жылы', language: 'Тіл',
+                availableShort: 'Қолжетімді', totalCopies: 'Барлық дана', issuedCopies: 'Берілген', copySummary: '{available}', copyAvailable: 'Данасы берілуге қолжетімді', copyAvailableBody: 'Қазір қолжетімді: {available}.',
                 allCheckedOut: 'Барлық даналар берілген', allCheckedOutBody: 'Қазір бос дана жоқ.', inStock: 'Қолда бар', unavailable: 'Қолжетімсіз',
                 reserve: 'Брондау', joinQueue: 'Кезекке тұру', pickup: 'Алу орны', signInToReserve: 'Брондау үшін кіріңіз', shortlistAdd: '☆ Топтамаға', shortlistAdded: '★ Топтамада', cite: 'Дәйексөз', characteristics: 'Сипаттамалар',
-                publisher: 'Баспа', publicationLanguage: 'Басылым тілі', resourceType: 'Ресурс түрі', authorMark: 'Авторлық белгі', keywords: 'Кілт сөздер', relatedMaterials: 'Байланысты материалдар', similarByUdc: 'Осы бөлімдегі ұқсас материалдар', availableNowLabel: 'Қазір қолжетімді', availabilityByPoint: 'Берілім нүктелері бойынша қолжетімділік', locationLabel: 'Локация', accessAndFormat: 'Қолжетімділік пен формат',
-                digitalMaterials: '💻 Электрондық материалдар', open: 'Ашу', login: 'Кіру', checking: '⏳ Тексеру...', reservedReady: '✓ Бұрыннан брондалған', reserving: '⏳ Брондау...', noCopies: 'Дана жоқ', reservationUnavailable: 'Брондау қолжетімсіз',
-                reservedState: '✓ Брондалған ({status})', readyForPickup: 'беруге дайын', waiting: 'күту', reserveSuccess: 'Кітап сәтті брондалды!', validUntil: '{date} дейін жарамды.', followStatus: 'Күйін кабинеттен бақылаңыз.', description: 'Аңдатпа', metadata: 'Метадеректер', licensedResources: 'Лицензиялық сілтемелер мен ресурстар', similarResources: 'Ұқсас академиялық ресурстар', browseMore: 'Тағы көру', readOnline: 'Цифрлық қолжетімділік', requestAccess: 'Қол жеткізуді сұрау', statusInStorage: 'Қордағы мәртебе', allCollections: 'Негізгі қор', generatedSummary: '{title} — {publisher} басылымы. Тілі: {language}. ӘОЖ: {udc}. Автор: {author}. Қазір қолжетімді: {available} дана.', udcPending: 'ӘОЖ нақтылануда', metadataPending: 'Метадеректер нақтылануда: {items}', classificationPending: 'Академиялық профиль нақтылануда', locationPending: 'Локация нақтылануда', physicalAvailable: 'Физикалық дана берілуге қолжетімді', physicalUnavailable: 'Физикалық қор бар, бірақ бос дана жоқ', physicalPending: 'Физикалық қор туралы дерек нақтылануда', digitalOpen: 'Цифрлық қарау ашық', digitalRestricted: 'Цифрлық қолжетімділік шектеулі', digitalCampus: 'Тек университет желісінде', digitalAuthenticated: 'Кабинетке кіргеннен кейін', udcSourceLabel: 'ӘОЖ көзі', profileLabel: 'Профиль',
+                publisher: 'Баспа', originalTitle: 'Түпнұсқа атауы', publicationLanguage: 'Басылым тілі', resourceType: 'Ресурс түрі', authorMark: 'Авторлық белгі', keywords: 'Кілт сөздер', relatedMaterials: 'Байланысты материалдар', similarByUdc: 'Осы бөлімдегі ұқсас материалдар', availableNowLabel: 'Қазір қолжетімді', availabilityByPoint: 'Берілім нүктелері бойынша қолжетімділік', locationLabel: 'Локация', accessAndFormat: 'Қолжетімділік пен формат',
+                digitalMaterials: ' Электрондық материалдар', open: 'Ашу', login: 'Кіру', checking: ' Тексеру...', reservedReady: ' Бұрыннан брондалған', reserving: ' Брондау...', noCopies: 'Дана жоқ', reservationUnavailable: 'Брондау қолжетімсіз',
+                reservedState: ' Брондалған ({status})', readyForPickup: 'беруге дайын', waiting: 'күту', reserveSuccess: 'Кітап сәтті брондалды!', validUntil: '{date} дейін жарамды.', followStatus: 'Күйін кабинеттен бақылаңыз.', description: 'Аңдатпа', metadata: 'Метадеректер', licensedResources: 'Лицензиялық сілтемелер мен ресурстар', similarResources: 'Ұқсас академиялық ресурстар', browseMore: 'Тағы көру', statusInStorage: 'Қордағы мәртебе', allCollections: 'Негізгі қор', physicalAvailable: 'Физикалық дана берілуге қолжетімді', physicalUnavailable: 'Физикалық қор бар, бірақ бос дана жоқ', digitalOpen: 'Цифрлық қарау ашық', digitalRestricted: 'Цифрлық қолжетімділік шектеулі', digitalCampus: 'Тек университет желісінде', digitalAuthenticated: 'Кабинетке кіргеннен кейін',
                 licenseTerms: 'Пайдалану шарттары', accessFormats: 'Қолжетімділік форматтары', printCopy: 'Басылған дана', digitalVersion: 'Электрондық нұсқа', digitalChecking: 'Электрондық нұсқаның бар-жоғы тексерілуде…', digitalNone: 'Бұл басылымның электрондық нұсқасы әзірге жоқ.', digitalNoDownload: 'Жүктеп алуға құқық иесі рұқсат бермеген — тек онлайн оқуға болады.', digitalFullscreen: 'Толық экранда ашу', digitalLevelPublic: 'Барлығына ашық', digitalLevelReaders: 'Кітапхана оқырмандарына', digitalClose: 'Қарау терезесін жабу', reserveFailed: 'Брондауды жасау мүмкін болмады.', networkError: 'Желі қатесі. Қайта көріңіз.',
-                digitalRead: 'Онлайн оқу', digitalExternal: 'Дереккөзде ашу', digitalDownload: 'Жүктеп алу', digitalSignIn: 'Қолжетімділік үшін кіру', exactLocationPending: 'Нақты орналасқан жерін кітапханашыдан нақтылаңыз'
+                digitalRead: 'Онлайн оқу', digitalExternal: 'Дереккөзде ашу', digitalDownload: 'Жүктеп алу', digitalSignIn: 'Қолжетімділік үшін кіру'
             },
             en: {
-                notFound: 'Book not found', genericError: 'Error', backToCatalog: 'Back to Catalog', untitled: 'Untitled', unknownAuthor: 'Unknown author',
+                notFound: 'Book not found', genericError: 'Error', loadFailed: 'Book details could not be loaded. Please try again later.', backToCatalog: 'Back to Catalog', untitled: 'Untitled', unknownAuthor: 'Unknown author',
                 publisherMissing: 'Publisher not specified', isbnMissing: 'ISBN not provided', yearMissing: 'Year not specified', languageMissing: 'Language unknown',
                 unit: 'Unit', campus: 'Building', servicePoint: 'Library point', hallSigla: 'Room / storage sigla', exactShelf: 'Shelf / stack / section', available: 'Available now', locationsUnavailable: 'Location details are unavailable', dueDate: 'Due date', activeLoan: 'You currently have this book',
-                reviewPrefix: '⚠ This record is currently under review:', trainingTracks: '📚 Academic tracks', showAllBooks: 'Show all books for this track', home: 'Home', catalog: 'Catalog', abstract: 'Abstract', subjectTerms: 'Subject Terms', languageMedia: 'Language & Media', editionLabel: 'Edition', editionMissing: 'Not specified', callNumber: 'Call Number',
-                coverTop: 'Catalog', availableNow: '✓ Available now', unavailableNow: '✗ Unavailable', invalidIsbn: 'Invalid ISBN', authors: 'Authors', author: 'Author', publicationYear: 'Publication year', language: 'Language',
-                availableShort: 'Available', copySummary: '{available}', copyAvailable: 'A copy is available for checkout', copyAvailableBody: 'Available now: {available} copies.',
+                home: 'Home', catalog: 'Catalog', abstract: 'Abstract', subjectTerms: 'Subject Terms', languageMedia: 'Language & Media', editionLabel: 'Edition', editionMissing: 'Not specified', callNumber: 'Call Number',
+                coverTop: 'Catalog', availableNow: ' Available now', unavailableNow: ' Unavailable', invalidIsbn: 'Invalid ISBN', authors: 'Authors', author: 'Author', publicationYear: 'Publication year', language: 'Language',
+                availableShort: 'Available', totalCopies: 'Total copies', issuedCopies: 'On loan', copySummary: '{available}', copyAvailable: 'A copy is available for checkout', copyAvailableBody: 'Available now: {available}.',
                 allCheckedOut: 'All copies are checked out', allCheckedOutBody: 'No copies are free right now.', inStock: 'In stock', unavailable: 'Unavailable',
                 reserve: 'Reserve', joinQueue: 'Join queue', pickup: 'Pickup location', signInToReserve: 'Sign in to reserve', shortlistAdd: '☆ Add to shortlist', shortlistAdded: '★ In shortlist', cite: 'Cite', characteristics: 'Details',
-                publisher: 'Publisher', publicationLanguage: 'Publication language', resourceType: 'Resource type', authorMark: 'Author mark', keywords: 'Keywords', relatedMaterials: 'Related materials', similarByUdc: 'Similar materials in this section', availableNowLabel: 'Available now', availabilityByPoint: 'Availability by service point', locationLabel: 'Location', accessAndFormat: 'Access and format',
-                digitalMaterials: '💻 Digital materials', open: 'Open', login: 'Sign in', checking: '⏳ Checking...', reservedReady: '✓ Already reserved', reserving: '⏳ Reserving...', noCopies: 'No copies', reservationUnavailable: 'Reservation unavailable',
-                reservedState: '✓ Reserved ({status})', readyForPickup: 'ready for pickup', waiting: 'waiting', reserveSuccess: 'The book has been reserved successfully!', validUntil: 'Valid until {date}.', followStatus: 'Track the status in your account.', description: 'Abstract', metadata: 'Metadata', licensedResources: 'Licensed references & resources', similarResources: 'Similar Academic Resources', browseMore: 'Browse More', readOnline: 'View Digital Access', requestAccess: 'Request Access', statusInStorage: 'Status in Storage', allCollections: 'Main Collection', generatedSummary: '{title} — published by {publisher}. Language: {language}. UDC: {udc}. Author: {author}. Available now: {available} copies.', udcPending: 'UDC pending', metadataPending: 'Metadata pending: {items}', classificationPending: 'Academic profile pending', locationPending: 'Location pending', physicalAvailable: 'A physical copy is available for checkout', physicalUnavailable: 'Physical holding exists, but no copy is free right now', physicalPending: 'Physical holding data is still being clarified', digitalOpen: 'Digital viewer available', digitalRestricted: 'Digital access restricted', digitalCampus: 'Campus network only', digitalAuthenticated: 'After sign-in', udcSourceLabel: 'UDC source', profileLabel: 'Profile',
+                publisher: 'Publisher', originalTitle: 'Original title', publicationLanguage: 'Publication language', resourceType: 'Resource type', authorMark: 'Author mark', keywords: 'Keywords', relatedMaterials: 'Related materials', similarByUdc: 'Similar materials in this section', availableNowLabel: 'Available now', availabilityByPoint: 'Availability by service point', locationLabel: 'Location', accessAndFormat: 'Access and format',
+                digitalMaterials: ' Digital materials', open: 'Open', login: 'Sign in', checking: ' Checking...', reservedReady: ' Already reserved', reserving: ' Reserving...', noCopies: 'No copies', reservationUnavailable: 'Reservation unavailable',
+                reservedState: ' Reserved ({status})', readyForPickup: 'ready for pickup', waiting: 'waiting', reserveSuccess: 'The book has been reserved successfully!', validUntil: 'Valid until {date}.', followStatus: 'Track the status in your account.', description: 'Abstract', metadata: 'Metadata', licensedResources: 'Licensed references & resources', similarResources: 'Similar Academic Resources', browseMore: 'Browse More', statusInStorage: 'Status in Storage', allCollections: 'Main Collection', physicalAvailable: 'A physical copy is available for checkout', physicalUnavailable: 'Physical holding exists, but no copy is free right now', digitalOpen: 'Digital viewer available', digitalRestricted: 'Digital access restricted', digitalCampus: 'Campus network only', digitalAuthenticated: 'After sign-in',
                 licenseTerms: 'Terms of use', accessFormats: 'Access formats', printCopy: 'Print copy', digitalVersion: 'Digital edition', digitalChecking: 'Checking for a digital edition…', digitalNone: 'This title has no digital edition yet.', digitalNoDownload: 'Downloading is not permitted by the rights holder — reading online only.', digitalFullscreen: 'Open full screen', digitalLevelPublic: 'Open to everyone', digitalLevelReaders: 'Library readers only', digitalClose: 'Close the viewer', reserveFailed: 'Unable to create the reservation.', networkError: 'Network error. Please try again.',
-                digitalRead: 'Read online', digitalExternal: 'Open at source', digitalDownload: 'Download', digitalSignIn: 'Sign in for access', exactLocationPending: 'Ask a librarian to confirm the exact location'
+                digitalRead: 'Read online', digitalExternal: 'Open at source', digitalDownload: 'Download', digitalSignIn: 'Sign in for access'
             }
         };
         const BOOK_I18N = BOOK_I18N_MAP[BOOK_LANG] || BOOK_I18N_MAP.ru;
+        const BOOK_UDC_LABEL = { ru: 'УДК', kk: 'ӘОЖ', en: 'UDC' }[BOOK_LANG] || 'УДК';
+        const BOOK_RESOURCE_TYPE_LABELS = {
+            ru: { book: 'Книга', textbook: 'Учебник', study_guide: 'Учебное пособие', methodical: 'Методическое пособие', journal: 'Журнал', periodical: 'Периодическое издание', dissertation: 'Диссертация', abstract: 'Автореферат', article: 'Статья', publication: 'Научная публикация', ebook: 'Электронная книга', digital_document: 'Электронный документ', _default: 'Документ' },
+            kk: { book: 'Кітап', textbook: 'Оқулық', study_guide: 'Оқу құралы', methodical: 'Әдістемелік құрал', journal: 'Журнал', periodical: 'Мерзімді басылым', dissertation: 'Диссертация', abstract: 'Автореферат', article: 'Мақала', publication: 'Ғылыми жарияланым', ebook: 'Электрондық кітап', digital_document: 'Электрондық құжат', _default: 'Құжат' },
+            en: { book: 'Book', textbook: 'Textbook', study_guide: 'Study guide', methodical: 'Methodological guide', journal: 'Journal', periodical: 'Periodical', dissertation: 'Dissertation', abstract: 'Thesis abstract', article: 'Article', publication: 'Scholarly publication', ebook: 'E-book', digital_document: 'Digital document', _default: 'Document' }
+        };
 
         function withLang(path) {
             const url = new URL(path, window.location.origin);
-            if (BOOK_LANG !== 'ru' && !url.searchParams.has('lang')) {
+            if (BOOK_LANG !== 'kk' && !url.searchParams.has('lang')) {
                 url.searchParams.set('lang', BOOK_LANG);
             }
             return `${url.pathname}${url.search}`;
+        }
+
+        function formatResourceType(value) {
+            const labels = BOOK_RESOURCE_TYPE_LABELS[BOOK_LANG] || BOOK_RESOURCE_TYPE_LABELS.ru;
+            const key = normalizeText(value, '').toLowerCase();
+            return labels[key] || labels._default;
         }
 
         async function loadBook() {
@@ -2244,8 +2331,11 @@
             } catch (err) {
                 loading.style.display = 'none';
                 error.style.display = 'block';
+                const publicMessage = err?.message === BOOK_I18N.notFound
+                    ? BOOK_I18N.notFound
+                    : BOOK_I18N.loadFailed;
                 error.innerHTML = `
-                    <strong>${BOOK_I18N.genericError}:</strong> ${err.message}
+                    <strong>${BOOK_I18N.genericError}:</strong> ${publicMessage}
                     <div style="margin-top: 1rem;">
                         <a href="${CATALOG_URL}" class="btn btn-ghost">${BOOK_I18N.backToCatalog}</a>
                     </div>
@@ -2271,7 +2361,7 @@
                             continue;
                         }
 
-                        throw new Error(`API Error: ${response.status}`);
+                        throw new Error(BOOK_I18N.loadFailed);
                     }
 
                     const result = await response.json();
@@ -2292,6 +2382,20 @@
             return value.trim() || fallback;
         }
 
+        function isNoiseText(value) {
+            const text = normalizeText(value, '');
+            return text !== '' && /^(?:текст|text)$/i.test(text);
+        }
+
+        function pickMeaningfulText(...values) {
+            for (const value of values) {
+                const text = normalizeText(value, '');
+                if (text === '' || isNoiseText(text)) continue;
+                return text;
+            }
+            return '';
+        }
+
         function escapeHtml(text) {
             if (!text) return '';
             const div = document.createElement('div');
@@ -2303,14 +2407,15 @@
             const serviceCode = String(location?.servicePoint?.code || '').trim().toLowerCase();
             const serviceName = String(location?.servicePoint?.name || '').trim();
             const campusCode = String(location?.campus?.code || '').trim().toLowerCase();
+            const unitCode = String(location?.institutionUnit?.code || '').trim().toLowerCase();
             const unitName = String(location?.institutionUnit?.name || '').trim();
 
-            if (serviceCode === '1' || campusCode === 'university_economic') return BOOK_LANG === 'en' ? 'Economics Library · room 1' : (BOOK_LANG === 'kk' ? 'Экономика кітапханасы · 1 кабинет' : 'Экономическая библиотека · каб. 1');
-            if (serviceCode === '2' || campusCode === 'university_technological') return BOOK_LANG === 'en' ? 'Technology Library · room 2' : (BOOK_LANG === 'kk' ? 'Технология кітапханасы · 2 кабинет' : 'Технологическая библиотека · каб. 2');
-            if (serviceCode === '3' || campusCode === 'college_main') return BOOK_LANG === 'en' ? 'College Library · room 3' : (BOOK_LANG === 'kk' ? 'Колледж кітапханасы · 3 кабинет' : 'Библиотека колледжа · каб. 3');
-            if (serviceCode === 'kstlib' || campusCode === 'university_central') return BOOK_LANG === 'en' ? 'KazTBU Central Library' : (BOOK_LANG === 'kk' ? 'ҚазТБУ орталық кітапханасы' : 'Центральная библиотека КазТБУ');
+            if (serviceCode === 'economics-desk' || campusCode === 'economics-desk') return BOOK_LANG === 'en' ? 'Economics Library' : (BOOK_LANG === 'kk' ? 'Экономика кітапханасы' : 'Экономическая библиотека');
+            if (serviceCode === 'technology-desk' || campusCode === 'technology-desk') return BOOK_LANG === 'en' ? 'Technology Library' : (BOOK_LANG === 'kk' ? 'Технологиялық кітапхана' : 'Технологическая библиотека');
+            if (serviceCode === 'college' || unitCode === 'college') return BOOK_LANG === 'en' ? 'College Library' : (BOOK_LANG === 'kk' ? 'Колледж кітапханасы' : 'Библиотека колледжа');
+            if (['scientific-library', 'reading-room'].includes(serviceCode) || ['scientific-library', 'reading-room'].includes(campusCode)) return BOOK_LANG === 'en' ? 'Scientific Library' : (BOOK_LANG === 'kk' ? 'Ғылыми кітапхана' : 'Научная библиотека');
 
-            return serviceName || unitName || BOOK_I18N.locationPending;
+            return serviceName || unitName || BOOK_I18N.locationsUnavailable;
         }
 
         function splitIntoParagraphs(text, extra = '') {
@@ -2322,7 +2427,24 @@
             if (pieces.length >= 2) return pieces.slice(0, 2);
             if (pieces.length === 1 && extra) return [pieces[0], extra];
             if (pieces.length === 1) return pieces;
-            return [extra || BOOK_I18N.metadataPending.replace('{items}', BOOK_I18N.classificationPending)];
+            return extra ? [extra] : [];
+        }
+
+        function formatInteger(value) {
+            return new Intl.NumberFormat(BOOK_LANG === 'kk' ? 'kk-KZ' : (BOOK_LANG === 'en' ? 'en-US' : 'ru-RU'))
+                .format(Number(value || 0));
+        }
+
+        function formatCopyCount(value) {
+            const count = Number(value || 0);
+            if (BOOK_LANG === 'kk') return `${formatInteger(count)} дана`;
+            if (BOOK_LANG === 'en') return `${formatInteger(count)} ${count === 1 ? 'copy' : 'copies'}`;
+            const mod10 = count % 10;
+            const mod100 = count % 100;
+            const noun = mod10 === 1 && mod100 !== 11
+                ? 'экземпляр'
+                : ((mod10 >= 2 && mod10 <= 4) && !(mod100 >= 12 && mod100 <= 14) ? 'экземпляра' : 'экземпляров');
+            return `${formatInteger(count)} ${noun}`;
         }
 
         function copyCitation(text) {
@@ -2335,14 +2457,18 @@
         function renderBook(book) {
             const content = document.getElementById('content');
             const rawTitle = normalizeText(book?.title?.display || book?.title?.raw, BOOK_I18N.untitled);
-            const rawSubtitle = normalizeText(book?.title?.subtitle || '', '');
+            const originalTitle = normalizeText(book?.title?.original || book?.title?.raw, '');
+            const rawSubtitle = pickMeaningfulText(book?.title?.subtitle);
             const rawAuthor = normalizeText(book?.primaryAuthor || BOOK_I18N.unknownAuthor);
             const rawPublisher = normalizeText(book?.publisher?.name || BOOK_I18N.publisherMissing);
             const rawIsbn = normalizeText(book?.isbn?.raw || BOOK_I18N.isbnMissing);
             const rawYear = normalizeText(book?.publicationYear || BOOK_I18N.yearMissing);
-            const rawLanguage = normalizeText(book?.language?.raw || book?.language?.code || BOOK_I18N.languageMissing);
-            const rawDescription = normalizeText(book?.description || book?.summary || book?.abstract || rawSubtitle, '');
+            const rawLanguage = normalizeText(book?.language?.label, BOOK_I18N.languageMissing);
+            // A subtitle is real metadata, but it is not an abstract. Keep the
+            // abstract section absent when the source has no annotation.
+            const rawDescription = pickMeaningfulText(book?.annotation);
             const available = Number(book?.copies?.available || 0);
+            const issued = Number(book?.copies?.issued || 0);
             const total = Number(book?.copies?.total || 0);
             const authors = Array.isArray(book?.authors) ? book.authors : [];
             const authorList = authors
@@ -2365,28 +2491,15 @@
                 }).format(new Date(activeLoan.dueAt))
                 : '';
             const classification = Array.isArray(book?.classification) ? book.classification.filter((item) => normalizeText(item?.label)) : [];
-            const needsReview = !!(book?.quality?.needsReview);
-            const reviewReasonCodes = Array.isArray(book?.quality?.reviewReasonCodes) ? book.quality.reviewReasonCodes : [];
             const udcRaw = normalizeText(book?.udc?.raw, '');
             const udcDescription = normalizeText(book?.udc?.description, '');
-            const udcSource = normalizeText(book?.udc?.source, '—');
-            const udcText = normalizeText(book?.udc?.display, '') || udcDescription || udcRaw || BOOK_I18N.udcPending;
-            const languageCode = normalizeText(book?.language?.code || book?.language?.raw, '—').toUpperCase();
+            const udcText = normalizeText(book?.udc?.display, '') || udcDescription || udcRaw;
             const isAvailable = available > 0;
             const editionText = rawSubtitle || BOOK_I18N.editionMissing;
-            const primaryLocation = locations.length ? formatLocationLabel(locations[0]) : BOOK_I18N.locationPending;
-            const accessSummaryText = total > 0 ? (isAvailable ? BOOK_I18N.physicalAvailable : BOOK_I18N.physicalUnavailable) : BOOK_I18N.physicalPending;
-            const profileText = classification.length
-                ? classification.map((item) => normalizeText(item?.label)).filter(Boolean).slice(0, 3).join(' · ')
-                : BOOK_I18N.classificationPending;
-            const descriptionText = rawDescription || BOOK_I18N.generatedSummary
-                .replace('{title}', rawTitle)
-                .replace('{publisher}', rawPublisher)
-                .replace('{language}', rawLanguage)
-                .replace('{udc}', udcText)
-                .replace('{author}', rawAuthor)
-                .replace('{available}', String(available));
-            const descriptionParagraphs = splitIntoParagraphs(descriptionText, accessSummaryText);
+            const primaryLocation = locations.length ? formatLocationLabel(locations[0]) : BOOK_I18N.locationsUnavailable;
+            const accessSummaryText = total > 0 ? (isAvailable ? BOOK_I18N.physicalAvailable : BOOK_I18N.physicalUnavailable) : BOOK_I18N.noCopies;
+            const descriptionText = rawDescription;
+            const descriptionParagraphs = descriptionText ? splitIntoParagraphs(descriptionText) : [];
             // ГОСТ-shaped reference built from the real MARC values. Parts the
             // source left empty are dropped rather than printed as dashes, and
             // the publisher — previously missing entirely — is included.
@@ -2420,19 +2533,20 @@
                 return `${segments.join('. ')}.`;
             })();
             const metadataRows = [
+                ...(originalTitle && originalTitle !== rawTitle ? [{ label: BOOK_I18N.originalTitle, value: originalTitle }] : []),
                 { label: BOOK_I18N.publisher, value: rawPublisher },
                 { label: BOOK_I18N.authors, value: authorList.slice(0, 3).join(' · ') },
                 { label: 'ISBN', value: rawIsbn },
-                { label: 'UDC', value: udcText },
-                { label: BOOK_I18N.udcSourceLabel, value: udcSource },
-                { label: BOOK_I18N.publicationLanguage, value: `${rawLanguage} (${languageCode})` },
-                { label: BOOK_I18N.resourceType, value: normalizeText(book?.resourceType, '—') },
+                ...(udcText ? [{ label: BOOK_UDC_LABEL, value: udcText }] : []),
+                { label: BOOK_I18N.publicationLanguage, value: rawLanguage },
+                { label: BOOK_I18N.resourceType, value: formatResourceType(book?.resourceType) },
                 // 090h is empty in the imported MARC source for all but a
                 // handful of records, so an always-on row would print a dash
                 // on nearly every card. Show it only when it carries a value.
                 ...(normalizeText(book?.authorMark, '') ? [{ label: BOOK_I18N.authorMark, value: normalizeText(book?.authorMark, '') }] : []),
-                { label: BOOK_I18N.profileLabel, value: profileText },
-                { label: BOOK_I18N.availableNowLabel, value: String(available) },
+                { label: BOOK_I18N.totalCopies, value: formatCopyCount(total) },
+                { label: BOOK_I18N.availableNowLabel, value: formatInteger(available) },
+                { label: BOOK_I18N.issuedCopies, value: formatInteger(issued) },
             ];
             const metadataRowsHtml = metadataRows
                 .map((row) => `<div class="meta-line"><span>${escapeHtml(row.label)}</span><span>${escapeHtml(row.value)}</span></div>`)
@@ -2442,7 +2556,7 @@
                 : '';
             const subjectHtml = classification.length
                 ? classification.slice(0, 4).map((item) => `<span class="bg-surface-container-high px-4 py-2 rounded-full text-xs font-medium">${escapeHtml(item.label)}</span>`).join('')
-                : `<span class="bg-surface-container-high px-4 py-2 rounded-full text-xs font-medium">${escapeHtml(BOOK_I18N.classificationPending)}</span>`;
+                : '';
             const keywordHtml = keywords.length
                 ? `<div class="mt-4"><p class="mb-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant">${escapeHtml(BOOK_I18N.keywords)}</p><div class="flex flex-wrap gap-2">${keywords.slice(0, 12).map((keyword) => `<span class="rounded-full border border-outline-variant/30 px-3 py-1 text-xs">${escapeHtml(keyword)}</span>`).join('')}</div></div>`
                 : '';
@@ -2466,12 +2580,10 @@
                     }).join('')}</div>
                 </div>`
                 : '';
-            const reviewHtml = needsReview
-                ? `<div class="mb-8 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">${escapeHtml(BOOK_I18N.reviewPrefix)} ${reviewReasonCodes.map((code) => `<span class="inline-flex px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 ml-1">${escapeHtml(code)}</span>`).join('')}</div>`
-                : '';
             const tableRows = locations.length
                 ? locations.map((location) => {
                     const pointName = location?.servicePoint?.name || '—';
+                    const publicPointName = formatLocationLabel(location);
                     const address = location?.address ? ` · ${location.address}` : '';
                     const sigla = location?.storageSigla
                         ? `${pointName} (${location.storageSigla})`
@@ -2479,16 +2591,18 @@
 
                     return `
                     <tr>
-                        <td>${escapeHtml(location?.institutionUnit?.name || '—')}</td>
+                        <td>${escapeHtml(publicPointName)}</td>
                         ${viewerAuthenticated ? `<td data-exact-location>${escapeHtml(`${location?.campus?.name || '—'}${address}`)}</td>` : ''}
                         ${viewerAuthenticated ? `<td data-exact-location>${escapeHtml(pointName)}</td>` : ''}
                         ${viewerAuthenticated ? `<td data-exact-location>${escapeHtml(sigla)}</td>` : ''}
-                        ${viewerAuthenticated ? `<td data-exact-location${location?.exactLocationPending ? ' data-location-pending' : ''}>${escapeHtml(location?.shelf || (location?.exactLocationPending ? BOOK_I18N.exactLocationPending : '—'))}</td>` : ''}
-                        <td class="${Number(location?.copies?.available || 0) > 0 ? 'avail-count' : 'zero-count'}">${Number(location?.copies?.available || 0)}</td>
+                        ${viewerAuthenticated ? `<td data-exact-location>${escapeHtml(location?.shelf || '—')}</td>` : ''}
+                        <td>${formatCopyCount(location?.copies?.total || 0)}</td>
+                        <td class="${Number(location?.copies?.available || 0) > 0 ? 'avail-count' : 'zero-count'}">${formatInteger(location?.copies?.available || 0)}</td>
+                        <td>${formatInteger(location?.copies?.issued || 0)}</td>
                     </tr>
                 `;
                 }).join('')
-                : `<tr><td colspan="${viewerAuthenticated ? '6' : '2'}">${escapeHtml(BOOK_I18N.locationsUnavailable)}</td></tr>`;
+                : `<tr><td colspan="${viewerAuthenticated ? '8' : '4'}">${escapeHtml(BOOK_I18N.locationsUnavailable)}</td></tr>`;
             const activeLoanHtml = activeLoan && dueDate
                 ? `<div class="mb-8 rounded-lg border border-secondary/30 bg-secondary/10 px-5 py-4" data-reader-due-date>
                     <p class="font-bold text-primary">${escapeHtml(BOOK_I18N.activeLoan)}</p>
@@ -2505,18 +2619,18 @@
             const coverUrlStyle = coverUrl ? encodeURI(coverUrl).replace(/'/g, '%27') : '';
             const coverDescription = descriptionText;
 
-            document.title = `${rawTitle} — Digital Library`;
+            document.title = `${rawTitle} — ${BOOK_TITLE_SUFFIX}`;
 
             content.innerHTML = `
                 <section id="book-detail-page" class="w-full py-8 md:py-14 min-h-screen">
                     <div class="mb-10">
                         <a class="flex items-center gap-2 text-secondary font-medium group" href="${CATALOG_URL}">
-                            <span class="material-symbols-outlined text-lg group-hover:-translate-x-1 transition-transform">arrow_back</span>
+                            <span class="material-symbols-outlined text-lg group-hover:-translate-x-1 transition-transform" aria-hidden="true">arrow_back</span>
                             <span class="text-sm font-label tracking-wide">${BOOK_I18N.backToCatalog}</span>
                         </a>
                     </div>
 
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 xl:gap-16 items-start">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12 items-start">
                         <div class="lg:col-span-4 xl:col-span-3">
                             <div class="bg-surface-container-low p-4 rounded-xl">
                                 <div data-detail-cover class="catalog-card-media">
@@ -2525,13 +2639,13 @@
                                             <div class="catalog-card-book__pages" aria-hidden="true">
                                                 <div class="catalog-card-book__page-content">
                                                     <div>
-                                                        <div class="catalog-card-book__page-label">${escapeHtml(rawPublisher.substring(0, 28) || 'KazTBU')}</div>
-                                                        <p class="catalog-card-book__page-text">${escapeHtml(coverDescription)}</p>
+                                                        <div class="catalog-card-book__page-label">${escapeHtml(rawPublisher.substring(0, 28) || BOOK_I18N.coverTop)}</div>
+                                                        ${coverDescription ? `<p class="catalog-card-book__page-text">${escapeHtml(coverDescription)}</p>` : ''}
                                                     </div>
                                                     <div class="catalog-card-book__page-meta">
                                                         <div class="catalog-card-book__page-row"><span>ISBN</span><strong>${escapeHtml(rawIsbn)}</strong></div>
                                                         <div class="catalog-card-book__page-row"><span>UDC</span><strong>${escapeHtml(udcText)}</strong></div>
-                                                        <div class="catalog-card-book__page-row"><span>${BOOK_I18N.language}</span><strong>${escapeHtml(languageCode)}</strong></div>
+                                                        <div class="catalog-card-book__page-row"><span>${BOOK_I18N.language}</span><strong>${escapeHtml(rawLanguage)}</strong></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2539,7 +2653,7 @@
                                                 ${coverUrlStyle !== '' ? `<div class="catalog-card-book__cover-art" style="background-image: url('${coverUrlStyle}');"></div>` : ''}
                                                 <div class="catalog-card-book__cover-shell">
                                                     <div>
-                                                        <span class="catalog-card-book__eyebrow">${escapeHtml(rawPublisher.substring(0, 28) || 'KazTBU')}</span>
+                                                        <span class="catalog-card-book__eyebrow">${escapeHtml(rawPublisher.substring(0, 28) || BOOK_I18N.coverTop)}</span>
                                                         <h2 class="catalog-card-book__title">${escapeHtml(rawTitle)}</h2>
                                                         <p class="catalog-card-book__author">${escapeHtml(rawAuthor)}</p>
                                                     </div>
@@ -2555,120 +2669,150 @@
                                 </div>
                             </div>
 
-                            <div class="mt-8 bg-surface-container-lowest p-6 rounded-xl border-l-4 ${isAvailable ? 'border-secondary' : 'border-error'}">
-                                <div class="flex items-center gap-3 mb-4">
-                                    <span class="material-symbols-outlined ${isAvailable ? 'text-secondary' : 'text-error'}" style="font-variation-settings: 'FILL' 1;">${isAvailable ? 'check_circle' : 'cancel'}</span>
-                                    <span class="${isAvailable ? 'text-secondary' : 'text-error'} font-bold text-sm tracking-wide uppercase">${isAvailable ? BOOK_I18N.inStock : BOOK_I18N.unavailable}</span>
-                                </div>
-                                <div class="space-y-4">
-                                    <div>
-                                        <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">${BOOK_I18N.locationLabel}</p>
-                                        <p class="text-on-surface font-semibold text-sm">${escapeHtml(primaryLocation)}</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">${BOOK_I18N.callNumber}</p>
-                                        <p class="text-on-surface font-semibold text-sm">${escapeHtml(udcText || rawIsbn)}</p>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
                         <div class="lg:col-span-8 xl:col-span-9">
-                            <div class="w-full">
-                                <h1 class="text-5xl md:text-6xl text-primary font-headline font-bold leading-tight mb-4 italic">${escapeHtml(rawTitle)}</h1>
-                                ${rawSubtitle ? `<p class="text-lg leading-relaxed text-on-surface-variant mb-8 max-w-3xl">${escapeHtml(rawSubtitle)}</p>` : ''}
+                            <div class="w-full book-detail-columns">
+                                <section class="book-intro-panel rounded-2xl border border-outline-variant/20 bg-surface-container-low/55 p-6 md:p-8 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                                    <div class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,340px)] xl:items-start">
+                                        <div class="space-y-6">
+                                            <div>
+                                                <h1 class="text-5xl md:text-6xl text-primary font-headline font-bold leading-tight italic" style="margin-bottom:35px;">${escapeHtml(rawTitle)}</h1>
+                                                ${rawSubtitle ? `<p class="text-lg leading-relaxed text-on-surface-variant max-w-3xl">${escapeHtml(rawSubtitle)}</p>` : ''}
+                                            </div>
 
-                                <div id="detail-bibliographic-grid" class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-12">
-                                    <div>
-                                        <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">${BOOK_I18N.author}</p>
-                                        <p class="text-lg text-primary font-semibold">${escapeHtml(authorList[0])}</p>
-                                        ${authorChipsHtml}
-                                    </div>
-                                    <div>
-                                        <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">${BOOK_I18N.publicationYear}</p>
-                                        <p class="text-lg text-primary font-semibold">${escapeHtml(rawYear)}</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">${BOOK_I18N.editionLabel}</p>
-                                        <p class="text-lg text-primary font-semibold">${escapeHtml(editionText)}</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">ISBN</p>
-                                        <p class="text-lg text-primary font-semibold">${escapeHtml(rawIsbn)}</p>
-                                    </div>
-                                </div>
+                                            <div id="detail-bibliographic-grid" class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                                                <div>
+                                                    <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">${BOOK_I18N.author}</p>
+                                                    <p class="text-lg text-primary font-semibold">${escapeHtml(authorList[0])}</p>
+                                                    ${authorChipsHtml}
+                                                </div>
+                                                <div>
+                                                    <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">${BOOK_I18N.publicationYear}</p>
+                                                    <p class="text-lg text-primary font-semibold">${escapeHtml(rawYear)}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">${BOOK_I18N.editionLabel}</p>
+                                                    <p class="text-lg text-primary font-semibold">${escapeHtml(editionText)}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-xs text-on-surface-variant font-label uppercase tracking-widest mb-1">ISBN</p>
+                                                    <p class="text-lg text-primary font-semibold">${escapeHtml(rawIsbn)}</p>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                <div id="detail-actions" class="flex flex-wrap gap-4 mb-16">
-                                    <div id="digital-materials-slot" class="flex flex-wrap gap-4">
-                                        <button class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-8 py-4 rounded-lg flex items-center gap-3 hover:opacity-95 transition-all shadow-lg" type="button" disabled>
-                                            <span class="material-symbols-outlined">auto_stories</span>
-                                            <span class="font-bold tracking-tight">${BOOK_I18N.readOnline}</span>
+                                        <aside class="space-y-4 xl:sticky xl:top-6">
+                                            <div id="detail-availability-summary" class="rounded-xl border border-outline-variant/20 bg-white p-5">
+                                                <h3 class="text-xs text-secondary font-label font-bold uppercase tracking-widest mb-3">${BOOK_I18N.statusInStorage}</h3>
+                                                <p class="text-sm leading-relaxed text-on-surface-variant mb-5">${escapeHtml(accessSummaryText)}</p>
+                                                <div class="space-y-3 text-sm">
+                                                    <div class="flex items-start justify-between gap-3 border-b border-outline-variant/20 pb-2">
+                                                        <span class="text-on-surface-variant">${BOOK_I18N.locationLabel}</span>
+                                                        <strong class="text-right text-on-surface">${escapeHtml(primaryLocation)}</strong>
+                                                    </div>
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <span class="text-on-surface-variant">${BOOK_I18N.totalCopies}</span>
+                                                        <strong class="text-right text-on-surface" data-testid="book-total-copies">${escapeHtml(formatCopyCount(total))}</strong>
+                                                    </div>
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <span class="text-on-surface-variant">${BOOK_I18N.availableNowLabel}</span>
+                                                        <strong class="text-right ${isAvailable ? 'text-secondary' : 'text-error'}">${escapeHtml(formatInteger(available))}</strong>
+                                                    </div>
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <span class="text-on-surface-variant">${BOOK_I18N.issuedCopies}</span>
+                                                        <strong class="text-right text-on-surface">${escapeHtml(formatInteger(issued))}</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="rounded-xl border border-outline-variant/20 bg-white p-5">
+                                                <div class="flex items-center gap-2 mb-3">
+                                                    <span class="material-symbols-outlined text-secondary" aria-hidden="true">sell</span>
+                                                    <h3 class="text-sm font-bold text-on-surface">${BOOK_I18N.characteristics}</h3>
+                                                </div>
+                                                <div class="grid gap-3 text-sm">
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <span class="text-on-surface-variant">${BOOK_I18N.publicationYear}</span>
+                                                        <strong class="text-right text-on-surface">${escapeHtml(rawYear)}</strong>
+                                                    </div>
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <span class="text-on-surface-variant">${BOOK_I18N.language}</span>
+                                                        <strong class="text-right text-on-surface">${escapeHtml(rawLanguage)}</strong>
+                                                    </div>
+                                                    ${udcText ? `<div class="flex items-start justify-between gap-3">
+                                                        <span class="text-on-surface-variant">${BOOK_UDC_LABEL}</span>
+                                                        <strong class="text-right text-on-surface">${escapeHtml(udcText)}</strong>
+                                                    </div>` : ''}
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <span class="text-on-surface-variant">${BOOK_I18N.availableNowLabel}</span>
+                                                        <strong class="text-right ${isAvailable ? 'text-secondary' : 'text-error'}">${escapeHtml(formatInteger(available))}</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </aside>
+                                    </div>
+
+                                    <div id="detail-actions" class="flex flex-wrap gap-4">
+                                        <div id="digital-materials-slot" class="flex flex-wrap gap-4"></div>
+                                        <button class="border border-outline-variant text-secondary px-8 py-4 rounded-lg flex items-center gap-3 hover:bg-surface-container-low transition-all" id="book-shortlist-btn" onclick="toggleBookShortlist()" type="button">
+                                            <span class="material-symbols-outlined" aria-hidden="true">bookmark_add</span>
+                                            <span class="font-bold tracking-tight">${BOOK_I18N.shortlistAdd}</span>
                                         </button>
+                                        <button class="border border-outline-variant text-on-surface px-8 py-4 rounded-lg flex items-center gap-3 hover:bg-surface-container-low transition-all" onclick='copyCitation(${JSON.stringify(citeText)})' type="button">
+                                            <span class="material-symbols-outlined" aria-hidden="true">format_quote</span>
+                                            <span class="font-bold tracking-tight">${BOOK_I18N.cite}</span>
+                                        </button>
+                                        @if($canReserveRecord)
+                                        <label class="min-w-56"><span class="mb-1 block text-xs font-bold uppercase tracking-wide text-on-surface-variant">${BOOK_I18N.pickup}</span><select class="w-full rounded-lg border border-outline-variant bg-white px-3 py-3" name="pickup_branch_id" form="member-reserve-form">@foreach($pickupBranches as $branch)<option value="{{ $branch->id }}">{{ $branch->name }}</option>@endforeach</select></label>
+                                        <button class="border border-outline-variant text-on-surface px-8 py-4 rounded-lg flex items-center gap-3 hover:bg-surface-container-low transition-all" form="member-reserve-form" type="submit" title="{{ __('librarian.member.reserve.hint') }}" ${!isAvailable && !@json($queueEnabled) ? 'disabled aria-disabled="true"' : ''}>
+                                            <span class="material-symbols-outlined" aria-hidden="true">event_available</span>
+                                            <span class="font-bold tracking-tight">${isAvailable ? BOOK_I18N.reserve : (@json($queueEnabled) ? BOOK_I18N.joinQueue : BOOK_I18N.unavailableNow)}</span>
+                                        </button>
+                                        @elseif($showGuestReserveLogin)
+                                        <a class="border border-outline-variant text-on-surface px-8 py-4 rounded-lg flex items-center gap-3 hover:bg-surface-container-low transition-all" href="{{ $loginHref }}">
+                                            <span class="material-symbols-outlined" aria-hidden="true">login</span>
+                                            <span class="font-bold tracking-tight">${BOOK_I18N.signInToReserve}</span>
+                                        </a>
+                                        @endif
                                     </div>
-                                    <button class="border border-outline-variant text-secondary px-8 py-4 rounded-lg flex items-center gap-3 hover:bg-surface-container-low transition-all" id="book-shortlist-btn" onclick="toggleBookShortlist()" type="button">
-                                        <span class="material-symbols-outlined">bookmark_add</span>
-                                        <span class="font-bold tracking-tight">${BOOK_I18N.shortlistAdd}</span>
-                                    </button>
-                                    <button class="border border-outline-variant text-on-surface px-8 py-4 rounded-lg flex items-center gap-3 hover:bg-surface-container-low transition-all" onclick='copyCitation(${JSON.stringify(citeText)})' type="button">
-                                        <span class="material-symbols-outlined">format_quote</span>
-                                        <span class="font-bold tracking-tight">${BOOK_I18N.cite}</span>
-                                    </button>
-                                    @if($canReserveRecord)
-                                    <label class="min-w-56"><span class="mb-1 block text-xs font-bold uppercase tracking-wide text-on-surface-variant">${BOOK_I18N.pickup}</span><select class="w-full rounded-lg border border-outline-variant bg-white px-3 py-3" name="pickup_branch_id" form="member-reserve-form">@foreach($pickupBranches as $branch)<option value="{{ $branch->id }}">{{ $branch->name }}</option>@endforeach</select></label>
-                                    <button class="border border-outline-variant text-on-surface px-8 py-4 rounded-lg flex items-center gap-3 hover:bg-surface-container-low transition-all" form="member-reserve-form" type="submit" title="{{ __('librarian.member.reserve.hint') }}" ${!isAvailable && !@json($queueEnabled) ? 'disabled aria-disabled="true"' : ''}>
-                                        <span class="material-symbols-outlined">event_available</span>
-                                        <span class="font-bold tracking-tight">${isAvailable ? BOOK_I18N.reserve : (@json($queueEnabled) ? BOOK_I18N.joinQueue : BOOK_I18N.unavailableNow)}</span>
-                                    </button>
-                                    @elseif(! session('library.user'))
-                                    <a class="border border-outline-variant text-on-surface px-8 py-4 rounded-lg flex items-center gap-3 hover:bg-surface-container-low transition-all" href="{{ $loginHref }}">
-                                        <span class="material-symbols-outlined">login</span>
-                                        <span class="font-bold tracking-tight">${BOOK_I18N.signInToReserve}</span>
-                                    </a>
-                                    @endif
-                                </div>
+                                </section>
 
-                                ${reviewHtml}
                                 ${activeLoanHtml}
 
-                                <div id="detail-metadata-panel" class="mb-12 grid grid-cols-1 xl:grid-cols-5 gap-8 rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-6">
+                                <div id="detail-metadata-panel" class="grid grid-cols-1 xl:grid-cols-5 gap-6 rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-5 md:p-6">
                                     <div class="xl:col-span-3">
                                         <h2 class="text-2xl text-primary font-headline font-bold mb-4">${BOOK_I18N.metadata}</h2>
                                         <div class="meta-list">${metadataRowsHtml}</div>
                                     </div>
-                                    <div id="detail-availability-summary" class="xl:col-span-2 rounded-lg border border-outline-variant/20 bg-white p-5">
-                                        <h3 class="text-xs text-secondary font-label font-bold uppercase tracking-widest mb-3">${BOOK_I18N.statusInStorage}</h3>
-                                        <p class="text-sm leading-relaxed text-on-surface-variant mb-5">${escapeHtml(accessSummaryText)}</p>
-                                        <div class="space-y-3 text-sm">
-                                            <div class="flex items-start justify-between gap-3 border-b border-outline-variant/20 pb-2">
-                                                <span class="text-on-surface-variant">${BOOK_I18N.locationLabel}</span>
-                                                <strong class="text-right text-on-surface">${escapeHtml(primaryLocation)}</strong>
-                                            </div>
-                                            <div class="flex items-start justify-between gap-3">
-                                                <span class="text-on-surface-variant">${BOOK_I18N.availableNowLabel}</span>
-                                                <strong class="text-right ${isAvailable ? 'text-secondary' : 'text-error'}">${escapeHtml(String(available))}</strong>
-                                            </div>
-                                        </div>
+                                    <div class="xl:col-span-2 rounded-lg border border-outline-variant/20 bg-white p-5">
+                                        <h3 class="text-xs text-secondary font-label font-bold uppercase tracking-widest mb-3">${BOOK_I18N.languageMedia}</h3>
+                                        <p class="text-sm leading-relaxed text-on-surface-variant">
+                                            ${BOOK_I18N.language}: ${escapeHtml(rawLanguage)}<br/>
+                                            ${BOOK_I18N.accessAndFormat}: ${escapeHtml(accessSummaryText)}<br/>
+                                            ${udcText ? `UDC: ${escapeHtml(udcText)}` : ''}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div id="detail-abstract" class="space-y-8">
+                                ${descriptionParagraphs.length ? `<div id="detail-abstract" class="space-y-6">
                                     <h2 class="text-2xl text-primary font-headline font-bold">${BOOK_I18N.abstract}</h2>
-                                    <div class="text-lg leading-relaxed text-on-surface-variant space-y-6 max-w-2xl">
+                                    <div class="text-lg leading-relaxed text-on-surface-variant space-y-6 max-w-3xl">
                                         ${descriptionParagraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')}
                                     </div>
-                                </div>
+                                </div>` : ''}
 
-                                {{-- ДИР §4.4 — print and electronic holdings are
+                                {{-- ДИР 4.4 — print and electronic holdings are
                                      two different things a reader acts on, so they
                                      get one block each instead of a merged blob.
                                      The digital card is filled by
                                      loadDigitalMaterials() once the API answers. --}}
-                                <div id="access-formats" class="mt-16 pt-16 border-t border-surface-container-high">
+                                <div id="access-formats" class="mt-12 pt-12 border-t border-surface-container-high">
                                     <h2 class="text-2xl text-primary font-headline font-bold mb-6">${BOOK_I18N.accessFormats}</h2>
-                                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <div class="rounded-lg border border-outline-variant/20 bg-white p-5">
+                                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                        <div class="rounded-2xl border border-outline-variant/20 bg-white p-5 md:p-6 shadow-[0_8px_20px_rgba(15,23,42,0.03)]">
                                             <div class="flex items-center gap-2 mb-3">
-                                                <span class="material-symbols-outlined text-secondary">menu_book</span>
+                                                <span class="material-symbols-outlined text-secondary" aria-hidden="true">menu_book</span>
                                                 <h3 class="text-sm font-bold text-on-surface">${BOOK_I18N.printCopy}</h3>
                                             </div>
                                             <p class="text-sm leading-relaxed text-on-surface-variant mb-4">${escapeHtml(accessSummaryText)}</p>
@@ -2684,43 +2828,47 @@
                                             </div>
                                         </div>
 
-                                        <div class="rounded-lg border border-outline-variant/20 bg-white p-5" id="digital-format-card">
+                                        <div id="digital-format-card" class="rounded-2xl border border-outline-variant/20 bg-white p-5 md:p-6 shadow-[0_8px_20px_rgba(15,23,42,0.03)]" hidden>
                                             <div class="flex items-center gap-2 mb-3">
-                                                <span class="material-symbols-outlined text-secondary">devices</span>
+                                                <span class="material-symbols-outlined text-secondary" aria-hidden="true">auto_stories</span>
                                                 <h3 class="text-sm font-bold text-on-surface">${BOOK_I18N.digitalVersion}</h3>
                                             </div>
-                                            <p class="text-sm text-on-surface-variant" id="digital-format-body">${BOOK_I18N.digitalChecking}</p>
-                                        </div>
-                                    </div>
-
-                                    {{-- The viewer is mounted here on demand: an
-                                         iframe of /digital-viewer/{id} reuses the
-                                         PDF.js reader with its access checks and
-                                         saved reading position, instead of a second
-                                         renderer that could disagree with it. --}}
-                                    <div id="inline-viewer-holder" class="mt-6" hidden>
-                                        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                                            <h3 class="text-xs text-secondary font-label font-bold uppercase tracking-widest" id="inline-viewer-title"></h3>
-                                            <div class="flex items-center gap-3">
-                                                {{-- No placeholder href: the real
-                                                     viewer URL is set by JS when the
-                                                     frame is mounted, and a dead
-                                                     "#" link is worse than none. --}}
-                                                <a id="inline-viewer-fullscreen" class="text-sm font-bold text-secondary hover:underline" target="_blank" rel="noopener">${BOOK_I18N.digitalFullscreen}</a>
-                                                <button id="inline-viewer-close" type="button" class="text-sm text-on-surface-variant hover:text-primary">${BOOK_I18N.digitalClose}</button>
+                                            <div id="digital-format-body" class="space-y-3 text-sm text-on-surface-variant">
+                                                <p>${BOOK_I18N.digitalNone}</p>
                                             </div>
                                         </div>
-                                        <iframe
-                                            id="inline-viewer-frame"
-                                            title="${BOOK_I18N.digitalVersion}"
-                                            class="w-full rounded-lg border border-outline-variant/30 bg-surface-container-low"
-                                            style="height: 80vh; min-height: 520px;"
-                                            loading="lazy"
-                                        ></iframe>
+
+                                        <div class="xl:col-span-2">
+                                            {{-- The viewer is mounted here on demand: an
+                                                 iframe of /digital-viewer/{id} reuses the
+                                                 PDF.js reader with its access checks and
+                                                 saved reading position, instead of a second
+                                                 renderer that could disagree with it. --}}
+                                            <div id="inline-viewer-holder" class="mt-2" hidden>
+                                                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                                                    <h3 class="text-xs text-secondary font-label font-bold uppercase tracking-widest" id="inline-viewer-title"></h3>
+                                                    <div class="flex items-center gap-3">
+                                                        {{-- No placeholder href: the real
+                                                             viewer URL is set by JS when the
+                                                             frame is mounted, and a dead
+                                                             "#" link is worse than none. --}}
+                                                        <a id="inline-viewer-fullscreen" class="text-sm font-bold text-secondary hover:underline" target="_blank" rel="noopener">${BOOK_I18N.digitalFullscreen}</a>
+                                                        <button id="inline-viewer-close" type="button" class="text-sm text-on-surface-variant hover:text-primary">${BOOK_I18N.digitalClose}</button>
+                                                    </div>
+                                                </div>
+                                                <iframe
+                                                    id="inline-viewer-frame"
+                                                    title="${BOOK_I18N.digitalVersion}"
+                                                    class="w-full rounded-lg border border-outline-variant/30 bg-surface-container-low"
+                                                    style="height: 80vh; min-height: 520px;"
+                                                    loading="lazy"
+                                                ></iframe>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="mt-16 pt-16 border-t border-surface-container-high grid grid-cols-1 md:grid-cols-2 gap-12">
+                                ${(subjectHtml || keywordHtml) ? `<div class="mt-16 pt-16 border-t border-surface-container-high grid grid-cols-1 md:grid-cols-2 gap-12">
                                     <div>
                                         <h3 class="text-xs text-secondary font-label font-bold uppercase tracking-widest mb-6">${BOOK_I18N.subjectTerms}</h3>
                                         <div class="flex flex-wrap gap-2">${subjectHtml}</div>
@@ -2729,12 +2877,12 @@
                                     <div>
                                         <h3 class="text-xs text-secondary font-label font-bold uppercase tracking-widest mb-6">${BOOK_I18N.languageMedia}</h3>
                                         <p class="text-on-surface-variant text-sm leading-relaxed">
-                                            ${BOOK_I18N.language}: ${escapeHtml(rawLanguage)} (${escapeHtml(languageCode)})<br/>
+                                            ${BOOK_I18N.language}: ${escapeHtml(rawLanguage)}<br/>
                                             ${BOOK_I18N.accessAndFormat}: ${escapeHtml(accessSummaryText)}<br/>
-                                            UDC: ${escapeHtml(udcText)} · ${BOOK_I18N.udcSourceLabel}: ${escapeHtml(udcSource)}
+                                            ${udcText ? `UDC: ${escapeHtml(udcText)}` : ''}
                                         </p>
                                     </div>
-                                </div>
+                                </div>` : ''}
 
                                 <div class="mt-12 pt-8 border-t border-surface-container-high/70">
                                     <h3 class="text-xs text-secondary font-label font-bold uppercase tracking-widest mb-4">${BOOK_I18N.availabilityByPoint}</h3>
@@ -2742,12 +2890,14 @@
                                         <table class="locations-table" id="locations-table">
                                             <thead>
                                                 <tr>
-                                                    <th>${BOOK_I18N.unit}</th>
+                                                    <th>${BOOK_I18N.locationLabel}</th>
                                                     ${viewerAuthenticated ? `<th>${BOOK_I18N.campus}</th>` : ''}
                                                     ${viewerAuthenticated ? `<th>${BOOK_I18N.servicePoint}</th>` : ''}
                                                     ${viewerAuthenticated ? `<th>${BOOK_I18N.hallSigla}</th>` : ''}
                                                     ${viewerAuthenticated ? `<th>${BOOK_I18N.exactShelf}</th>` : ''}
+                                                    <th>${BOOK_I18N.totalCopies}</th>
                                                     <th>${BOOK_I18N.available}</th>
+                                                    <th>${BOOK_I18N.issuedCopies}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>${tableRows}</tbody>
@@ -2818,7 +2968,7 @@
 
                     actions.push(signInHelps
                         ? `<a href="${escapeHtml(LOGIN_URL)}" class="btn btn-secondary" title="${escapeHtml(blocked.accessDeniedReason || '')}">${BOOK_I18N.digitalSignIn}</a>`
-                        : `<button class="btn btn-secondary" type="button" title="${escapeHtml(blocked.accessDeniedReason || '')}">${BOOK_I18N.requestAccess}</button>`);
+                        : `<span class="inline-flex items-center rounded-lg border border-outline-variant px-4 py-2 text-sm text-on-surface-variant" role="status">${escapeHtml(blocked.accessDeniedReason || BOOK_I18N.digitalRestricted)}</span>`);
                 }
 
                 // Buttons only. The access chip and the licence paragraph used to
@@ -2841,13 +2991,15 @@
          * appears where allow_download permits it.
          */
         function renderDigitalFormatCard(materials, readable, external, downloadable, blocked, licenses) {
+            const card = document.getElementById('digital-format-card');
             const body = document.getElementById('digital-format-body');
-            if (!body) return;
+            if (!body || !card) return;
 
             if (!materials || materials.length === 0) {
-                body.textContent = BOOK_I18N.digitalNone;
                 return;
             }
+
+            card.hidden = false;
 
             const item = readable || external || blocked || materials[0];
             const rows = [];
@@ -2876,11 +3028,11 @@
                         data-viewer="${escapeHtml(readable.viewerUrl)}"
                         data-title="${escapeHtml(readable.title || '')}"
                         class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg flex items-center gap-2 hover:opacity-95 transition-all font-bold text-sm">
-                        <span class="material-symbols-outlined text-[19px]">auto_stories</span>${escapeHtml(BOOK_I18N.digitalRead)}
+                        <span class="material-symbols-outlined text-[19px]" aria-hidden="true">auto_stories</span>${escapeHtml(BOOK_I18N.digitalRead)}
                     </button>
                     ${downloadable ? `<a href="${escapeHtml(downloadable.downloadUrl)}"
                         class="border border-outline-variant text-on-surface px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-surface-container-low transition-all font-bold text-sm">
-                        <span class="material-symbols-outlined text-[19px]">download</span>${escapeHtml(BOOK_I18N.digitalDownload)}
+                        <span class="material-symbols-outlined text-[19px]" aria-hidden="true">download</span>${escapeHtml(BOOK_I18N.digitalDownload)}
                     </a>` : ''}
                     <span class="inline-flex items-center gap-1 rounded-full bg-surface-container-high px-3 py-1 text-xs font-bold text-on-surface-variant">
                         <span class="material-symbols-outlined text-[15px]" aria-hidden="true">${readable.accessLevel === 'public' ? 'public' : 'badge'}</span>
@@ -2891,14 +3043,14 @@
                 // than leaving the reader hunting for a missing button.
                 if (!downloadable) {
                     rows.push(`<p class="text-xs text-on-surface-variant mb-2">
-                        <span class="material-symbols-outlined align-middle text-[15px]">lock</span>
+                        <span class="material-symbols-outlined align-middle text-[15px]" aria-hidden="true">lock</span>
                         ${escapeHtml(BOOK_I18N.digitalNoDownload)}
                     </p>`);
                 }
             } else if (external) {
                 rows.push(`<a href="${escapeHtml(external.viewerUrl)}" target="_blank" rel="noopener noreferrer"
                     class="inline-flex items-center gap-2 text-sm font-bold text-secondary hover:underline mb-3">
-                    <span class="material-symbols-outlined text-[19px]">open_in_new</span>${escapeHtml(BOOK_I18N.digitalExternal)}
+                    <span class="material-symbols-outlined text-[19px]" aria-hidden="true">open_in_new</span>${escapeHtml(BOOK_I18N.digitalExternal)}
                 </a>`);
             } else if (blocked) {
                 const signInHelps = !IS_AUTHENTICATED
@@ -2906,12 +3058,12 @@
 
                 rows.push(`<div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 mb-3">
                     <p class="flex items-center gap-2 text-sm font-bold text-amber-900">
-                        <span class="material-symbols-outlined text-[19px]">lock</span>
+                        <span class="material-symbols-outlined text-[19px]" aria-hidden="true">lock</span>
                         ${escapeHtml(blocked.accessLevel === 'restricted' ? BOOK_I18N.digitalRestricted : BOOK_I18N.digitalAuthenticated)}
                     </p>
                     <p class="mt-1 text-xs text-amber-900">${escapeHtml(blocked.accessDeniedReason || '')}</p>
                     ${signInHelps ? `<a href="${escapeHtml(LOGIN_URL)}" class="mt-2 inline-flex items-center gap-1 text-sm font-bold text-amber-900 underline">
-                        <span class="material-symbols-outlined text-[17px]">login</span>${escapeHtml(BOOK_I18N.digitalSignIn)}
+                        <span class="material-symbols-outlined text-[17px]" aria-hidden="true">login</span>${escapeHtml(BOOK_I18N.digitalSignIn)}
                     </a>` : ''}
                 </div>`);
             }
