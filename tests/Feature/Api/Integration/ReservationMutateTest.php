@@ -17,6 +17,8 @@ class ReservationMutateTest extends TestCase
     {
         parent::setUp();
 
+        config(['services.integration.allowed_tokens' => 'integration-test-token']);
+
         $this->headers = [
             'Authorization' => 'Bearer integration-test-token',
             'X-Request-Id' => 'req-mut-001',

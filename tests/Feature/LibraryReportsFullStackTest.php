@@ -67,7 +67,7 @@ class LibraryReportsFullStackTest extends TestCase
             count(ReportRegistry::OFFICIAL_CODES) + count(ReportRegistry::OPERATIONAL_CODES),
             $registry->codes(),
         );
-        $this->assertCount(22, ReportRegistry::OPERATIONAL_CODES);
+        $this->assertCount(36, ReportRegistry::OPERATIONAL_CODES);
         foreach ($registry->all() as $definition) {
             $this->assertNotEmpty($definition->columns);
             $this->assertNotEmpty($definition->defaultSort);
@@ -142,6 +142,63 @@ class LibraryReportsFullStackTest extends TestCase
         $this->assertSame(4, ActivityLog::query()->where('entity_id', 'librarian:acquisitions')->where('action_type', 'export')->count());
     }
 
+    public function test_collection_detail_exports_share_the_bounded_dataset_for_every_format(): void
+    {
+        $fixture = $this->fixture();
+        $query = [
+            'preset' => 'custom',
+            'from' => now()->subDay()->toDateString(),
+            'to' => now()->addDay()->toDateString(),
+            'type' => 'inventory-book',
+        ];
+
+        $csv = $this->signInToLibraryAs($this->librarian)
+            ->get(route('librarian.reports.export', $query + ['format' => 'csv']))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString($fixture['copy']->inventory_number, $csv->streamedContent());
+
+        $pdf = $this->signInToLibraryAs($this->librarian)
+            ->get(route('librarian.reports.export', $query + ['format' => 'pdf']))
+            ->assertOk();
+        $this->assertStringStartsWith('%PDF', $pdf->getContent());
+
+        foreach (['xlsx' => 'xl/worksheets/sheet1.xml', 'docx' => 'word/document.xml'] as $format => $entry) {
+            $response = $this->signInToLibraryAs($this->librarian)
+                ->get(route('librarian.reports.export', $query + ['format' => $format]))
+                ->assertOk();
+            $path = $response->baseResponse->getFile()->getPathname();
+            $zip = new ZipArchive;
+            $this->assertTrue($zip->open($path) === true);
+            $this->assertNotFalse($zip->locateName($entry));
+            $zip->close();
+            @unlink($path);
+        }
+
+        $this->signInToLibraryAs($this->librarian)
+            ->get(route('librarian.reports.print', $query))
+            ->assertOk()
+            ->assertSee($fixture['copy']->inventory_number);
+
+        config(['library.reports.max_live_rows' => 100]);
+        BookCopy::factory()->count(100)->create([
+            'bibliographic_record_id' => $fixture['copy']->bibliographic_record_id,
+            'branch_id' => $fixture['copy']->branch_id,
+            'fund_id' => $fixture['copy']->fund_id,
+            'accounting_type' => 'inventory',
+            'registration_date' => today(),
+        ]);
+
+        foreach (['csv', 'pdf', 'xlsx', 'docx'] as $format) {
+            $this->signInToLibraryAs($this->librarian)
+                ->get(route('librarian.reports.export', $query + ['format' => $format]))
+                ->assertUnprocessable();
+        }
+        $this->signInToLibraryAs($this->librarian)
+            ->get(route('librarian.reports.print', $query))
+            ->assertUnprocessable();
+    }
+
     public function test_print_invalid_paths_and_permissions_are_enforced(): void
     {
         $query = ['preset' => 'day'];
@@ -202,6 +259,8 @@ class LibraryReportsFullStackTest extends TestCase
             ->get(route('librarian.reports.index'))
             ->assertOk()
             ->assertSee('data-report-code="acquisitions"', false)
+            ->assertSee('data-report-code="ksu-part-1"', false)
+            ->assertSee('data-report-code="acquisition-act"', false)
             ->assertDontSee('data-report-code="users"', false)
             ->assertDontSee('data-report-code="loans"', false)
             ->assertDontSee('attendance-check-title', false)
@@ -211,6 +270,9 @@ class LibraryReportsFullStackTest extends TestCase
             ->assertForbidden();
         $this->signInToLibraryAs($acquisitions)
             ->get(route('librarian.reports.export', ['type' => 'acquisitions', 'format' => 'csv', 'preset' => 'day']))
+            ->assertOk();
+        $this->signInToLibraryAs($acquisitions)
+            ->get(route('librarian.reports.export', ['type' => 'ksu-part-1', 'format' => 'csv', 'preset' => 'day']))
             ->assertOk();
         $this->signInToLibraryAs($acquisitions)
             ->get(route('librarian.reports.export', ['type' => 'fines', 'format' => 'csv', 'preset' => 'day']))
@@ -312,7 +374,7 @@ class LibraryReportsFullStackTest extends TestCase
         );
     }
 
-    /** @return array{fund: Fund} */
+    /** @return array{fund: Fund, copy: BookCopy} */
     private function fixture(): array
     {
         $branch = Branch::query()->firstOrFail();
@@ -342,6 +404,6 @@ class LibraryReportsFullStackTest extends TestCase
         ]);
         ExternalResourceEvent::query()->create(['external_resource_id' => $external->getKey(), 'user_id' => $reader->getKey(), 'event_type' => 'outbound_click', 'role_name' => 'student', 'created_at' => now()]);
 
-        return ['fund' => $fund];
+        return ['fund' => $fund, 'copy' => $copy];
     }
 }

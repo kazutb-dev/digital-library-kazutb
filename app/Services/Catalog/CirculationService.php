@@ -78,9 +78,12 @@ class CirculationService
         ?string $dueDateReason = null,
     ): Loan {
         return DB::transaction(function () use ($reader, $copy, $staff, $override, $overrideReason, $manualDueAt, $dueDateReason): Loan {
+            // A stable reader row serialises the cross-copy loan limit. Row
+            // locks on existing loans alone do not protect the zero-row case.
+            $reader = User::query()->whereKey($reader->getKey())->lockForUpdate()->firstOrFail();
+            $profile = ReaderProfile::forUser($reader);
             $copy = BookCopy::query()->whereKey($copy->getKey())->lockForUpdate()->firstOrFail();
             $copyBefore = $copy->only(['status', 'condition', 'issue_count']);
-            $profile = ReaderProfile::forUser($reader);
 
             if ($profile->status !== 'active') {
                 throw CirculationException::because('reader_blocked', ['reason' => (string) $profile->block_reason]);
@@ -134,7 +137,7 @@ class CirculationService
                 throw CirculationException::because('reservation_not_ready');
             }
 
-            if (! in_array($copy->status, BookCopy::ISSUABLE_STATUSES, true)) {
+            if (! in_array($copy->status, BookCopy::ISSUABLE_STATUSES, true) || ! $copy->isCirculatable()) {
                 throw CirculationException::because('copy_not_available', ['status' => $copy->status]);
             }
             if ($copy->access_restriction === 'reading_room') {
@@ -220,7 +223,7 @@ class CirculationService
             );
 
             return $loan;
-        });
+        }, 3);
     }
 
     /**
@@ -320,7 +323,6 @@ class CirculationService
             } elseif ($incident === 'damaged') {
                 $copy->status = match ($incidentData['preliminary_action'] ?? 'repair') {
                     'return_to_fund' => 'available',
-                    'write_off' => 'written_off',
                     default => 'under_repair',
                 };
                 $copy->save();

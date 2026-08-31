@@ -26,6 +26,8 @@ class ReservationReadTest extends TestCase
     {
         parent::setUp();
 
+        config(['services.integration.allowed_tokens' => 'integration-test-token']);
+
         $this->validHeaders = [
             'Authorization' => 'Bearer integration-test-token',
             'X-Request-Id' => 'req-rv-001',

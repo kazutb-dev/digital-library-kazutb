@@ -8,6 +8,7 @@ use App\Services\Library\ResolvedDigitalMaterial;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -203,6 +204,10 @@ class DigitalMaterialController extends Controller
         $path = $this->access->localFilePath($material);
 
         if ($path !== null) {
+            if ((bool) config('digital_access.x_accel_redirect', false)) {
+                return $this->acceleratedFileResponse($material, $path, $disposition, $headers);
+            }
+
             // BinaryFileResponse marks itself public in its constructor, which
             // strips the `private` directive we set above. Re-assert it: licensed
             // material must not be held by a shared cache or proxy.
@@ -238,6 +243,52 @@ class DigitalMaterialController extends Controller
                 ),
             ],
         );
+    }
+
+    /**
+     * Let nginx transfer a large private file after this controller has already
+     * authorised the reader. The location is `internal`, so this URI cannot be
+     * requested directly to bypass DigitalAccessService.
+     *
+     * @param array<string, string> $headers
+     */
+    private function acceleratedFileResponse(
+        ResolvedDigitalMaterial $material,
+        string $path,
+        string $disposition,
+        array $headers,
+    ): Response {
+        $privateRoot = rtrim(Storage::disk($material->storageDisk ?? 'local')->path(''), DIRECTORY_SEPARATOR)
+            .DIRECTORY_SEPARATOR;
+        $realPath = realpath($path);
+        $realRoot = realpath($privateRoot);
+
+        // Never turn a database path into an arbitrary nginx filesystem read.
+        // Falling back to BinaryFileResponse is safer if the resolved file is
+        // unexpectedly outside the configured private disk root.
+        if ($realPath === false || $realRoot === false || ! str_starts_with($realPath, $realRoot.DIRECTORY_SEPARATOR)) {
+            return response()
+                ->file($path, $headers)
+                ->setPrivate()
+                ->setContentDisposition($disposition, $this->safeFilename($material));
+        }
+
+        $relativePath = ltrim(substr($realPath, strlen($realRoot)), DIRECTORY_SEPARATOR);
+        $internalUri = rtrim((string) config('digital_access.x_accel_prefix'), '/')
+            .'/'.implode('/', array_map('rawurlencode', explode(DIRECTORY_SEPARATOR, $relativePath)));
+
+        $response = response('', 200, $headers + [
+            'Accept-Ranges' => 'bytes',
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                $disposition,
+                $this->safeFilename($material),
+            ),
+            'X-Accel-Redirect' => $internalUri,
+        ]);
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 
     /**

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ __('admin.profile.forced_title') }} — {{ __('brand.library.name') }}</title>
     @include('partials.favicons')
-    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    @vite('resources/css/app.css')
     <link rel="stylesheet" href="/fonts/fonts.css">
     <style>
         body { font-family: 'Manrope', sans-serif; }

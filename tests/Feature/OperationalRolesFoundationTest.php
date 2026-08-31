@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\Loan;
+use App\Models\Catalog\Reservation;
 use App\Models\ContactMessage;
 use App\Models\MessageCategory;
 use App\Models\User;
@@ -134,9 +135,10 @@ class OperationalRolesFoundationTest extends TestCase
             ->assertSee(route('librarian.data-cleanup'), false);
     }
 
-    public function test_acquisitions_sidebar_and_catalog_create_boundary(): void
+    public function test_acquisitions_can_create_a_draft_for_intake_but_cannot_edit_catalogue_records(): void
     {
         $acquisitions = $this->makeControlPlaneUser('acquisitions');
+        $record = BibliographicRecord::factory()->create();
 
         $this->signInToLibraryAs($acquisitions)
             ->get('/librarian')
@@ -149,8 +151,91 @@ class OperationalRolesFoundationTest extends TestCase
             ->assertSee(__('librarian.overview.roles.acquisitions.subtitle'));
 
         $this->signInToLibraryAs($acquisitions)
-            ->get('/librarian/catalog/create')
+            ->get(route('librarian.catalog.create', ['return_to' => 'acquisitions']))
+            ->assertOk()
+            ->assertSee('name="return_to" value="acquisitions"', false);
+
+        $draftTitle = 'Acquisition intake draft '.str()->random(8);
+        $this->signInToLibraryAs($acquisitions)
+            ->withoutMiddleware(PreventRequestForgery::class)
+            ->post(route('librarian.catalog.store'), [
+                'title' => $draftTitle,
+                'language' => 'ru',
+                'resource_type' => 'book',
+                'return_to' => 'acquisitions',
+            ])
+            ->assertRedirect(route('librarian.acquisitions.index', ['record_q' => $draftTitle]));
+
+        $draft = BibliographicRecord::query()->where('title', $draftTitle)->firstOrFail();
+        $this->assertTrue($draft->is_draft);
+        $this->assertSame($acquisitions->getKey(), $draft->responsible_librarian_id);
+
+        $this->signInToLibraryAs($acquisitions)
+            ->get(route('librarian.catalog.edit', $record))
             ->assertForbidden();
+
+        $originalTitle = $record->title;
+        $this->signInToLibraryAs($acquisitions)
+            ->withoutMiddleware(PreventRequestForgery::class)
+            ->patch(route('librarian.catalog.update', $record), [
+                'title' => 'Arbitrary acquisition overwrite',
+                'language' => 'ru',
+                'resource_type' => 'book',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame($originalTitle, $record->refresh()->title);
+    }
+
+    public function test_director_cannot_reach_destructive_library_operations(): void
+    {
+        $director = $this->makeControlPlaneUser('director');
+        $record = BibliographicRecord::factory()->create();
+        $copy = BookCopy::factory()->create(['bibliographic_record_id' => $record->getKey()]);
+        $reader = $this->makeControlPlaneUser('member');
+        $reservation = Reservation::factory()->create([
+            'user_id' => $reader->getKey(),
+            'bibliographic_record_id' => $record->getKey(),
+        ]);
+        $originalRecordTitle = $record->title;
+        $originalCopyStatus = $copy->status;
+
+        $requests = [
+            fn () => $this->delete(route('librarian.catalog.destroy', $record)),
+            fn () => $this->post(route('librarian.copies.write-off.store'), [
+                'copy_ids' => [$copy->getKey()],
+                'reason' => 'Director must not write off copies',
+            ]),
+            fn () => $this->post(route('librarian.inventory.store'), [
+                'name' => 'Director must not start inventory',
+            ]),
+            fn () => $this->post(route('librarian.acquisitions.store'), [
+                'supplier_name' => 'Director must not intake stock',
+            ]),
+            fn () => $this->post(route('librarian.ksu.conflicts.resolve-group'), [
+                'conflict_ids' => [1],
+                'resolution' => 'accept',
+            ]),
+            fn () => $this->post(route('librarian.reservations.pass-to-next', $reservation), [
+                'reason' => 'Director must not reorder the queue',
+            ]),
+        ];
+
+        foreach ($requests as $request) {
+            $this->signInToLibraryAs($director)
+                ->withoutMiddleware(PreventRequestForgery::class);
+            $request()->assertForbidden();
+        }
+
+        $this->assertDatabaseHas('bibliographic_records', [
+            'id' => $record->getKey(),
+            'title' => $originalRecordTitle,
+        ]);
+        $this->assertSame($originalCopyStatus, $copy->refresh()->status);
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->getKey(),
+            'status' => $reservation->status,
+        ]);
     }
 
     public function test_cataloguer_can_edit_but_cannot_issue_or_delete_records(): void
@@ -309,12 +394,15 @@ class OperationalRolesFoundationTest extends TestCase
         foreach (['director', 'acquisitions', 'cataloguer', 'bibliographer'] as $roleName) {
             $staff = $this->makeControlPlaneUser($roleName);
 
-            $this->signInToLibraryAs($staff)->get('/internal/review')->assertForbidden();
+            $this->signInToLibraryAs($staff)->get('/internal/review')->assertRedirect('/librarian/data-cleanup');
+            $canonical = $this->signInToLibraryAs($staff)->get('/librarian/data-cleanup');
+            $roleName === 'cataloguer' ? $canonical->assertOk() : $canonical->assertForbidden();
             $this->signInToLibraryAs($staff)->get('/internal/ai-chat')->assertForbidden();
         }
 
         $senior = $this->makeControlPlaneUser('senior_librarian');
-        $this->signInToLibraryAs($senior)->get('/internal/review')->assertOk();
+        $this->signInToLibraryAs($senior)->get('/internal/review')->assertRedirect('/librarian/data-cleanup');
+        $this->signInToLibraryAs($senior)->get('/librarian/data-cleanup')->assertOk();
         $this->signInToLibraryAs($senior)->get('/internal/ai-chat')->assertOk();
     }
 

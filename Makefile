@@ -9,10 +9,8 @@
 
 .PHONY: help install dev-up dev-down dev-logs dev-shell dev-migrate dev-seed dev-fresh \
         prod-up prod-down prod-build prod-deploy \
-        test test-unit test-e2e build lint \
-	db-status fresh migrate vendor-pdfjs \
-	audit-infra audit-schema audit-db audit-all \
-	audit-catalog-quality recover-known-volume \
+        test test-unit test-e2e test-all build lint \
+	db-status fresh migrate verify-pdfjs \
         branches-status
 
 # ── Colors ─────────────────────────────────────────────────────
@@ -33,13 +31,17 @@ help: ## Show this help
 install: ## Install all dependencies (composer + npm)
 	composer install
 	npm ci
-	$(MAKE) vendor-pdfjs
+	$(MAKE) verify-pdfjs
 
 build: ## Build frontend assets for production
 	npm run build
 
-vendor-pdfjs: ## Refresh the vendored pdf.js reader assets from node_modules
-	./scripts/vendor-pdfjs.sh
+verify-pdfjs: ## Verify the committed pdf.js reader assets match node_modules
+	@test -s public/vendor/pdfjs/build/pdf.min.mjs
+	@test -s public/vendor/pdfjs/build/pdf.worker.min.mjs
+	@test -d public/vendor/pdfjs/cmaps
+	@test -d public/vendor/pdfjs/standard_fonts
+	@node -e "const fs=require('fs'); const expected=require('./node_modules/pdfjs-dist/package.json').version; const actual=fs.readFileSync('public/vendor/pdfjs/VERSION','utf8').trim(); if(actual!==expected){console.error('Vendored pdf.js '+actual+' does not match dependency '+expected); process.exit(1)}; console.log('Vendored pdf.js '+actual+' verified')"
 
 lint: ## Run pint (PHP) linter
 	./vendor/bin/pint --test
@@ -105,40 +107,9 @@ fresh: ## Disabled: use the guarded isolated PostgreSQL test runner
 	@echo "Direct migrate:fresh targets are disabled. Use TEST_DB_DATABASE=<name>_test ./scripts/dev/test-postgres.sh."
 	@exit 64
 
-# ── Audit helpers (non-destructive) ───────────────────────────
-audit-infra: ## Run host/runtime/backup discovery audit
-	bash scripts/dev/infra-audit.sh
-
-audit-schema: ## Compare DB objects used by code vs migration-managed tables
-	bash scripts/dev/schema-drift-audit.sh
-
-audit-db: ## Probe configured PostgreSQL and collect entity counts when reachable
-	bash scripts/dev/db-recovery-audit.sh
-
-audit-catalog-quality: ## Run SQL quality audit script against current DB connection
-	bash scripts/dev/run-catalog-quality-audit.sh
-
-recover-known-volume: ## Probe old known Docker volume for legacy postgres data
-	bash scripts/dev/recover-known-postgres-volume.sh
-
-audit-all: audit-infra audit-schema audit-db ## Run all recovery audits
-
 # ── Git helpers ────────────────────────────────────────────────
 branches-status: ## Show all branches with tracking info
 	git branch -vv
 	@echo ""
 	@echo "$(CYAN)Remotes:$(RESET)"
 	git remote -v
-
-# ── System setup (requires sudo) ───────────────────────────────
-setup-php84: ## Install PHP 8.4 (Ubuntu 24.04, requires sudo)
-	sudo bash scripts/dev/install-php84.sh
-
-setup-docker: ## Install Docker (Ubuntu 24.04, requires sudo)
-	sudo bash scripts/dev/install-docker.sh
-
-setup-all: ## Full system setup (PHP 8.4 + Docker, requires sudo)
-	$(MAKE) setup-php84
-	$(MAKE) setup-docker
-	$(MAKE) install
-	$(MAKE) build

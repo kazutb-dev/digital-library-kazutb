@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ContactMessage;
+use App\Models\MessageAttachment;
 use App\Models\MessageCategory;
 use App\Services\Messages\MessageSlaService;
 use App\Services\Messages\MessageSubmissionService;
@@ -10,6 +11,7 @@ use App\Services\Messages\MessageWorkflowService;
 use Database\Seeders\MessageCategorySeeder;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\BuildsAdminControlPlane;
@@ -23,7 +25,6 @@ class MessageAppealsWorkflowTest extends TestCase
     {
         parent::setUp();
         $this->setUpAdminControlPlane();
-        (require base_path('database/migrations/2026_08_06_000000_build_message_appeals_workflow.php'))->up();
         app(MessageCategorySeeder::class)->run();
         $this->withoutMiddleware(PreventRequestForgery::class);
     }
@@ -70,6 +71,35 @@ class MessageAppealsWorkflowTest extends TestCase
         $stranger = $this->makeControlPlaneUser('member');
         $message = $this->submit($owner);
         $this->signInToLibraryAs($stranger)->get(route('member.messages.show', $message))->assertNotFound();
+    }
+
+    public function test_message_attachments_are_owner_parent_and_visibility_scoped(): void
+    {
+        Storage::fake('local');
+        $owner = $this->makeControlPlaneUser('member');
+        $stranger = $this->makeControlPlaneUser('member');
+        $message = $this->submit($owner);
+        $otherMessage = $this->submit($stranger);
+
+        $public = $this->attachment($message, 'messages/public-proof.pdf', 'public');
+        $private = $this->attachment($message, 'messages/private-proof.pdf', 'director_only');
+        $other = $this->attachment($otherMessage, 'messages/other-proof.pdf', 'public');
+
+        $download = $this->signInToLibraryAs($owner)
+            ->get(route('member.messages.attachments.show', [$message, $public]));
+        $download->assertOk();
+        $this->assertStringContainsString('private', (string) $download->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-store', (string) $download->headers->get('Cache-Control'));
+
+        $this->signInToLibraryAs($stranger)
+            ->get(route('member.messages.attachments.show', [$message, $public]))
+            ->assertNotFound();
+        $this->signInToLibraryAs($owner)
+            ->get(route('member.messages.attachments.show', [$message, $private]))
+            ->assertNotFound();
+        $this->signInToLibraryAs($owner)
+            ->get(route('member.messages.attachments.show', [$message, $other]))
+            ->assertNotFound();
     }
 
     public function test_complaint_response_requires_director_approval(): void
@@ -153,5 +183,26 @@ class MessageAppealsWorkflowTest extends TestCase
             'body' => 'A sufficiently detailed message for workflow testing.', 'preferred_contact_channel' => 'in_app',
             'submission_token' => $token ?: (string) Str::uuid(),
         ], $request);
+    }
+
+    private function attachment(ContactMessage $message, string $path, string $visibility): MessageAttachment
+    {
+        $contents = 'attachment-security-fixture:'.$path;
+        Storage::disk('local')->put($path, $contents);
+
+        return MessageAttachment::query()->create([
+            'contact_message_id' => $message->getKey(),
+            'uploaded_by' => $message->user_id,
+            'public_id' => (string) Str::uuid(),
+            'disk' => 'local',
+            'path' => $path,
+            'original_name' => basename($path),
+            'extension' => 'pdf',
+            'mime' => 'application/pdf',
+            'size' => strlen($contents),
+            'sha256' => hash('sha256', $contents),
+            'visibility' => $visibility,
+            'scan_status' => 'clean',
+        ]);
     }
 }

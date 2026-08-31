@@ -22,10 +22,10 @@ class LibrarianWorkspaceFullStackTest extends TestCase
         $this->setUpAdminControlPlane();
     }
 
-    public function test_registry_exposes_complete_metadata_and_twenty_two_operational_reports(): void
+    public function test_registry_exposes_complete_metadata_and_accounting_reports(): void
     {
         $registry = app(ReportRegistry::class);
-        $this->assertCount(22, ReportRegistry::OPERATIONAL_CODES);
+        $this->assertCount(36, ReportRegistry::OPERATIONAL_CODES);
         foreach ($registry->all() as $definition) {
             $this->assertNotEmpty($definition->code);
             $this->assertNotEmpty($definition->dataset);

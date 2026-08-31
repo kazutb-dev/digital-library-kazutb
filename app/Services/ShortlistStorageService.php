@@ -368,9 +368,11 @@ class ShortlistStorageService
 
         $draft = $this->getOrCreateDraft($userId);
 
-        // Merge draft metadata (session — DB only if DB is empty)
+        // Merge draft metadata. A newly-created favourites collection only has
+        // the service placeholder title, so the guest's own title must win.
+        // Existing persistent collections remain authoritative.
         if (is_array($sessionDraft) && ! empty($sessionDraft)) {
-            if ($draft->title === null && isset($sessionDraft['title'])) {
+            if (($draft->wasRecentlyCreated || $draft->title === null) && isset($sessionDraft['title'])) {
                 $draft->title = $sessionDraft['title'];
             }
             if ($draft->notes === null && isset($sessionDraft['notes'])) {

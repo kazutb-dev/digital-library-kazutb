@@ -78,8 +78,10 @@ runtime_probe="$({
             echo "env=".app()->environment().PHP_EOL;
             $configuredDatabase = (string) config("database.connections.".config("database.default").".database");
             $pdoDatabase = (string) Illuminate\Support\Facades\DB::selectOne("select current_database() as name")->name;
+            $pdoUser = (string) Illuminate\Support\Facades\DB::selectOne("select current_user as name")->name;
             echo "db=".$configuredDatabase.PHP_EOL;
             echo "pdo_db=".$pdoDatabase.PHP_EOL;
+            echo "pdo_user=".$pdoUser.PHP_EOL;
             echo "config_cache=".app()->getCachedConfigPath().PHP_EOL;
         '
 } 2>/dev/null)"
@@ -88,6 +90,7 @@ printf '%s\n' "${runtime_probe}"
 effective_environment="$(printf '%s\n' "${runtime_probe}" | sed -n 's/^env=//p' | tail -n1)"
 effective_database="$(printf '%s\n' "${runtime_probe}" | sed -n 's/^db=//p' | tail -n1)"
 pdo_database="$(printf '%s\n' "${runtime_probe}" | sed -n 's/^pdo_db=//p' | tail -n1)"
+pdo_user="$(printf '%s\n' "${runtime_probe}" | sed -n 's/^pdo_user=//p' | tail -n1)"
 effective_cache="$(printf '%s\n' "${runtime_probe}" | sed -n 's/^config_cache=//p' | tail -n1)"
 
 if [[ "${effective_environment}" != "testing" ]]; then
@@ -102,6 +105,10 @@ if [[ "${pdo_database}" != "${test_database}" ]]; then
     echo "Refusing PostgreSQL test reset: PDO current_database() does not match the requested test database." >&2
     exit 64
 fi
+if [[ -z "${pdo_user}" || ! "${pdo_user}" =~ ^[A-Za-z0-9_]+$ ]]; then
+    echo "Refusing PostgreSQL test reset: PDO runtime role is empty or unsafe." >&2
+    exit 64
+fi
 if [[ "${effective_cache}" != "${test_cache}" ]]; then
     echo "Refusing PostgreSQL test reset: Laravel did not use the isolated config cache path." >&2
     exit 64
@@ -112,10 +119,11 @@ echo "SAFE TEST DATABASE CONFIRMED: ${effective_database}"
 echo "Preparing isolated PostgreSQL database: ${test_database}"
 docker compose exec -T \
     -e KAZUTB_TEST_DATABASE="${test_database}" \
+    -e KAZUTB_TEST_OWNER="${pdo_user}" \
     postgres sh -eu -c '
         export PGPASSWORD="${POSTGRES_PASSWORD}"
         dropdb --username="${POSTGRES_USER}" --if-exists --force "${KAZUTB_TEST_DATABASE}"
-        createdb --username="${POSTGRES_USER}" --encoding=UTF8 "${KAZUTB_TEST_DATABASE}"
+        createdb --username="${POSTGRES_USER}" --owner="${KAZUTB_TEST_OWNER}" --encoding=UTF8 "${KAZUTB_TEST_DATABASE}"
     '
 
 docker compose run --rm --no-deps --entrypoint php "${container_env[@]}" app artisan migrate --force --no-interaction

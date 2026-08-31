@@ -32,21 +32,21 @@
         <div class="flex items-baseline justify-between gap-3"><h2 class="font-headline text-2xl text-primary">{{ __('data_quality.object.title') }}</h2><strong>{{ $relatedIssues->count() }}</strong></div>
         <div class="mt-4 space-y-4">
             @foreach($relatedIssues as $finding)
+                @php($presentation = $presentations[$finding->getKey()])
                 <article class="admin-card border-l-4 {{ in_array($finding->severity, ['critical','high']) ? 'border-l-red-500' : ($finding->severity === 'medium' ? 'border-l-amber-500' : 'border-l-slate-300') }}">
                     <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div><h3 class="font-semibold text-primary">{{ __('data_quality.rules.'.$finding->rule_code) }}</h3><div class="mt-2 flex flex-wrap gap-2"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs">{{ __('data_quality.categories.'.$finding->category) }}</span><span class="rounded-full border px-2 py-1 text-xs">{{ __('data_quality.severity.'.$finding->severity) }}</span><span class="rounded-full border px-2 py-1 text-xs">{{ __('data_quality.statuses.'.$finding->status) }}</span></div></div>
+                        <div><h3 class="font-semibold text-primary">{{ $presentation['title'] }}</h3><div class="mt-2 flex flex-wrap gap-2"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs">{{ __('data_quality.categories.'.$finding->category) }}</span><span class="rounded-full border px-2 py-1 text-xs">{{ __('data_quality.severity.'.$finding->severity) }}</span><span class="rounded-full border px-2 py-1 text-xs">{{ __('data_quality.statuses.'.$finding->status) }}</span></div></div>
                         <span class="text-xs text-slate-400">{{ $finding->last_detected_at?->format('d.m.Y H:i') }}</span>
                     </div>
                     <div class="mt-4 grid gap-4 lg:grid-cols-2">
-                        <div><div class="admin-label">{{ __('data_quality.fields.value') }}</div><div class="mt-1 min-h-16 whitespace-pre-wrap break-words rounded-lg bg-red-50 p-3 text-sm">{{ $finding->current_value ?? '—' }}</div></div>
-                        <div><div class="admin-label">{{ __('data_quality.fields.expected') }}</div><div class="mt-1 min-h-16 whitespace-pre-wrap break-words rounded-lg bg-emerald-50 p-3 text-sm">{{ $finding->suggested_action ?: $finding->expected_format }}</div></div>
+                        <div><div class="admin-label">{{ __('data_quality.fields.detected') }}</div><div data-testid="quality-friendly-current" class="mt-1 min-h-20 whitespace-pre-line break-words rounded-xl border border-red-100 bg-red-50 p-4 text-sm leading-6">{{ $presentation['current'] }}</div></div>
+                        <div><div class="admin-label">{{ __('data_quality.fields.how_to_fix') }}</div><div data-testid="quality-friendly-guidance" class="mt-1 min-h-20 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6"><p>{{ $presentation['guidance'] }}</p>@if($presentation['replacement'])<p class="mt-3"><strong>{{ __('data_quality.fields.suggested_value') }}:</strong> <span class="break-words">{{ $presentation['replacement'] }}</span></p>@endif</div></div>
                     </div>
-                    <p class="mt-3 text-sm leading-6 text-slate-600">{{ $finding->description }}</p>
                     <details class="mt-4 border-t pt-3">
-                        <summary class="cursor-pointer text-sm font-semibold text-secondary">{{ __('data_quality.actions.false_positive') }}</summary>
+                        <summary class="cursor-pointer text-sm font-semibold text-secondary">{{ __('data_quality.actions.value_is_correct') }}</summary>
                         @can('data_quality.triage')<form class="mt-3 max-w-xl" method="POST" action="{{ route('librarian.data-quality.issues.false-positive', $finding) }}">@csrf<p class="mb-2 text-xs text-slate-500">{{ __('data_quality.messages.false_positive_help') }}</p><textarea class="admin-input" name="reason" required minlength="5" maxlength="2000"></textarea><button class="admin-btn admin-btn-secondary mt-2">{{ __('data_quality.actions.false_positive') }}</button></form>@endcan
                     </details>
-                    <details class="mt-3 text-xs text-slate-500"><summary class="cursor-pointer">{{ __('data_quality.fields.technical_details') }}</summary><div class="mt-2 font-mono">{{ $finding->rule_code }} · {{ $finding->issue_number }}</div></details>
+                    <details class="mt-3 text-xs text-slate-500"><summary class="cursor-pointer">{{ __('data_quality.fields.technical_details') }}</summary><dl class="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[11rem_1fr]"><dt>{{ __('data_quality.fields.issue') }}</dt><dd class="font-mono">{{ $finding->issue_number }}</dd><dt>{{ __('data_quality.fields.rule') }}</dt><dd class="font-mono">{{ $finding->rule_code }}</dd><dt>{{ __('data_quality.fields.field') }}</dt><dd class="font-mono">{{ $presentation['field'] }}</dd><dt>{{ __('data_quality.fields.raw_value') }}</dt><dd class="break-all font-mono">{{ $presentation['raw_current'] }}</dd></dl></details>
                 </article>
             @endforeach
         </div>
@@ -58,7 +58,7 @@
             @can('data_quality.assign')<form method="POST" action="{{ route('librarian.data-quality.issues.assign', $issue) }}">@csrf<label><span class="admin-label">{{ __('data_quality.fields.assignee') }}</span><select class="admin-input" name="assigned_to">@foreach($assignees as $person)<option value="{{ $person->id }}">{{ $person->name }}</option>@endforeach</select></label><button class="admin-btn admin-btn-secondary mt-2">{{ __('data_quality.actions.assign') }}</button></form>@endcan
             @can('data_quality.triage')<form method="POST" action="{{ route('librarian.data-quality.issues.comments', $issue) }}">@csrf<label><span class="admin-label">{{ __('data_quality.actions.comment') }}</span><input class="admin-input" name="body" required maxlength="5000"></label><button class="admin-btn admin-btn-secondary mt-2">{{ __('data_quality.actions.comment') }}</button></form>@endcan
         </div>
-        <div class="mt-5 space-y-3">@foreach($issue->comments as $comment)<div class="rounded-xl border p-3 text-sm"><strong>{{ $comment->author?->name ?? 'System' }}</strong><span class="ml-2 text-xs text-slate-400">{{ $comment->created_at }}</span><p class="mt-1">{{ $comment->body }}</p></div>@endforeach</div>
+        <div class="mt-5 space-y-3">@foreach($issue->comments as $comment)<div class="rounded-xl border p-3 text-sm"><strong>{{ $comment->author?->name ?? __('data_quality.presentation.system') }}</strong><span class="ml-2 text-xs text-slate-400">{{ $comment->created_at }}</span><p class="mt-1">{{ $comment->body }}</p></div>@endforeach</div>
     </section>
 </div>
 @endsection

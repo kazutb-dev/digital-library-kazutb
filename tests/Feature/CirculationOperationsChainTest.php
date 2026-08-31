@@ -10,10 +10,8 @@ use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\CirculationIncidentCase;
 use App\Models\Catalog\Fine;
 use App\Models\Catalog\Loan;
-use App\Models\Catalog\ReaderNotification;
 use App\Models\Catalog\ReaderProfile;
 use App\Models\Catalog\ReplacementCandidate;
-use App\Models\Catalog\Reservation;
 use App\Models\Fund;
 use App\Models\User;
 use App\Services\Catalog\CirculationService;
@@ -47,6 +45,14 @@ class CirculationOperationsChainTest extends TestCase
     {
         parent::setUp();
         $this->setUpAdminControlPlane();
+
+        foreach ([
+            'database/migrations/2026_08_28_100000_create_marc_recovery_model.php',
+            'database/migrations/2026_08_28_100100_extend_catalogue_for_marc_recovery.php',
+            'database/migrations/2026_08_29_120000_create_acquisition_batches_and_safe_number_sequences.php',
+        ] as $path) {
+            (require base_path($path))->up();
+        }
 
         $this->circulation = app(CirculationService::class);
         $this->reservations = app(ReservationQueueService::class);
@@ -333,19 +339,23 @@ class CirculationOperationsChainTest extends TestCase
             $this->adminUser,
             'write_off',
             'Conservation review found the copy irreparable',
+            false,
+            '2026-08-29',
+            'ACT-INC-2026-001',
         );
         $this->assertSame('resolved', $resolved->status);
         $this->assertSame('written_off', $copy->fresh()->status);
-        $history = $copy->history()->where('event_type', 'written_off')->firstOrFail();
+        $history = $copy->history()->where('event_type', 'write_off')->firstOrFail();
         $this->assertSame($case->getKey(), $history->details['incident_case_id']);
-        $this->assertSame('under_repair', $history->details['old_status']);
-        $this->assertSame('written_off', $history->details['new_status']);
-        $this->assertSame('write_off', $history->details['resolution_type']);
+        $this->assertSame('under_repair', $history->details['old']['status']);
+        $this->assertSame('written_off', $history->details['new']['status']);
+        $this->assertNotNull($history->details['ksu_withdrawal_entry_id']);
         $this->assertSame($this->adminUser->getKey(), $history->actor_id);
         $this->assertAuditActions([
             'circulation.return',
             'incident.opened',
             'incident.damage_assessed',
+            'ksu.withdrawal.created',
             'incident.resolved',
         ]);
         $this->assertTransitionAudit('incident.resolved');

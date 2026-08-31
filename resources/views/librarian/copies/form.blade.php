@@ -159,6 +159,12 @@
                 </label>
 
                 <label class="block">
+                    <span class="admin-label">{{ __('copy_registry.fields.service_point') }}</span>
+                    <input class="admin-input" type="text" name="service_point_code" maxlength="64" value="{{ $value('service_point_code') }}">
+                    @error('service_point_code')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                </label>
+
+                <label class="block">
                     <span class="admin-label">{{ __('librarian.copies.fields.access_restriction') }}</span>
                     <select class="admin-input" name="access_restriction" required>
                         @foreach ($copyAccessRestrictions as $restriction)
@@ -228,6 +234,12 @@
                     <input class="admin-input" type="text" name="shelf_location" maxlength="255" value="{{ $value('shelf_location') }}">
                     @error('shelf_location')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
                 </label>
+
+                <label class="block">
+                    <span class="admin-label">{{ __('copy_registry.fields.shelf_index') }}</span>
+                    <input class="admin-input" type="text" name="shelf_index" maxlength="128" value="{{ $value('shelf_index') }}">
+                    @error('shelf_index')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                </label>
             </div>
         </section>
 
@@ -248,6 +260,9 @@
                     <span class="admin-label">{{ __('librarian.copies.fields.acquisition_source') }}</span>
                     <select class="admin-input" name="acquisition_source">
                         <option value="">{{ __('common.fields.none') }}</option>
+                        @if($editing && filled($value('acquisition_source')) && ! in_array($value('acquisition_source'), \App\Models\Catalog\BookCopy::ACQUISITION_SOURCES, true))
+                            <option value="{{ $value('acquisition_source') }}" selected>{{ $value('acquisition_source') }} · {{ __('copy_registry.legacy_source') }}</option>
+                        @endif
                         @foreach(\App\Models\Catalog\BookCopy::ACQUISITION_SOURCES as $source)
                             <option value="{{ $source }}" @selected($value('acquisition_source') === $source)>{{ __('librarian.copies.acquisition_sources.'.$source) }}</option>
                         @endforeach

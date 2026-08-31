@@ -36,14 +36,18 @@
         ['repository', 'Репозиторий', '/repository'],
         ['news', 'Новости', '/news'],
         ['events', 'События', '/events'],
-        ['contacts', 'Контакты', '/contacts'],
       ],
       'institution' => 'Об институте',
       'institution_links' => [
         ['О библиотеке', '/about'],
-        ['Руководство', '/leadership'],
-        ['Правила библиотеки', '/rules'],
         ['Обзор фонда', '/discover'],
+      ],
+      'contacts_menu' => 'Контакты',
+      'contacts_menu_aria' => 'Контакты и информация о библиотеке',
+      'contacts_links' => [
+        ['contacts', 'Связаться с библиотекой', 'Адрес, режим работы и каналы связи', '/contacts'],
+        ['rules', 'Правила библиотеки', 'Выдача, фонд и электронный доступ', '/rules'],
+        ['leadership', 'Руководство библиотеки', 'Подтверждённые сведения о руководителе', '/leadership'],
       ],
       'search' => 'Поиск',
       'search_placeholder' => 'Название, автор, УДК…',
@@ -64,14 +68,18 @@
         ['repository', 'Репозиторий', '/repository'],
         ['news', 'Жаңалықтар', '/news'],
         ['events', 'Іс-шаралар', '/events'],
-        ['contacts', 'Байланыс', '/contacts'],
       ],
       'institution' => 'Институт туралы',
       'institution_links' => [
         ['Кітапхана туралы', '/about'],
-        ['Басшылық', '/leadership'],
-        ['Кітапхана ережелері', '/rules'],
         ['Қорға шолу', '/discover'],
+      ],
+      'contacts_menu' => 'Байланыс',
+      'contacts_menu_aria' => 'Байланыс және кітапхана туралы ақпарат',
+      'contacts_links' => [
+        ['contacts', 'Кітапханамен байланысу', 'Мекенжай, жұмыс уақыты және байланыс арналары', '/contacts'],
+        ['rules', 'Кітапхана ережелері', 'Беру, қор және электрондық қолжетімділік', '/rules'],
+        ['leadership', 'Кітапхана басшылығы', 'Кітапхана басшысы туралы расталған мәліметтер', '/leadership'],
       ],
       'search' => 'Іздеу',
       'search_placeholder' => 'Атауы, авторы, ӘОЖ…',
@@ -92,14 +100,18 @@
         ['repository', 'Repository', '/repository'],
         ['news', 'News', '/news'],
         ['events', 'Events', '/events'],
-        ['contacts', 'Contacts', '/contacts'],
       ],
       'institution' => 'Institution',
       'institution_links' => [
         ['About the Library', '/about'],
-        ['Leadership', '/leadership'],
-        ['Library Rules', '/rules'],
         ['Browse the collection', '/discover'],
+      ],
+      'contacts_menu' => 'Contacts',
+      'contacts_menu_aria' => 'Contacts and library information',
+      'contacts_links' => [
+        ['contacts', 'Contact the library', 'Address, opening hours, and contact channels', '/contacts'],
+        ['rules', 'Library rules', 'Borrowing, collections, and digital access', '/rules'],
+        ['leadership', 'Library leadership', 'Confirmed information about the director', '/leadership'],
       ],
       'search' => 'Search',
       'search_placeholder' => 'Title, author, UDC…',
@@ -710,6 +722,61 @@
 
   .hdr-panel--menu { width: min(92vw, 320px); padding: 10px 0; max-height: 74vh; overflow-y: auto; }
 
+  .hdr-contact-nav { display: none; }
+
+  .hdr-contact-nav > summary {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-size: 13.5px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .hdr-contact-nav > summary svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    transition: transform 180ms ease;
+  }
+
+  .hdr-contact-nav[open] > summary svg { transform: rotate(180deg); }
+  .site-header.is-solid .hdr-contact-nav > summary {
+    border-color: rgba(15, 76, 129, 0.18);
+    background: rgba(15, 76, 129, 0.07);
+    color: var(--hdr-accent);
+  }
+
+  .hdr-panel--contacts {
+    width: min(92vw, 390px);
+    padding: 8px;
+  }
+
+  .hdr-contact-link {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px 16px;
+    align-items: center;
+    padding: 15px 16px;
+    color: var(--hdr-ink);
+    text-decoration: none;
+  }
+
+  .hdr-contact-link + .hdr-contact-link { border-top: 1px solid var(--hdr-line); }
+  .hdr-contact-link strong { font-size: 14px; line-height: 1.25; }
+  .hdr-contact-link span { color: var(--hdr-ink-soft); font-size: 12px; line-height: 1.4; }
+  .hdr-contact-link svg { grid-column: 2; grid-row: 1 / span 2; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; }
+  .hdr-contact-link:hover,
+  .hdr-contact-link[aria-current='page'] { background: #f1f7f6; color: var(--hdr-accent); }
+
   .hdr-menu__link {
     display: block;
     padding: 10px 20px;
@@ -777,6 +844,10 @@
   @media (min-width: 1024px) {
     .hdr-nav { display: flex; }
     .hdr-burger { display: none; }
+  }
+
+  @media (min-width: 1280px) {
+    .hdr-contact-nav { display: flex; }
   }
 
   /* Tablet: a compact four-item nav; the remainder lives in the menu. */
@@ -909,6 +980,24 @@
 
     {{-- Right: search, quick links, language, account --}}
     <div class="hdr-actions">
+      <details class="hdr-disclosure hdr-contact-nav">
+        <summary aria-label="{{ $headerCopy['contacts_menu_aria'] }}">
+          {{ $headerCopy['contacts_menu'] }}
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7 9 5 5 5-5"></path></svg>
+        </summary>
+        <nav class="hdr-panel hdr-panel--contacts" aria-label="{{ $headerCopy['contacts_menu_aria'] }}">
+          @foreach($headerCopy['contacts_links'] as [$key, $label, $description, $href])
+            <a class="hdr-contact-link"
+               href="{{ $routeWithLang($href) }}"
+               @if($activePage === $key) aria-current="page" @endif>
+              <strong>{{ $label }}</strong>
+              <span>{{ $description }}</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+            </a>
+          @endforeach
+        </nav>
+      </details>
+
       <details class="hdr-disclosure hdr-search" data-global-search>
         <summary class="hdr-icon" role="button" aria-label="{{ $headerCopy['search'] }}">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -1007,6 +1096,13 @@
         <nav class="hdr-panel hdr-panel--menu" aria-label="{{ $headerCopy['menu'] }}">
           @foreach($headerCopy['links'] as [$key, $label, $href])
             <a class="hdr-menu__link" href="{{ $routeWithLang($href) }}" @if($activePage === $key) aria-current="page" @endif>{{ $label }}</a>
+          @endforeach
+
+          <p class="hdr-menu__group">{{ $headerCopy['contacts_menu'] }}</p>
+          @foreach($headerCopy['contacts_links'] as [$key, $label, $description, $href])
+            <a class="hdr-menu__link {{ $activePage === $key ? 'hdr-menu__link--accent' : 'hdr-menu__link--muted' }}"
+               href="{{ $routeWithLang($href) }}"
+               @if($activePage === $key) aria-current="page" @endif>{{ $label }}</a>
           @endforeach
 
           <p class="hdr-menu__group">{{ $headerCopy['institution'] }}</p>

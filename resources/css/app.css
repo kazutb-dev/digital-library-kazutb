@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/forms';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -8,7 +9,100 @@
 @source '../**/*.ts';
 @source '../**/*.tsx';
 
+/*
+ * Shared Tailwind theme for the server-rendered public, member and staff
+ * surfaces.  Keep these tokens in the compiled bundle: the old CDN setup
+ * repeated the same palette in every layout and made production rendering
+ * depend on a third-party script.
+ */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-surface-bright: #f8f9fa;
+    --color-inverse-primary: #afc8f0;
+    --color-on-surface-variant: #43474e;
+    --color-inverse-on-surface: #f0f1f2;
+    --color-on-secondary: #ffffff;
+    --color-surface: #f8f9fa;
+    --color-surface-variant: #e1e3e4;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-low: #f3f4f5;
+    --color-surface-container: #edeeef;
+    --color-surface-container-high: #e7e8e9;
+    --color-surface-container-highest: #e1e3e4;
+    --color-surface-low: #f3f4f5;
+    --color-surface-high: #e7e8e9;
+    --color-surface-highest: #e1e3e4;
+    --color-surface-dim: #d9dadb;
+    --color-primary-fixed-dim: #afc8f0;
+    --color-on-secondary-fixed: #002020;
+    --color-tertiary-fixed: #d1e4fb;
+    --color-primary-fixed: #d4e3ff;
+    --color-on-tertiary-fixed-variant: #36485b;
+    --color-surface-tint: #476083;
+    --color-secondary: #006a6a;
+    --color-secondary-soft: #d8f4f1;
+    --color-tertiary: #000610;
+    --color-outline: #74777f;
+    --color-outline-variant: #c4c6cf;
+    --color-error-container: #ffdad6;
+    --color-on-tertiary-container: #76889d;
+    --color-background: #f8f9fa;
+    --color-on-secondary-fixed-variant: #004f4f;
+    --color-error: #ba1a1a;
+    --color-danger: #ba1a1a;
+    --color-on-surface: #191c1d;
+    --color-primary: #000613;
+    --color-on-tertiary: #ffffff;
+    --color-on-primary: #ffffff;
+    --color-on-error: #ffffff;
+    --color-on-error-container: #93000a;
+    --color-inverse-surface: #2e3132;
+    --color-secondary-fixed-dim: #76d6d5;
+    --color-primary-container: #001f3f;
+    --color-on-primary-fixed: #001c3a;
+    --color-on-tertiary-fixed: #091d2e;
+    --color-on-background: #191c1d;
+    --color-on-primary-container: #6f88ad;
+    --color-tertiary-fixed-dim: #b5c8df;
+    --color-on-secondary-container: #006e6e;
+    --color-secondary-fixed: #93f2f2;
+    --color-secondary-container: #90efef;
+    --color-on-primary-fixed-variant: #2f486a;
+    --color-tertiary-container: #0d2031;
+
+    --font-headline: 'Newsreader', serif;
+    --font-body: 'Manrope', sans-serif;
+    --font-label: 'Manrope', sans-serif;
+}
+
+/* Tailwind v4 provides container-query variants natively. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Public pages use the same tokens with their editorial font pairing. */
+[data-library-tailwind-theme='public'] {
+    --font-headline: 'Literata', serif;
+    --font-body: 'Google Sans', sans-serif;
+    --font-label: 'Google Sans', sans-serif;
+}
+
+/*
+ * The public/member/librarian CDN configs intentionally used tighter radii.
+ * Scope those overrides so admin, password-change and SPA screens retain the
+ * standard Tailwind radius scale.
+ */
+[data-library-tailwind-radius='compact'] {
+    --radius-lg: 0.25rem;
+    --radius-xl: 0.5rem;
+}
+
+[data-library-tailwind-radius='compact'] .rounded {
+    border-radius: 0.125rem;
+}
+
+[data-library-tailwind-radius='compact'] .rounded-t {
+    border-top-left-radius: 0.125rem;
+    border-top-right-radius: 0.125rem;
+}
+
+[data-library-tailwind-radius='compact'] .rounded-full {
+    border-radius: 0.75rem;
 }

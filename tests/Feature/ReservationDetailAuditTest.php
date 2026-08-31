@@ -17,6 +17,8 @@ use App\Services\Catalog\CirculationService;
 use App\Services\Catalog\LoanPeriodPolicy;
 use App\Services\Catalog\ReservationInsightService;
 use App\Services\Catalog\ReservationQueueService;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
@@ -404,7 +406,7 @@ class ReservationDetailAuditTest extends TestCase
 
     public function test_extend_and_pass_to_next_routes_work_end_to_end(): void
     {
-        $librarian = $this->makeControlPlaneUser('librarian');
+        $librarian = $this->makeControlPlaneUser('senior_librarian');
         BookCopy::factory()->create(['bibliographic_record_id' => $this->record->getKey(), 'status' => 'available']);
         $hold = $this->readyHold($this->reservations->create($this->reader(), $this->record));
         $originalExpiry = $hold->expires_at;
@@ -453,6 +455,45 @@ class ReservationDetailAuditTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame((int) $chosen->getKey(), (int) $reservation->fresh()->assigned_copy_id);
+    }
+
+    public function test_reservation_action_permissions_cannot_be_bypassed_through_confirm_routes(): void
+    {
+        $librarian = $this->makeControlPlaneUser('librarian');
+        $automatic = BookCopy::factory()->create([
+            'bibliographic_record_id' => $this->record->getKey(),
+            'status' => 'available',
+            'inventory_number' => 'AUTO-PERMISSION',
+        ]);
+        $chosen = BookCopy::factory()->create([
+            'bibliographic_record_id' => $this->record->getKey(),
+            'status' => 'available',
+            'inventory_number' => 'CHOSEN-PERMISSION',
+        ]);
+        $pending = $this->reservations->create($this->reader(), $this->record);
+
+        $role = Role::findByName('librarian');
+        $role->revokePermissionTo(['reservation.assign_copy', 'reservation.fulfill']);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $librarian->unsetRelation('roles')->unsetRelation('permissions');
+
+        $this->signInToLibraryAs($librarian)
+            ->post(route('librarian.reservations.confirm', $pending), [
+                'assigned_copy_id' => $chosen->getKey(),
+            ])
+            ->assertForbidden();
+
+        $this->assertSame((int) $automatic->getKey(), (int) $pending->fresh()->assigned_copy_id);
+        $this->assertSame('pending', $pending->fresh()->status);
+
+        $this->signInToLibraryAs($librarian)
+            ->post(route('librarian.reservations.ready', $pending))
+            ->assertForbidden();
+
+        $this->assertFalse($librarian->can('reservation.extend'));
+        $this->signInToLibraryAs($librarian)
+            ->post(route('librarian.reservations.extend', $pending))
+            ->assertForbidden();
     }
 
     public function test_reader_sees_the_hedged_forecast_on_their_reservations_page(): void

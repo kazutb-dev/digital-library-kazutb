@@ -45,6 +45,15 @@ class BibliographicRecord extends Model
         'title', 'subtitle', 'primary_author', 'additional_authors', 'publisher',
         'publication_year', 'language', 'udc_code', 'author_mark', 'category',
         'annotation', 'keywords', 'isbn', 'resource_type', 'cover_path', 'notes',
+        'publication_place', 'statement_of_responsibility', 'edition_statement',
+        'issn', 'bbk_code', 'local_classification', 'physical_extent',
+        'physical_details', 'dimensions', 'accompanying_material', 'series_title',
+        'series_number', 'volume', 'issue', 'part_number', 'part_title',
+        'control_number', 'country_code', 'cataloging_language', 'source_agency',
+        'material_designation', 'ksu_literature_type', 'faculty', 'department',
+        'disciplines', 'specialty', 'record_created_on',
+        'legacy_language_code', 'legacy_modified_at',
+        'legacy_local_path', 'legacy_import_batch_id', 'legacy_imported_at',
         'is_draft', 'needs_manual_review', 'review_note', 'review_category', 'responsible_librarian_id',
         'merged_into_id', 'merge_status', 'legacy_external_id',
     ];
@@ -60,6 +69,10 @@ class BibliographicRecord extends Model
             'additional_authors' => 'array',
             'keywords' => 'array',
             'publication_year' => 'integer',
+            'record_created_on' => 'date',
+            'legacy_import_batch_id' => 'integer',
+            'legacy_modified_at' => 'datetime',
+            'legacy_imported_at' => 'datetime',
             'is_draft' => 'boolean',
             'needs_manual_review' => 'boolean',
         ];
@@ -90,6 +103,33 @@ class BibliographicRecord extends Model
         return $this->belongsToMany(self::class, 'bibliographic_record_relations', 'record_id', 'related_record_id');
     }
 
+    public function contributors(): BelongsToMany
+    {
+        return $this->belongsToMany(Contributor::class, 'bibliographic_record_contributor')
+            ->withPivot(['role', 'position', 'marc_tag'])
+            ->withTimestamps()
+            ->orderByPivot('position');
+    }
+
+    public function subjects(): BelongsToMany
+    {
+        return $this->belongsToMany(Subject::class, 'bibliographic_record_subject')
+            ->withPivot(['position', 'marc_tag'])
+            ->withTimestamps()
+            ->orderByPivot('position');
+    }
+
+    public function legacyMarcRecords(): HasMany
+    {
+        return $this->hasMany(LegacyMarcRecord::class)->latest('id');
+    }
+
+    /** Alias used by read models that present the legacy payload as raw MARC. */
+    public function rawMarcRecords(): HasMany
+    {
+        return $this->hasMany(LegacyMarcRecord::class)->latest('id');
+    }
+
     public function responsibleLibrarian(): BelongsTo
     {
         return $this->belongsTo(User::class, 'responsible_librarian_id');
@@ -105,11 +145,20 @@ class BibliographicRecord extends Model
         $term = trim($term);
         $needle = '%'.mb_strtolower($term).'%';
         $normalizedIsbn = mb_strtolower((string) preg_replace('/[^0-9xX]/', '', $term));
+        $normalizedIssn = mb_strtolower((string) preg_replace('/[^0-9xX]/', '', $term));
+        $schema = $query->getConnection()->getSchemaBuilder();
+        $hasRecoveryColumns = $schema->hasColumn('bibliographic_records', 'issn');
+        $hasAcademicColumns = $schema->hasColumn('bibliographic_records', 'faculty');
+        $hasContributors = $schema->hasTable('contributors') && $schema->hasTable('bibliographic_record_contributor');
+        $hasSubjects = $schema->hasTable('subjects') && $schema->hasTable('bibliographic_record_subject');
         $isbnExpression = $query->getConnection()->getDriverName() === 'pgsql'
             ? "LOWER(REGEXP_REPLACE(COALESCE(isbn, ''), '[^0-9Xx]', '', 'g'))"
             : "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(isbn, ''), '-', ''), ' ', ''), '.', ''), '/', ''))";
+        $issnExpression = $query->getConnection()->getDriverName() === 'pgsql'
+            ? "LOWER(REGEXP_REPLACE(COALESCE(issn, ''), '[^0-9Xx]', '', 'g'))"
+            : "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(issn, ''), '-', ''), ' ', ''), '.', ''), '/', ''))";
 
-        return $query->where(function (Builder $builder) use ($isbnExpression, $needle, $normalizedIsbn, $term): void {
+        return $query->where(function (Builder $builder) use ($hasAcademicColumns, $hasContributors, $hasRecoveryColumns, $hasSubjects, $isbnExpression, $issnExpression, $needle, $normalizedIsbn, $normalizedIssn, $term): void {
             $builder
                 ->whereRaw('LOWER(title) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(COALESCE(subtitle, \'\')) LIKE ?', [$needle])
@@ -125,22 +174,75 @@ class BibliographicRecord extends Model
                 ->orWhereRaw('LOWER(COALESCE(category, \'\')) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(COALESCE(resource_type, \'\')) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(COALESCE(annotation, \'\')) LIKE ?', [$needle])
+                ->orWhereRaw("LOWER(COALESCE(CAST(publication_year AS TEXT), '')) LIKE ?", [$needle])
                 ->orWhereRaw('LOWER(CAST(additional_authors AS TEXT)) LIKE ?', [$needle])
                 ->orWhereRaw('LOWER(CAST(keywords AS TEXT)) LIKE ?', [$needle])
-                ->orWhereJsonContains('keywords', $term)
-                ->orWhereHas('translations', function (Builder $translations) use ($needle, $term): void {
-                    $translations
-                        ->whereIn('translation_status', BibliographicRecordTranslation::PUBLIC_STATUSES)
-                        ->where(function (Builder $content) use ($needle, $term): void {
-                            $content
-                                ->whereRaw('LOWER(title) LIKE ?', [$needle])
-                                ->orWhere('title', 'like', '%'.$term.'%')
-                                ->orWhereRaw('LOWER(COALESCE(annotation, \'\')) LIKE ?', [$needle])
-                                ->orWhere('annotation', 'like', '%'.$term.'%')
-                                ->orWhereRaw('LOWER(CAST(keywords AS TEXT)) LIKE ?', [$needle])
-                                ->orWhereJsonContains('keywords', $term);
-                        });
-                });
+                ->orWhereJsonContains('keywords', $term);
+
+            // SQLite's LOWER() is ASCII-only. Keep a native LIKE branch so
+            // Cyrillic/Kazakh searches remain useful in the isolated suite;
+            // PostgreSQL still benefits from the normalized branch above.
+            foreach (['title', 'subtitle', 'primary_author', 'publisher', 'isbn', 'udc_code', 'author_mark', 'category', 'annotation'] as $column) {
+                $builder->orWhere($column, 'like', '%'.$term.'%');
+            }
+
+            if ($hasRecoveryColumns) {
+                foreach ([
+                    'publication_place', 'statement_of_responsibility', 'edition_statement',
+                    'issn', 'bbk_code', 'local_classification', 'physical_extent',
+                    'physical_details', 'dimensions', 'accompanying_material', 'series_title',
+                    'series_number', 'volume', 'issue', 'part_number', 'part_title',
+                    'control_number', 'country_code', 'cataloging_language',
+                    'material_designation',
+                ] as $column) {
+                    $builder
+                        ->orWhereRaw("LOWER(COALESCE({$column}, '')) LIKE ?", [$needle])
+                        ->orWhere($column, 'like', '%'.$term.'%');
+                }
+                if (strlen($normalizedIssn) >= 7) {
+                    $builder->orWhereRaw("{$issnExpression} LIKE ?", ['%'.$normalizedIssn.'%']);
+                }
+            }
+
+            if ($hasAcademicColumns) {
+                foreach (['ksu_literature_type', 'faculty', 'department', 'disciplines', 'specialty'] as $column) {
+                    $builder
+                        ->orWhereRaw("LOWER(COALESCE({$column}, '')) LIKE ?", [$needle])
+                        ->orWhere($column, 'like', '%'.$term.'%');
+                }
+            }
+
+            if ($hasContributors) {
+                $builder->orWhereHas('contributors', fn (Builder $contributors) => $contributors
+                    ->where(function (Builder $names) use ($needle, $term): void {
+                        $names
+                            ->whereRaw('LOWER(contributors.name) LIKE ?', [$needle])
+                            ->orWhere('contributors.name', 'like', '%'.$term.'%');
+                    }));
+            }
+
+            if ($hasSubjects) {
+                $builder->orWhereHas('subjects', fn (Builder $subjects) => $subjects
+                    ->where(function (Builder $terms) use ($needle, $term): void {
+                        $terms
+                            ->whereRaw('LOWER(subjects.term) LIKE ?', [$needle])
+                            ->orWhere('subjects.term', 'like', '%'.$term.'%');
+                    }));
+            }
+
+            $builder->orWhereHas('translations', function (Builder $translations) use ($needle, $term): void {
+                $translations
+                    ->whereIn('translation_status', BibliographicRecordTranslation::PUBLIC_STATUSES)
+                    ->where(function (Builder $content) use ($needle, $term): void {
+                        $content
+                            ->whereRaw('LOWER(title) LIKE ?', [$needle])
+                            ->orWhere('title', 'like', '%'.$term.'%')
+                            ->orWhereRaw('LOWER(COALESCE(annotation, \'\')) LIKE ?', [$needle])
+                            ->orWhere('annotation', 'like', '%'.$term.'%')
+                            ->orWhereRaw('LOWER(CAST(keywords AS TEXT)) LIKE ?', [$needle])
+                            ->orWhereJsonContains('keywords', $term);
+                    });
+            });
         });
     }
 
@@ -217,10 +319,27 @@ class BibliographicRecord extends Model
      */
     public function allAuthors(): array
     {
-        return array_values(array_filter([
+        $authors = array_filter([
             $this->primary_author,
             ...(array) ($this->additional_authors ?? []),
-        ]));
+        ]);
+
+        if ($this->relationLoaded('contributors')) {
+            $authors = [
+                ...$authors,
+                ...$this->contributors
+                    ->filter(fn (Contributor $contributor): bool => ($contributor->pivot?->role ?? 'author') === 'author')
+                    ->pluck('name')
+                    ->all(),
+            ];
+        }
+
+        return collect($authors)
+            ->map(static fn ($author): string => trim((string) $author))
+            ->filter()
+            ->unique(static fn (string $author): string => mb_strtolower($author, 'UTF-8'))
+            ->values()
+            ->all();
     }
 
     /**
@@ -244,6 +363,6 @@ class BibliographicRecord extends Model
 
     public function availableCopiesCount(): int
     {
-        return $this->copies()->where('status', 'available')->count();
+        return $this->copies()->availableForCirculation()->count();
     }
 }

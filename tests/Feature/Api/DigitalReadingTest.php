@@ -10,6 +10,7 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
+use Tests\Concerns\UsesIsolatedLocalStorage;
 
 /**
  * End-to-end cover for reading library-held material: what opens in the
@@ -18,6 +19,7 @@ use Tests\TestCase;
  */
 class DigitalReadingTest extends TestCase
 {
+    use UsesIsolatedLocalStorage;
     use BuildsAdminControlPlane;
 
     protected function setUp(): void
@@ -25,7 +27,7 @@ class DigitalReadingTest extends TestCase
         parent::setUp();
         $this->setUpAdminControlPlane();
         $this->withoutMiddleware(PreventRequestForgery::class);
-        Storage::fake('local');
+        $this->fakeIsolatedLocalStorage();
     }
 
     private function makeMaterial(array $overrides = []): ElectronicMaterial
@@ -213,6 +215,23 @@ class DigitalReadingTest extends TestCase
         $this->assertSame('%PDF-1.4', $response->streamedContent());
     }
 
+    public function test_production_stream_delegates_private_file_delivery_to_nginx(): void
+    {
+        config(['digital_access.x_accel_redirect' => true]);
+        $material = $this->makeMaterial();
+
+        $response = $this->get("/api/v1/digital-materials/{$material->getKey()}/stream");
+
+        $response->assertOk()
+            ->assertHeader('X-Accel-Redirect')
+            ->assertHeader('Accept-Ranges', 'bytes');
+        $this->assertStringStartsWith(
+            '/__protected-library-files/',
+            (string) $response->headers->get('X-Accel-Redirect'),
+        );
+        $this->assertSame('', $response->getContent());
+    }
+
     public function test_stream_is_refused_without_access(): void
     {
         $material = $this->makeMaterial(['access_level' => 'authenticated']);
@@ -393,6 +412,12 @@ class DigitalReadingTest extends TestCase
         $response->assertOk();
         $response->assertSee('viewer-root', false);
         $response->assertSee('viewer-canvas', false);
+        $response->assertSee('embedded-viewer-body', false);
+        $response->assertDontSee('id="siteHeader"', false);
+        $response->assertDontSee('class="university-footer"', false);
+        $record = $material->bibliographicRecord;
+        $bookIdentifier = $record->isbn ?: (string) $record->getKey();
+        $response->assertSee('href="/book/'.rawurlencode($bookIdentifier).'"', false);
         // The reader must be driven by the bundled pdf.js, not an external CDN.
         $response->assertSee('/vendor/pdfjs/build/pdf.min.mjs', false);
         // The stream URL reaches the page inside a @json blob, so slashes arrive escaped.

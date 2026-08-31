@@ -12,6 +12,9 @@ class BridgeCopiesDiagnosticsDbTest extends TestCase
     {
         parent::setUp();
 
+        // Authorization is covered separately; keep this live DB check free of
+        // identity writes by exercising only the controller/read-service shape.
+        $this->withoutMiddleware();
         Config::set('database.default', 'pgsql');
         DB::purge('pgsql');
     }

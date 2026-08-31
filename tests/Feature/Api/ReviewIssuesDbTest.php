@@ -12,6 +12,9 @@ class ReviewIssuesDbTest extends TestCase
     {
         parent::setUp();
 
+        // Authorization is covered by DiagnosticApiAuthorizationTest. Avoid
+        // provisioning an account into the live read-only verification DB.
+        $this->withoutMiddleware();
         Config::set('database.default', 'pgsql');
         DB::purge('pgsql');
     }
@@ -52,7 +55,7 @@ class ReviewIssuesDbTest extends TestCase
     {
         $severity = $this->firstExistingSeverity();
 
-        $response = $this->getJson('/api/v1/review/issues?severity=' . urlencode($severity) . '&limit=5');
+        $response = $this->getJson('/api/v1/review/issues?severity='.urlencode($severity).'&limit=5');
 
         $response->assertOk();
 

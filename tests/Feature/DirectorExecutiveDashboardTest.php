@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Services\Reports\DirectorAnalyticsService;
 use App\Services\Reports\OperationalDashboardService;
 use Illuminate\Support\Carbon;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
@@ -92,6 +94,49 @@ class DirectorExecutiveDashboardTest extends TestCase
             ->get(route('librarian.overview'))
             ->assertOk()
             ->assertDontSee('data-section="director-executive-dashboard"', false);
+    }
+
+    public function test_active_staff_card_uses_the_registered_user_morph_alias(): void
+    {
+        $this->makeControlPlaneUser('cataloguer');
+        $this->makeControlPlaneUser('member');
+        $this->makeControlPlaneUser('librarian', ['is_active' => false]);
+
+        $expected = User::query()
+            ->where('is_active', true)
+            ->whereHas('roles', fn ($roles) => $roles->where('name', '!=', 'member'))
+            ->count();
+
+        $this->assertGreaterThan(0, $expected);
+        $this->assertSame(
+            $expected,
+            app(DirectorAnalyticsService::class)->build()['cards']['active_staff_accounts'],
+        );
+    }
+
+    public function test_executive_export_honours_the_separate_export_permission(): void
+    {
+        $director = $this->makeControlPlaneUser('director');
+        $directorRole = Role::findByName('director', 'web');
+        $directorRole->revokePermissionTo('reports.export');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $director = $director->fresh();
+
+        $this->signInToLibraryAs($director)
+            ->get(route('librarian.overview'))
+            ->assertOk()
+            ->assertDontSee(route('librarian.executive.export', 'csv'), false);
+        $this->signInToLibraryAs($director)
+            ->get(route('librarian.executive.export', 'csv'))
+            ->assertForbidden();
+
+        $directorRole->givePermissionTo('reports.export');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->signInToLibraryAs($director->fresh())
+            ->get(route('librarian.executive.export', 'csv'))
+            ->assertOk()
+            ->assertDownload();
     }
 
     public function test_acquisitions_and_cataloguer_receive_role_specific_aggregate_dashboards(): void

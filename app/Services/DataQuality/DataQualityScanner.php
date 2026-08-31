@@ -114,7 +114,7 @@ class DataQualityScanner
                     ->withExists([
                         'bibliographicRecord as dq_record_exists',
                         'loans as dq_has_active_loan' => fn (Builder $loan) => $loan->whereIn('status', ['active', 'overdue'])->whereNull('returned_at'),
-                        'reservations as dq_has_active_reservation' => fn (Builder $reservation) => $reservation->whereIn('status', ['queued', 'ready']),
+                        'reservations as dq_has_active_reservation' => fn (Builder $reservation) => $reservation->whereIn('status', Reservation::ACTIVE_STATUSES),
                     ]);
             }
             $query->chunkById($this->chunkSize(), function ($models) use ($run, $entityType, &$counters, &$errors): bool {

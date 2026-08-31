@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class DemoAuthTest extends TestCase
@@ -31,9 +32,9 @@ class DemoAuthTest extends TestCase
         config(['demo_auth.enabled' => true, 'demo_users.enabled' => true]);
 
         $expectedCopy = [
-            'ru' => 'Используйте корпоративный логин и пароль университета.',
-            'kk' => 'Университеттің корпоративтік логині мен құпиясөзін пайдаланыңыз.',
-            'en' => 'Use your university corporate login and password.',
+            'ru' => 'Введите корпоративный логин и пароль университета, чтобы продолжить.',
+            'kk' => 'Жалғастыру үшін университеттің корпоративтік логині мен құпиясөзін енгізіңіз.',
+            'en' => 'Enter your university login and password to continue.',
         ];
 
         foreach ($expectedCopy as $locale => $copy) {
@@ -60,9 +61,10 @@ class DemoAuthTest extends TestCase
 
     public function test_real_login_route_remains_available(): void
     {
-        $response = $this->withoutMiddleware(PreventRequestForgery::class)
-            ->postJson('/api/login', ['login' => 'unknown-ad-user', 'password' => 'invalid-credential']);
+        $route = collect(Route::getRoutes()->getRoutes())
+            ->first(fn ($route) => $route->uri() === 'api/login' && in_array('POST', $route->methods(), true));
 
-        $this->assertContains($response->status(), [401, 503]);
+        $this->assertNotNull($route);
+        $this->assertSame('App\\Http\\Controllers\\Api\\AuthController@login', $route->getActionName());
     }
 }

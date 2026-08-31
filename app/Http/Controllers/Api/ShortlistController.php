@@ -19,6 +19,7 @@ class ShortlistController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorizeAuthenticatedShortlist($request);
         $items = $this->storage->getItems($request);
 
         return response()->json([
@@ -34,6 +35,7 @@ class ShortlistController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorizeAuthenticatedShortlist($request);
         $validated = $request->validate([
             'identifier' => ['required', 'string', 'max:255'],
             'title' => ['required', 'string', 'max:1000'],
@@ -72,6 +74,7 @@ class ShortlistController extends Controller
      */
     public function destroy(Request $request, string $identifier): JsonResponse
     {
+        $this->authorizeAuthenticatedShortlist($request);
         $removed = $this->storage->removeItem($request, $identifier);
 
         if (! $removed) {
@@ -91,6 +94,7 @@ class ShortlistController extends Controller
      */
     public function clear(Request $request): JsonResponse
     {
+        $this->authorizeAuthenticatedShortlist($request);
         $this->storage->clearItems($request);
 
         return response()->json([
@@ -104,9 +108,10 @@ class ShortlistController extends Controller
      */
     public function export(Request $request): JsonResponse
     {
+        $this->authorizeAuthenticatedShortlist($request);
         $format = $request->query('format', BibliographyFormatter::FORMAT_NUMBERED);
         $items = $this->storage->getItems($request);
-        $formatter = new BibliographyFormatter();
+        $formatter = new BibliographyFormatter;
 
         $result = $formatter->format(array_values($items), $format);
 
@@ -121,6 +126,7 @@ class ShortlistController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
+        $this->authorizeAuthenticatedShortlist($request);
         $items = $this->storage->getItems($request);
         $draft = $this->storage->getDraftMeta($request);
 
@@ -156,6 +162,7 @@ class ShortlistController extends Controller
      */
     public function updateDraft(Request $request): JsonResponse
     {
+        $this->authorizeAuthenticatedShortlist($request);
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -178,6 +185,7 @@ class ShortlistController extends Controller
      */
     public function check(Request $request): JsonResponse
     {
+        $this->authorizeAuthenticatedShortlist($request);
         $validated = $request->validate([
             'identifiers' => ['required', 'array', 'max:50'],
             'identifiers.*' => ['required', 'string', 'max:255'],
@@ -189,5 +197,17 @@ class ShortlistController extends Controller
             'data' => $result,
             'meta' => ['total' => $this->storage->countItems($request)],
         ]);
+    }
+
+    /**
+     * Guests deliberately keep an anonymous session shortlist. Once a session
+     * belongs to an account, however, persistence is an own-scope member action
+     * and must honour the explicit RBAC capability.
+     */
+    private function authorizeAuthenticatedShortlist(Request $request): void
+    {
+        $user = $request->user();
+
+        abort_if($user !== null && ! $user->can('shortlist.manage_own'), 403);
     }
 }

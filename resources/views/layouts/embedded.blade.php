@@ -1,8 +1,7 @@
 {{--
-  Chrome-free layout for pages rendered inside an iframe (currently the digital
-  viewer embedded in a book card). Site header, nav and footer are supplied by
-  the hosting page, so repeating them here would give the reader two headers and
-  waste vertical space that belongs to the document.
+  Chrome-free reading layout for the digital viewer, both standalone and inside
+  an iframe. The reading room owns the full viewport; the site header and footer
+  belong to the catalogue, not to the document surface.
 --}}
 <!DOCTYPE html>
 <html lang="{{ app()->getLocale() }}">

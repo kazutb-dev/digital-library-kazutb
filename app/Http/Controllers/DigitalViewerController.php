@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Catalog\ElectronicMaterial;
 use App\Services\Library\DigitalAccessService;
+use App\Services\Library\ResolvedDigitalMaterial;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -23,6 +25,8 @@ class DigitalViewerController extends Controller
 
     public function show(Request $request, string $materialId): View
     {
+        $locale = app()->getLocale();
+        $catalogUrl = $locale === 'kk' ? '/catalog' : '/catalog?lang='.$locale;
         $material = $this->access->resolve($materialId);
 
         if ($material === null) {
@@ -32,8 +36,11 @@ class DigitalViewerController extends Controller
                 'material' => null,
                 'progress' => null,
                 'deniedReason' => null,
+                'backUrl' => $catalogUrl,
             ]);
         }
+
+        $backUrl = $this->bookUrl($material, $locale) ?? $catalogUrl;
 
         if (! $this->access->canAccess($material, $request)) {
             return view('digital-viewer', [
@@ -42,6 +49,7 @@ class DigitalViewerController extends Controller
                 'material' => null,
                 'progress' => null,
                 'deniedReason' => $this->access->accessDeniedReason($material, $request),
+                'backUrl' => $backUrl,
             ]);
         }
 
@@ -70,6 +78,27 @@ class DigitalViewerController extends Controller
             ],
             'progress' => $this->access->readingProgress($material, $request),
             'deniedReason' => null,
+            'backUrl' => $backUrl,
         ]);
+    }
+
+    private function bookUrl(ResolvedDigitalMaterial $material, string $locale): ?string
+    {
+        if (! str_starts_with($material->ref, 'em:')) {
+            return null;
+        }
+
+        $electronic = ElectronicMaterial::query()
+            ->with('bibliographicRecord:id,isbn')
+            ->find((int) substr($material->ref, 3));
+        $record = $electronic?->bibliographicRecord;
+        if ($record === null) {
+            return null;
+        }
+
+        $identifier = filled($record->isbn) ? (string) $record->isbn : (string) $record->getKey();
+        $url = '/book/'.rawurlencode($identifier);
+
+        return $locale === 'kk' ? $url : $url.'?lang='.rawurlencode($locale);
     }
 }

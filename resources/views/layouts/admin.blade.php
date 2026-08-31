@@ -4,8 +4,23 @@
     $legacyAdmin = is_array(session('library.user')) ? session('library.user') : [];
     $userName = trim((string) ($eloquentAdmin?->name ?? $legacyAdmin['name'] ?? __('roles.names.admin'))) ?: __('roles.names.admin');
     $userInitial = mb_strtoupper(mb_substr($userName, 0, 1));
+    $canonicalStaffRoles = ['librarian', 'director', 'senior_librarian', 'acquisitions', 'cataloguer', 'bibliographer'];
+    $isCanonicalStaff = $eloquentAdmin?->hasAnyRole($canonicalStaffRoles) ?? false;
+    $canEnterAdminOverview = $eloquentAdmin?->hasRole('admin')
+        || (($eloquentAdmin !== null && ! $isCanonicalStaff)
+            && $eloquentAdmin->hasAnyPermission(\App\Http\Middleware\EnsureControlPlaneAccess::PERMISSIONS));
+    $adminHomeHref = $canEnterAdminOverview
+        ? route('admin.overview')
+        : ($isCanonicalStaff
+            ? route('librarian.overview')
+            : ($eloquentAdmin?->can('integrations.view')
+                ? route('admin.integrations.index')
+                : route('admin.external-resources.index')));
+    $adminProfileHref = $canEnterAdminOverview
+        ? route('admin.profile.edit')
+        : ($isCanonicalStaff ? route('librarian.profile.show') : null);
     $adminNav = [
-        ['label' => __('admin.nav.dashboard'), 'icon' => 'dashboard', 'href' => route('admin.overview'), 'active' => request()->routeIs('admin.overview'), 'permissions' => []],
+        ['label' => __('admin.nav.dashboard'), 'icon' => 'dashboard', 'href' => route('admin.overview'), 'active' => request()->routeIs('admin.overview'), 'permissions' => [], 'visible' => $canEnterAdminOverview],
         ['label' => __('admin.users.title'), 'icon' => 'group', 'href' => route('admin.users.index'), 'active' => request()->routeIs('admin.users.*'), 'permissions' => ['users.manage']],
         ['label' => __('roles.title'), 'icon' => 'shield_person', 'href' => route('admin.roles.index'), 'active' => request()->routeIs('admin.roles.*'), 'permissions' => ['roles.manage']],
         ['label' => __('admin.nav.audit_logs'), 'icon' => 'gavel', 'href' => route('admin.logs.index'), 'active' => request()->routeIs('admin.logs.*'), 'permissions' => ['system.logs']],
@@ -13,6 +28,7 @@
         ['label' => __('admin.nav.feedback'), 'icon' => 'inbox', 'href' => route('admin.messages.index'), 'active' => request()->routeIs('admin.messages.*', 'admin.feedback'), 'permissions' => ['messages.view_assigned']],
         ['label' => __('admin.nav.reports'), 'icon' => 'analytics', 'href' => route('admin.reports.index'), 'active' => request()->routeIs('admin.reports.*'), 'permissions' => ['reports.view_full']],
         ['label' => __('admin.nav.integrations'), 'icon' => 'hub', 'href' => route('admin.integrations.index'), 'active' => request()->routeIs('admin.integrations.*'), 'permissions' => ['integrations.view']],
+        ['label' => __('library_recovery.title'), 'icon' => 'database', 'href' => route('admin.library-recovery.index'), 'active' => request()->routeIs('admin.library-recovery.*'), 'permissions' => ['legacy_recovery.view']],
         ['label' => match($pageLang) { 'ru' => 'Система и резервные копии', 'en' => 'System & backups', default => 'Жүйе және сақтық көшірмелер' }, 'icon' => 'monitor_heart', 'href' => route('admin.system.index'), 'active' => request()->routeIs('admin.system.*'), 'permissions' => ['system.settings']],
         ['label' => __('admin.nav.branches_funds'), 'icon' => 'account_balance', 'href' => route('admin.branches.index'), 'active' => request()->routeIs('admin.branches.*', 'admin.funds.*'), 'permissions' => ['branches.manage']],
         ['label' => __('admin.nav.external_resources'), 'icon' => 'language', 'href' => route('admin.external-resources.index'), 'active' => request()->routeIs('admin.external-resources.*'), 'permissions' => ['external_resources.manage']],
@@ -20,7 +36,8 @@
     ];
     $adminNav = array_values(array_filter(
         $adminNav,
-        static fn (array $item): bool => $item['permissions'] === [] || ($eloquentAdmin?->canAny($item['permissions']) ?? false),
+        static fn (array $item): bool => (bool) ($item['visible'] ?? true)
+            && ($item['permissions'] === [] || ($eloquentAdmin?->canAny($item['permissions']) ?? false)),
     ));
 @endphp
 <!DOCTYPE html>
@@ -31,36 +48,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', __('brand.workspace.admin').' — '.__('brand.library.name'))</title>
     @include('partials.favicons')
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    @vite('resources/css/app.css')
     <link rel="stylesheet" href="/fonts/fonts.css">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        surface: '#f8f9fa',
-                        'surface-low': '#f3f4f5',
-                        'surface-high': '#e7e8e9',
-                        'surface-highest': '#e1e3e4',
-                        primary: '#000613',
-                        'primary-container': '#001f3f',
-                        secondary: '#006a6a',
-                        'secondary-soft': '#d8f4f1',
-                        outline: '#74777f',
-                        danger: '#ba1a1a'
-                    },
-                    fontFamily: {
-                        headline: ['Newsreader', 'serif'],
-                        body: ['Manrope', 'sans-serif']
-                    },
-                    borderRadius: {
-                        xl: '0.75rem',
-                        '2xl': '1rem'
-                    }
-                }
-            }
-        };
-    </script>
     <style>
         body { font-family: 'Manrope', sans-serif; }
         .font-headline { font-family: 'Newsreader', serif; }
@@ -70,6 +59,9 @@
             width: 100%; border: 1px solid #d8dade; background: #fff; border-radius: .5rem;
             padding: .68rem .8rem; font-size: .875rem; color: #191c1d;
         }
+        /* Higher specificity so the icon offset wins over the `padding` shorthand above; otherwise text slides under a leading/trailing icon. */
+        .admin-input.pl-10 { padding-left: 2.5rem; }
+        .admin-input.pr-10 { padding-right: 2.5rem; }
         .admin-input:focus { border-color: #006a6a; box-shadow: 0 0 0 2px rgba(0,106,106,.12); outline: none; }
         .admin-label { display: block; margin-bottom: .4rem; color: #43474e; font-size: .72rem; font-weight: 700; letter-spacing: .055em; text-transform: uppercase; }
         .admin-card { border-radius: .75rem; background: #fff; padding: 1.5rem; box-shadow: 0 12px 35px rgba(0,6,19,.035); }
@@ -92,7 +84,7 @@
 <body class="min-h-screen bg-surface text-slate-900 antialiased">
     <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col bg-white px-3 py-5 md:flex">
         <div class="mb-7 px-2">
-            <x-library-brand variant="sidebar" :href="route('admin.overview')" />
+            <x-library-brand variant="sidebar" :href="$adminHomeHref" />
             <div class="mt-4 border-t border-slate-100 pt-3 pl-1" data-workspace-role>
                 <div class="text-[10px] font-bold uppercase tracking-[.15em] text-secondary">{{ __('brand.workspace.system') }}</div>
                 <div class="mt-1 text-sm font-bold text-primary-container">{{ __('brand.workspace.admin') }}</div>
@@ -139,7 +131,7 @@
                     </summary>
                     <div class="absolute left-0 top-12 w-72 rounded-xl border border-slate-100 bg-white p-2 shadow-xl">
                         <div class="border-b border-slate-100 px-2 pb-3 pt-1">
-                            <x-library-brand variant="sidebar" :href="route('admin.overview')" />
+                            <x-library-brand variant="sidebar" :href="$adminHomeHref" />
                             <div class="mt-3 text-xs font-bold text-primary-container">{{ __('brand.workspace.system') }} · {{ __('brand.workspace.admin') }}</div>
                         </div>
                         @foreach ($adminNav as $item)
@@ -150,13 +142,14 @@
                     </div>
                 </details>
 
-                <x-library-brand variant="compact" :href="route('admin.overview')" class="md:hidden" />
+                <x-library-brand variant="compact" :href="$adminHomeHref" class="md:hidden" />
 
                 <div class="hidden min-w-0 items-center gap-3 text-sm text-slate-500 sm:flex">
                     <span class="material-symbols-outlined text-[20px] text-secondary">verified_user</span>
                     <span class="truncate">{{ $userName }}</span>
                 </div>
 
+                @if ($canEnterAdminOverview)
                 <div class="relative hidden w-full max-w-md flex-1 sm:block" id="admin-global-search">
                     <form method="GET" action="{{ route('admin.search') }}" role="search">
                         <span class="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[19px] text-slate-400">search</span>
@@ -176,15 +169,18 @@
                         data-search-results
                     ></div>
                 </div>
+                @endif
 
                 <div class="ml-auto flex items-center gap-2">
                     <x-locale-switcher variant="light" />
-                    <a
-                        href="{{ route('admin.profile.edit') }}"
-                        class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-container text-sm font-bold text-white transition hover:opacity-80"
-                        title="{{ __('admin.profile.title') }}"
-                        aria-label="{{ __('admin.profile.title') }}"
-                    >{{ $userInitial }}</a>
+                    @if ($adminProfileHref !== null)
+                        <a
+                            href="{{ $adminProfileHref }}"
+                            class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-container text-sm font-bold text-white transition hover:opacity-80"
+                            title="{{ __('admin.profile.title') }}"
+                            aria-label="{{ __('admin.profile.title') }}"
+                        >{{ $userInitial }}</a>
+                    @endif
                 </div>
             </div>
         </header>

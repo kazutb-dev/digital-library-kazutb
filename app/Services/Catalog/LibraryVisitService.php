@@ -10,6 +10,7 @@ use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Attendance recording (ДИР 9.4). A card scan at the entrance produces a
@@ -61,47 +62,53 @@ class LibraryVisitService
         string $source = 'desk',
         ?string $notes = null,
     ): array {
-        // Attendance is not circulation: a blocked reader who walks in has
-        // still walked in, so status is not a gate here. Only a profile is
-        // required, to keep visits tied to actual library readers.
-        $profile = ReaderProfile::query()->where('user_id', $reader->getKey())->first();
-        if ($profile === null) {
-            throw CirculationException::because('visit_reader_not_registered');
-        }
+        return DB::transaction(function () use ($reader, $branchId, $staff, $source, $notes): array {
+            // This profile row is also the per-reader scan mutex. Without it,
+            // two turnstile requests can both observe an empty recent window
+            // and insert duplicate visits. Attendance is not circulation: a
+            // blocked reader is still counted, but a real profile is required.
+            $profile = ReaderProfile::query()
+                ->where('user_id', $reader->getKey())
+                ->lockForUpdate()
+                ->first();
+            if ($profile === null) {
+                throw CirculationException::because('visit_reader_not_registered');
+            }
 
-        $recent = LibraryVisit::query()
-            ->where('user_id', $reader->getKey())
-            ->where('scanned_at', '>=', now()->subMinutes(self::DEDUPE_MINUTES))
-            ->orderByDesc('scanned_at')
-            ->first();
+            $recent = LibraryVisit::query()
+                ->where('user_id', $reader->getKey())
+                ->where('scanned_at', '>=', now()->subMinutes(self::DEDUPE_MINUTES))
+                ->orderByDesc('scanned_at')
+                ->first();
 
-        if ($recent !== null) {
-            return ['visit' => $recent, 'duplicate' => true];
-        }
+            if ($recent !== null) {
+                return ['visit' => $recent, 'duplicate' => true];
+            }
 
-        $visit = LibraryVisit::query()->create([
-            'user_id' => $reader->getKey(),
-            'branch_id' => $branchId,
-            'scanned_at' => now(),
-            'scanned_by' => $staff?->getKey(),
-            'source' => in_array($source, LibraryVisit::SOURCES, true) ? $source : 'desk',
-            'notes' => $notes,
-        ]);
-
-        $this->audit->log(
-            actionType: 'visit.record',
-            entityType: 'library_visit',
-            entityId: $visit->getKey(),
-            newValues: [
-                'reader_id' => $reader->getKey(),
+            $visit = LibraryVisit::query()->create([
+                'user_id' => $reader->getKey(),
                 'branch_id' => $branchId,
-                'source' => $visit->source,
-            ],
-            scope: 'library',
-            actor: $staff ?? ['name' => 'Kiosk', 'role' => 'system'],
-        );
+                'scanned_at' => now(),
+                'scanned_by' => $staff?->getKey(),
+                'source' => in_array($source, LibraryVisit::SOURCES, true) ? $source : 'desk',
+                'notes' => $notes,
+            ]);
 
-        return ['visit' => $visit, 'duplicate' => false];
+            $this->audit->log(
+                actionType: 'visit.record',
+                entityType: 'library_visit',
+                entityId: $visit->getKey(),
+                newValues: [
+                    'reader_id' => $reader->getKey(),
+                    'branch_id' => $branchId,
+                    'source' => $visit->source,
+                ],
+                scope: 'library',
+                actor: $staff ?? ['name' => 'Kiosk', 'role' => 'system'],
+            );
+
+            return ['visit' => $visit, 'duplicate' => false];
+        }, 3);
     }
 
     /**

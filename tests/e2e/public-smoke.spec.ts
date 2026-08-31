@@ -19,6 +19,7 @@ const canonicalRoutes = [
 const viewports = [
   { name: 'desktop-1920', width: 1920, height: 1080 },
   { name: 'desktop-1440', width: 1440, height: 900 },
+  { name: 'desktop-1280', width: 1280, height: 800 },
   { name: 'desktop-1366', width: 1366, height: 768 },
   { name: 'tablet-1024', width: 1024, height: 768 },
   { name: 'tablet-768', width: 768, height: 1024 },

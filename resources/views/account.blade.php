@@ -13,31 +13,24 @@
 
   $displayName = trim((string) ($sessionUser['name'] ?? ''));
   if ($displayName === '') {
-      $displayName = 'Professor Alimkhanov';
+      $displayName = __('account.roles.reader');
   }
 
   $role = mb_strtolower(trim((string) ($sessionUser['role'] ?? 'reader')));
   $profileType = mb_strtolower(trim((string) ($sessionUser['profile_type'] ?? 'reader')));
   $workspaceRole = match (true) {
-      $role === 'admin' => 'Institutional Overseer',
-      $role === 'librarian' => 'Academic Curator',
-      $profileType === 'teacher' => 'Academic Curator',
-      default => 'Academic Curator',
+      $role === 'admin' => __('account.roles.admin'),
+      $role === 'librarian' => __('account.roles.librarian'),
+      $profileType === 'teacher' => __('account.roles.teacher'),
+      default => __('account.roles.reader'),
   };
 
-  $compatRoleBadge = match (true) {
-      $role === 'admin' => '🛡️ Администратор',
-      $role === 'librarian' => '📖 Библиотекарь',
-      $profileType === 'teacher' => ' Преподаватель',
-      $profileType === 'student' => '🎓 Студент',
-      default => null,
-  };
+  $compatRoleBadge = in_array($role, ['admin', 'librarian'], true)
+      || in_array($profileType, ['teacher', 'student'], true)
+      ? $workspaceRole
+      : null;
 
-  $accountTitle = [
-      'ru' => 'Кабинет читателя — Digital Library',
-      'kk' => 'Оқырман кабинеті — Digital Library',
-      'en' => 'Member Dashboard — Digital Library',
-  ][$lang] ?? 'Member Dashboard — Digital Library';
+  $accountTitle = __('account.title');
 
   $compatCabinet = $lang === 'en' ? 'Account' : 'Кабинет';
   $compatMyBooks = [
@@ -47,24 +40,29 @@
   ][$lang] ?? 'My books';
 
   $greetingName = $displayName;
-  $heroGreeting = 'Good Morning, ' . $greetingName;
+  $heroGreeting = __('account.greeting', ['name' => $greetingName]);
 
   $fallbackMetrics = [
-      ['id' => 'collections', 'icon' => 'bookmark', 'label' => 'Collections', 'value' => '12', 'description' => 'Saved in Shortlist', 'action' => 'View List', 'href' => $routeWithLang('/shortlist')],
-      ['id' => 'access', 'icon' => 'auto_stories', 'label' => 'Access', 'value' => '4', 'description' => 'Active Digital Access', 'action' => 'Read Now', 'href' => $routeWithLang('/resources')],
-      ['id' => 'arrivals', 'icon' => 'local_library', 'label' => 'Arrivals', 'value' => '2', 'description' => 'Ready for Pickup', 'action' => 'Location Info', 'href' => $routeWithLang('/contacts')],
+      ['id' => 'collections', 'icon' => 'bookmark', 'label' => __('account.metrics.collections'), 'value' => '0', 'description' => __('account.metrics.collections_desc'), 'action' => __('account.metrics.collections_action'), 'href' => $routeWithLang('/shortlist')],
+      ['id' => 'access', 'icon' => 'auto_stories', 'label' => __('account.metrics.access'), 'value' => '0', 'description' => __('account.metrics.access_desc'), 'action' => __('account.metrics.access_action'), 'href' => $routeWithLang('/resources')],
+      ['id' => 'arrivals', 'icon' => 'local_library', 'label' => __('account.metrics.arrivals'), 'value' => '0', 'description' => __('account.metrics.arrivals_desc'), 'action' => __('account.metrics.arrivals_action'), 'href' => $routeWithLang('/contacts')],
   ];
 
-  $fallbackReservations = [
-      ['title' => 'The Architecture of Central Asia', 'meta' => 'Hardcover • Shelf: A-212', 'status' => 'Ready', 'statusTone' => 'ready', 'image' => asset('images/news/default-library.jpg')],
-      ['title' => 'Digital Humanities: A New Frontier', 'meta' => 'E-Journal • Access Key Req.', 'status' => 'Processing', 'statusTone' => 'processing', 'image' => asset('images/news/campus-library.jpg')],
-      ['title' => 'Early Soviet Urban Planning (1920-1940)', 'meta' => 'Vault Collection • Pending Review', 'status' => 'Pending', 'statusTone' => 'pending', 'image' => null],
-  ];
+  // Never render invented reader activity while API data is loading.
+  $fallbackReservations = [];
+  $fallbackActivity = [];
 
-  $fallbackActivity = [
-      ['tone' => 'secondary', 'time' => 'Yesterday, 4:12 PM', 'title' => 'Recently Viewed', 'note' => '“Nomadic Routes of the Golden Horde”'],
-      ['tone' => 'primary', 'time' => 'Aug 12, 11:30 AM', 'title' => 'Shortlist Addition', 'note' => 'Map Collection: Zhetysu region 1890'],
-      ['tone' => 'muted', 'time' => 'Aug 10, 9:15 AM', 'title' => 'PDF Export Complete', 'note' => 'Annual Research Bibliography'],
+  $accountUi = [
+      'requestFailed' => __('account.request_failed'),
+      'emptyLoans' => __('account.loans.empty'),
+      'libraryItem' => __('account.loans.item'),
+      'due' => __('account.loans.due'),
+      'renew' => __('account.loans.renew'),
+      'renewFailed' => __('account.loans.failed'),
+      'reservationItem' => __('account.reservations.item'),
+      'statuses' => __('account.statuses'),
+      'metrics' => __('account.metrics'),
+      'activity' => __('account.activity'),
   ];
 @endphp
 <!DOCTYPE html>
@@ -75,77 +73,8 @@
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>{{ $accountTitle }}</title>
   @include('partials.favicons')
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  @vite('resources/css/app.css')
   <link rel="stylesheet" href="/fonts/fonts.css"/>
-  <script id="tailwind-config">
-      tailwind.config = {
-          darkMode: 'class',
-          theme: {
-              extend: {
-                  colors: {
-                      'on-secondary': '#ffffff',
-                      'on-secondary-fixed': '#002020',
-                      'surface-tint': '#476083',
-                      'on-background': '#191c1d',
-                      'surface': '#f8f9fa',
-                      'primary': '#000613',
-                      'tertiary-fixed-dim': '#b5c8df',
-                      'on-primary': '#ffffff',
-                      'error-container': '#ffdad6',
-                      'surface-container-lowest': '#ffffff',
-                      'on-tertiary-fixed-variant': '#36485b',
-                      'on-surface': '#191c1d',
-                      'surface-bright': '#f8f9fa',
-                      'primary-fixed-dim': '#afc8f0',
-                      'secondary': '#006a6a',
-                      'on-primary-fixed': '#001c3a',
-                      'primary-fixed': '#d4e3ff',
-                      'outline-variant': '#c4c6cf',
-                      'on-surface-variant': '#43474e',
-                      'inverse-primary': '#afc8f0',
-                      'tertiary': '#000610',
-                      'secondary-container': '#90efef',
-                      'inverse-surface': '#2e3132',
-                      'surface-dim': '#d9dadb',
-                      'surface-container': '#edeeef',
-                      'background': '#f8f9fa',
-                      'secondary-fixed': '#93f2f2',
-                      'on-tertiary-container': '#76889d',
-                      'on-primary-container': '#6f88ad',
-                      'on-tertiary-fixed': '#091d2e',
-                      'on-error-container': '#93000a',
-                      'surface-container-highest': '#e1e3e4',
-                      'inverse-on-surface': '#f0f1f2',
-                      'on-primary-fixed-variant': '#2f486a',
-                      'primary-container': '#001f3f',
-                      'outline': '#74777f',
-                      'surface-variant': '#e1e3e4',
-                      'on-secondary-fixed-variant': '#004f4f',
-                      'surface-container-high': '#e7e8e9',
-                      'on-error': '#ffffff',
-                      'tertiary-container': '#0d2031',
-                      'surface-container-low': '#f3f4f5',
-                      'error': '#ba1a1a',
-                      'secondary-fixed-dim': '#76d6d5',
-                      'tertiary-fixed': '#d1e4fb',
-                      'on-tertiary': '#ffffff',
-                      'on-secondary-container': '#006e6e'
-                  },
-                  borderRadius: {
-                      DEFAULT: '0.125rem',
-                      lg: '0.25rem',
-                      xl: '0.5rem',
-                      full: '0.75rem'
-                  },
-                  fontFamily: {
-                      headline: ['Newsreader', 'serif'],
-                      body: ['Manrope', 'sans-serif'],
-                      label: ['Manrope', 'sans-serif']
-                  }
-              }
-          }
-      }
-  </script>
   <style>
       .material-symbols-outlined {
           font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
@@ -176,9 +105,9 @@
       }
   </style>
 </head>
-<body class="bg-surface text-on-surface flex min-h-screen">
+<body class="bg-surface text-on-surface flex min-h-screen" data-library-tailwind-radius="compact">
 <div class="sr-only">
-  <span>Member Dashboard</span>
+  <span>{{ __('account.title') }}</span>
   <span>{{ $compatCabinet }}</span>
   <span>Кабинет читателя</span>
   <span>{{ $compatMyBooks }}</span>
@@ -191,11 +120,11 @@
 
 <aside data-member-rail class="h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-[#F8F9FA] flex flex-col gap-4 p-8 border-r border-surface-container-high z-50">
   <div class="mb-10">
-    <h2 class="text-xs uppercase tracking-widest text-on-surface-variant font-semibold mb-6">Workspace</h2>
+    <h2 class="text-xs uppercase tracking-widest text-on-surface-variant font-semibold mb-6">{{ __('account.workspace') }}</h2>
     <div class="flex items-center gap-3 mb-8">
-      <img class="w-12 h-12 rounded-full object-cover shadow-sm" src="{{ asset('images/news/author-visit.jpg') }}" alt="Member Workspace"/>
+      <img class="w-12 h-12 rounded-full object-cover shadow-sm" src="{{ asset('images/news/author-visit.jpg') }}" alt="{{ __('account.member_workspace') }}"/>
       <div>
-        <p class="font-sans text-sm font-medium tracking-wide text-[#001F3F]">Member Workspace</p>
+        <p class="font-sans text-sm font-medium tracking-wide text-[#001F3F]">{{ __('account.member_workspace') }}</p>
         <p class="text-[10px] uppercase tracking-tighter opacity-60">{{ $workspaceRole }}</p>
       </div>
     </div>
@@ -204,31 +133,31 @@
   <nav class="flex-grow flex flex-col gap-2">
     <a class="bg-[#001F3F] text-white rounded-lg px-4 py-3 shadow-sm flex items-center gap-3 transition-all duration-500" href="{{ $routeWithLang('/account') }}">
       <span class="material-symbols-outlined" data-icon="desktop_windows">desktop_windows</span>
-      <span class="font-sans text-sm font-medium tracking-wide">My Desk</span>
+      <span class="font-sans text-sm font-medium tracking-wide">{{ __('account.nav.desk') }}</span>
     </a>
     <a class="text-[#001F3F] px-4 py-3 opacity-60 hover:bg-[#006A6A]/10 hover:text-[#006A6A] rounded-lg flex items-center gap-3 transition-all duration-500" href="{{ $routeWithLang('/account', ['tab' => 'history']) }}">
       <span class="material-symbols-outlined" data-icon="history">history</span>
-      <span class="font-sans text-sm font-medium tracking-wide">History</span>
+      <span class="font-sans text-sm font-medium tracking-wide">{{ __('account.nav.history') }}</span>
     </a>
     <a class="text-[#001F3F] px-4 py-3 opacity-60 hover:bg-[#006A6A]/10 hover:text-[#006A6A] rounded-lg flex items-center gap-3 transition-all duration-500" href="{{ $routeWithLang('/shortlist') }}">
       <span class="material-symbols-outlined" data-icon="folder_special">folder_special</span>
-      <span class="font-sans text-sm font-medium tracking-wide">Research Folders</span>
+      <span class="font-sans text-sm font-medium tracking-wide">{{ __('account.nav.folders') }}</span>
     </a>
     <a class="text-[#001F3F] px-4 py-3 opacity-60 hover:bg-[#006A6A]/10 hover:text-[#006A6A] rounded-lg flex items-center gap-3 transition-all duration-500" href="{{ $routeWithLang('/contacts') }}">
       <span class="material-symbols-outlined" data-icon="settings">settings</span>
-      <span class="font-sans text-sm font-medium tracking-wide">Settings</span>
+      <span class="font-sans text-sm font-medium tracking-wide">{{ __('account.nav.settings') }}</span>
     </a>
   </nav>
 
   <a href="{{ $routeWithLang('/shortlist') }}" class="mt-8 bg-[#006A6A] text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 text-sm font-medium shadow-md hover:bg-primary transition-all duration-500">
     <span class="material-symbols-outlined text-sm" data-icon="add">add</span>
-    New Research Session
+    {{ __('account.nav.new_session') }}
   </a>
 
   <div class="mt-auto pt-8 border-t border-surface-container-high flex flex-col gap-2">
     <a class="text-[#001F3F] px-4 py-3 opacity-60 hover:bg-[#006A6A]/10 hover:text-[#006A6A] rounded-lg flex items-center gap-3 transition-all duration-500" href="{{ $routeWithLang('/contacts') }}">
       <span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
-      <span class="font-sans text-sm font-medium tracking-wide">Help Center</span>
+      <span class="font-sans text-sm font-medium tracking-wide">{{ __('account.nav.help') }}</span>
     </a>
   </div>
 </aside>
@@ -241,7 +170,7 @@
         {!! __('shell.legacy_account_notice') !!}
       </p>
       <a href="/dashboard" class="inline-flex items-center gap-1 text-sm font-medium text-secondary hover:text-primary transition-colors whitespace-nowrap">
-        Try the new dashboard
+        {{ __('account.new_dashboard') }}
         <span class="material-symbols-outlined text-sm" aria-hidden="true">arrow_forward</span>
       </a>
     </div>
@@ -249,18 +178,17 @@
   <header class="w-full sticky top-0 z-40 backdrop-blur-md bg-opacity-90 bg-[#F8F9FA]">
     <div class="flex justify-between items-center px-8 lg:px-12 py-6 max-w-[1440px] mx-auto gap-4">
       <div class="flex items-center gap-8 lg:gap-12">
-        <h1 class="text-2xl font-serif font-bold text-[#001F3F] leading-none">Kazakh University of Technology and Business named after K. Kulazhanov Digital<br/>Library</h1>
+        <h1 class="text-2xl font-serif font-bold text-[#001F3F] leading-none">{{ __('account.university') }}</h1>
         <nav class="hidden md:flex items-center gap-6 lg:gap-8">
-          <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/catalog') }}">Catalog</a>
-          <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/resources') }}">Resources</a>
-          <a id="archive-nav-link" class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/catalog') }}"><span aria-hidden="true"></span></a>
-          <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/shortlist') }}">Shortlist</a>
+          <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/catalog') }}">{{ __('account.nav.catalog') }}</a>
+          <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/resources') }}">{{ __('account.nav.resources') }}</a>
+          <a class="text-[#001F3F] opacity-70 hover:opacity-100 transition-all duration-300 ease-in-out hover:text-[#006A6A] font-sans text-sm font-medium" href="{{ $routeWithLang('/shortlist') }}">{{ __('account.nav.shortlist') }}</a>
         </nav>
       </div>
       <div class="flex items-center gap-4 lg:gap-6">
         <div class="relative hidden lg:block">
           <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
-          <input id="member-search-input" class="pl-10 pr-4 py-2 bg-surface-container-highest border-none rounded-full text-sm w-64 focus:ring-1 focus:ring-secondary" placeholder="" aria-label="Dashboard search" type="text"/>
+          <input id="member-search-input" class="pl-10 pr-4 py-2 bg-surface-container-highest border-none rounded-full text-sm w-64 focus:ring-1 focus:ring-secondary" placeholder="{{ __('account.search') }}" aria-label="{{ __('account.search') }}" type="text"/>
         </div>
         <div class="flex items-center gap-4 text-[#001F3F]">
           <a href="{{ $routeWithLang('/contacts') }}" class="flex items-center hover:text-secondary transition-colors"><span class="material-symbols-outlined cursor-pointer" data-icon="notifications">notifications</span></a>
@@ -273,7 +201,7 @@
   <div class="max-w-[1200px] mx-auto px-8 lg:px-12 py-16">
     <section class="mb-16" data-member-dashboard-hero>
       <h2 class="serif-text text-4xl lg:text-5xl italic tracking-tight text-primary mb-4">{{ $heroGreeting }}</h2>
-      <p class="text-on-surface-variant text-lg max-w-2xl leading-relaxed">Your digital archive is updated. You have 3 new mentions in your Research Folders and 2 books arriving today at the Central Library desk.</p>
+      <p class="text-on-surface-variant text-lg max-w-2xl leading-relaxed">{{ __('account.hero') }}</p>
     </section>
 
     <section class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20" data-member-dashboard-overview>
@@ -296,18 +224,18 @@
       <div class="lg:col-span-8 space-y-16">
         <section data-member-dashboard-loans>
           <div class="flex items-center justify-between mb-8">
-            <h3 class="serif-text text-2xl font-bold text-primary">Current loans</h3>
-            <span class="text-xs font-bold text-on-surface-variant tracking-widest uppercase">Library account</span>
+            <h3 class="serif-text text-2xl font-bold text-primary">{{ __('account.loans.title') }}</h3>
+            <span class="text-xs font-bold text-on-surface-variant tracking-widest uppercase">{{ __('account.loans.subtitle') }}</span>
           </div>
           <div id="loan-list" class="space-y-4" aria-live="polite">
-            <p class="text-sm text-on-surface-variant">Loan information is loading.</p>
+            <p class="text-sm text-on-surface-variant">{{ __('account.loans.loading') }}</p>
           </div>
         </section>
 
         <section data-member-dashboard-reservations>
           <div class="flex items-center justify-between mb-8">
-            <h3 class="serif-text text-2xl font-bold text-primary">Current Reservations</h3>
-            <span class="text-xs font-bold text-on-surface-variant tracking-widest uppercase">Tracked Assets</span>
+            <h3 class="serif-text text-2xl font-bold text-primary">{{ __('account.reservations.title') }}</h3>
+            <span class="text-xs font-bold text-on-surface-variant tracking-widest uppercase">{{ __('account.reservations.subtitle') }}</span>
           </div>
 
           <div id="reservation-list" class="space-y-4">
@@ -338,19 +266,19 @@
         </section>
 
         <section>
-          <h4 class="text-xs font-bold text-on-surface-variant tracking-widest uppercase mb-6">Quick Actions</h4>
+          <h4 class="text-xs font-bold text-on-surface-variant tracking-widest uppercase mb-6">{{ __('account.quick_actions') }}</h4>
           <div class="flex flex-wrap gap-4">
             <a href="{{ $routeWithLang('/shortlist') }}" class="px-8 py-3 bg-primary-container text-on-primary rounded-lg font-bold text-sm shadow-sm hover:bg-primary hover:text-white transition-all duration-300 flex items-center gap-2">
               <span class="material-symbols-outlined text-sm">view_list</span>
-              Open Shortlist
+              {{ __('account.actions.open_shortlist') }}
             </a>
             <a href="{{ $routeWithLang('/catalog') }}" class="px-8 py-3 bg-surface-container-highest text-primary rounded-lg font-bold text-sm hover:bg-surface-container-high transition-all duration-300 flex items-center gap-2">
               <span class="material-symbols-outlined text-sm">search</span>
-              Return to Catalog
+              {{ __('account.actions.catalog') }}
             </a>
             <a href="{{ $routeWithLang('/contacts') }}" class="px-8 py-3 bg-transparent border border-outline-variant/30 text-secondary rounded-lg font-bold text-sm hover:bg-secondary/5 transition-all duration-300 flex items-center gap-2">
               <span class="material-symbols-outlined text-sm">chat_bubble</span>
-              Contact Librarian
+              {{ __('account.actions.contact') }}
             </a>
           </div>
         </section>
@@ -362,7 +290,7 @@
 
       <div class="lg:col-span-4 space-y-12">
         <section class="bg-surface-container-lowest p-8 rounded-xl dashboard-shadow" data-member-dashboard-activity>
-          <h3 class="serif-text text-xl font-bold text-primary mb-8">Recent Activity</h3>
+          <h3 class="serif-text text-xl font-bold text-primary mb-8">{{ __('account.activity.title') }}</h3>
           <div id="activity-timeline" class="space-y-8 relative timeline-line">
             @foreach($fallbackActivity as $activity)
               <div class="relative pl-10">
@@ -383,12 +311,12 @@
           </div>
           <h4 class="text-xs font-bold text-secondary tracking-widest uppercase mb-4 flex items-center gap-2">
             <span class="material-symbols-outlined text-sm">lightbulb</span>
-            Librarian&#039;s Note
+            {{ __('account.note.title') }}
           </h4>
           <p class="serif-text italic text-primary leading-relaxed text-lg mb-6">
-            “The newly digitised 'Zhetysu Chronicles' contain annotated margins by the original curators. These offer unique insights into the 19th-century mapping techniques used in the region. I highly recommend cross-referencing these with the British Library archives we accessed last month.”
+            “{{ __('account.note.text') }}”
           </p>
-          <p class="text-xs font-bold text-on-surface-variant">— Dr. Serikbayev, Lead Archivist</p>
+          <p class="text-xs font-bold text-on-surface-variant">— {{ __('account.note.author') }}</p>
         </section>
       </div>
     </div>
@@ -397,12 +325,12 @@
   <footer class="w-full mt-20 pb-12 bg-[#F8F9FA]">
     <div class="max-w-7xl mx-auto px-8 lg:px-12 flex flex-col md:flex-row justify-between items-center gap-8">
       <p class="font-sans text-xs uppercase tracking-widest opacity-50 text-[#001F3F]">
-         2024 Kazakh University of Technology and Business named after K. Kulazhanov Digital Library. The Digital Curator System.
+         © {{ date('Y') }} {{ __('account.footer.copyright') }}
       </p>
       <div class="flex items-center gap-6 lg:gap-10">
-        <a class="font-sans text-xs uppercase tracking-widest opacity-50 text-[#001F3F] hover:underline transition-opacity" href="{{ $routeWithLang('/login') }}">Institutional Access</a>
-        <a class="font-sans text-xs uppercase tracking-widest opacity-50 text-[#001F3F] hover:underline transition-opacity" href="{{ $routeWithLang('/about') }}">Privacy Policy</a>
-        <a class="font-sans text-xs uppercase tracking-widest opacity-50 text-[#001F3F] hover:underline transition-opacity" href="{{ $routeWithLang('/about') }}">Terms of Service</a>
+        <a class="font-sans text-xs uppercase tracking-widest opacity-50 text-[#001F3F] hover:underline transition-opacity" href="{{ $routeWithLang('/login') }}">{{ __('account.footer.access') }}</a>
+        <a class="font-sans text-xs uppercase tracking-widest opacity-50 text-[#001F3F] hover:underline transition-opacity" href="{{ $routeWithLang('/about') }}">{{ __('account.footer.privacy') }}</a>
+        <a class="font-sans text-xs uppercase tracking-widest opacity-50 text-[#001F3F] hover:underline transition-opacity" href="{{ $routeWithLang('/about') }}">{{ __('account.footer.terms') }}</a>
       </div>
     </div>
   </footer>
@@ -410,12 +338,12 @@
 
 <div id="confirm-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
   <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-    <h2 id="confirm-modal-title" class="serif-text text-2xl font-bold text-primary">Renew this loan?</h2>
-    <p class="mt-2 text-sm text-on-surface-variant">The due date will be extended according to the current circulation policy.</p>
+    <h2 id="confirm-modal-title" class="serif-text text-2xl font-bold text-primary">{{ __('account.loans.confirm_title') }}</h2>
+    <p class="mt-2 text-sm text-on-surface-variant">{{ __('account.loans.confirm_text') }}</p>
     <p id="renew-result" class="mt-3 hidden text-sm" role="status" aria-live="polite"></p>
     <div class="mt-6 flex justify-end gap-3">
-      <button type="button" class="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold" data-renew-cancel>Cancel</button>
-      <button type="button" class="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white" data-renew-confirm>Renew</button>
+      <button type="button" class="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold" data-renew-cancel>{{ __('account.actions.cancel') }}</button>
+      <button type="button" class="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white" data-renew-confirm>{{ __('account.actions.renew') }}</button>
     </div>
   </div>
 </div>
@@ -425,16 +353,10 @@
   const ACCOUNT_LOANS_ENDPOINT = '/api/v1/account/loans';
   const ACCOUNT_RESERVATIONS_ENDPOINT = '/api/v1/account/reservations';
   const SHORTLIST_SUMMARY_ENDPOINT = '/api/v1/shortlist/summary';
+  const ACCOUNT_UI = @json($accountUi);
 
   function patchDashboardLabels() {
-    const archiveText = ['Ar', 'chive'].join('');
-    const archiveNode = document.querySelector('#archive-nav-link span');
-    if (archiveNode) archiveNode.textContent = archiveText;
-
-    const searchInput = document.getElementById('member-search-input');
-    if (searchInput) {
-      searchInput.placeholder = ['Search', ['ar', 'chive...'].join('')].join(' ');
-    }
+    // Kept as a compatibility hook for older cached scripts.
   }
 
   function escapeHtml(value) {
@@ -443,7 +365,7 @@
 
   async function getJson(url) {
     const response = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error('Request failed');
+    if (!response.ok) throw new Error(ACCOUNT_UI.requestFailed);
     return response.json();
   }
 
@@ -457,12 +379,12 @@
   function statusPill(status) {
     const normalized = String(status || 'PENDING').toUpperCase();
     const map = {
-      READY: { label: 'Ready', cls: 'bg-secondary-container text-on-secondary-container' },
-      PROCESSING: { label: 'Processing', cls: 'bg-surface-container-highest text-on-surface-variant' },
-      PENDING: { label: 'Pending', cls: 'bg-surface-container-high text-on-surface-variant opacity-60' },
-      FULFILLED: { label: 'Ready', cls: 'bg-secondary-container text-on-secondary-container' },
-      CANCELLED: { label: 'Pending', cls: 'bg-surface-container-high text-on-surface-variant opacity-60' },
-      EXPIRED: { label: 'Pending', cls: 'bg-surface-container-high text-on-surface-variant opacity-60' },
+      READY: { label: ACCOUNT_UI.statuses.ready, cls: 'bg-secondary-container text-on-secondary-container' },
+      PROCESSING: { label: ACCOUNT_UI.statuses.processing, cls: 'bg-surface-container-highest text-on-surface-variant' },
+      PENDING: { label: ACCOUNT_UI.statuses.pending, cls: 'bg-surface-container-high text-on-surface-variant opacity-60' },
+      FULFILLED: { label: ACCOUNT_UI.statuses.fulfilled, cls: 'bg-secondary-container text-on-secondary-container' },
+      CANCELLED: { label: ACCOUNT_UI.statuses.cancelled, cls: 'bg-surface-container-high text-on-surface-variant opacity-60' },
+      EXPIRED: { label: ACCOUNT_UI.statuses.expired, cls: 'bg-surface-container-high text-on-surface-variant opacity-60' },
     };
     return map[normalized] || map.PENDING;
   }
@@ -471,20 +393,20 @@
     const list = document.getElementById('loan-list');
     if (!list) return;
     if (!Array.isArray(items) || items.length === 0) {
-      list.innerHTML = '<p class="text-sm text-on-surface-variant">No current loans.</p>';
+      list.innerHTML = `<p class="text-sm text-on-surface-variant">${escapeHtml(ACCOUNT_UI.emptyLoans)}</p>`;
       return;
     }
 
     list.innerHTML = items.slice(0, 10).map((loan) => {
       const id = loan.id || loan.loanId || loan.uuid;
-      const title = loan.title || loan.bookTitle || loan.book?.title || 'Library item';
+      const title = loan.title || loan.bookTitle || loan.book?.title || ACCOUNT_UI.libraryItem;
       const due = loan.dueAt || loan.due_at || '';
       const status = String(loan.status || '').toLowerCase();
       const canRenew = Boolean(id) && status === 'active' && Number(loan.renewCount ?? loan.renew_count ?? 0) < 3;
 
       return `<article class="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-surface-container-low p-5">
-        <div><h4 class="font-bold text-primary">${escapeHtml(title)}</h4><p class="mt-1 text-xs text-on-surface-variant">${due ? `Due: ${escapeHtml(due)}` : escapeHtml(status)}</p></div>
-        ${canRenew ? `<button id="renew-btn-${escapeHtml(id)}" data-renew-loan="${escapeHtml(id)}" type="button" class="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white">Renew</button>` : ''}
+        <div><h4 class="font-bold text-primary">${escapeHtml(title)}</h4><p class="mt-1 text-xs text-on-surface-variant">${due ? `${escapeHtml(ACCOUNT_UI.due)}: ${escapeHtml(due)}` : escapeHtml(status)}</p></div>
+        ${canRenew ? `<button id="renew-btn-${escapeHtml(id)}" data-renew-loan="${escapeHtml(id)}" type="button" class="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white">${escapeHtml(ACCOUNT_UI.renew)}</button>` : ''}
       </article>`;
     }).join('');
     list.querySelectorAll('[data-renew-loan]').forEach((button) => {
@@ -512,11 +434,11 @@
           headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''},
         });
         const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.message || payload.error || 'Renewal failed');
+        if (!response.ok) throw new Error(payload.message || payload.error || ACCOUNT_UI.renewFailed);
         close();
         await loadMemberDashboard();
       } catch (error) {
-        if (result) { result.textContent = error.message || 'Renewal failed'; result.classList.remove('hidden'); }
+        if (result) { result.textContent = error.message || ACCOUNT_UI.renewFailed; result.classList.remove('hidden'); }
       } finally {
         confirmButton.disabled = false;
       }
@@ -536,8 +458,8 @@
 
     list.innerHTML = items.slice(0, 3).map((item, index) => {
       const status = statusPill(item.status);
-      const title = item.book?.title || item.title || 'Library item';
-      const meta = item.meta || (item.book?.isbn ? `ISBN ${item.book.isbn}` : 'Member reservation');
+      const title = item.book?.title || item.title || ACCOUNT_UI.libraryItem;
+      const meta = item.meta || (item.book?.isbn ? `ISBN ${item.book.isbn}` : ACCOUNT_UI.reservationItem);
       const image = images[index] ?? null;
 
       return `
@@ -605,9 +527,9 @@
       const reservationItems = Array.isArray(reservations?.data) && reservations.data.length ? reservations.data : null;
       const readyCount = reservationItems ? reservationItems.filter((item) => String(item.status || '').toUpperCase() === 'READY').length || reservationItems.length : 2;
 
-      metricValue('collections', shortlistCount, 'Saved in Shortlist');
-      metricValue('access', activeAccess, 'Active Digital Access');
-      metricValue('arrivals', readyCount, 'Ready for Pickup');
+      metricValue('collections', shortlistCount, ACCOUNT_UI.metrics.collections_desc);
+      metricValue('access', activeAccess, ACCOUNT_UI.metrics.access_desc);
+      metricValue('arrivals', readyCount, ACCOUNT_UI.metrics.arrivals_desc);
       renderLoans(Array.isArray(loans?.data) ? loans.data : []);
 
       if (reservationItems) {
@@ -619,18 +541,18 @@
         loans.data.slice(0, 3).forEach((loan, index) => {
           activityItems.push({
             tone: index === 0 ? 'secondary' : (index === 1 ? 'primary' : 'muted'),
-            time: loan.loanedAt || loan.createdAt || 'Recently',
-            title: index === 0 ? 'Recently Viewed' : (index === 1 ? 'Shortlist Addition' : 'PDF Export Complete'),
-            note: loan.title || loan.bookTitle || 'Library activity',
+            time: loan.loanedAt || loan.createdAt || ACCOUNT_UI.activity.recently,
+            title: index === 0 ? ACCOUNT_UI.activity.viewed : (index === 1 ? ACCOUNT_UI.activity.shortlist : ACCOUNT_UI.activity.export),
+            note: loan.title || loan.bookTitle || ACCOUNT_UI.activity.generic,
           });
         });
       }
 
       if (!activityItems.length && shortlistCount) {
         activityItems.push(
-          { tone: 'secondary', time: 'Yesterday, 4:12 PM', title: 'Recently Viewed', note: 'Nomadic Routes of the Golden Horde' },
-          { tone: 'primary', time: 'Aug 12, 11:30 AM', title: 'Shortlist Addition', note: 'Map Collection: Zhetysu region 1890' },
-          { tone: 'muted', time: 'Aug 10, 9:15 AM', title: 'PDF Export Complete', note: 'Annual Research Bibliography' },
+          { tone: 'secondary', time: ACCOUNT_UI.activity.recently, title: ACCOUNT_UI.activity.viewed, note: 'Nomadic Routes of the Golden Horde' },
+          { tone: 'primary', time: ACCOUNT_UI.activity.recently, title: ACCOUNT_UI.activity.shortlist, note: 'Map Collection: Zhetysu region 1890' },
+          { tone: 'muted', time: ACCOUNT_UI.activity.recently, title: ACCOUNT_UI.activity.export, note: 'Annual Research Bibliography' },
         );
       }
 

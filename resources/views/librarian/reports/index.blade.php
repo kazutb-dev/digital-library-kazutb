@@ -124,6 +124,11 @@
         'messages' => 'support_agent', 'repository' => 'school', 'external-resources' => 'language', 'staff' => 'badge',
         'audit-summary' => 'policy', 'fund-movement' => 'sync_alt', 'new-acquisitions' => 'library_add',
         'write-offs' => 'inventory_2', 'electronic-materials' => 'picture_as_pdf',
+        'ksu-part-1' => 'playlist_add', 'ksu-part-2' => 'playlist_remove', 'ksu-part-3' => 'balance',
+        'ksu-register' => 'menu_book', 'acquisition-act' => 'receipt_long', 'inventory-book' => 'inventory',
+        'non-inventory-book' => 'list_alt', 'new-arrivals' => 'new_releases', 'fund-by-sigla' => 'shelves',
+        'fund-by-language' => 'translate', 'fund-by-type' => 'category', 'fund-by-udc' => 'account_tree',
+        'acquisitions-by-source-value' => 'payments', 'writeoffs' => 'inventory_2',
     ];
 
     $activeMeta = $types->firstWhere('key', $activeReportKey) ?? ['key' => $activeReportKey];

@@ -101,6 +101,12 @@
         <x-admin.status-badge :status="$statusTone($copy->status)" :label="__('librarian.copies.statuses.'.$copy->status)" />
         <x-admin.status-badge :status="$conditionTone($copy->condition)" :label="__('librarian.copies.conditions.'.$copy->condition)" />
         <span class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+            {{ __('copy_lifecycle.inventory') }}: {{ __('copy_lifecycle.inventory_statuses.'.($copy->inventory_status ?: \App\Models\Catalog\BookCopy::separatedStateFor($copy->status)[0])) }}
+        </span>
+        <span class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+            {{ __('copy_lifecycle.circulation') }}: {{ __('copy_lifecycle.circulation_statuses.'.($copy->circulation_status ?: \App\Models\Catalog\BookCopy::separatedStateFor($copy->status)[1])) }}
+        </span>
+        <span class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
             {{ __('librarian.copies.fields.access_restriction') }}: {{ __('librarian.copies.access_restrictions.'.$copy->access_restriction) }}
         </span>
         <span class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
@@ -179,6 +185,8 @@
                         <dt class="admin-label">{{ __('librarian.copies.fields.storage_sigla') }}</dt>
                         <dd class="text-sm text-slate-700">{{ $copy->storage_sigla ?: '—' }}</dd>
                     </div>
+                    <div><dt class="admin-label">{{ __('copy_registry.fields.service_point') }}</dt><dd class="text-sm text-slate-700">{{ $copy->service_point_code ?: '—' }}</dd></div>
+                    <div><dt class="admin-label">{{ __('copy_registry.fields.shelf_index') }}</dt><dd class="text-sm text-slate-700">{{ $copy->shelf_index ?: '—' }}</dd></div>
                     <div>
                         <dt class="admin-label">{{ __('librarian.copies.fields.room') }}</dt>
                         <dd class="text-sm text-slate-700">{{ $copy->room ?: '—' }}</dd>
@@ -191,6 +199,8 @@
                         <dt class="admin-label">{{ __('librarian.copies.fields.shelf_location') }}</dt>
                         <dd class="text-sm text-slate-700">{{ $copy->shelf_location ?: '—' }}</dd>
                     </div>
+                    <div><dt class="admin-label">{{ __('copy_registry.fields.service_point') }}</dt><dd class="text-sm text-slate-700">{{ $copy->service_point_code ?: '—' }}</dd></div>
+                    <div><dt class="admin-label">{{ __('copy_registry.fields.shelf_index') }}</dt><dd class="text-sm text-slate-700">{{ $copy->shelf_index ?: '—' }}</dd></div>
                     <div>
                         <dt class="admin-label">{{ __('librarian.copies.fields.branch') }}</dt>
                         <dd class="text-sm text-slate-700">{{ $copy->branch?->name ?? '—' }}</dd>
@@ -424,12 +434,29 @@
                         <dt class="admin-label">{{ __('librarian.copies.fields.issue_count') }}</dt>
                         <dd class="text-sm text-slate-700 tabular-nums">{{ number_format((int) $copy->issue_count, 0, ',', ' ') }}</dd>
                     </div>
+                    @if($copy->writeoff_date || $copy->writeoff_act || $copy->writeoff_reason)
+                        <div><dt class="admin-label">{{ __('copy_lifecycle.fields.writeoff_date') }}</dt><dd class="text-sm text-slate-700">{{ $copy->writeoff_date?->format('d.m.Y') ?? '—' }}</dd></div>
+                        <div><dt class="admin-label">{{ __('copy_lifecycle.fields.writeoff_act') }}</dt><dd class="text-sm text-slate-700">{{ $copy->writeoff_act ?: '—' }}</dd></div>
+                        <div class="sm:col-span-2"><dt class="admin-label">{{ __('copy_lifecycle.fields.writeoff_reason') }}</dt><dd class="whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{{ $copy->writeoff_reason ?: '—' }}</dd></div>
+                    @endif
                     <div class="sm:col-span-2">
                         <dt class="admin-label">{{ __('librarian.copies.fields.balance_status') }}</dt>
                         <dd class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{{ __('librarian.copies.not_recorded') }}</dd>
                     </div>
                 </dl>
             </section>
+
+            @canany(['legacy_recovery.review', 'legacy_recovery.view'])
+                <section class="admin-card">
+                    <h2 class="mb-2 flex items-center gap-2 font-headline text-2xl text-primary"><span class="material-symbols-outlined text-secondary">database</span>{{ __('copy_lifecycle.legacy.title') }}</h2>
+                    <p class="mb-5 text-xs text-slate-500">{{ __('copy_lifecycle.legacy.description') }}</p>
+                    <dl class="grid gap-x-8 gap-y-4 sm:grid-cols-2">
+                        @foreach(['legacy_inv_id','legacy_doc_id','legacy_inventory_number','sigla_code','legacy_sigla_id','local_library_code','fund_raw','price_raw','accounting_mode_raw','legacy_state_raw','legacy_state_label','legacy_notes'] as $legacyField)
+                            <div @class(['sm:col-span-2' => in_array($legacyField, ['legacy_notes'], true)])><dt class="admin-label">{{ __('copy_lifecycle.legacy.fields.'.$legacyField) }}</dt><dd class="break-words text-sm text-slate-700">{{ $copy->{$legacyField} !== null && $copy->{$legacyField} !== '' ? $copy->{$legacyField} : '—' }}</dd></div>
+                        @endforeach
+                    </dl>
+                </section>
+            @endcanany
 
             <section class="admin-card">
                 <h2 class="mb-5 flex items-center gap-2 font-headline text-2xl text-primary">
@@ -593,6 +620,8 @@
                                 <legend class="admin-label">{{ __('common.fields.actions') }}</legend>
                                 <div class="space-y-2">
                                     @foreach (['write_off' => 'delete_sweep', 'lost' => 'help', 'under_repair' => 'build', 'restore' => 'restore_from_trash'] as $action => $icon)
+                                        @continue($action === 'write_off' && ! auth()->user()->can('copies.write_off'))
+                                        @continue($action === 'restore' && $copy->status === 'written_off')
                                         <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm transition-colors hover:border-secondary hover:bg-surface-container-low">
                                             <input
                                                 class="h-4 w-4 border-slate-300 text-secondary focus:ring-secondary"
@@ -609,6 +638,15 @@
                                 </div>
                                 @error('action')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
                             </fieldset>
+
+                            <div class="hidden rounded-xl border border-amber-200 bg-amber-50 p-4" data-writeoff-fields>
+                                <p class="mb-4 text-sm text-amber-900">{{ __('copy_lifecycle.writeoff_warning') }}</p>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <label><span class="admin-label">{{ __('copy_lifecycle.fields.writeoff_date') }}</span><input class="admin-input" type="date" name="writeoff_date" value="{{ old('writeoff_date', now()->toDateString()) }}" data-writeoff-required></label>
+                                    <label><span class="admin-label">{{ __('copy_lifecycle.fields.writeoff_act') }}</span><input class="admin-input" name="writeoff_act" maxlength="128" value="{{ old('writeoff_act') }}" data-writeoff-required></label>
+                                    <label class="sm:col-span-2"><span class="admin-label">{{ __('copy_lifecycle.fields.writeoff_reason') }}</span><textarea class="admin-input" name="writeoff_reason" minlength="5" maxlength="2000" data-writeoff-required>{{ old('writeoff_reason') }}</textarea></label>
+                                </div>
+                            </div>
 
                             <label class="block">
                                 <span class="admin-label">{{ __('common.fields.reason') }}</span>
@@ -647,4 +685,22 @@
             </script>
         @endpush
     @endif
+
+    @push('scripts')
+        <script>
+            (() => {
+                const actions = document.querySelectorAll('input[name="action"]');
+                const block = document.querySelector('[data-writeoff-fields]');
+                if (!actions.length || !block) return;
+                const sync = () => {
+                    const selected = document.querySelector('input[name="action"]:checked');
+                    const active = selected?.value === 'write_off';
+                    block.classList.toggle('hidden', !active);
+                    block.querySelectorAll('[data-writeoff-required]').forEach((field) => { field.required = active; });
+                };
+                actions.forEach((action) => action.addEventListener('change', sync));
+                sync();
+            })();
+        </script>
+    @endpush
 @endsection

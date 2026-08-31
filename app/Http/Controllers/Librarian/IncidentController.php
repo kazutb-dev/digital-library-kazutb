@@ -212,10 +212,14 @@ class IncidentController extends Controller
             'resolution_type' => ['required', Rule::in(['fine', 'repair', 'write_off', 'monetary_compensation', 'no_charge'])],
             'reason' => ['required', 'string', 'min:5', 'max:4000'],
             'waive_fine' => ['nullable', 'boolean'],
+            'writeoff_date' => ['nullable', 'required_if:resolution_type,write_off', 'date'],
+            'writeoff_act' => ['nullable', 'required_if:resolution_type,write_off', 'string', 'max:128'],
         ]);
         $this->incidents->resolveWithoutReplacement(
             $incident, $request->user(), $validated['resolution_type'],
             $validated['reason'], $request->boolean('waive_fine'),
+            $validated['writeoff_date'] ?? null,
+            $validated['writeoff_act'] ?? null,
         );
 
         return back()->with('success', __('incidents.messages.resolved'));

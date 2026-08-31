@@ -12,6 +12,9 @@ class ReviewIssuesSummaryDbTest extends TestCase
     {
         parent::setUp();
 
+        // Authorization is covered by DiagnosticApiAuthorizationTest. Avoid
+        // provisioning an account into the live read-only verification DB.
+        $this->withoutMiddleware();
         Config::set('database.default', 'pgsql');
         DB::purge('pgsql');
     }

@@ -62,6 +62,8 @@ return [
         'download' => 'Жүктеп алу',
         'resume_hint' => 'Сіз :page-беттен оқуды жалғастырасыз.',
         'progress_saved' => 'Орын сақталды',
+        'read_progress' => 'Оқылды',
+        'turn_hint' => 'парақтау',
         'license_terms' => 'Лицензия шарттары',
         'denied_title' => 'Қолжетімділік үшін кітапхана рұқсаты қажет',
         'denied_inactive' => 'Материал уақытша қолжетімсіз.',

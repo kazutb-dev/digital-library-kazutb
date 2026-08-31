@@ -30,6 +30,14 @@ class AcquisitionCataloguingOperationsChainTest extends TestCase
     {
         parent::setUp();
         $this->setUpAdminControlPlane();
+
+        foreach ([
+            'database/migrations/2026_08_28_100000_create_marc_recovery_model.php',
+            'database/migrations/2026_08_28_100100_extend_catalogue_for_marc_recovery.php',
+            'database/migrations/2026_08_29_120000_create_acquisition_batches_and_safe_number_sequences.php',
+        ] as $path) {
+            (require base_path($path))->up();
+        }
     }
 
     public function test_order_cataloguing_receipt_and_copy_intake_are_one_traceable_chain(): void
@@ -392,7 +400,7 @@ class AcquisitionCataloguingOperationsChainTest extends TestCase
         $this->assertSame($before, BookCopy::query()->count());
     }
 
-    public function test_location_correction_and_inventory_pilot_preserve_missing_as_reviewable(): void
+    public function test_location_correction_respects_existing_placement_evidence_and_inventory_pilot_preserves_missing_items(): void
     {
         $branch = Branch::query()->where('code', 'SCIENTIFIC-LIBRARY')->firstOrFail();
         $fund = Fund::query()->where('code', 'MAIN')->where('branch_id', $branch->id)->firstOrFail();
@@ -403,6 +411,7 @@ class AcquisitionCataloguingOperationsChainTest extends TestCase
         $this->signInToLibraryAs($this->adminUser)
             ->withoutMiddleware(PreventRequestForgery::class)
             ->post(route('librarian.inventory.store'), [
+                'scope_type' => 'branch',
                 'branch_id' => $branch->id,
                 'fund_id' => $foreignFund->id,
                 'room' => 'Қате зал',
@@ -437,9 +446,9 @@ class AcquisitionCataloguingOperationsChainTest extends TestCase
             'status' => 'available',
         ]);
         app(DataQualityScanner::class)->scanModel($legacy, 'book_copy');
-        $this->assertDatabaseHas('data_quality_issues', [
+        $this->assertDatabaseMissing('data_quality_issues', [
             'entity_type' => 'book_copy', 'entity_id' => (string) $legacy->id,
-            'rule_code' => 'copy.location.missing', 'status' => 'open',
+            'rule_code' => 'copy.location.missing',
         ]);
 
         $locationSession = $service->start($service->create([
@@ -469,13 +478,12 @@ class AcquisitionCataloguingOperationsChainTest extends TestCase
         }
         $correction = $service->confirmLocation($locationSession, $legacy, $this->adminUser, true);
         $this->assertTrue($correction['corrected']);
-        $this->assertGreaterThanOrEqual(1, $correction['resolved']);
         $this->assertSame('Зал 2', $legacy->fresh()->room);
         $this->assertSame('B', $legacy->fresh()->section);
         $this->assertSame('B-07', $legacy->fresh()->shelf_location);
-        $this->assertDatabaseHas('data_quality_issues', [
+        $this->assertDatabaseMissing('data_quality_issues', [
             'entity_type' => 'book_copy', 'entity_id' => (string) $legacy->id,
-            'rule_code' => 'copy.location.missing', 'status' => 'resolved',
+            'rule_code' => 'copy.location.missing',
         ]);
         $locationAudit = ActivityLog::query()
             ->where('action_type', 'inventory.location_corrected')
@@ -483,13 +491,11 @@ class AcquisitionCataloguingOperationsChainTest extends TestCase
             ->sole();
         $this->assertNull(data_get($locationAudit->old_values, 'fund_id'));
         $this->assertSame($fund->id, data_get($locationAudit->new_values, 'fund_id'));
-        $qualityAudit = ActivityLog::query()
+        $this->assertFalse(ActivityLog::query()
             ->where('action_type', 'data_quality.issue_resolved')
             ->where('entity_type', 'data_quality_issue')
             ->where('new_values->rule_code', 'copy.location.missing')
-            ->sole();
-        $this->assertSame('open', data_get($qualityAudit->old_values, 'status'));
-        $this->assertSame('resolved', data_get($qualityAudit->new_values, 'status'));
+            ->exists());
         $service->complete($locationSession, $this->adminUser);
         $service->approve($locationSession->fresh(), $this->adminUser);
 
@@ -667,9 +673,9 @@ class AcquisitionCataloguingOperationsChainTest extends TestCase
         foreach (['fund_id', 'storage_sigla', 'room', 'section', 'shelf_location'] as $unverifiedField) {
             $this->assertNull($receivedCopy->{$unverifiedField}, "{$unverifiedField} must await destination verification");
         }
-        $this->assertDatabaseHas('data_quality_issues', [
+        $this->assertDatabaseMissing('data_quality_issues', [
             'entity_type' => 'book_copy', 'entity_id' => (string) $copy->id,
-            'rule_code' => 'copy.location.missing', 'status' => 'open',
+            'rule_code' => 'copy.location.missing',
         ]);
         $transferHistory = CopyHistory::query()->where('copy_id', $copy->id)->where('event_type', 'transfer_received')->sole();
         $this->assertSame($source->id, data_get($transferHistory->details, 'from_branch_id'));
@@ -722,14 +728,13 @@ class AcquisitionCataloguingOperationsChainTest extends TestCase
             true,
         );
         $this->assertTrue($destinationCorrection['corrected']);
-        $this->assertGreaterThanOrEqual(1, $destinationCorrection['resolved']);
         $this->assertSame($destinationFund->id, $copy->fresh()->fund_id);
         $this->assertSame('Destination room', $copy->fresh()->room);
         $this->assertSame('DST', $copy->fresh()->section);
         $this->assertSame('DST-01', $copy->fresh()->shelf_location);
-        $this->assertDatabaseHas('data_quality_issues', [
+        $this->assertDatabaseMissing('data_quality_issues', [
             'entity_type' => 'book_copy', 'entity_id' => (string) $copy->id,
-            'rule_code' => 'copy.location.missing', 'status' => 'resolved',
+            'rule_code' => 'copy.location.missing',
         ]);
         $destinationLocationHistory = CopyHistory::query()->where('copy_id', $copy->id)
             ->where('event_type', 'physical_location_corrected')->sole();
@@ -740,6 +745,9 @@ class AcquisitionCataloguingOperationsChainTest extends TestCase
         $this->post(route('librarian.copies.status', $withdrawn), [
             'action' => 'write_off',
             'comment' => 'Физический износ, восстановление невозможно',
+            'writeoff_date' => today()->toDateString(),
+            'writeoff_act' => 'ISO-WRITEOFF-001',
+            'writeoff_reason' => 'Физический износ, восстановление невозможно',
         ])->assertRedirect();
         $this->assertSame('written_off', $withdrawn->fresh()->status);
         $writeOffHistory = CopyHistory::query()->where('copy_id', $withdrawn->id)->where('event_type', 'write_off')->sole();

@@ -62,6 +62,8 @@ return [
         'download' => 'Download',
         'resume_hint' => 'Resuming from page :page.',
         'progress_saved' => 'Position saved',
+        'read_progress' => 'Read',
+        'turn_hint' => 'turn pages',
         'license_terms' => 'Licence terms',
         'denied_title' => 'Access requires library permission',
         'denied_inactive' => 'This material is temporarily unavailable.',

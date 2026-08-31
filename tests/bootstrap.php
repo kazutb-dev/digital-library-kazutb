@@ -33,6 +33,12 @@ $testEnvironment = [
     'FILESYSTEM_DISK' => 'local',
     'FRONTEND_CATALOG_PROXY_URL' => 'http://127.0.0.1:1/test-catalog-disabled',
     'INTEGRATION_ALLOWED_TOKENS' => 'phpunit-test-token',
+    // Integration middleware writes explicitly to the `stack` channel rather
+    // than the default channel. Keep both test log paths on stderr so PHPUnit
+    // never appends to runtime-owned daily log files.
+    'LOG_CHANNEL' => 'stderr',
+    'LOG_STACK' => 'stderr',
+    'LOG_LEVEL' => 'debug',
     'MAIL_MAILER' => 'array',
     'QUEUE_CONNECTION' => 'sync',
     'SESSION_DRIVER' => 'array',

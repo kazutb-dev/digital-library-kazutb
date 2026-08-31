@@ -14,7 +14,8 @@ class InventorySession extends Model
     public const STATUSES = ['draft', 'running', 'review', 'completed', 'approved', 'cancelled'];
 
     protected $fillable = [
-        'session_number', 'branch_id', 'fund_id', 'room', 'section', 'shelf_range', 'pilot_limit', 'inventory_date',
+        'session_number', 'scope_type', 'branch_id', 'fund_id', 'storage_sigla',
+        'service_point_code', 'room', 'section', 'shelf_range', 'pilot_limit', 'inventory_date',
         'responsible_id', 'status', 'expected_count', 'found_count', 'missing_count',
         'misplaced_count', 'unknown_count', 'duplicate_count', 'started_at', 'completed_at',
         'approved_at', 'approved_by',

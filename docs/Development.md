@@ -4,12 +4,12 @@
 
 | Tool | Required | Install |
 |------|----------|---------|
-| PHP | **8.4** | `sudo bash scripts/dev/install-php84.sh` |
+| PHP | **8.4** | Install from the supported packages for your OS |
 | Composer | 2.x | Already installed |
 | Node.js | **22 LTS** | `nvm install 22 && nvm alias default 22` |
 | npm | 10.x | Bundled with Node 22 |
-| Docker | latest | `sudo bash scripts/dev/install-docker.sh` |
-| Docker Compose | plugin v2 | Bundled with Docker above |
+| Docker | latest | Install from Docker's supported packages for your OS |
+| Docker Compose | plugin v2 | Install with Docker Engine/Desktop |
 
 ### NVM quick setup (if not done)
 
@@ -122,8 +122,8 @@ make test-all          # lint + PHPUnit + Playwright
 ## Quality gates (same as CI)
 
 ```bash
-composer qa:ci         # local CI gate script
-composer lint          # pint formatting check
+composer qa:ci         # Composer validation, Pint, critical tests, production build
+vendor/bin/pint --test # Pint formatting check only
 npm run build          # must succeed
 ```
 

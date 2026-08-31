@@ -94,7 +94,11 @@ class InternalCopyReadTest extends TestCase
 
     public function test_copy_detail_rejects_invalid_uuid(): void
     {
-        $response = $this->withSession($this->staffSession())->getJson('/api/v1/internal/copies/not-a-uuid');
+        $response = $this->withoutMiddleware([
+            \App\Http\Middleware\EnsureInternalCirculationStaff::class,
+            \Spatie\Permission\Middleware\PermissionMiddleware::class,
+        ])
+            ->withSession($this->staffSession())->getJson('/api/v1/internal/copies/not-a-uuid');
 
         $response
             ->assertStatus(400)
@@ -149,7 +153,11 @@ class InternalCopyReadTest extends TestCase
 
     public function test_document_copies_rejects_invalid_uuid(): void
     {
-        $response = $this->withSession($this->staffSession())->getJson('/api/v1/internal/documents/not-a-uuid/copies');
+        $response = $this->withoutMiddleware([
+            \App\Http\Middleware\EnsureInternalCirculationStaff::class,
+            \Spatie\Permission\Middleware\PermissionMiddleware::class,
+        ])
+            ->withSession($this->staffSession())->getJson('/api/v1/internal/documents/not-a-uuid/copies');
 
         $response
             ->assertStatus(400)

@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Branch;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
 use App\Models\DataQualityIssue;
+use App\Models\Fund;
 use App\Models\User;
 use App\Services\DataQuality\BulkCorrectionService;
+use App\Services\DataQuality\DataQualityRuleRegistry;
 use App\Services\DataQuality\DataQualityScanner;
 use App\Services\DataQuality\DuplicateDetectionService;
 use App\Services\DataQuality\EncodingInspector;
@@ -126,7 +129,7 @@ class DataQualityControlCenterTest extends TestCase
         ]);
         $this->assertSame(
             'recommendation',
-            app(\App\Services\DataQuality\DataQualityRuleRegistry::class)->catalogue()['bib.language.legacy_code']['type'],
+            app(DataQualityRuleRegistry::class)->catalogue()['bib.language.legacy_code']['type'],
         );
     }
 
@@ -155,6 +158,59 @@ class DataQualityControlCenterTest extends TestCase
             ->assertOk()
             ->assertSee(trans('data_quality.coverage.not_scanned'))
             ->assertSee('0 / 1');
+    }
+
+    public function test_issue_page_uses_request_locale_and_explains_location_conflict_in_plain_language(): void
+    {
+        $selectedBranch = Branch::query()->create([
+            'code' => 'READING-RU',
+            'name' => 'Читальный зал',
+            'type' => 'reading_room',
+            'is_active' => true,
+        ]);
+        $actualFundBranch = Branch::query()->create([
+            'code' => 'MAIN-RU',
+            'name' => 'Научная библиотека',
+            'type' => 'library',
+            'is_active' => true,
+        ]);
+        $fund = Fund::query()->create([
+            'branch_id' => $actualFundBranch->getKey(),
+            'code' => 'PERIODICALS-RU',
+            'name' => 'Фонд периодических изданий',
+            'fund_type' => 'periodicals',
+            'institutional_scope' => 'general',
+            'is_active' => true,
+        ]);
+        $copy = BookCopy::factory()->create([
+            'branch_id' => $selectedBranch->getKey(),
+            'fund_id' => $fund->getKey(),
+        ]);
+
+        app()->setLocale('kk');
+        app(DataQualityScanner::class)->scanModel($copy, 'book_copy');
+        $issue = DataQualityIssue::query()
+            ->where('entity_type', 'book_copy')
+            ->where('entity_id', (string) $copy->getKey())
+            ->where('rule_code', 'copy.location.fund_branch_conflict')
+            ->firstOrFail();
+        $this->assertSame('Сенімді дереккөзбен салыстыру', $issue->suggested_action);
+
+        app()->setLocale('ru');
+        $response = $this->signInAs($this->actor)->get(route('librarian.data-quality.issues.show', [
+            'issue' => $issue,
+            'lang' => 'ru',
+        ]));
+
+        $response->assertOk()
+            ->assertSee('data-testid="quality-friendly-current"', false)
+            ->assertSee('Библиотечная точка: Читальный зал')
+            ->assertSee('Фонд: Фонд периодических изданий')
+            ->assertSee('Выбранный фонд относится к другой библиотечной точке: Научная библиотека')
+            ->assertSee('Выбранный фонд должен относиться к выбранной библиотечной точке.')
+            ->assertDontSee('Сенімді дереккөзбен салыстыру')
+            ->assertDontSee('Қор таңдалған кітапхана нүктесіне жатпайды.')
+            ->assertDontSee('The fund must belong to the selected library point');
     }
 
     public function test_librarian_correction_is_audited_and_resolved_by_revalidation(): void

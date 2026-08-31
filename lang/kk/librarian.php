@@ -128,6 +128,7 @@ $translations = [
                 'electronic_resources' => 'Белсенді электрондық ресурстар',
                 'message_sla_overdue' => 'SLA мерзімі бұзылған өтініштер',
                 'fines_charged_period' => 'Кезеңде есептелген айыппұлдар', 'acquisition_value_period' => 'Тіркелген түсімдердің құны',
+                'arrivals_current_month' => 'Осы айдағы түсімдер', 'writeoffs_year' => 'Осы жылғы шығарулар', 'ksu_entries_year' => 'Осы жылғы ЖЕК жазбалары', 'ksu_conflicts' => 'Ашық ЖЕК қайшылықтары',
                 'records_total'=>'Библиографиялық жазбалар','copies_available'=>'Қолжетімді даналар','copies_issued'=>'Берілген даналар','copies_repair'=>'Жөндеудегі даналар','copies_lost'=>'Жоғалған даналар','records_added_period'=>'Кезеңде қосылған жазбалар','reservations_queued'=>'Кезектегі брондаулар','reservations_ready'=>'Дайын брондаулар','reservations_expired_period'=>'Мерзімі өткен брондаулар','fines_paid_period'=>'Төленген айыппұлдар','fines_waived_period'=>'Есептен шығарылған айыппұлдар','repository_added_period'=>'Репозиторийге қосылған жұмыстар','repository_usage_period'=>'Репозиторийді пайдалану','tasks_open'=>'Ашық тапсырмалар','tasks_overdue'=>'Мерзімі өткен тапсырмалар','integration_failures'=>'Интеграция қателері',
                 'reservation_average_wait_hours'=>'Брондауды орташа күту, сағат','overdue_readers'=>'Мерзімін өткізген оқырмандар','average_overdue_days'=>'Орташа кешігу, күн','oldest_overdue_days'=>'Ең ұзақ кешігу, күн','repository_restricted'=>'Шектеулі немесе тек метадеректі жұмыстар','external_active'=>'Белсенді лицензиялық/серіктес ресурстар','external_unavailable'=>'Қолжетімсіз сыртқы ресурстар','digital_access_failures'=>'Цифрлық қолжетімділіктен бас тартулар','complaints_open'=>'Ашық шағымдар','messages_high_priority'=>'Жоғары басымдықты өтініштер','data_quality_critical'=>'Дерек сапасының сыни мәселелері','inactive_readers'=>'Белсенді емес оқырмандар','active_staff_accounts'=>'Қызметкерлердің белсенді есептік жазбалары','privileged_role_assignments'=>'Артықшылықты рөл тағайындаулары',
             ],
@@ -140,6 +141,7 @@ $translations = [
                 'repository' => '12 айдағы репозиторий өсімі',
                 'external' => 'Соңғы 14 күндегі сыртқы ресурс өтулері',
                 'fund_types' => 'Қордың құжат түрлері бойынша құрамы',
+                'languages' => 'Тілдер бойынша қор', 'sigla' => 'Сигла бойынша қор', 'acquisition_sources' => 'Көздер бойынша түсімдер', 'acquisition_value_by_source' => 'Көздер бойынша түсім құны',
                 'udc' => 'Қордың ӘОЖ бойынша бөлінуі',
                 'message_sla' => 'Ашық өтініштердің SLA күйі',
             ],
@@ -150,7 +152,7 @@ $translations = [
             'acquisitions' => [
                 'eyebrow' => 'Қорды толықтыру', 'title' => 'Толықтырушы панелі',
                 'subtitle' => 'Нақты түсімдер, толықтыру көздері және толық өңдеуден өтпеген құжаттар.',
-                'cards' => ['received_today' => 'Бүгін түсті', 'received_month' => 'Айда түсті', 'sources_month' => 'Айдағы көздер', 'processing_copies' => 'Өңдеудегі даналар', 'incomplete_records' => 'Толық емес жазбалар'],
+                'cards' => ['received_today' => 'Бүгін түсті', 'received_month' => 'Айда түсті', 'arrivals_current_month' => 'Осы айдағы түсімдер', 'sources_month' => 'Айдағы көздер', 'acquisition_value_month' => 'Айдағы түсім құны', 'writeoffs_year' => 'Осы жылғы шығарулар', 'ksu_entries_year' => 'Осы жылғы ЖЕК жазбалары', 'ksu_conflicts' => 'Ашық ЖЕК қайшылықтары', 'processing_copies' => 'Өңдеудегі даналар', 'incomplete_records' => 'Толық емес жазбалар'],
                 'distribution' => 'Айдағы түсім көздері', 'trend' => '12 айдағы түсімдер',
             ],
             'cataloguer' => [
@@ -500,10 +502,26 @@ $translations = [
         'empty' => 'Берілген шарттар бойынша даналар табылмады.',
     ],
 
+    'udc_reference' => [
+        'title' => 'ӘОЖ анықтамалығы', 'eyebrow' => 'Каталогтау',
+        'subtitle' => 'Каталогтаушы тексеруі қажет сипаттамалар: :count',
+        'search_placeholder' => 'ӘОЖ коды немесе сипаттама', 'search' => 'Іздеу', 'parent' => 'Жоғарғы бөлім',
+        'verified' => 'Тексерілді', 'needs_review' => 'Тексеру қажет',
+        'description_ru' => 'Орысша сипаттама', 'description_kk' => 'Қазақша сипаттама', 'description_en' => 'Ағылшынша сипаттама',
+        'department' => 'Бағыт немесе факультет', 'verified_checkbox' => 'Сипаттаманы каталогтаушы тексерді', 'save' => 'Сақтау',
+    ],
+
     'circulation' => [
         'eyebrow' => 'Кітап беру',
         'title' => 'Оқырмандарға қызмет көрсету',
         'subtitle' => 'Материалдарды беру, қайтару және мерзімін ұзарту, мерзімдер мен берешектерді бақылау.',
+        'history_title' => 'Кітап беру тарихы',
+        'history_hint' => 'Мұнда беру және қайтару операциялары көрсетіледі. Оқырман, кітап немесе дана нөмірі бойынша іздеңіз.',
+        'search_reader_or_copy' => 'Оқырманның аты-жөні, кітап атауы немесе дана нөмірі',
+        'reader' => 'Оқырман',
+        'copy' => 'Кітап және дана',
+        'issued_at' => 'Берілген күні',
+        'returned_at' => 'Қайтарылған күні',
         'issue_title' => 'Материалды беру',
         'issue_subtitle' => 'Оқырманды сәйкестендіріңіз, шектеулерді тексеріңіз және дананы сканерлеңіз.',
         'return_title' => 'Материалды қайтару',
@@ -1250,15 +1268,19 @@ $translations = [
     'inventory' => [
         'title' => 'Түгендеу', 'kicker' => 'Қорды сканерлеу', 'description' => 'Күтілетін даналардың snapshot-ы және сәйкессіздіктерді тексеру. Сканерлеу дана күйін автоматты өзгертпейді.', 'new_session' => 'Жаңа сессия', 'branch' => 'Филиал', 'fund' => 'Қор', 'all_funds' => 'Барлық қорлар', 'room' => 'Зал', 'shelf' => 'Сөре / ауқым', 'date' => 'Күні', 'create' => 'Сессия құру', 'created' => 'Түгендеу сессиясы құрылды.', 'updated' => 'Сессия жаңартылды.', 'number' => 'Нөмір', 'zone' => 'Аймақ', 'status' => 'Күй', 'expected' => 'Күтіледі', 'found' => 'Табылды', 'missing' => 'Жоқ', 'misplaced' => 'Өз орнында емес', 'unknown' => 'Белгісіз', 'duplicates' => 'Қайталау', 'empty' => 'Сессиялар жоқ.', 'start' => 'Бастау және snapshot сақтау', 'scan' => 'Сканерлеу', 'scan_placeholder' => 'Штрихкод, QR немесе мүлік нөмірі', 'register_scan' => 'Тіркеу', 'scan_help' => 'USB-сканер пернетақта сияқты жұмыс істейді. Қайталанған код табылған санын арттырмайды.', 'scan_result' => 'Нәтиже: :result', 'complete' => 'Сканерлеуді аяқтау', 'complete_confirm' => 'Сәйкессіздіктерді тексеруге өту керек пе?', 'approve' => 'Нәтижені бекіту', 'approve_confirm' => 'Даналарды автоматты өзгертпей бекіту керек пе?', 'snapshot' => 'Күтілетін даналардың snapshot-ы', 'code' => 'Код', 'book' => 'Басылым', 'expected_status' => 'Күтілетін күй', 'result' => 'Нәтиже',
         'section' => 'Секция', 'pilot_size' => 'Pilot көлемі', 'copies' => 'дана', 'storage_code' => 'Сигла', 'completeness' => 'Орналасу толықтығы',
+        'scope' => 'Қамту', 'any_branch' => 'Барлық филиалдар', 'service_point' => 'Қызмет көрсету пункті',
+        'session_size' => 'Сессия көлемі', 'full_scope' => 'Таңдалған қамтуды толық тексеру', 'pilot_count' => 'Pilot — :count дана',
+        'scope_value_required' => 'Түгендеудің таңдалған қамтуы үшін мәнді көрсетіңіз.',
+        'scopes' => ['all' => 'Бүкіл қор', 'branch' => 'Филиал', 'fund' => 'Қор', 'sigla' => 'Сигла', 'service_point' => 'Қызмет көрсету пункті'],
         'location_problems' => 'Қорды орналастыру мәселелері', 'location_known_only' => 'Тек дерекқордағы нақты мәндер көрсетіледі; бос орналасу автоматты толтырылмайды.',
         'without_point' => 'Кітапхана нүктесі жоқ', 'without_fund' => 'Қор жоқ', 'without_room' => 'Зал жоқ', 'without_section' => 'Секция жоқ', 'without_shelf' => 'Сөре жоқ', 'without_storage_code' => 'Сигла жоқ', 'point_fund_conflicts' => 'Нүкте/қор қайшылығы',
         'checked' => 'Тексерілді', 'requires_review' => 'Нақтылау қажет', 'physical_verification' => 'Қорды тексеру', 'inventory_number' => 'Түгендеу нөмірі', 'observed_inventory' => 'Кітапта көрінетін нөмір (сәйкес болмаса)', 'confirm_found' => 'Дана табылды', 'identity_help' => 'ISBN физикалық дананы анықтамайды. Таңбалау үшін дәл түгендеу нөмірі қажет.',
         'inventory_condition' => 'Кітаптағы түгендеу нөмірі', 'inventory_conditions' => ['unverified' => 'Тексерілмеді', 'visible' => 'Көрінеді және сәйкес', 'db_only' => 'Тек дерекқорда', 'unreadable' => 'Оқылмайды', 'mismatch' => 'Сәйкес емес'],
         'database_location' => 'Ағымдағы дерекқор', 'actions' => 'Әрекеттер', 'apply_location_correction' => 'Жылжытуды растау', 'confirm_location' => 'Орналасуды растау', 'marking' => 'Таңбалау',
         'pilot_analytics' => 'Pilot нәтижесі', 'location_confirmed' => 'Орналасу расталды', 'location_corrected' => 'Орналасу түзетілді', 'barcodes_assigned' => 'Штрих-код тағайындалды', 'labels_printed' => 'Жапсырма басылды', 'scan_confirmed' => 'Скан расталды', 'median_handling_seconds' => 'Медианалық уақыт, сек.',
-        'inventory_not_found' => 'Бұл түгендеу нөмірі бар дана табылмады. ISBN дана идентификаторы ретінде қолданылмайды.', 'invalid_inventory_condition' => 'Түгендеу нөмірінің күйін таңдаңыз.', 'observed_required' => 'Кітапта нақты көрінетін нөмірді енгізіңіз.', 'fund_branch_mismatch' => 'Таңдалған қор таңдалған кітапхана нүктесіне тиесілі болуы керек.', 'location_result' => 'Орналасу өңделді. Түзетілген ескертулер: :resolved. Қалды: :remaining.',
+        'inventory_not_found' => 'Бұл түгендеу нөмірі бар дана табылмады. ISBN дана идентификаторы ретінде қолданылмайды.', 'identifier_ambiguous' => 'Бұл код бірнеше дананы көрсетеді. Сканерлеу алдында түгендеу нөмірі мен штрихкод қайшылығын шешіңіз.', 'invalid_inventory_condition' => 'Түгендеу нөмірінің күйін таңдаңыз.', 'observed_required' => 'Кітапта нақты көрінетін нөмірді енгізіңіз.', 'fund_branch_mismatch' => 'Таңдалған қор таңдалған кітапхана нүктесіне тиесілі болуы керек.', 'location_result' => 'Орналасу өңделді. Түзетілген ескертулер: :resolved. Қалды: :remaining.',
         'statuses' => ['draft' => 'Жоба', 'running' => 'Жүріп жатыр', 'review' => 'Тексеру', 'completed' => 'Аяқталды', 'approved' => 'Бекітілді', 'cancelled' => 'Жойылды'],
-        'results' => ['missing' => 'Тексеру кезінде табылмады', 'found' => 'Табылды', 'misplaced' => 'Басқа орында тіркелген', 'unknown' => 'Белгісіз код', 'duplicate' => 'Қайта сканерлеу', 'status_conflict' => 'Күй қайшылығы', 'requires_review' => 'Қайта тексеру қажет'],
+        'results' => ['missing' => 'Күтіледі / табылмады', 'found' => 'Табылды', 'misplaced' => 'Орны дұрыс емес', 'unknown' => 'Белгісіз код', 'duplicate' => 'Қайта сканерлеу', 'written_off' => 'Есептен шығарылған дана', 'status_conflict' => 'Күй қайшылығы', 'requires_review' => 'Қайта тексеру қажет'],
     ],
 ];
 $translations['member'] = array_replace_recursive($translations['member'], $translations['member_portal']);

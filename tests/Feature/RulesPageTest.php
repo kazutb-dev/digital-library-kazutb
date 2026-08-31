@@ -2,8 +2,7 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 /**
@@ -24,25 +23,15 @@ use Tests\TestCase;
  */
 class RulesPageTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        config()->set('demo_auth.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
-    }
+    use BuildsAdminControlPlane;
 
     private function loginAs(string $identitySlug): void
     {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
-        ]);
+        $this->setUpAdminControlPlane();
+        $user = $identitySlug === 'admin'
+            ? $this->adminUser
+            : $this->makeControlPlaneUser($identitySlug, ['locale' => 'ru']);
+        $this->signInToLibraryAs($user);
     }
 
     public function test_guest_can_access_rules_page(): void
@@ -99,6 +88,17 @@ class RulesPageTest extends TestCase
         $response->assertDontSee('2026-04-22', false);
     }
 
+    public function test_rules_header_explains_scope_without_unverified_policy_metadata(): void
+    {
+        $response = $this->get('/rules?lang=ru');
+
+        $response->assertOk()
+            ->assertSee('5 тематических разделов', false)
+            ->assertSee('Показываются в личном кабинете', false)
+            ->assertSee('class="rules-canonical__num"', false)
+            ->assertDontSee('class="rules-page__section-label"', false);
+    }
+
     public function test_rules_page_renders_russian_locale_variant(): void
     {
         $response = $this->get('/rules?lang=ru');
@@ -108,14 +108,12 @@ class RulesPageTest extends TestCase
         // Section headlines
         $response->assertSee('Общие положения', false);
         $response->assertSee('Выдача и возврат', false);
-        $response->assertSee('Электронный доступ', false);
-        $response->assertSee('Правила поведения', false);
-        $response->assertSee('Вопросы и поддержка', false);
-        $response->assertSee('Срок возврата', false);
-        $response->assertSee('В личном кабинете', false);
-        $response->assertSee('Если действие доступно', false);
-        $response->assertDontSee('Нарушения и взыскания', false);
-        $response->assertDontSee('Шкала приостановки доступа', false);
+        $response->assertSee('Работа в читальном зале', false);
+        $response->assertSee('Обязанности читателей', false);
+        $response->assertSee('Ответственность', false);
+        $response->assertSee('студентам, магистрантам, докторантам', false);
+        $response->assertSee('читательский билет', false);
+        $response->assertSee('только в читальном зале', false);
     }
 
     public function test_rules_page_renders_kazakh_locale_variant(): void
@@ -126,12 +124,10 @@ class RulesPageTest extends TestCase
         $response->assertSee('Кітапхананы пайдалану ережелері', false);
         $response->assertSee('Жалпы ережелер', false);
         $response->assertSee('Беру және қайтару', false);
-        $response->assertSee('Электрондық қолжетімділік', false);
-        $response->assertSee('Мінез-құлық ережелері', false);
-        $response->assertSee('Сұрақтар мен қолдау', false);
-        $response->assertSee('Қайтару мерзімі', false);
-        $response->assertSee('Жеке кабинетте', false);
-        $response->assertDontSee('Бұзушылықтар мен шаралар', false);
+        $response->assertSee('Оқу залында пайдалану', false);
+        $response->assertSee('Оқырмандардың міндеттері', false);
+        $response->assertSee('Жауапкершілік', false);
+        $response->assertSee('оқырман билеті', false);
     }
 
     public function test_rules_page_renders_english_locale_variant(): void
@@ -142,35 +138,23 @@ class RulesPageTest extends TestCase
         $response->assertSee('Library Usage Rules', false);
         $response->assertSee('General provisions', false);
         $response->assertSee('Borrowing and returns', false);
-        $response->assertSee('Digital access', false);
-        $response->assertSee('Code of conduct', false);
-        $response->assertSee('Questions and support', false);
-        $response->assertSee('Current loan', false);
-        $response->assertSee('In the reader account', false);
-        $response->assertSee('When the action is available', false);
-        $response->assertSee('Based on current availability', false);
-        $response->assertSee('Feedback', false);
-        $response->assertDontSee('Violations and penalties', false);
-        $response->assertDontSee('controlled viewer with no download path', false);
-        $response->assertDontSee('Access suspension ladder', false);
-        $response->assertDontSee('Right of appeal', false);
+        $response->assertSee('Reading-room use', false);
+        $response->assertSee('Reader responsibilities', false);
+        $response->assertSee('Responsibility', false);
+        $response->assertSee('identity document or student ID', false);
+        $response->assertSee('Rare-collection editions', false);
+        $response->assertSee('temporarily restricted or suspended', false);
     }
 
-    public function test_borrowing_section_shows_only_current_loan_facts_without_fixed_audience_limits(): void
+    public function test_borrowing_section_renders_only_the_official_lending_rules(): void
     {
         $response = $this->get('/rules?lang=en');
 
         $response->assertOk();
-        $response->assertSee('Current loan', false);
-        $response->assertSee('Due date', false);
-        $response->assertDontSee('Undergraduate students', false);
-        $response->assertDontSee('doctoral students', false);
-        $response->assertDontSee('Faculty and research staff', false);
-        $this->assertSame(
-            1,
-            substr_count($response->getContent(), 'data-audience-slot'),
-            'Only the source-backed current-loan card should be published.'
-        );
+        $response->assertSee('issued for temporary use', false);
+        $response->assertSee('established due date', false);
+        $response->assertDontSee('Current loan', false);
+        $this->assertSame(0, substr_count($response->getContent(), 'data-audience-slot'));
     }
 
     public function test_rules_footer_meta_renders_related_links(): void

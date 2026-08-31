@@ -85,16 +85,23 @@ class CatalogReadService
         // Data Cleanup queue, but it must not hide a real book from readers.
         $publicCopies = static fn (Builder $copies): Builder => $copies
             ->whereNotIn('status', ['written_off', 'lost']);
+        $eagerLoads = ['translations'];
+        if (DatabaseSchema::hasTable('contributors') && DatabaseSchema::hasTable('bibliographic_record_contributor')) {
+            $eagerLoads[] = 'contributors';
+        }
+        if (DatabaseSchema::hasTable('subjects') && DatabaseSchema::hasTable('bibliographic_record_subject')) {
+            $eagerLoads[] = 'subjects';
+        }
         $builder = BibliographicRecord::query()
             ->when($completeOnly, fn (Builder $query) => $query
                 ->where('is_draft', false)
                 ->whereNotNull('title')
                 ->whereRaw("TRIM(title) <> ''"))
-            ->with('translations')
+            ->with($eagerLoads)
             ->withCount([
                 'copies' => $publicCopies,
                 'copies as physical_copies_count' => $publicCopies,
-                'copies as available_copies_count' => fn (Builder $copies) => $copies->where('status', 'available'),
+                'copies as available_copies_count' => fn (Builder $copies) => $copies->availableForCirculation(),
                 'copies as issued_copies_count' => fn (Builder $copies) => $copies->whereIn('status', ['issued', 'overdue']),
                 'copies as processing_copies_count' => fn (Builder $copies) => $copies->where('status', 'in_processing'),
                 'copies as repair_copies_count' => fn (Builder $copies) => $copies->where('status', 'under_repair'),
@@ -189,7 +196,7 @@ class CatalogReadService
             ->whereHas('copies', $deskCopies)
             ->withCount([
                 'copies as desk_copies_count' => $deskCopies,
-                'copies as desk_available_copies_count' => fn (Builder $copies) => $deskCopies($copies)->where('status', 'available'),
+                'copies as desk_available_copies_count' => fn (Builder $copies) => $deskCopies($copies)->availableForCirculation(),
             ])
             ->with('translations')
             ->withSum(['copies as desk_issue_count' => $deskCopies], 'issue_count')
@@ -296,10 +303,10 @@ class CatalogReadService
         // column: a record is "available" when at least one copy is on shelf.
         $availabilityKey = mb_strtolower(trim((string) $availability));
         match ($availabilityKey) {
-            'available' => $builder->whereHas('copies', fn (Builder $copies) => $copies->where('status', 'available')),
+            'available' => $builder->whereHas('copies', fn (Builder $copies) => $copies->availableForCirculation()),
             'issued' => $builder
                 ->whereHas('copies', fn (Builder $copies) => $copies->whereIn('status', ['issued', 'overdue']))
-                ->whereDoesntHave('copies', fn (Builder $copies) => $copies->where('status', 'available')),
+                ->whereDoesntHave('copies', fn (Builder $copies) => $copies->availableForCirculation()),
             'electronic_only' => $builder
                 ->whereHas('electronicMaterials', fn (Builder $materials) => $materials->published())
                 ->whereDoesntHave('copies', fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost'])),
@@ -592,7 +599,7 @@ class CatalogReadService
         bool $includeUdcCode = false,
     ): array {
         $localized = $this->localizedContent->bibliographic($record);
-        $available = (int) ($record->available_copies_count ?? $record->copies()->where('status', 'available')->count());
+        $available = (int) ($record->available_copies_count ?? $record->copies()->availableForCirculation()->count());
         $totalCopies = (int) ($record->physical_copies_count ?? $record->copies()->whereNotIn('status', ['written_off', 'lost'])->count());
         $digitalCount = (int) ($record->active_electronic_materials_count
             ?? $record->electronicMaterials()->published()->count());
@@ -627,6 +634,29 @@ class CatalogReadService
 
         $languageCode = PublicCatalogLanguage::normalize((string) $record->language);
 
+        $contributors = $record->relationLoaded('contributors')
+            ? $record->contributors->map(static fn ($contributor): array => [
+                'name' => (string) $contributor->name,
+                'role' => (string) ($contributor->pivot?->role ?? 'author'),
+                'kind' => (string) ($contributor->kind ?? 'person'),
+            ])->values()->all()
+            : [];
+        $subjects = $record->relationLoaded('subjects')
+            ? $record->subjects->map(static fn ($subject): array => [
+                'term' => (string) $subject->term,
+                'scheme' => (string) ($subject->scheme ?? 'topical'),
+            ])->values()->all()
+            : [];
+        $classification = collect($subjects)->map(static fn (array $subject): array => [
+            'id' => $subject['term'],
+            'label' => $subject['term'],
+            'sourceKind' => 'subject',
+            'scheme' => $subject['scheme'],
+        ]);
+        if (filled($record->category) && ! $classification->contains(fn (array $item): bool => $item['label'] === $record->category)) {
+            $classification->push(['id' => $record->category, 'label' => $record->category, 'sourceKind' => 'category', 'scheme' => 'local']);
+        }
+
         return [
             'id' => (string) $record->getKey(),
             'title' => [
@@ -638,6 +668,8 @@ class CatalogReadService
             ],
             'primaryAuthor' => $record->primary_author,
             'authors' => $record->allAuthors(),
+            'contributors' => $contributors,
+            'subjects' => $subjects,
             'publisher' => [
                 'name' => (string) ($record->publisher ?? ''),
             ],
@@ -676,19 +708,17 @@ class CatalogReadService
                 'issueCount' => (int) ($record->total_issue_count ?? 0),
                 'latestRegistrationDate' => $latestRegistrationDate,
             ],
-            'classification' => $record->category !== null && $record->category !== ''
-                ? [['id' => $record->category, 'label' => $record->category, 'sourceKind' => 'subject']]
-                : [],
+            'classification' => $classification->values()->all(),
             'udc' => [
-                'raw' => $includeUdcCode ? $udcCode : '',
+                // UDC is public bibliographic classification, not a holding
+                // identifier. Readers need the actual code to search and cite
+                // a record; exact inventory and shelf data remain protected.
+                'raw' => $udcCode,
                 'description' => $udcDescription,
-                'display' => $includeUdcCode
-                    ? trim($udcCode.($udcDescription !== '' ? ' — '.$udcDescription : ''))
-                    : $udcDescription,
+                'display' => trim($udcCode.($udcDescription !== '' ? ' — '.$udcDescription : '')),
                 'source' => $udcCode !== '' ? 'udc' : '',
             ],
             'authorMark' => (string) ($record->author_mark ?? ''),
-            'source' => 'catalog.bibliographic_records',
         ];
     }
 
@@ -751,10 +781,19 @@ class CatalogReadService
         }
         if (($value = trim((string) $author)) !== '') {
             $needle = '%'.mb_strtolower($value).'%';
-            $builder->where(function (Builder $inner) use ($needle): void {
+            $builder->where(function (Builder $inner) use ($needle, $value): void {
                 $inner
                     ->whereRaw('LOWER(COALESCE(primary_author, \'\')) LIKE ?', [$needle])
-                    ->orWhereRaw('LOWER(CAST(additional_authors AS TEXT)) LIKE ?', [$needle]);
+                    ->orWhereRaw('LOWER(CAST(additional_authors AS TEXT)) LIKE ?', [$needle])
+                    ->orWhere('primary_author', 'like', '%'.$value.'%');
+                if (DatabaseSchema::hasTable('contributors') && DatabaseSchema::hasTable('bibliographic_record_contributor')) {
+                    $inner->orWhereHas('contributors', fn (Builder $contributors) => $contributors
+                        ->where(function (Builder $names) use ($needle, $value): void {
+                            $names
+                                ->whereRaw('LOWER(contributors.name) LIKE ?', [$needle])
+                                ->orWhere('contributors.name', 'like', '%'.$value.'%');
+                        }));
+                }
             });
         }
         if (($value = trim((string) $publisher)) !== '') {
@@ -780,6 +819,14 @@ class CatalogReadService
                     ->orWhereRaw('LOWER(COALESCE(udc_code, \'\')) LIKE ?', [$needle])
                     ->orWhereRaw('LOWER(CAST(keywords AS TEXT)) LIKE ?', [$needle])
                     ->orWhereJsonContains('keywords', $value);
+                if (DatabaseSchema::hasTable('subjects') && DatabaseSchema::hasTable('bibliographic_record_subject')) {
+                    $inner->orWhereHas('subjects', fn (Builder $subjects) => $subjects
+                        ->where(function (Builder $terms) use ($needle, $value): void {
+                            $terms
+                                ->whereRaw('LOWER(subjects.term) LIKE ?', [$needle])
+                                ->orWhere('subjects.term', 'like', '%'.$value.'%');
+                        }));
+                }
             });
         }
     }
@@ -836,6 +883,11 @@ class CatalogReadService
             // discover page deep-links by UDC while facets use categories.
             $builder->where(function (Builder $inner) use ($value): void {
                 $inner->where('category', $value)->orWhere('udc_code', 'like', $value.'%');
+                if (DatabaseSchema::hasTable('subjects') && DatabaseSchema::hasTable('bibliographic_record_subject')) {
+                    $inner->orWhereHas('subjects', fn (Builder $subjects) => $subjects
+                        ->where('subjects.term', $value)
+                        ->orWhere('subjects.normalized_term', mb_strtolower($value)));
+                }
             });
         }
     }
@@ -852,7 +904,7 @@ class CatalogReadService
         if ($availableOnly || $physicalOnly || $mapping !== null) {
             $builder->whereHas('copies', function (Builder $copies) use ($availableOnly, $mapping): void {
                 if ($availableOnly) {
-                    $copies->where('status', 'available');
+                    $copies->availableForCirculation();
                 } else {
                     // "Physical holdings" means a copy that still belongs to
                     // the collection — written-off and lost items do not count.
@@ -968,7 +1020,7 @@ class CatalogReadService
                         'shelf' => '',
                         'copies' => [
                             'total' => $group->count(),
-                            'available' => $group->where('status', 'available')->count(),
+                            'available' => $group->filter(fn (BookCopy $copy): bool => $copy->status === 'available' && $copy->isCirculatable())->count(),
                             'issued' => $group->whereIn('status', ['issued', 'overdue'])->count(),
                         ],
                     ];
@@ -982,5 +1034,4 @@ class CatalogReadService
 
         return $result;
     }
-
 }

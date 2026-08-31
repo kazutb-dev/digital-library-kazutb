@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Services\Library\ReaderContactNormalizationService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class ReaderContactNormalizationTest extends TestCase
@@ -14,6 +15,13 @@ class ReaderContactNormalizationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // This class verifies normalization and validation contracts. Route
+        // authorization is covered separately with real staff users.
+        $this->withoutMiddleware([
+            \App\Http\Middleware\EnsureInternalCirculationStaff::class,
+            \Spatie\Permission\Middleware\PermissionMiddleware::class,
+        ]);
 
         if ($this->canUseLivePgsql()) {
             $this->useLivePgsql = true;
@@ -114,10 +122,15 @@ class ReaderContactNormalizationTest extends TestCase
 
     public function test_contact_stats_route_exists(): void
     {
-        $response = $this->withSession($this->staffSession())
-            ->getJson('/api/v1/internal/reader-contacts/stats');
+        $route = collect(Route::getRoutes()->getRoutes())
+            ->first(fn ($route) => $route->uri() === 'api/v1/internal/reader-contacts/stats');
 
-        $this->assertNotEquals(404, $response->status());
+        $this->assertNotNull($route);
+        $this->assertContains('GET', $route->methods());
+        $this->assertSame(
+            'App\\Http\\Controllers\\Api\\InternalReaderContactController@stats',
+            $route->getActionName(),
+        );
     }
 
     public function test_contact_stats_returns_data(): void
@@ -245,13 +258,12 @@ class ReaderContactNormalizationTest extends TestCase
         ]);
     }
 
-    public function test_stewardship_page_has_contact_normalization_section(): void
+    public function test_legacy_stewardship_page_redirects_to_data_cleanup(): void
     {
         $response = $this->withSession($this->staffSession())
             ->get('/internal/stewardship');
 
-        $response->assertOk();
-        $response->assertSee('Нормализация контактов');
-        $response->assertSee('reader-contacts/stats');
+        $response->assertStatus(301);
+        $response->assertRedirect('/librarian/data-cleanup');
     }
 }

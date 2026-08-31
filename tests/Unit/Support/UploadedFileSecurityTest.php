@@ -56,4 +56,15 @@ class UploadedFileSecurityTest extends TestCase
         UploadedFileSecurity::assertPassivePdf($file);
         $this->addToAssertionCount(1);
     }
+
+    public function test_keyword_bytes_inside_a_binary_stream_are_not_treated_as_an_active_action(): void
+    {
+        $file = UploadedFile::fake()->createWithContent(
+            'scanned.pdf',
+            "%PDF-1.6\n1 0 obj << /Length 18 >>\nstream\nimage-/JS-bytes!!\nendstream\nendobj\n%%EOF",
+        );
+
+        UploadedFileSecurity::assertPassivePdf($file);
+        $this->addToAssertionCount(1);
+    }
 }

@@ -30,6 +30,7 @@ final class LibraryReportService
     public function __construct(
         private readonly ReportRegistry $registry,
         private readonly OperationalReportService $operational,
+        private readonly CollectionAccountingReportService $collectionAccounting,
     ) {}
 
     /** @return array<string, mixed> */
@@ -59,13 +60,15 @@ final class LibraryReportService
     public function dataset(string $type, ReportFilters $filters): array
     {
         abort_unless($this->registry->find($type) !== null, 404);
-        $report = match ($type) {
-            'acquisitions' => $this->acquisitions($filters),
-            'fund-usage' => $this->fundUsage($filters),
-            'users' => $this->users($filters),
-            'electronic-resources' => $this->electronicResources($filters),
-            default => $this->operational->build($type, $filters),
-        };
+        $report = $this->collectionAccounting->supports($type)
+            ? $this->collectionAccounting->build($type, $filters)
+            : match ($type) {
+                'acquisitions' => $this->acquisitions($filters),
+                'fund-usage' => $this->fundUsage($filters),
+                'users' => $this->users($filters),
+                'electronic-resources' => $this->electronicResources($filters),
+                default => $this->operational->build($type, $filters),
+            };
 
         $maximum = max(100, (int) config('library.reports.max_live_rows', 10000));
         if (count($report['rows'] ?? []) > $maximum) {
@@ -129,6 +132,8 @@ final class LibraryReportService
             ['data_quality_issues', 'status'],
             ['news', 'status'],
             ['contact_messages', 'status'],
+            ['acquisition_batches', 'status'],
+            ['ksu_entries', 'status'],
             ['electronic_materials', 'workflow_status'],
             ['external_resources', 'publication_status'],
             ['repository_items', 'status'],

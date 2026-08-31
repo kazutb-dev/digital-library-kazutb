@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ReaderConvergenceTest extends TestCase
@@ -46,5 +48,20 @@ class ReaderConvergenceTest extends TestCase
 
         // Reader should normalize publicationYear → year for canonical API
         $this->assertStringContainsString('publicationYear', $content);
+    }
+
+    public function test_external_catalog_proxy_never_exposes_transport_details(): void
+    {
+        Http::fake(static function (): never {
+            throw new ConnectionException('connect failed: internal-catalog.service:5173 secret-route');
+        });
+
+        $response = $this->getJson('/api/v1/catalog-external?lang=en')
+            ->assertStatus(503)
+            ->assertJsonPath('success', false)
+            ->assertJsonMissingPath('message');
+
+        $this->assertStringNotContainsString('internal-catalog.service', $response->getContent());
+        $this->assertStringNotContainsString('secret-route', $response->getContent());
     }
 }

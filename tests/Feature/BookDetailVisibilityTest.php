@@ -158,7 +158,7 @@ class BookDetailVisibilityTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_guest_sees_udc_description_while_reader_sees_full_code_and_description(): void
+    public function test_guest_and_reader_both_see_public_udc_code_and_description(): void
     {
         $reader = $this->makeControlPlaneUser('member');
         UdcCode::query()->updateOrCreate(['code' => '004'], [
@@ -174,10 +174,32 @@ class BookDetailVisibilityTest extends TestCase
         $guest = $service->findByIdentifier((string) $record->getKey());
         $authenticated = $service->findByIdentifier((string) $record->getKey(), $reader);
 
-        $this->assertSame('', $guest['udc']['raw']);
-        $this->assertSame('Жасанды интеллект', $guest['udc']['display']);
+        $this->assertSame('004.8', $guest['udc']['raw']);
+        $this->assertSame('004.8 — Жасанды интеллект', $guest['udc']['display']);
         $this->assertSame('004.8', $authenticated['udc']['raw']);
         $this->assertSame('004.8 — Жасанды интеллект', $authenticated['udc']['display']);
+    }
+
+    public function test_book_detail_never_embeds_a_direct_external_material_url(): void
+    {
+        $record = BibliographicRecord::factory()->create(['is_draft' => false]);
+        ElectronicMaterial::query()->create([
+            'bibliographic_record_id' => $record->getKey(),
+            'title' => 'Licensed external edition',
+            'external_url' => 'https://licensed.example.test/private/item',
+            'file_type' => 'pdf',
+            'access_level' => 'authenticated',
+            'is_active' => true,
+            'workflow_status' => 'published',
+        ]);
+
+        $payload = app(BookDetailReadService::class)->findByIdentifier((string) $record->getKey());
+
+        $this->assertNotEmpty($payload['electronicMaterials']);
+        $this->assertArrayNotHasKey('externalUrl', $payload['electronicMaterials'][0]);
+        $this->getJson('/api/v1/book-db/'.$record->getKey())
+            ->assertOk()
+            ->assertJsonMissing(['externalUrl' => 'https://licensed.example.test/private/item']);
     }
 
     public function test_only_catalog_staff_receive_internal_quality_signals(): void

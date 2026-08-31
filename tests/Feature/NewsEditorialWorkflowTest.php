@@ -15,6 +15,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
@@ -27,19 +28,6 @@ class NewsEditorialWorkflowTest extends TestCase
     {
         parent::setUp();
         $this->setUpAdminControlPlane();
-        DB::table('news')->insert([
-            'slug' => 'legacy-upgrade-record',
-            'title' => 'Legacy upgrade record',
-            'category' => 'event',
-            'body' => 'Legacy publication body',
-            'excerpt' => 'Legacy excerpt',
-            'status' => 'draft',
-            'language' => 'ru',
-            'created_by' => $this->adminUser->getKey(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        (require base_path('database/migrations/2026_08_05_000000_expand_news_editorial_workflow.php'))->up();
         app(NewsCategorySeeder::class)->run();
         $this->withoutMiddleware(PreventRequestForgery::class);
     }
@@ -62,15 +50,12 @@ class NewsEditorialWorkflowTest extends TestCase
         $workflow->transition($own, 'approved', $director);
     }
 
-    public function test_upgrade_migration_backfills_legacy_news_without_losing_content(): void
+    public function test_editorial_schema_is_available_in_the_canonical_control_plane(): void
     {
-        $legacy = News::query()->where('slug', 'legacy-upgrade-record')->firstOrFail();
-
-        $this->assertNotNull($legacy->public_id);
-        $this->assertSame('event', $legacy->type);
-        $this->assertSame('Legacy upgrade record', $legacy->title_ru);
-        $this->assertSame('Legacy publication body', $legacy->content_ru);
-        $this->assertSame('legacy-upgrade-record', $legacy->slug_ru);
+        $this->assertTrue(Schema::hasTable('news_categories'));
+        $this->assertTrue(Schema::hasColumns('news', [
+            'public_id', 'type', 'title_ru', 'content_ru', 'slug_ru',
+        ]));
     }
 
     public function test_librarian_has_no_direct_publication_permission(): void

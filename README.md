@@ -52,7 +52,7 @@ Important paths for evaluators:
 - tests/Unit: unit tests
 - tests/Feature: feature and API/integration-oriented tests
 - tests/e2e: Playwright browser tests
-- scripts/dev: QA/dev helper scripts used by Composer scripts
+- scripts/dev/test-postgres.sh: guarded isolated PostgreSQL test runner
 - qa/: QA workspace and research artifacts
 - qa/final-improvements/: canonical metrics, tables, figures, traceability
 - qa/final-research/: manuscript and final integration/proofread reports
@@ -67,16 +67,14 @@ Required tools (Docker workflow):
 
 Required tools (non-Docker/local workflow):
 
-- PHP 8.3+ (some QA scripts require PHP 8.4+ or Docker fallback)
+- PHP 8.3+ (the current verified development runtime is PHP 8.4)
 - Composer 2+
 - Node.js 20.19.0+
 - npm 10+
 - PostgreSQL (if not using Docker PostgreSQL)
 
-Optional but useful:
-
-- Bash shell on Windows (Git Bash or WSL) for scripts under scripts/dev/\*.sh
-- GitHub CLI (gh) for extended evidence logging in qa:evidence
+The guarded PostgreSQL test runner is a Bash script; on Windows use Git Bash,
+WSL, or the Linux-based application container.
 
 ## Installation and Setup
 
@@ -262,7 +260,9 @@ composer test:stewardship
 Environment note:
 
 - phpunit.xml sets DB_CONNECTION=sqlite and DB_DATABASE=:memory: for test defaults.
-- Some scripts/documentation identify PostgreSQL-only scenarios; run with live PostgreSQL when required for those paths.
+- PostgreSQL-specific tests must use `composer test:postgres` with an explicit
+  database name ending in `_test`. Do not point generic PHPUnit commands at a
+  live runtime database.
 
 ### Browser / end-to-end tests (Playwright)
 
@@ -299,43 +299,29 @@ This runs:
 1. npm run build
 2. npm run test:e2e
 
-## Test Scripts / QA Scripts
+## Test and QA commands
 
-Script directory:
-
-- scripts/dev/
-
-Verified Composer script commands and what they do:
+Verified Composer commands and what they do:
 
 - composer qa:ci
-    - Runs scripts/dev/run-ci-gates.sh
-    - Performs: Laravel cache clear, Pint checks on targeted files, critical-path test filter, frontend production build.
+    - Runs Composer validation, Pint, the isolated critical-path test filter,
+      and the frontend production build directly from `composer.json`.
     - Use when: reproducing CI-like local gate checks.
 
-- composer qa:evidence
-    - Runs scripts/dev/run-verification-evidence.sh
-    - Captures evidence logs for qa:ci and Playwright runs, writes artifacts under evidence/verification/ with timestamps.
-    - Use when: producing auditable verification evidence.
-
-- composer qa:coverage-threshold
-    - Runs scripts/dev/check-coverage-threshold.php build/test-results/clover.xml 4
-    - Use when: validating coverage threshold after generating clover.xml.
-
-- composer dev:check
-    - Runs scripts/dev/check-dev-env.sh
-    - Prints availability and versions of core tools.
-
 - composer dev:critical-paths
-    - Runs scripts/dev/check-runtime-critical-paths.sh
-    - Checks presence and summary of critical-path test files.
+    - Alias for the isolated `test:critical-paths` PHPUnit filter.
 
 - composer dev:catalog-paths (alias composer test:catalog-paths)
-    - Runs scripts/dev/check-public-catalog-paths.sh
-    - Validates canonical route/API wiring and reports PASS/FAIL.
+    - Runs the public catalogue convergence/page/recovery feature tests.
 
-Important shell note:
+- composer test:internal, composer test:reservation-core, composer
+  test:integration-reservations, and composer test:stewardship
+    - Run their maintained PHPUnit filters or explicit test files directly;
+      no deleted wrapper script is involved.
 
-- Many scripts use bash and may require Git Bash/WSL on Windows if run outside containers.
+The only maintained script under `scripts/dev/` is `test-postgres.sh`. It
+refuses non-`_test` targets and verifies the effective connection before any
+test migration.
 
 ## QA / Research Artifacts
 
@@ -373,12 +359,14 @@ If you are evaluating reproducibility, start with:
 - Playwright startup behavior:
     - playwright.config.ts can fallback to Docker web server when compatible local PHP is unavailable.
 
-- Script portability on Windows:
-    - scripts/dev/\*.sh are bash scripts; run via Git Bash/WSL or inside Linux-based containers.
+- Guarded PostgreSQL runner portability on Windows:
+    - `scripts/dev/test-postgres.sh` requires Git Bash/WSL or a Linux-based
+      container.
 
-- Partially supported script references:
-    - composer.json includes dev:vault-sync, dev:vault-watch, and dev:install-vault-hooks entries that reference scripts/dev/vault-\*.sh files not present in this repository snapshot.
-    - Treat those commands as unavailable unless those scripts are added.
+- Removed legacy helpers:
+    - vault sync/hooks, ad-hoc recovery audits, evidence capture, and host
+      installer wrappers are not repository commands. Follow the checked-in
+      deployment/runtime documentation and approved operational procedure.
 
 ## License
 

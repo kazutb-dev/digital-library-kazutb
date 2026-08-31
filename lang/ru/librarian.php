@@ -142,6 +142,7 @@ $translations = [
                 'electronic_resources' => 'Активные электронные ресурсы',
                 'message_sla_overdue' => 'Обращения с нарушенным SLA',
                 'fines_charged_period' => 'Начислено штрафов за период', 'acquisition_value_period' => 'Стоимость зарегистрированных поступлений',
+                'arrivals_current_month' => 'Поступления за текущий месяц', 'writeoffs_year' => 'Списано за текущий год', 'ksu_entries_year' => 'Записи КСУ за текущий год', 'ksu_conflicts' => 'Открытые конфликты КСУ',
                 'records_total'=>'Библиографические записи','copies_available'=>'Доступные экземпляры','copies_issued'=>'Выданные экземпляры','copies_repair'=>'Экземпляры в ремонте','copies_lost'=>'Утерянные экземпляры','records_added_period'=>'Записи, добавленные за период','reservations_queued'=>'Брони в очереди','reservations_ready'=>'Брони готовы','reservations_expired_period'=>'Истёкшие брони','fines_paid_period'=>'Оплаченные штрафы','fines_waived_period'=>'Списанные штрафы','repository_added_period'=>'Работы, добавленные в репозиторий','repository_usage_period'=>'Использование репозитория','tasks_open'=>'Открытые задачи','tasks_overdue'=>'Просроченные задачи','integration_failures'=>'Ошибки интеграций',
                 'reservation_average_wait_hours'=>'Среднее ожидание брони, часы','overdue_readers'=>'Читатели с просрочками','average_overdue_days'=>'Средняя просрочка, дни','oldest_overdue_days'=>'Самая давняя просрочка, дни','repository_restricted'=>'Ограниченные работы и метаданные','external_active'=>'Активные лицензионные/партнёрские ресурсы','external_unavailable'=>'Недоступные внешние ресурсы','digital_access_failures'=>'Отказы цифрового доступа','complaints_open'=>'Открытые жалобы','messages_high_priority'=>'Приоритетные обращения','data_quality_critical'=>'Критические проблемы качества','inactive_readers'=>'Неактивные читатели','active_staff_accounts'=>'Активные учётные записи сотрудников','privileged_role_assignments'=>'Назначения привилегированных ролей',
             ],
@@ -154,6 +155,7 @@ $translations = [
                 'repository' => 'Рост репозитория за 12 месяцев',
                 'external' => 'Переходы к внешним ресурсам за 14 дней',
                 'fund_types' => 'Состав фонда по типам документов',
+                'languages' => 'Фонд по языкам', 'sigla' => 'Фонд по сиглам', 'acquisition_sources' => 'Поступления по источникам', 'acquisition_value_by_source' => 'Стоимость поступлений по источникам',
                 'udc' => 'Распределение фонда по УДК',
                 'message_sla' => 'SLA открытых обращений',
             ],
@@ -164,7 +166,7 @@ $translations = [
             'acquisitions' => [
                 'eyebrow' => 'Комплектование фонда', 'title' => 'Панель комплектатора',
                 'subtitle' => 'Фактические поступления, источники комплектования и документы, которые ещё не прошли полную обработку.',
-                'cards' => ['received_today' => 'Поступило сегодня', 'received_month' => 'Поступило за месяц', 'sources_month' => 'Источников за месяц', 'processing_copies' => 'Экземпляры в обработке', 'incomplete_records' => 'Неполные записи'],
+                'cards' => ['received_today' => 'Поступило сегодня', 'received_month' => 'Поступило за месяц', 'arrivals_current_month' => 'Поступления за текущий месяц', 'sources_month' => 'Источников за месяц', 'acquisition_value_month' => 'Стоимость поступлений за месяц', 'writeoffs_year' => 'Списано за текущий год', 'ksu_entries_year' => 'Записи КСУ за текущий год', 'ksu_conflicts' => 'Открытые конфликты КСУ', 'processing_copies' => 'Экземпляры в обработке', 'incomplete_records' => 'Неполные записи'],
                 'distribution' => 'Источники поступлений за месяц', 'trend' => 'Поступления за 12 месяцев',
             ],
             'cataloguer' => [
@@ -529,10 +531,26 @@ $translations = [
         'empty' => 'Экземпляры по заданным условиям не найдены.',
     ],
 
+    'udc_reference' => [
+        'title' => 'Справочник УДК', 'eyebrow' => 'Каталогизация',
+        'subtitle' => 'Описаний, которые нужно проверить каталогизатору: :count',
+        'search_placeholder' => 'Код УДК или описание', 'search' => 'Найти', 'parent' => 'Родительский раздел',
+        'verified' => 'Проверено', 'needs_review' => 'Нужно проверить',
+        'description_ru' => 'Описание на русском', 'description_kk' => 'Описание на казахском', 'description_en' => 'Описание на английском',
+        'department' => 'Направление или факультет', 'verified_checkbox' => 'Описание проверено каталогизатором', 'save' => 'Сохранить',
+    ],
+
     'circulation' => [
         'eyebrow' => 'Книговыдача',
         'title' => 'Обслуживание читателей',
         'subtitle' => 'Выдача, возврат и продление материалов, контроль сроков и задолженностей.',
+        'history_title' => 'История книговыдачи',
+        'history_hint' => 'Здесь показаны выдачи и возвраты. Найдите операцию по читателю, книге или номеру экземпляра.',
+        'search_reader_or_copy' => 'ФИО читателя, название книги или номер экземпляра',
+        'reader' => 'Читатель',
+        'copy' => 'Книга и экземпляр',
+        'issued_at' => 'Дата выдачи',
+        'returned_at' => 'Дата возврата',
         'issue_title' => 'Выдача материала',
         'issue_subtitle' => 'Идентифицируйте читателя, проверьте ограничения и отсканируйте экземпляр.',
         'return_title' => 'Возврат материала',
@@ -1215,7 +1233,7 @@ $translations = [
             'open_resource' => 'Открыть ресурс',
             'available_copies' => 'Свободных экземпляров: :count',
             'empty_title' => 'Подборка пуста',
-            'empty_body' => 'Откройте каталог и нажмите В подборку» на карточке издания — сохранённые записи появятся здесь.',
+            'empty_body' => 'Откройте каталог и нажмите «В подборку» на карточке издания — сохранённые записи появятся здесь.',
         ],
         'reserve' => [
             'button' => 'Забронировать',
@@ -1288,15 +1306,19 @@ $translations = [
     'inventory' => [
         'title' => 'Инвентаризация', 'kicker' => 'Сканирование фонда', 'description' => 'Сессии со снимком ожидаемых экземпляров и проверкой расхождений. Сканирование не меняет статус экземпляра автоматически.', 'new_session' => 'Новая сессия', 'branch' => 'Филиал', 'fund' => 'Фонд', 'all_funds' => 'Все фонды', 'room' => 'Зал', 'shelf' => 'Полка / диапазон', 'date' => 'Дата', 'create' => 'Создать сессию', 'created' => 'Сессия инвентаризации создана.', 'updated' => 'Сессия обновлена.', 'number' => 'Номер', 'zone' => 'Зона', 'status' => 'Статус', 'expected' => 'Ожидается', 'found' => 'Найдено', 'missing' => 'Отсутствует', 'misplaced' => 'Не на месте', 'unknown' => 'Неизвестно', 'duplicates' => 'Повторы', 'empty' => 'Сессий пока нет.', 'start' => 'Начать и сохранить snapshot', 'scan' => 'Сканирование', 'scan_placeholder' => 'Штрихкод, QR или инвентарный номер', 'register_scan' => 'Зарегистрировать', 'scan_help' => 'USB-сканер работает как клавиатура. Повторный код будет отмечен и не увеличит число найденных.', 'scan_result' => 'Результат: :result', 'complete' => 'Завершить сканирование', 'complete_confirm' => 'Перейти к проверке расхождений?', 'approve' => 'Утвердить результат', 'approve_confirm' => 'Утвердить результат без автоматического изменения экземпляров?', 'snapshot' => 'Snapshot ожидаемых экземпляров', 'code' => 'Код', 'book' => 'Издание', 'expected_status' => 'Ожидаемый статус', 'result' => 'Результат',
         'section' => 'Секция', 'pilot_size' => 'Размер pilot', 'copies' => 'экземпляров', 'storage_code' => 'Сигла', 'completeness' => 'Полнота location',
+        'scope' => 'Охват', 'any_branch' => 'Все филиалы', 'service_point' => 'Пункт обслуживания',
+        'session_size' => 'Размер сессии / Размер pilot', 'full_scope' => 'Полная проверка выбранного охвата', 'pilot_count' => 'Pilot — :count экз.',
+        'scope_value_required' => 'Выберите значение для указанного охвата инвентаризации.',
+        'scopes' => ['all' => 'Весь фонд', 'branch' => 'Филиал', 'fund' => 'Фонд', 'sigla' => 'Сигла', 'service_point' => 'Пункт обслуживания'],
         'location_problems' => 'Проблемы размещения фонда', 'location_known_only' => 'Показаны только фактические значения БД; пропуски не заполняются автоматически.',
         'without_point' => 'Нет библиотечной точки', 'without_fund' => 'Нет фонда', 'without_room' => 'Нет зала', 'without_section' => 'Нет секции', 'without_shelf' => 'Нет полки', 'without_storage_code' => 'Нет сиглы', 'point_fund_conflicts' => 'Конфликт point/fund',
         'checked' => 'Проверено', 'requires_review' => 'Требуют уточнения', 'physical_verification' => 'Проверка фонда', 'inventory_number' => 'Инвентарный номер', 'observed_inventory' => 'Номер, видимый на книге (при расхождении)', 'confirm_found' => 'Экземпляр найден', 'identity_help' => 'ISBN не идентифицирует физический экземпляр. Для маркировки нужен точный инвентарный номер.',
         'inventory_condition' => 'Инвентарный номер на книге', 'inventory_conditions' => ['unverified' => 'Не проверен', 'visible' => 'Виден и совпадает', 'db_only' => 'Только в БД', 'unreadable' => 'Нечитаем', 'mismatch' => 'Не совпадает'],
         'database_location' => 'Текущая БД', 'actions' => 'Действия', 'apply_location_correction' => 'Подтвердить перемещение', 'confirm_location' => 'Подтвердить location', 'marking' => 'Маркировка',
         'pilot_analytics' => 'Результат pilot', 'location_confirmed' => 'Location confirmed', 'location_corrected' => 'Location corrected', 'barcodes_assigned' => 'Barcodes assigned', 'labels_printed' => 'Labels printed', 'scan_confirmed' => 'Scan confirmed', 'median_handling_seconds' => 'Median handling time, сек.',
-        'inventory_not_found' => 'Экземпляр с таким инвентарным номером не найден. ISBN не используется как идентификатор экземпляра.', 'invalid_inventory_condition' => 'Выберите состояние инвентарного номера.', 'observed_required' => 'Укажите номер, который фактически виден на книге.', 'fund_branch_mismatch' => 'Выбранный фонд должен относиться к выбранной библиотечной точке.', 'location_result' => 'Location обработан. Исправлено замечаний: :resolved. Осталось: :remaining.',
+        'inventory_not_found' => 'Экземпляр с таким инвентарным номером не найден. ISBN не используется как идентификатор экземпляра.', 'identifier_ambiguous' => 'Код соответствует нескольким экземплярам. Сначала разрешите конфликт инвентарного номера и штрихкода.', 'invalid_inventory_condition' => 'Выберите состояние инвентарного номера.', 'observed_required' => 'Укажите номер, который фактически виден на книге.', 'fund_branch_mismatch' => 'Выбранный фонд должен относиться к выбранной библиотечной точке.', 'location_result' => 'Location обработан. Исправлено замечаний: :resolved. Осталось: :remaining.',
         'statuses' => ['draft' => 'Черновик', 'running' => 'Идёт', 'review' => 'Проверка', 'completed' => 'Завершена', 'approved' => 'Утверждена', 'cancelled' => 'Отменена'],
-        'results' => ['missing' => 'Не найден при проверке', 'found' => 'Найден', 'misplaced' => 'Зарегистрирован в другой локации', 'unknown' => 'Неизвестный код', 'duplicate' => 'Повторный скан', 'status_conflict' => 'Конфликт статуса', 'requires_review' => 'Требует повторной проверки'],
+        'results' => ['missing' => 'Ожидается / не найден', 'found' => 'Найден', 'misplaced' => 'Неправильное место', 'unknown' => 'Неизвестный код', 'duplicate' => 'Повторный скан', 'written_off' => 'Списанный экземпляр', 'status_conflict' => 'Конфликт статуса', 'requires_review' => 'Требует повторной проверки'],
     ],
 ];
 $translations['member'] = array_replace_recursive($translations['member'], $translations['member_portal']);

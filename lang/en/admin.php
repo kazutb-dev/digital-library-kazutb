@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'system' => ['backup_created' => 'Backup created and verified.', 'restore_verified' => 'Restore test completed successfully in the isolated :database database.'],
     'layout' => [
         'portal_title' => 'Admin Portal',
         'portal_subtitle' => 'High-control governance',
@@ -25,6 +26,7 @@ return [
         'security' => 'Security',
         'backups' => 'Backup & Recovery',
         'librarian_console' => 'Librarian workspace',
+        'admin_console' => 'Administrator workspace',
         'logout' => 'Sign out',
     ],
     'dashboard' => [

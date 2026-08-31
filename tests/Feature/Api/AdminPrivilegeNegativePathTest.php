@@ -40,6 +40,17 @@ class AdminPrivilegeNegativePathTest extends TestCase
         foreach ($this->protectedPages() as $uri) {
             $this->signInToLibraryAs($librarian)->get($uri)->assertForbidden();
         }
+
+        // These read-only operational tools are deliberately delegated and
+        // do not grant general access to the administrative control plane.
+        $this->signInToLibraryAs($librarian)
+            ->get('/admin/external-resources')
+            ->assertOk()
+            ->assertDontSee('href="'.route('admin.overview').'"', false);
+        $this->signInToLibraryAs($librarian)
+            ->get('/admin/integrations')
+            ->assertOk()
+            ->assertDontSee('href="'.route('admin.overview').'"', false);
     }
 
     public function test_custom_role_can_enter_only_its_delegated_control_plane_scope(): void
@@ -118,9 +129,7 @@ class AdminPrivilegeNegativePathTest extends TestCase
             '/admin/feedback',
             '/admin/reports',
             '/admin/settings',
-            '/admin/integrations',
             '/admin/branches',
-            '/admin/external-resources',
         ];
     }
 }

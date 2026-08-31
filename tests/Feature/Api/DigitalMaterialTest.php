@@ -6,13 +6,18 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Models\Catalog\BibliographicRecord;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class DigitalMaterialTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->setUpAdminControlPlane();
         $this->withoutMiddleware(PreventRequestForgery::class);
     }
 
@@ -37,6 +42,22 @@ class DigitalMaterialTest extends TestCase
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    private function seedBook(): BibliographicRecord
+    {
+        return BibliographicRecord::query()->create([
+            'title' => 'Книга с электронной версией',
+            'primary_author' => 'Тестовый автор',
+            'publisher' => 'Тестовое издательство',
+            'publication_year' => 2026,
+            'language' => 'ru',
+            'udc_code' => '02',
+            'annotation' => 'Проверка блока электронных материалов.',
+            'isbn' => '9781471573880',
+            'resource_type' => 'book',
+            'is_draft' => false,
+        ]);
     }
 
     private function seedTestMaterial(string $accessLevel = 'authenticated', bool $isActive = true): string
@@ -99,7 +120,9 @@ class DigitalMaterialTest extends TestCase
 
     public function test_book_page_has_digital_materials_slot(): void
     {
-        $response = $this->get('/book/9781471573880');
+        $record = $this->seedBook();
+
+        $response = $this->get('/book/'.$record->isbn);
         $response->assertOk();
         $response->assertSee('digital-materials-slot', false);
         $response->assertSee('loadDigitalMaterials', false);
@@ -263,7 +286,7 @@ class DigitalMaterialTest extends TestCase
 
     public function test_book_page_still_renders(): void
     {
-        $response = $this->get('/book/9781471573880');
+        $response = $this->get('/book/'.$this->seedBook()->isbn);
         $response->assertOk();
     }
 

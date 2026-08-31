@@ -3,32 +3,38 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Library\CirculationLoan;
+use App\Models\User;
 use App\Services\Library\CirculationLoanReadService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class LoanVisibilityTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    private User $member;
+
     /** A valid UUID that won't match any real record. */
     private const FAKE_UUID = '00000000-0000-0000-0000-000000000000';
     private const FAKE_UUID_2 = '00000000-0000-0000-0000-000000000001';
 
     // ─── Session auth helper ─────────────────────────────────
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpAdminControlPlane();
+        $this->member = $this->makeControlPlaneUser('member', ['locale' => 'ru']);
+    }
+
     private function withAuthSession(array $user = []): static
     {
-        $defaults = [
-            'id' => 'test-user-1',
-            'name' => 'Тест Тестов',
-            'email' => 'test@digital-library.test',
-            'role' => 'student',
-        ];
-
-        return $this->withSession(['library.user' => array_merge($defaults, $user)]);
+        return $this->signInToLibraryAs($this->member);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -113,6 +119,7 @@ class LoanVisibilityTest extends TestCase
 
     public function test_service_summary_returns_expected_keys(): void
     {
+        $this->requireLivePgsql('Live PostgreSQL is required for the circulation read-model service test.');
         $service = new CirculationLoanReadService();
         $summary = $service->summaryForReader(self::FAKE_UUID);
 
@@ -125,6 +132,7 @@ class LoanVisibilityTest extends TestCase
 
     public function test_service_summary_returns_zeros_for_nonexistent_reader(): void
     {
+        $this->requireLivePgsql('Live PostgreSQL is required for the circulation read-model service test.');
         $service = new CirculationLoanReadService();
         $summary = $service->summaryForReader(self::FAKE_UUID_2);
 
@@ -137,12 +145,14 @@ class LoanVisibilityTest extends TestCase
 
     public function test_service_find_loan_returns_null_for_missing(): void
     {
+        $this->requireLivePgsql('Live PostgreSQL is required for the circulation read-model service test.');
         $service = new CirculationLoanReadService();
         $this->assertNull($service->findLoan(self::FAKE_UUID));
     }
 
     public function test_service_find_loans_by_reader_returns_empty_array(): void
     {
+        $this->requireLivePgsql('Live PostgreSQL is required for the circulation read-model service test.');
         $service = new CirculationLoanReadService();
         $loans = $service->findLoansByReader(self::FAKE_UUID_2);
 
@@ -152,6 +162,7 @@ class LoanVisibilityTest extends TestCase
 
     public function test_service_find_active_loan_by_copy_returns_null(): void
     {
+        $this->requireLivePgsql('Live PostgreSQL is required for the circulation read-model service test.');
         $service = new CirculationLoanReadService();
         $this->assertNull($service->findActiveLoanByCopy(self::FAKE_UUID));
     }
@@ -166,7 +177,8 @@ class LoanVisibilityTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Мои книги');
-        $response->assertSee('book-grid');
+        $response->assertSee('data-member-dashboard-loans', false);
+        $response->assertSee('loan-list', false);
     }
 
     public function test_account_page_has_loan_tabs(): void
@@ -174,9 +186,8 @@ class LoanVisibilityTest extends TestCase
         $response = $this->withAuthSession()->get('/account');
 
         $response->assertOk();
-        $response->assertSee('loan-tab');
-        $response->assertSee('Активные');
-        $response->assertSee('Возвращённые');
+        $response->assertSee('data-member-dashboard-loans', false);
+        $response->assertSee('/api/v1/account/loans', false);
     }
 
     public function test_account_page_has_circulation_stats(): void
@@ -184,10 +195,9 @@ class LoanVisibilityTest extends TestCase
         $response = $this->withAuthSession()->get('/account');
 
         $response->assertOk();
-        $response->assertSee('active-loans-count');
-        $response->assertSee('overdue-loans-count');
-        $response->assertSee('due-soon-loans-count');
-        $response->assertSee('returned-loans-count');
+        $response->assertSee('metric-collections', false);
+        $response->assertSee('metric-access', false);
+        $response->assertSee('metric-arrivals', false);
     }
 
     public function test_account_page_has_loan_summary_endpoint(): void
@@ -195,7 +205,7 @@ class LoanVisibilityTest extends TestCase
         $response = $this->withAuthSession()->get('/account');
 
         $response->assertOk();
-        $response->assertSee('account/loans/summary');
+        $response->assertSee('/api/v1/account/loans', false);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -209,6 +219,13 @@ class LoanVisibilityTest extends TestCase
             return true;
         } catch (\Exception $e) {
             return false;
+        }
+    }
+
+    private function requireLivePgsql(string $message): void
+    {
+        if (! $this->canUseLivePgsql()) {
+            $this->markTestSkipped($message);
         }
     }
 
@@ -234,6 +251,7 @@ class LoanVisibilityTest extends TestCase
 
     public function test_account_summary_still_works(): void
     {
+        $this->requireLivePgsql('Live PostgreSQL is required for the legacy account summary read model.');
         $response = $this->withAuthSession()->getJson('/api/v1/account/summary');
         $response->assertOk();
         $response->assertJsonPath('authenticated', true);

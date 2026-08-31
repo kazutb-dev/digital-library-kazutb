@@ -31,11 +31,21 @@ class PermissionSeeder extends Seeder
         'catalog.delete_record',
         'catalog.merge_duplicates',
         'catalog.import',
+        'catalog.view_raw_marc',
 
         // Physical copies attached to catalogue records.
         'copies.create',
         'copies.edit',
         'copies.delete',
+        'copies.movements.view',
+        'copies.movements.create',
+        'copies.write_off',
+
+        // Summarized inventory accounting (КСУ). Conflict resolution remains
+        // independent from ordinary register maintenance for maker/checker use.
+        'ksu.view',
+        'ksu.manage',
+        'ksu.resolve',
 
         // Reservations / holds.
         'reservation.create',
@@ -215,6 +225,8 @@ class PermissionSeeder extends Seeder
         'acquisitions.create_order',
         'acquisitions.receive',
         'acquisitions.manage',
+        'acquisitions.intake',
+        'acquisitions.confirm',
 
         // Daily librarian workspace queues.
         'tasks.view',
@@ -244,9 +256,16 @@ class PermissionSeeder extends Seeder
         'users.manage',
         'roles.manage',
         'system.settings',
+        'library.settings.manage',
         'system.logs',
         'branches.manage',
         'data_cleanup.access',
+
+        // Immutable recovered source, quarantine and reconciliation tooling.
+        'legacy_recovery.view',
+        'legacy_recovery.review',
+        'legacy_recovery.resolve',
+        'legacy_recovery.manage',
 
         // Persistent data-quality control centre (ДИР 6, ТЗ 11).
         'data_quality.view',

@@ -65,6 +65,14 @@ class SettingController extends Controller
             'max_renewals' => ['sometimes', 'integer', 'min:0', 'max:20'],
             'manual_due_date_max_days' => ['sometimes', 'integer', 'min:1', 'max:365'],
             'inventory_batch_scan_limit' => ['sometimes', 'integer', 'min:10', 'max:100000'],
+            'inventory_numbering_enabled' => ['sometimes', 'boolean'],
+            'inventory_number_prefix' => ['sometimes', 'string', 'max:24', 'regex:/^[A-Za-z0-9_-]+$/'],
+            'barcode_generation_enabled' => ['sometimes', 'boolean'],
+            'barcode_prefix' => ['sometimes', 'string', 'max:24', 'regex:/^[A-Za-z0-9_-]+$/'],
+            'ksu_numbering_enabled' => ['sometimes', 'boolean'],
+            'ksu_yearly_reset' => ['sometimes', 'accepted'],
+            'default_service_point' => ['nullable', 'string', 'max:64'],
+            'default_sigla' => ['nullable', 'string', 'max:64'],
             'barcode_format' => ['sometimes', Rule::in(['code128'])],
             'barcode_label_size' => ['sometimes', 'string', 'max:20'],
             'overdue_blocking_enabled' => ['required', 'boolean'],
@@ -105,7 +113,7 @@ class SettingController extends Controller
 
         $validated['renewal_allowed'] = $request->boolean('renewal_allowed');
         $validated['overdue_blocking_enabled'] = $request->boolean('overdue_blocking_enabled');
-        foreach (['reservation_queue_enabled', 'reservation_manual_confirmation_required', 'reservation_interbranch_transfer_enabled', 'reservation_queue_override_enabled', 'reservation_blocking_on_fines', 'replacement_requires_senior_approval', 'replacement_exception_requires_director', 'monetary_compensation_allowed', 'incident_blocks_issues', 'replacement_required_severe', 'replacement_required_irreparable', 'data_quality_bulk_approval_required', 'data_quality_merge_approval_required'] as $booleanKey) {
+        foreach (['reservation_queue_enabled', 'reservation_manual_confirmation_required', 'reservation_interbranch_transfer_enabled', 'reservation_queue_override_enabled', 'reservation_blocking_on_fines', 'replacement_requires_senior_approval', 'replacement_exception_requires_director', 'monetary_compensation_allowed', 'incident_blocks_issues', 'replacement_required_severe', 'replacement_required_irreparable', 'data_quality_bulk_approval_required', 'data_quality_merge_approval_required', 'inventory_numbering_enabled', 'barcode_generation_enabled', 'ksu_numbering_enabled'] as $booleanKey) {
             if ($request->has($booleanKey)) {
                 $validated[$booleanKey] = $request->boolean($booleanKey);
             }
@@ -145,6 +153,14 @@ class SettingController extends Controller
         }
         $validated['news_categories'] = $this->listValue($validated['news_categories'], 'news_categories');
         $validated['message_categories'] = $this->listValue($validated['message_categories'], 'message_categories');
+        if (array_key_exists('ksu_yearly_reset', $validated)) {
+            $validated['ksu_yearly_reset'] = true;
+        }
+        foreach (['default_service_point', 'default_sigla'] as $nullableTextKey) {
+            if (array_key_exists($nullableTextKey, $validated)) {
+                $validated[$nullableTextKey] = trim((string) ($validated[$nullableTextKey] ?? ''));
+            }
+        }
 
         $definitions = $this->definitions();
 
@@ -262,6 +278,14 @@ class SettingController extends Controller
             'max_renewals' => ['type' => 'integer', 'group' => 'circulation', 'description' => 'Maximum renewals per loan.'],
             'manual_due_date_max_days' => ['type' => 'integer', 'group' => 'circulation', 'description' => 'Maximum manual due-date horizon.'],
             'inventory_batch_scan_limit' => ['type' => 'integer', 'group' => 'inventory', 'description' => 'Maximum scans per inventory session.'],
+            'inventory_numbering_enabled' => ['type' => 'boolean', 'group' => 'library_operations', 'description' => 'Enable concurrency-safe inventory number generation for new arrivals.'],
+            'inventory_number_prefix' => ['type' => 'string', 'group' => 'library_operations', 'description' => 'Default prefix for new inventory numbers.'],
+            'barcode_generation_enabled' => ['type' => 'boolean', 'group' => 'library_operations', 'description' => 'Generate barcodes for newly confirmed acquisition copies.'],
+            'barcode_prefix' => ['type' => 'string', 'group' => 'library_operations', 'description' => 'Default prefix for generated barcodes.'],
+            'ksu_numbering_enabled' => ['type' => 'boolean', 'group' => 'library_operations', 'description' => 'Enable attended KSU allocation for new operations.'],
+            'ksu_yearly_reset' => ['type' => 'boolean', 'group' => 'library_operations', 'description' => 'KSU numeric sequences restart for each calendar year.'],
+            'default_service_point' => ['type' => 'string', 'group' => 'library_operations', 'description' => 'Default service point for new arrivals.'],
+            'default_sigla' => ['type' => 'string', 'group' => 'library_operations', 'description' => 'Default storage sigla for new arrivals.'],
             'barcode_format' => ['type' => 'string', 'group' => 'barcodes', 'description' => 'Linear barcode format.'],
             'barcode_label_size' => ['type' => 'string', 'group' => 'barcodes', 'description' => 'Printable label size.'],
             'overdue_blocking_enabled' => ['type' => 'boolean', 'group' => 'circulation', 'description' => 'Whether overdue loans block new operations.'],

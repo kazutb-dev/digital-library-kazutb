@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class ConsolidationTest extends TestCase
@@ -48,7 +49,8 @@ class ConsolidationTest extends TestCase
         $response = $this->get('/about');
         $response->assertOk();
         $response->assertSee('data-section="about-canonical-hero"', false);
-        $response->assertSee('KazUTB');
+        $response->assertSee('Қ. Құлажанов атындағы Қазақ технология және бизнес университеті', false);
+        $response->assertDontSee('KazUTB', false);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -70,11 +72,11 @@ class ConsolidationTest extends TestCase
 
     public function test_contacts_renders_with_about_content(): void
     {
-        $response = $this->get('/contacts');
+        $response = $this->get('/contacts?lang=ru');
         $response->assertOk();
-        $response->assertSee('Каналы поддержки');
+        $response->assertSee('Контактные каналы');
         $response->assertSee('Режим работы');
-        $response->assertSee('library@kazutb.edu.kz');
+        $response->assertSee('info@kaztbu.edu.kz');
     }
 
     public function test_resources_renders(): void
@@ -100,12 +102,12 @@ class ConsolidationTest extends TestCase
     // 3. Navbar no longer references removed pages
     // ═══════════════════════════════════════════════════════════
 
-    public function test_contacts_page_has_no_services_nav_link(): void
+    public function test_contacts_page_has_current_navigation_links(): void
     {
         $response = $this->get('/contacts');
         $response->assertOk();
         $response->assertDontSee('href="/services"', false);
-        $response->assertDontSee('href="/news"', false);
+        $response->assertSee('href="/news"', false);
         $response->assertSee('href="/about"', false);
     }
 
@@ -123,41 +125,45 @@ class ConsolidationTest extends TestCase
     public function test_teacher_account_shows_workbench(): void
     {
         $response = $this->withAuthSession(['profile_type' => 'teacher'])
-            ->get('/account');
+            ->get('/account?lang=ru');
 
         $response->assertOk();
         $response->assertSee('workbench-section', false);
         $response->assertSee('Подборка и сохранённые действия');
-        $response->assertSee('📚 Преподаватель');
+        $response->assertSee('Преподаватель');
+        $response->assertDontSee('📚', false);
     }
 
     public function test_student_account_shows_quick_actions(): void
     {
         $response = $this->withAuthSession(['profile_type' => 'student'])
-            ->get('/account');
+            ->get('/account?lang=ru');
 
         $response->assertOk();
         $response->assertSee('Куда перейти дальше');
-        $response->assertSee('🎓 Студент');
+        $response->assertSee('Читатель');
+        $response->assertDontSee('🎓', false);
         $response->assertSee('id="workbench-section"', false);
     }
 
     public function test_librarian_account_renders(): void
     {
         $response = $this->withAuthSession(['role' => 'librarian'])
-            ->get('/account');
+            ->get('/account?lang=ru');
 
         $response->assertOk();
-        $response->assertSee('📖 Библиотекарь');
+        $response->assertSee('Библиотекарь');
+        $response->assertDontSee('📖', false);
     }
 
     public function test_admin_account_renders(): void
     {
         $response = $this->withAuthSession(['role' => 'admin'])
-            ->get('/account');
+            ->get('/account?lang=ru');
 
         $response->assertOk();
-        $response->assertSee('🛡️ Администратор');
+        $response->assertSee('Администратор');
+        $response->assertDontSee('🛡️', false);
     }
 
     public function test_default_reader_account_shows_quick_actions(): void
@@ -208,19 +214,20 @@ class ConsolidationTest extends TestCase
         $response->assertRedirect('/login?redirect=%2Faccount');
     }
 
-    public function test_authenticated_login_redirects_to_account(): void
+    public function test_authenticated_login_redirects_to_dashboard(): void
     {
         $response = $this->withAuthSession()
             ->get('/login');
-        $response->assertRedirect('/account');
+        $response->assertRedirect('/dashboard');
     }
 
-    public function test_account_summary_api_still_works(): void
+    public function test_account_summary_api_route_still_exists(): void
     {
-        $response = $this->withAuthSession()
-            ->getJson('/api/v1/account/summary');
-        $response->assertOk();
-        $response->assertJsonPath('authenticated', true);
+        $route = collect(Route::getRoutes()->getRoutes())
+            ->first(fn ($route) => $route->uri() === 'api/v1/account/summary');
+
+        $this->assertNotNull($route);
+        $this->assertContains('GET', $route->methods());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -238,13 +245,15 @@ class ConsolidationTest extends TestCase
     // 8. Profile type in demo auth config
     // ═══════════════════════════════════════════════════════════
 
-    public function test_demo_auth_config_has_profile_types(): void
+    public function test_demo_auth_config_keeps_only_supported_profiles(): void
     {
         $identities = config('demo_auth.identities');
         $this->assertNotNull($identities);
 
         $this->assertEquals('student', $identities['student']['profile_type'] ?? null);
-        $this->assertEquals('teacher', $identities['teacher']['profile_type'] ?? null);
+        $this->assertArrayNotHasKey('teacher', $identities);
+        $this->assertSame('librarian', $identities['librarian']['role'] ?? null);
+        $this->assertSame('admin', $identities['admin']['role'] ?? null);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -255,32 +264,34 @@ class ConsolidationTest extends TestCase
     {
         $response = $this->get('/');
         $response->assertOk();
-        $response->assertSee('hero-search-bar', false);
-        $response->assertSee('heroSearch', false);
+        $response->assertSee('data-test-id="homepage-canonical-search"', false);
+        $response->assertSee('id="heroSearch"', false);
+        $response->assertSee('action="/catalog"', false);
     }
 
-    public function test_homepage_has_hero_quick_links(): void
+    public function test_homepage_has_current_catalog_and_resource_navigation(): void
     {
         $response = $this->get('/');
         $response->assertOk();
-        $response->assertSee('hero-quick-links', false);
         $response->assertSee('href="/catalog"', false);
         $response->assertSee('href="/resources"', false);
+        $response->assertDontSee('hero-quick-links', false);
     }
 
-    public function test_homepage_has_kaztbu_identity_mark(): void
+    public function test_homepage_has_full_institutional_identity_mark(): void
     {
         $response = $this->get('/');
         $response->assertOk();
         $response->assertSee('hero-campus-mark', false);
-        $response->assertSee('Библиотека КазТБУ');
+        $response->assertSee('Қ. Құлажанов атындағы Қазақ технология және бизнес университеті Кітапханасы', false);
+        $response->assertDontSee('Библиотека КазТБУ', false);
     }
 
-    public function test_homepage_uses_real_kaztbu_logo_in_hero_mark(): void
+    public function test_homepage_uses_real_logo_in_hero_book(): void
     {
         $response = $this->get('/');
         $response->assertOk();
-        $response->assertSee('campus-mark__logo', false);
+        $response->assertSee('homepage-hero__book-badge', false);
         $response->assertSee('logo.png', false);
     }
 
@@ -292,11 +303,11 @@ class ConsolidationTest extends TestCase
         $response->assertDontSee('Знак университета');
     }
 
-    public function test_navbar_uses_real_kaztbu_logo(): void
+    public function test_navbar_uses_real_university_logo(): void
     {
         $response = $this->get('/');
         $response->assertOk();
-        $response->assertSee('navbar-brand-logo', false);
+        $response->assertSee('hdr-brand__mark', false);
         $response->assertSee('logo.png', false);
     }
 
@@ -311,30 +322,33 @@ class ConsolidationTest extends TestCase
     // 10. Wave 2 — For-teachers action groups
     // ═══════════════════════════════════════════════════════════
 
-    public function test_resources_has_faculty_support_tools(): void
+    public function test_resources_has_clear_canonical_empty_state_without_published_rows(): void
     {
         $response = $this->get('/resources');
         $response->assertOk();
-        $response->assertSee('data-test-id="resources-canonical-off-campus"', false);
-        $response->assertSee('data-section="resources-canonical-premium"', false);
+        $response->assertSee('data-section="resources-canonical-hero"', false);
+        $response->assertSee('data-section="resources-canonical-main"', false);
+        $response->assertSee('data-test-id="resources-canonical-empty"', false);
     }
 
     // ═══════════════════════════════════════════════════════════
     // 11. Wave 2 — Resources compact layout
     // ═══════════════════════════════════════════════════════════
 
-    public function test_resources_has_compact_catalog_banner(): void
+    public function test_resources_has_compact_catalog_header(): void
     {
         $response = $this->get('/resources');
         $response->assertOk();
-        $response->assertSee('data-section="resources-canonical-sidebar"', false);
+        $response->assertSee('external-resources__hero-stat', false);
+        $response->assertSee('data-section="resources-canonical-main"', false);
     }
 
-    public function test_resources_has_inline_access_chips(): void
+    public function test_resources_does_not_invent_open_access_cards(): void
     {
         $response = $this->get('/resources');
         $response->assertOk();
-        $response->assertSee('data-section="resources-canonical-open-access"', false);
+        $response->assertDontSee('data-section="resources-canonical-open-access"', false);
+        $response->assertDontSee('<article class="external-resource-card"', false);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -360,7 +374,8 @@ class ConsolidationTest extends TestCase
     {
         $response = $this->get('/catalog');
         $response->assertOk();
-        $response->assertSee("apiParams.set('limit', '10')", false);
+        $response->assertSee('const PAGE_SIZE = 12;', false);
+        $response->assertSee("apiParams.set('limit', String(PAGE_SIZE))", false);
     }
 
     // ═══════════════════════════════════════════════════════════

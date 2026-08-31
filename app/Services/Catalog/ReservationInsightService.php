@@ -132,7 +132,7 @@ class ReservationInsightService
             ->with('branch')
             ->where('bibliographic_record_id', $reservation->bibliographic_record_id)
             ->where(function ($query) use ($reservation): void {
-                $query->where('status', 'available')
+                $query->availableForCirculation()
                     ->orWhere('id', $reservation->assigned_copy_id);
             })
             ->orderBy('inventory_number')

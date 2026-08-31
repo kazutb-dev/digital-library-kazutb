@@ -37,4 +37,21 @@ class AdminSeederDeletionSafetyTest extends TestCase
         $this->assertSoftDeleted('funds', ['id' => $fund->getKey()]);
         $this->assertSoftDeleted('external_resources', ['id' => $resource->getKey()]);
     }
+
+    public function test_repeated_seed_applies_only_safe_official_url_updates(): void
+    {
+        $ipr = ExternalResource::query()->where('slug', 'ipr-smart')->firstOrFail();
+        $atu = ExternalResource::query()->where('slug', 'atu-library')->firstOrFail();
+        $rntb = ExternalResource::query()->where('slug', 'rntb-kazakhstan')->firstOrFail();
+
+        $ipr->update(['url' => 'https://www.iprbookshop.ru/']);
+        $atu->update(['url' => null]);
+        $rntb->update(['url' => 'https://curated.example.test/rntb']);
+
+        app(ExternalResourceSeeder::class)->run();
+
+        $this->assertSame('https://ipr-smart.ru/', $ipr->refresh()->url);
+        $this->assertSame('https://library.atu.edu.kz/', $atu->refresh()->url);
+        $this->assertSame('https://curated.example.test/rntb', $rntb->refresh()->url);
+    }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Services\Reports;
 
-use App\Models\AcquisitionOrder;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\DigitalMaterialAccessLog;
@@ -72,7 +71,11 @@ final class DirectorAnalyticsService
                         $fallback->whereNull('registration_date')->whereBetween('acquisition_date', [$selectedStart->toDateString(), $selectedEnd->toDateString()]);
                     });
             })),
-            'written_off' => $this->count(BookCopy::class, fn (Builder $query) => $query->where('status', 'written_off')->whereBetween('updated_at', [$selectedStart, $selectedEnd])),
+            'written_off' => $this->writeoffCount($selectedStart, $selectedEnd),
+            'arrivals_current_month' => $this->acquisitionCount($monthStart, $monthEnd),
+            'writeoffs_year' => $this->writeoffCount($now->copy()->startOfYear()->utc(), $now->copy()->endOfYear()->utc()),
+            'ksu_entries_year' => $this->ksuEntries((int) $now->year),
+            'ksu_conflicts' => $this->ksuConflicts(),
             'issued_today' => $this->count(Loan::class, fn (Builder $query) => $query->whereBetween('issued_at', [$todayStart, $todayEnd])),
             'issued_week' => $this->count(Loan::class, fn (Builder $query) => $query->whereBetween('issued_at', [$weekStart, $weekEnd])),
             'issued_month' => $this->count(Loan::class, fn (Builder $query) => $query->whereBetween('issued_at', [$selectedStart, $selectedEnd])),
@@ -121,7 +124,11 @@ final class DirectorAnalyticsService
 
         $distributions = [
             'fund_types' => $this->catalogDistribution('records.resource_type'),
+            'languages' => $this->catalogDistribution('records.language'),
             'udc' => $this->udcDistribution(),
+            'sigla' => $this->siglaDistribution(),
+            'acquisition_sources' => $this->acquisitionSourceDistribution($selectedStart, $selectedEnd),
+            'acquisition_value_by_source' => $this->acquisitionSourceDistribution($selectedStart, $selectedEnd, true),
             'message_sla' => $this->messageSlaDistribution($now->utc()),
             'reader_segments' => $this->readerSegmentDistribution(),
             'reservations' => $this->statusDistribution('reservations'),
@@ -390,6 +397,71 @@ final class DirectorAnalyticsService
         })->all();
     }
 
+    private function acquisitionCount(Carbon $from, Carbon $to): int
+    {
+        if (! $this->hasTable('book_copies')) {
+            return 0;
+        }
+
+        return (int) BookCopy::query()->where(function (Builder $dates) use ($from, $to): void {
+            $dates->whereBetween('registration_date', [$from->toDateString(), $to->toDateString()])
+                ->orWhere(function (Builder $fallback) use ($from, $to): void {
+                    $fallback->whereNull('registration_date')
+                        ->whereBetween('acquisition_date', [$from->toDateString(), $to->toDateString()]);
+                });
+        })->count();
+    }
+
+    private function acquisitionValue(Carbon $from, Carbon $to): float
+    {
+        if (! $this->hasTable('book_copies')) {
+            return 0.0;
+        }
+
+        return round((float) BookCopy::query()->where(function (Builder $dates) use ($from, $to): void {
+            $dates->whereBetween('registration_date', [$from->toDateString(), $to->toDateString()])
+                ->orWhere(function (Builder $fallback) use ($from, $to): void {
+                    $fallback->whereNull('registration_date')
+                        ->whereBetween('acquisition_date', [$from->toDateString(), $to->toDateString()]);
+                });
+        })->sum('price'), 2);
+    }
+
+    private function writeoffCount(Carbon $from, Carbon $to): int
+    {
+        if (! $this->hasTable('book_copies')) {
+            return 0;
+        }
+
+        $query = BookCopy::query()->where('status', 'written_off');
+        if (Schema::hasColumn('book_copies', 'writeoff_date')) {
+            $query->where(function (Builder $period) use ($from, $to): void {
+                $period->whereBetween('writeoff_date', [$from->toDateString(), $to->toDateString()])
+                    ->orWhere(function (Builder $fallback) use ($from, $to): void {
+                        $fallback->whereNull('writeoff_date')->whereBetween('updated_at', [$from, $to]);
+                    });
+            });
+        } else {
+            $query->whereBetween('updated_at', [$from, $to]);
+        }
+
+        return (int) $query->count();
+    }
+
+    private function ksuEntries(int $year): int
+    {
+        return $this->hasTable('ksu_entries')
+            ? (int) DB::table('ksu_entries')->where('year', $year)->where('status', '<>', 'draft')->count()
+            : 0;
+    }
+
+    private function ksuConflicts(): int
+    {
+        return $this->hasTable('ksu_conflicts')
+            ? (int) DB::table('ksu_conflicts')->where('status', 'open')->count()
+            : 0;
+    }
+
     /** @return list<array{label: string, value: int}> */
     private function catalogDistribution(string $column): array
     {
@@ -428,6 +500,55 @@ final class DirectorAnalyticsService
             ->get()
             ->map(fn ($row): array => ['label' => (string) $row->bucket, 'value' => (int) $row->aggregate])
             ->all();
+    }
+
+    /** @return list<array{label: string, value: int}> */
+    private function siglaDistribution(): array
+    {
+        if (! $this->hasTable('book_copies')) {
+            return [];
+        }
+
+        $bucket = Schema::hasColumn('book_copies', 'sigla_code')
+            ? "COALESCE(NULLIF(sigla_code, ''), NULLIF(storage_sigla, ''), '—')"
+            : "COALESCE(NULLIF(storage_sigla, ''), '—')";
+
+        return BookCopy::query()
+            ->whereNotIn('status', ['written_off', 'lost'])
+            ->selectRaw("{$bucket} AS bucket, COUNT(*) AS aggregate")
+            ->groupByRaw($bucket)
+            ->orderByDesc('aggregate')
+            ->limit(12)
+            ->get()
+            ->map(fn ($row): array => ['label' => (string) $row->bucket, 'value' => (int) $row->aggregate])
+            ->all();
+    }
+
+    /** @return list<array{label: string, value: int|float}> */
+    private function acquisitionSourceDistribution(Carbon $from, Carbon $to, bool $value = false): array
+    {
+        if (! $this->hasTable('book_copies')) {
+            return [];
+        }
+
+        $aggregate = $value ? 'COALESCE(SUM(price), 0)' : 'COUNT(*)';
+
+        return BookCopy::query()
+            ->where(function (Builder $dates) use ($from, $to): void {
+                $dates->whereBetween('registration_date', [$from->toDateString(), $to->toDateString()])
+                    ->orWhere(function (Builder $fallback) use ($from, $to): void {
+                        $fallback->whereNull('registration_date')
+                            ->whereBetween('acquisition_date', [$from->toDateString(), $to->toDateString()]);
+                    });
+            })
+            ->selectRaw("COALESCE(acquisition_source, 'other') AS bucket, {$aggregate} AS aggregate")
+            ->groupByRaw("COALESCE(acquisition_source, 'other')")
+            ->orderByDesc('aggregate')
+            ->get()
+            ->map(fn ($row): array => [
+                'label' => (string) $row->bucket,
+                'value' => $value ? round((float) $row->aggregate, 2) : (int) $row->aggregate,
+            ])->all();
     }
 
     /** @return list<array{label: string, value: int}> */
@@ -522,7 +643,7 @@ final class DirectorAnalyticsService
 
         return [
             'records_total' => $this->count(BibliographicRecord::class, fn (Builder $query) => $query),
-            'copies_available' => $this->count(BookCopy::class, fn (Builder $query) => $query->where('status', 'available')),
+            'copies_available' => $this->count(BookCopy::class, fn (Builder $query) => $query->availableForCirculation()),
             'copies_issued' => $this->count(BookCopy::class, fn (Builder $query) => $query->whereIn('status', ['issued', 'overdue'])),
             'copies_repair' => $this->count(BookCopy::class, fn (Builder $query) => $query->where('status', 'under_repair')),
             'copies_lost' => $this->count(BookCopy::class, fn (Builder $query) => $query->where('status', 'lost')),
@@ -552,9 +673,7 @@ final class DirectorAnalyticsService
             'tasks_open' => $this->count(LibraryTask::class, fn (Builder $query) => $query->whereIn('status', ['open', 'in_progress', 'blocked'])),
             'tasks_overdue' => $this->count(LibraryTask::class, fn (Builder $query) => $query->whereIn('status', ['open', 'in_progress', 'blocked'])->whereNotNull('due_at')->where('due_at', '<', $now->utc())),
             'integration_failures' => $failedIntegrations,
-            'acquisition_value_period' => $this->hasTable('acquisition_orders')
-                ? round((float) AcquisitionOrder::query()->whereBetween('created_at', [$from, $to])->sum('total_amount'), 2)
-                : 0.0,
+            'acquisition_value_period' => $this->acquisitionValue($from, $to),
         ];
     }
 
@@ -780,7 +899,7 @@ final class DirectorAnalyticsService
 
         return (int) DB::table('users')->where('is_active', true)->whereExists(function ($query): void {
             $query->selectRaw('1')->from('model_has_roles')->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-                ->whereColumn('model_has_roles.model_id', 'users.id')->where('model_has_roles.model_type', User::class)->where('roles.name', '!=', 'member');
+                ->whereColumn('model_has_roles.model_id', 'users.id')->where('model_has_roles.model_type', (new User)->getMorphClass())->where('roles.name', '!=', 'member');
         })->count();
     }
 

@@ -15,6 +15,7 @@ final class ReportRegistry
         'news-events', 'messages', 'repository', 'external-resources', 'staff',
         'audit-summary', 'fund-movement', 'new-acquisitions', 'write-offs',
         'electronic-materials',
+        ...CollectionAccountingReportService::CODES,
     ];
 
     /** @var array<string, ReportDefinition> */
@@ -73,11 +74,21 @@ final class ReportRegistry
                 'fund-movement', 'write-offs' => 'catalog.copy_history',
                 'new-acquisitions' => 'catalog.book_copies',
                 'electronic-materials' => 'digital.access_logs',
+                default => 'catalog.book_copies+catalog.ksu_entries+acquisitions.batches',
             },
             filters: $this->operationalFilters($code),
-            columns: ['dimension', 'total', ...($code === 'fines' ? ['amount'] : [])],
-            defaultSort: ['key' => 'total', 'direction' => 'desc'],
-            totals: $code === 'fines' ? ['total', 'amount'] : ['total'],
+            columns: in_array($code, CollectionAccountingReportService::CODES, true)
+                ? CollectionAccountingReportService::columns($code)
+                : ['dimension', 'total', ...($code === 'fines' ? ['amount'] : [])],
+            defaultSort: [
+                'key' => in_array($code, CollectionAccountingReportService::CODES, true)
+                    ? CollectionAccountingReportService::columns($code)[0]
+                    : 'total',
+                'direction' => 'desc',
+            ],
+            totals: in_array($code, CollectionAccountingReportService::CODES, true)
+                ? CollectionAccountingReportService::totals($code)
+                : ($code === 'fines' ? ['total', 'amount'] : ['total']),
             charts: ['distribution'],
             exports: ['csv', 'pdf', 'xlsx', 'docx'],
             permission: match ($code) {
@@ -90,6 +101,8 @@ final class ReportRegistry
                 'external-resources' => 'external_resources.view_analytics|reports.view_full',
                 'staff' => 'staff_performance.view|reports.view_full',
                 'audit-summary' => 'system.logs|reports.view_full',
+                'ksu-part-1', 'ksu-register', 'acquisition-act', 'inventory-book',
+                'non-inventory-book', 'new-arrivals', 'acquisitions-by-source-value' => 'reports.view_acquisitions|reports.view_ops|reports.view_full',
                 default => 'reports.view_ops|reports.view_full',
             },
             official: false,
@@ -106,6 +119,10 @@ final class ReportRegistry
     /** @return list<string> */
     private function operationalFilters(string $code): array
     {
+        if (in_array($code, CollectionAccountingReportService::CODES, true)) {
+            return CollectionAccountingReportService::filters($code);
+        }
+
         $filters = ['preset', 'from', 'to'];
         if (in_array($code, ['loans', 'returns', 'renewals', 'overdue', 'fines', 'reservations', 'queue', 'incidents', 'inventory', 'news-events', 'messages'], true)) {
             $filters[] = 'status';

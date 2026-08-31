@@ -7,7 +7,7 @@
     <div><span class="text-xs text-slate-500">{{ __('librarian.member_portal.profile.name') }}</span><p class="font-semibold">{{ auth()->user()->name }}</p></div>
     <div><span class="text-xs text-slate-500">{{ __('librarian.member_portal.card.ticket') }}</span><p class="font-mono font-semibold">{{ $profile->ticket_number }}</p></div>
     <div><span class="text-xs text-slate-500">{{ __('librarian.member_portal.profile.category') }}</span><p>{{ __('librarian.member_portal.categories.'.$profile->category) }}</p></div>
-    <div><span class="text-xs text-slate-500">Email</span><p>{{ auth()->user()->email }}</p></div>
+    <div><span class="text-xs text-slate-500">{{ __('common.fields.email') }}</span><p>{{ auth()->user()->email }}</p></div>
     <div><span class="text-xs text-slate-500">{{ __('librarian.member.profile.faculty') }}</span><p>{{ $profile->faculty ?: '—' }}</p></div>
     <div><span class="text-xs text-slate-500">{{ __('librarian.member.profile.department') }}</span><p>{{ $profile->department ?: '—' }}</p></div>
     <div><span class="text-xs text-slate-500">{{ __('librarian.member.profile.group') }}</span><p>{{ $profile->study_group ?: '—' }}</p></div>

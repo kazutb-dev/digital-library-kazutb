@@ -2,31 +2,24 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use App\Models\User;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class MemberReservationsPageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    private User $member;
+    private User $librarian;
+
     protected function setUp(): void
     {
         parent::setUp();
-
-        config()->set('demo_auth.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
-    }
-
-    private function loginAs(string $identitySlug): void
-    {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
-        ]);
+        $this->setUpAdminControlPlane();
+        $this->adminUser->forceFill(['locale' => 'ru'])->save();
+        $this->member = $this->makeControlPlaneUser('member', ['locale' => 'ru']);
+        $this->librarian = $this->makeControlPlaneUser('librarian', ['locale' => 'ru']);
     }
 
     public function test_guest_is_redirected_to_login(): void
@@ -39,42 +32,41 @@ class MemberReservationsPageTest extends TestCase
 
     public function test_student_can_view_reservations(): void
     {
-        $this->loginAs('student');
+        $this->signInToLibraryAs($this->member);
 
         $response = $this->get('/dashboard/reservations');
 
         $response->assertOk();
-        $response->assertSee('My reservations', false);
-        $response->assertSee('Ready for pickup', false);
-        $response->assertSee('Confirmed', false);
-        $response->assertSee('Pending review', false);
+        $response->assertSee('Мои бронирования', false);
+        $response->assertSee('Активные бронирования', false);
+        $response->assertSee('Завершённые бронирования', false);
     }
 
     public function test_teacher_can_view_reservations(): void
     {
-        $this->loginAs('teacher');
+        $this->signInToLibraryAs($this->member);
 
         $response = $this->get('/dashboard/reservations');
 
         $response->assertOk();
-        $response->assertSee('My reservations', false);
+        $response->assertSee('Мои бронирования', false);
     }
 
-    public function test_librarian_is_forbidden(): void
+    public function test_librarian_is_redirected_to_staff_workspace(): void
     {
-        $this->loginAs('librarian');
+        $this->signInToLibraryAs($this->librarian);
 
         $response = $this->get('/dashboard/reservations');
 
-        $response->assertForbidden();
+        $response->assertRedirect('/librarian');
     }
 
-    public function test_admin_is_forbidden(): void
+    public function test_admin_is_redirected_to_admin_workspace(): void
     {
-        $this->loginAs('admin');
+        $this->signInToLibraryAs($this->adminUser);
 
         $response = $this->get('/dashboard/reservations');
 
-        $response->assertForbidden();
+        $response->assertRedirect('/admin');
     }
 }

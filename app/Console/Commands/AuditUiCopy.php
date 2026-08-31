@@ -111,6 +111,7 @@ class AuditUiCopy extends Command
             resource_path('views'),
             resource_path('js'),
             app_path(),
+            config_path(),
             lang_path(),
             base_path('routes'),
             database_path('seeders'),
@@ -134,8 +135,20 @@ class AuditUiCopy extends Command
     private function isAllowed(string $rule, string $path, string $line): bool
     {
         if ($rule === 'legacy_brand') {
+            // Barcode prefixes are machine identifiers, not rendered branding.
+            // Keep them configurable without teaching this copy audit to treat
+            // an operational code as a public-facing university name.
+            if (preg_match('/barcode(?:_[a-z0-9]+)*_prefix|barcodePrefix/i', $line) === 1) {
+                return true;
+            }
             if (preg_match('/(?:[\w.+-]+@)?[\w.-]*(?:kazutb|kaztbu)[\w.-]*(?:\.edu\.kz|\.local)/iu', $line) === 1
                 || preg_match('/[\x27\x22](?:kazutb|kaztbu)-[a-z0-9_-]+[\x27\x22]\s*=>/iu', $line) === 1) {
+                return true;
+            }
+            // A verified social-media URL/handle is an external machine
+            // identifier, not a prose form of the university brand. Keep the
+            // exception limited to the explicit contact payload fields.
+            if (preg_match('/instagram_(?:url|handle)/iu', $line) === 1) {
                 return true;
             }
             if (str_contains($path, 'LibraryAuthenticator.php')
@@ -147,6 +160,15 @@ class AuditUiCopy extends Command
             if (str_contains($path, 'database/seeders/') && preg_match('/(?:title|publisher|name|isbn|issn|doi|legacy|external_id)/iu', $line) === 1) {
                 return true;
             }
+            if ($path === 'config/external_resources.php' && str_contains($line, "'slug' =>")) {
+                return true;
+            }
+        }
+
+        if ($rule === 'developer_copy' && $path === 'app/Console/Commands/ApplyMarcRecovery.php') {
+            // This command persists recovery provenance and internal field
+            // names; none of these strings is rendered in the application UI.
+            return true;
         }
 
         if ($rule === 'placeholder_copy' && (str_contains($line, 'placeholder=') || str_contains($line, "'placeholder'"))) {

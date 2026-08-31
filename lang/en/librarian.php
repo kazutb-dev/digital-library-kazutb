@@ -128,6 +128,7 @@ $translations = [
                 'electronic_resources' => 'Active electronic resources',
                 'message_sla_overdue' => 'Inquiries outside SLA',
                 'fines_charged_period' => 'Fines charged in period', 'acquisition_value_period' => 'Recorded acquisition value',
+                'arrivals_current_month' => 'Arrivals this month', 'writeoffs_year' => 'Withdrawals this year', 'ksu_entries_year' => 'KSU entries this year', 'ksu_conflicts' => 'Open KSU conflicts',
                 'records_total'=>'Bibliographic records','copies_available'=>'Available copies','copies_issued'=>'Issued copies','copies_repair'=>'Copies under repair','copies_lost'=>'Lost copies','records_added_period'=>'Records added in period','reservations_queued'=>'Reservations queued','reservations_ready'=>'Reservations ready','reservations_expired_period'=>'Reservations expired','fines_paid_period'=>'Fines paid','fines_waived_period'=>'Fines waived','repository_added_period'=>'Repository works added','repository_usage_period'=>'Repository use','tasks_open'=>'Open tasks','tasks_overdue'=>'Overdue tasks','integration_failures'=>'Integration failures',
                 'reservation_average_wait_hours'=>'Average reservation wait, hours','overdue_readers'=>'Readers with overdue loans','average_overdue_days'=>'Average overdue, days','oldest_overdue_days'=>'Oldest overdue, days','repository_restricted'=>'Restricted or metadata-only works','external_active'=>'Active licensed/partner resources','external_unavailable'=>'Unavailable external resources','digital_access_failures'=>'Denied digital access attempts','complaints_open'=>'Open complaints','messages_high_priority'=>'High-priority inquiries','data_quality_critical'=>'Critical data-quality issues','inactive_readers'=>'Inactive readers','active_staff_accounts'=>'Active staff accounts','privileged_role_assignments'=>'Privileged role assignments',
             ],
@@ -140,6 +141,7 @@ $translations = [
                 'repository' => 'Repository growth over 12 months',
                 'external' => 'External-resource opens during the last 14 days',
                 'fund_types' => 'Collection by document type',
+                'languages' => 'Collection by language', 'sigla' => 'Collection by sigla', 'acquisition_sources' => 'Acquisitions by source', 'acquisition_value_by_source' => 'Acquisition value by source',
                 'udc' => 'Collection distribution by UDC',
                 'message_sla' => 'Open-inquiry SLA',
             ],
@@ -150,7 +152,7 @@ $translations = [
             'acquisitions' => [
                 'eyebrow' => 'Collection development', 'title' => 'Acquisitions dashboard',
                 'subtitle' => 'Actual receipts, acquisition sources, and documents that have not completed processing.',
-                'cards' => ['received_today' => 'Received today', 'received_month' => 'Received this month', 'sources_month' => 'Sources this month', 'processing_copies' => 'Copies in processing', 'incomplete_records' => 'Incomplete records'],
+                'cards' => ['received_today' => 'Received today', 'received_month' => 'Received this month', 'arrivals_current_month' => 'Arrivals this month', 'sources_month' => 'Sources this month', 'acquisition_value_month' => 'Acquisition value this month', 'writeoffs_year' => 'Withdrawals this year', 'ksu_entries_year' => 'KSU entries this year', 'ksu_conflicts' => 'Open KSU conflicts', 'processing_copies' => 'Copies in processing', 'incomplete_records' => 'Incomplete records'],
                 'distribution' => 'Acquisition sources this month', 'trend' => 'Acquisitions over 12 months',
             ],
             'cataloguer' => [
@@ -500,10 +502,26 @@ $translations = [
         'empty' => 'No copies match the selected criteria.',
     ],
 
+    'udc_reference' => [
+        'title' => 'UDC Reference', 'eyebrow' => 'Cataloguing',
+        'subtitle' => 'Descriptions requiring a cataloguer review: :count',
+        'search_placeholder' => 'UDC code or description', 'search' => 'Search', 'parent' => 'Parent section',
+        'verified' => 'Verified', 'needs_review' => 'Needs review',
+        'description_ru' => 'Russian description', 'description_kk' => 'Kazakh description', 'description_en' => 'English description',
+        'department' => 'Subject area or faculty', 'verified_checkbox' => 'Description verified by a cataloguer', 'save' => 'Save',
+    ],
+
     'circulation' => [
         'eyebrow' => 'Circulation',
         'title' => 'Patron Services',
         'subtitle' => 'Check out, check in, and renew items; monitor due dates and outstanding balances.',
+        'history_title' => 'Circulation history',
+        'history_hint' => 'This page lists checkouts and returns. Search by patron, title, or copy number.',
+        'search_reader_or_copy' => 'Patron name, title, or copy number',
+        'reader' => 'Patron',
+        'copy' => 'Title and copy',
+        'issued_at' => 'Checkout date',
+        'returned_at' => 'Return date',
         'issue_title' => 'Check out an item',
         'issue_subtitle' => 'Identify the patron, review any restrictions, and scan the copy.',
         'return_title' => 'Check in an item',
@@ -1250,15 +1268,19 @@ $translations = [
     'inventory' => [
         'title' => 'Inventory', 'kicker' => 'Collection scanning', 'description' => 'Sessions preserve a snapshot of expected copies and classify discrepancies. Scanning never changes copy status automatically.', 'new_session' => 'New session', 'branch' => 'Branch', 'fund' => 'Collection', 'all_funds' => 'All collections', 'room' => 'Room', 'shelf' => 'Shelf / range', 'date' => 'Date', 'create' => 'Create session', 'created' => 'Inventory session created.', 'updated' => 'Session updated.', 'number' => 'Number', 'zone' => 'Zone', 'status' => 'Status', 'expected' => 'Expected', 'found' => 'Found', 'missing' => 'Missing', 'misplaced' => 'Misplaced', 'unknown' => 'Unknown', 'duplicates' => 'Duplicates', 'empty' => 'No sessions yet.', 'start' => 'Start and save snapshot', 'scan' => 'Scan', 'scan_placeholder' => 'Barcode, QR or inventory number', 'register_scan' => 'Register', 'scan_help' => 'A USB scanner works as a keyboard. Duplicate codes are recorded without increasing the found count.', 'scan_result' => 'Result: :result', 'complete' => 'Finish scanning', 'complete_confirm' => 'Move to discrepancy review?', 'approve' => 'Approve result', 'approve_confirm' => 'Approve without automatically changing copies?', 'snapshot' => 'Expected-copy snapshot', 'code' => 'Code', 'book' => 'Edition', 'expected_status' => 'Expected status', 'result' => 'Result',
         'section' => 'Section', 'pilot_size' => 'Pilot size', 'copies' => 'copies', 'storage_code' => 'Storage code', 'completeness' => 'Location completeness',
+        'scope' => 'Scope', 'any_branch' => 'All branches', 'service_point' => 'Service point',
+        'session_size' => 'Session size', 'full_scope' => 'Full selected scope', 'pilot_count' => 'Pilot — :count copies',
+        'scope_value_required' => 'Select a value for the chosen inventory scope.',
+        'scopes' => ['all' => 'Entire collection', 'branch' => 'Branch', 'fund' => 'Fund', 'sigla' => 'Storage code', 'service_point' => 'Service point'],
         'location_problems' => 'Collection location issues', 'location_known_only' => 'Only stored database values are shown; missing locations are never inferred.',
         'without_point' => 'No library point', 'without_fund' => 'No fund', 'without_room' => 'No hall', 'without_section' => 'No section', 'without_shelf' => 'No shelf', 'without_storage_code' => 'No storage code', 'point_fund_conflicts' => 'Point/fund conflict',
         'checked' => 'Checked', 'requires_review' => 'Requires review', 'physical_verification' => 'Collection verification', 'inventory_number' => 'Inventory number', 'observed_inventory' => 'Number visible on the book (if different)', 'confirm_found' => 'Copy found', 'identity_help' => 'ISBN does not identify a physical copy. An exact inventory number is required before marking.',
         'inventory_condition' => 'Physical inventory number', 'inventory_conditions' => ['unverified' => 'Not verified', 'visible' => 'Visible and matching', 'db_only' => 'Database only', 'unreadable' => 'Unreadable', 'mismatch' => 'Mismatch'],
         'database_location' => 'Current database', 'actions' => 'Actions', 'apply_location_correction' => 'Confirm move', 'confirm_location' => 'Confirm location', 'marking' => 'Marking',
         'pilot_analytics' => 'Pilot result', 'location_confirmed' => 'Location confirmed', 'location_corrected' => 'Location corrected', 'barcodes_assigned' => 'Barcodes assigned', 'labels_printed' => 'Labels printed', 'scan_confirmed' => 'Scan confirmed', 'median_handling_seconds' => 'Median handling time, sec.',
-        'inventory_not_found' => 'No copy has this inventory number. ISBN is not used as a copy identifier.', 'invalid_inventory_condition' => 'Select the inventory-number condition.', 'observed_required' => 'Enter the number physically visible on the book.', 'fund_branch_mismatch' => 'The selected fund must belong to the selected branch.', 'location_result' => 'Location processed. Issues resolved: :resolved. Remaining: :remaining.',
+        'inventory_not_found' => 'No copy has this inventory number. ISBN is not used as a copy identifier.', 'identifier_ambiguous' => 'This code identifies more than one copy. Resolve the inventory/barcode conflict before scanning.', 'invalid_inventory_condition' => 'Select the inventory-number condition.', 'observed_required' => 'Enter the number physically visible on the book.', 'fund_branch_mismatch' => 'The selected fund must belong to the selected branch.', 'location_result' => 'Location processed. Issues resolved: :resolved. Remaining: :remaining.',
         'statuses' => ['draft' => 'Draft', 'running' => 'Running', 'review' => 'Review', 'completed' => 'Completed', 'approved' => 'Approved', 'cancelled' => 'Cancelled'],
-        'results' => ['missing' => 'Not found during check', 'found' => 'Found', 'misplaced' => 'Registered at another location', 'unknown' => 'Unknown code', 'duplicate' => 'Duplicate scan', 'status_conflict' => 'Status conflict', 'requires_review' => 'Requires recheck'],
+        'results' => ['missing' => 'Expected / not found', 'found' => 'Found', 'misplaced' => 'Wrong location', 'unknown' => 'Unknown code', 'duplicate' => 'Duplicate scan', 'written_off' => 'Written-off copy', 'status_conflict' => 'Status conflict', 'requires_review' => 'Requires recheck'],
     ],
 ];
 $translations['member'] = array_replace_recursive($translations['member'], $translations['member_portal']);

@@ -141,15 +141,15 @@ class CatalogFiltersTest extends TestCase
         $this->assertSame(1, $this->catalog->search(udc: '33')['meta']['total']);
     }
 
-    public function test_catalog_udc_visibility_is_simplified_for_guests_and_full_for_authenticated_readers(): void
+    public function test_catalog_udc_code_and_description_are_public_bibliographic_metadata(): void
     {
         $this->record(['udc_code' => '004.8']);
 
         $guest = $this->catalog->search()['data'][0]['udc'];
         $authenticated = $this->catalog->search(includeUdcCode: true)['data'][0]['udc'];
 
-        $this->assertSame('', $guest['raw']);
-        $this->assertSame('Жасанды интеллект', $guest['display']);
+        $this->assertSame('004.8', $guest['raw']);
+        $this->assertSame('004.8 — Жасанды интеллект', $guest['display']);
         $this->assertSame('004.8', $authenticated['raw']);
         $this->assertSame('004.8 — Жасанды интеллект', $authenticated['display']);
     }

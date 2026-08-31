@@ -38,5 +38,32 @@ export default defineConfig(({ mode }) => {
                 ignored: ['**/storage/framework/views/**'],
             },
         },
+        build: {
+            rolldownOptions: {
+                output: {
+                    codeSplitting: {
+                        groups: [
+                            {
+                                name: 'vendor-react',
+                                test: /[\\/]node_modules[\\/](?:react|react-dom|scheduler)[\\/]/,
+                                priority: 30,
+                            },
+                            {
+                                name: 'vendor-ai-sdk',
+                                test: /[\\/]node_modules[\\/](?:@ai-sdk|ai|zod)[\\/]/,
+                                priority: 20,
+                                maxSize: 450_000,
+                            },
+                            {
+                                name: 'vendor-21st-sdk',
+                                test: /[\\/]node_modules[\\/]@21st-sdk[\\/]/,
+                                priority: 10,
+                                maxSize: 450_000,
+                            },
+                        ],
+                    },
+                },
+            },
+        },
     };
 });

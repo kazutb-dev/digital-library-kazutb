@@ -29,9 +29,12 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
+use Tests\Concerns\UsesIsolatedLocalStorage;
 
 class ScholarlyRepositoryWorkflowTest extends TestCase
 {
+    use UsesIsolatedLocalStorage;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -48,7 +51,7 @@ class ScholarlyRepositoryWorkflowTest extends TestCase
         DB::purge();
         DB::setDefaultConnection('sqlite');
         DB::reconnect('sqlite');
-        Storage::fake('local');
+        $this->fakeIsolatedLocalStorage();
         $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
 
         $this->createSqliteSchema();

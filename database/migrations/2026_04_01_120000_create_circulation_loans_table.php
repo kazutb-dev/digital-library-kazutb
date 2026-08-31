@@ -12,7 +12,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement('CREATE SCHEMA IF NOT EXISTS app');
+        $isSqlite = DB::getDriverName() === 'sqlite';
+        if ($isSqlite) {
+            $attached = collect(DB::select('PRAGMA database_list'))->contains(
+                fn (object $database): bool => $database->name === 'app'
+            );
+            if (! $attached) {
+                DB::statement("ATTACH DATABASE ':memory:' AS app");
+            }
+        } else {
+            DB::statement('CREATE SCHEMA IF NOT EXISTS app');
+        }
 
         Schema::create('app.circulation_loans', function (Blueprint $table) {
             $table->uuid('id')->primary();
@@ -30,7 +40,8 @@ return new class extends Migration
             $table->index(['copy_id', 'status'], 'idx_circ_loans_copy_status');
         });
 
-        DB::statement(
+        if (! $isSqlite) {
+            DB::statement(
             <<<'SQL'
             ALTER TABLE app.circulation_loans
             ADD CONSTRAINT ck_circ_loans_due_after_issue
@@ -38,7 +49,7 @@ return new class extends Migration
             SQL
         );
 
-        DB::statement(
+            DB::statement(
             <<<'SQL'
             ALTER TABLE app.circulation_loans
             ADD CONSTRAINT ck_circ_loans_return_after_issue
@@ -46,7 +57,7 @@ return new class extends Migration
             SQL
         );
 
-        DB::statement(
+            DB::statement(
             <<<'SQL'
             ALTER TABLE app.circulation_loans
             ADD CONSTRAINT ck_circ_loans_renew_non_negative
@@ -54,7 +65,7 @@ return new class extends Migration
             SQL
         );
 
-        DB::statement(
+            DB::statement(
             <<<'SQL'
             ALTER TABLE app.circulation_loans
             ADD CONSTRAINT ck_circ_loans_status
@@ -62,13 +73,18 @@ return new class extends Migration
             SQL
         );
 
-        DB::statement(
+            DB::statement(
             <<<'SQL'
             CREATE UNIQUE INDEX ux_circ_loans_active_copy
             ON app.circulation_loans (copy_id)
             WHERE status = 'active' AND returned_at IS NULL
             SQL
-        );
+            );
+        } else {
+            DB::statement(
+                "CREATE UNIQUE INDEX app.ux_circ_loans_active_copy ON circulation_loans (copy_id) WHERE status = 'active' AND returned_at IS NULL"
+            );
+        }
     }
 
     /**

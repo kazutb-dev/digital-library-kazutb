@@ -37,7 +37,7 @@ return [
             'ad_login' => 'demo_student',
             'label' => 'Студент',
             'description' => 'Поиск, каталог, бронирование, личный кабинет',
-            'icon' => '🎓',
+            'icon' => 'school',
             'landing' => '/dashboard',
         ],
 
@@ -50,7 +50,7 @@ return [
             'ad_login' => 'demo_librarian',
             'label' => 'Библиотекарь',
             'description' => 'Выдача и возврат, каталогизация, очереди, отчёты',
-            'icon' => '📖',
+            'icon' => 'menu_book',
             'landing' => '/librarian',
         ],
 
@@ -63,7 +63,7 @@ return [
             'ad_login' => 'demo_director',
             'label' => 'Директор библиотеки',
             'description' => 'Полная аналитика, контроль качества и публикации',
-            'icon' => '📊',
+            'icon' => 'monitoring',
             'landing' => '/librarian',
         ],
 
@@ -76,7 +76,7 @@ return [
             'ad_login' => 'demo_senior_librarian',
             'label' => 'Ведущий библиотекарь',
             'description' => 'Координация операций и контроль качества данных',
-            'icon' => '🧭',
+            'icon' => 'explore',
             'landing' => '/librarian',
         ],
 
@@ -89,7 +89,7 @@ return [
             'ad_login' => 'demo_acquisitions',
             'label' => 'Комплектатор',
             'description' => 'Заказы, поступления и регистрация экземпляров',
-            'icon' => '📦',
+            'icon' => 'inventory_2',
             'landing' => '/librarian',
         ],
 
@@ -102,7 +102,7 @@ return [
             'ad_login' => 'demo_cataloguer',
             'label' => 'Каталогизатор',
             'description' => 'Библиографические записи, УДК и классификация',
-            'icon' => '🏷️',
+            'icon' => 'sell',
             'landing' => '/librarian',
         ],
 
@@ -115,7 +115,7 @@ return [
             'ad_login' => 'demo_bibliographer',
             'label' => 'Библиограф',
             'description' => 'Поиск, библиографические списки и консультации',
-            'icon' => '🔎',
+            'icon' => 'search',
             'landing' => '/librarian',
         ],
 
@@ -128,7 +128,7 @@ return [
             'ad_login' => 'demo_admin',
             'label' => 'Администратор',
             'description' => 'Пользователи, роли, настройки системы, логи',
-            'icon' => '🛡️',
+            'icon' => 'admin_panel_settings',
             'landing' => '/admin',
         ],
 

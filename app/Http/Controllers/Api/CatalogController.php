@@ -8,6 +8,7 @@ use App\Services\Library\CatalogReadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 class CatalogController extends Controller
 {
@@ -114,13 +115,17 @@ class CatalogController extends Controller
             }
 
             return response()->json([
-                'error' => 'Failed to fetch from external API',
-                'status' => $response->status(),
-            ], $response->status());
-        } catch (\Exception $e) {
+                'error' => (string) __('errors.pages.503.title'),
+                'success' => false,
+            ], 503);
+        } catch (Throwable $e) {
+            report($e);
+
             return response()->json([
-                'error' => 'Error connecting to external API',
-                'message' => $e->getMessage(),
+                // Never return DNS names, internal proxy URLs or transport
+                // details from a public fallback endpoint.
+                'error' => (string) __('errors.pages.503.title'),
+                'success' => false,
             ], 503);
         }
     }

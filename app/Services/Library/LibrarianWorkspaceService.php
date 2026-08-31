@@ -18,6 +18,7 @@ use App\Models\PeriodicalIssue;
 use App\Models\PeriodicalSubscription;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\DatabaseSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -233,10 +234,30 @@ final class LibrarianWorkspaceService
         return $issue;
     }
 
-    public function movements(): LengthAwarePaginator
+    /** @param array<string,mixed> $filters */
+    public function movements(array $filters = []): LengthAwarePaginator
     {
-        return CopyHistory::query()->with(['copy.bibliographicRecord:id,title', 'actor:id,name,email'])
-            ->orderByDesc('occurred_at')->paginate(50)->withQueryString();
+        $query = CopyHistory::query()
+            ->whereIn('event_type', ['fund_movement', 'location_changed', 'transfer_received'])
+            ->with(['copy.bibliographicRecord:id,title', 'copy.branch:id,name', 'copy.fund:id,name', 'actor:id,name,email']);
+
+        if ($term = trim((string) ($filters['q'] ?? ''))) {
+            $needle = '%'.mb_strtolower($term).'%';
+            $query->whereHas('copy', function (Builder $copy) use ($needle): void {
+                $copy->whereRaw('LOWER(inventory_number) LIKE ?', [$needle])
+                    ->orWhereRaw("LOWER(COALESCE(barcode, '')) LIKE ?", [$needle])
+                    ->orWhereHas('bibliographicRecord', fn (Builder $record) => $record
+                        ->whereRaw('LOWER(title) LIKE ?', [$needle]));
+            });
+        }
+        if ($from = ($filters['date_from'] ?? null)) {
+            $query->where('occurred_at', '>=', Carbon::parse($from, config('app.library_timezone'))->startOfDay()->utc());
+        }
+        if ($to = ($filters['date_to'] ?? null)) {
+            $query->where('occurred_at', '<=', Carbon::parse($to, config('app.library_timezone'))->endOfDay()->utc());
+        }
+
+        return $query->orderByDesc('occurred_at')->paginate(50)->withQueryString();
     }
 
     /** @return Collection<int,array<string,mixed>> */
@@ -267,14 +288,25 @@ final class LibrarianWorkspaceService
         };
         $result = ['records' => collect(), 'copies' => collect(), 'readers' => collect(), 'operations' => collect()];
         if ($user->can('catalog.search')) {
-            $result['records'] = BibliographicRecord::query()->withCount(['copies', 'copies as available_copies_count' => fn (Builder $query) => $query->where('status', 'available')])->where(function (Builder $query) use ($like, $matches): void {
-                $matches($query, 'title', $like)
-                    ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('isbn').") LIKE ? ESCAPE '\\'", [$like])
-                    ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('primary_author').") LIKE ? ESCAPE '\\'", [$like]);
-            })->limit(10)->get(['id', 'title', 'primary_author', 'isbn']);
-            $result['copies'] = BookCopy::query()->with(['bibliographicRecord:id,title', 'branch:id,name', 'fund:id,name'])->where(function (Builder $query) use ($like, $matches): void {
+            $result['records'] = BibliographicRecord::query()
+                ->withCount(['copies', 'copies as available_copies_count' => fn (Builder $query) => $query->availableForCirculation()])
+                ->search($term)
+                ->limit(10)
+                ->get(['id', 'title', 'primary_author', 'isbn']);
+            $hasRecoveryCopyFields = DatabaseSchema::hasTable('book_copies')
+                && BookCopy::query()->getConnection()->getSchemaBuilder()->hasColumn('book_copies', 'sigla_code');
+            $result['copies'] = BookCopy::query()->with(['bibliographicRecord:id,title', 'branch:id,name', 'fund:id,name'])->where(function (Builder $query) use ($hasRecoveryCopyFields, $like, $matches): void {
                 $matches($query, 'inventory_number', $like)
-                    ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('barcode').") LIKE ? ESCAPE '\\'", [$like]);
+                    ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('barcode').") LIKE ? ESCAPE '\\'", [$like])
+                    ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('ksu_number').") LIKE ? ESCAPE '\\'", [$like])
+                    ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('storage_sigla').") LIKE ? ESCAPE '\\'", [$like])
+                    ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('shelf_location').") LIKE ? ESCAPE '\\'", [$like])
+                    ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('acquisition_source').") LIKE ? ESCAPE '\\'", [$like]);
+                if ($hasRecoveryCopyFields) {
+                    $query
+                        ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('sigla_code').") LIKE ? ESCAPE '\\'", [$like])
+                        ->orWhereRaw('LOWER('.$query->getQuery()->getGrammar()->wrap('shelf_index').") LIKE ? ESCAPE '\\'", [$like]);
+                }
             })->limit(10)->get();
         }
         if ($user->canAny(['circulation.issue', 'circulation.return', 'messages.view_all'])) {

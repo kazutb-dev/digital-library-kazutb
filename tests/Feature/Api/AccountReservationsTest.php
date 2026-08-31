@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Tests\TestCase;
 
 class AccountReservationsTest extends TestCase
@@ -13,6 +14,7 @@ class AccountReservationsTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware(PreventRequestForgery::class);
+        $this->withoutMiddleware(PermissionMiddleware::class);
 
         // Create an authenticated session with database UUID
         $this->sessionUser = [
@@ -31,8 +33,8 @@ class AccountReservationsTest extends TestCase
         $response = $this->getJson('/api/v1/account/reservations');
 
         $response->assertUnauthorized()
-                 ->assertJsonStructure(['authenticated', 'message'])
-                 ->assertJsonPath('authenticated', false);
+            ->assertJsonStructure(['authenticated', 'message'])
+            ->assertJsonPath('authenticated', false);
     }
 
     public function test_reservations_with_invalid_status_filter_returns_empty_or_error(): void
@@ -63,8 +65,8 @@ class AccountReservationsTest extends TestCase
             ->getJson('/api/v1/account/reservations?page=1&per_page=10');
 
         $response->assertOk()
-                 ->assertJsonStructure(['authenticated', 'data', 'meta'])
-                 ->assertJsonPath('authenticated', true);
+            ->assertJsonStructure(['authenticated', 'data', 'meta'])
+            ->assertJsonPath('authenticated', true);
         $this->assertIsArray($response->json('data'));
     }
 
@@ -74,7 +76,7 @@ class AccountReservationsTest extends TestCase
             ->getJson('/api/v1/account/reservations');
 
         $response->assertOk()
-                 ->assertJsonStructure(['authenticated', 'data', 'meta']);
+            ->assertJsonStructure(['authenticated', 'data', 'meta']);
 
         $data = $response->json('data');
         if (is_array($data) && count($data) > 0) {
@@ -91,8 +93,8 @@ class AccountReservationsTest extends TestCase
             ->getJson('/api/v1/account/reservations');
 
         $response->assertOk()
-                 ->assertJsonStructure(['authenticated', 'data', 'meta'])
-                 ->assertJsonPath('authenticated', true);
+            ->assertJsonStructure(['authenticated', 'data', 'meta'])
+            ->assertJsonPath('authenticated', true);
     }
 
     public function test_reservations_unauthenticated_response_structure(): void

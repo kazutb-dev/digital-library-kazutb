@@ -103,4 +103,16 @@ class StaffProfileAndWorkspaceResolutionTest extends TestCase
         $this->signInToLibraryAs($cataloguer)->get('/admin')->assertForbidden();
         $this->signInToLibraryAs($cataloguer)->get('/librarian/executive/export/csv')->assertForbidden();
     }
+
+    public function test_admin_can_return_to_the_admin_console_from_the_librarian_sidebar(): void
+    {
+        $admin = $this->makeControlPlaneUser('admin', ['locale' => 'ru']);
+
+        $workspace = $this->signInToLibraryAs($admin)->get('/librarian?lang=ru');
+
+        $workspace->assertOk()
+            ->assertSee(route('admin.overview'), false)
+            ->assertSee(__('admin.nav.admin_console', locale: 'ru'))
+            ->assertDontSee(route('admin.profile.edit'), false);
+    }
 }

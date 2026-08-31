@@ -23,7 +23,7 @@
 @forelse($cases as $case)
 <tr>
     <td><a class="font-bold text-secondary" href="{{ route('librarian.incidents.show',$case) }}">{{ $case->case_number }}</a></td>
-    <td>{{ $case->reader?->name }}<div class="text-xs text-slate-500">{{ $case->reader?->readerProfile?->category }}</div></td>
+    <td>{{ $case->reader?->name }}@if($case->reader?->readerProfile?->category)<div class="text-xs text-slate-500">{{ __('librarian.circulation.reader_categories.'.$case->reader->readerProfile->category) }}</div>@endif</td>
     <td>{{ $case->originalCopy?->bibliographicRecord?->title }}<div class="text-xs text-slate-500">{{ $case->originalCopy?->inventory_number }}</div></td>
     <td>{{ __('incidents.types.'.$case->incident_type) }}</td>
     <td>{{ __('incidents.statuses.'.$case->status) }}</td>

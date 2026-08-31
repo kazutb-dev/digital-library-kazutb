@@ -23,7 +23,7 @@ class AdminErrorLogAndLastAdminTest extends TestCase
         $this->signInToLibraryAs($this->adminUser)
             ->get('/admin/error-log')
             ->assertOk()
-            ->assertSee('Журнал ошибок');
+            ->assertSee(__('admin.error_log.title'));
 
         $editor = $this->makeControlPlaneUser('member');
         $editor->givePermissionTo('news.edit_any');

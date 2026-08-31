@@ -12,7 +12,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement('CREATE SCHEMA IF NOT EXISTS app');
+        if (DB::getDriverName() === 'sqlite') {
+            $attached = collect(DB::select('PRAGMA database_list'))->contains(
+                fn (object $database): bool => $database->name === 'app'
+            );
+            if (! $attached) {
+                DB::statement("ATTACH DATABASE ':memory:' AS app");
+            }
+        } else {
+            DB::statement('CREATE SCHEMA IF NOT EXISTS app');
+        }
 
         Schema::create('app.circulation_audit_events', function (Blueprint $table) {
             $table->uuid('id')->primary();

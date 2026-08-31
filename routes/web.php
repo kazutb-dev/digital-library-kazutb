@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\FundController;
 use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\ImportController;
 use App\Http\Controllers\Admin\IntegrationController;
+use App\Http\Controllers\Admin\LibraryDataRecoveryController;
 use App\Http\Controllers\Admin\NewsController as AdminNewsController;
 use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Admin\ReportController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\ContactMessageSubmissionController;
 use App\Http\Controllers\DigitalViewerController;
 use App\Http\Controllers\DiscoverController;
 use App\Http\Controllers\ExternalResourceRedirectController;
+use App\Http\Controllers\Librarian\AcquisitionBatchController as LibrarianAcquisitionBatchController;
 use App\Http\Controllers\Librarian\AnnualContentPlanController as LibrarianAnnualContentPlanController;
 use App\Http\Controllers\Librarian\CatalogAttachmentController as LibrarianCatalogAttachmentController;
 use App\Http\Controllers\Librarian\CatalogController as LibrarianCatalogController;
@@ -35,10 +37,13 @@ use App\Http\Controllers\Librarian\ExecutiveDashboardController as LibrarianExec
 use App\Http\Controllers\Librarian\FineController as LibrarianFineController;
 use App\Http\Controllers\Librarian\IncidentController as LibrarianIncidentController;
 use App\Http\Controllers\Librarian\InventoryController as LibrarianInventoryController;
+use App\Http\Controllers\Librarian\KsuRegisterController as LibrarianKsuRegisterController;
+use App\Http\Controllers\Librarian\LibraryOperationSettingController as LibrarianLibraryOperationSettingController;
 use App\Http\Controllers\Librarian\MessageController as LibrarianMessageController;
 use App\Http\Controllers\Librarian\NewsController as LibrarianNewsController;
 use App\Http\Controllers\Librarian\OfficialReportController as LibrarianOfficialReportController;
 use App\Http\Controllers\Librarian\ProfileController as LibrarianProfileController;
+use App\Http\Controllers\Librarian\RecoveryQualityController as LibrarianRecoveryQualityController;
 use App\Http\Controllers\Librarian\ReportController as LibrarianReportController;
 use App\Http\Controllers\Librarian\RepositoryController as LibrarianRepositoryController;
 use App\Http\Controllers\Librarian\ReservationController as LibrarianReservationController;
@@ -74,6 +79,7 @@ use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 // Route changes are intentionally tracked by the vault hook automation.
 // This file doubles as the final validation target for route-aware vault logging.
@@ -983,6 +989,8 @@ $leadershipPublicProvider = static function (): array {
                 'kk' => 'Ресми дереккөз',
                 'en' => 'Official source',
             ],
+            'email' => 'zh.pankey@kaztbu.edu.kz',
+            'extension' => '112',
         ],
     ];
 
@@ -1019,16 +1027,16 @@ $leadershipPublicProvider = static function (): array {
     ];
 };
 
-// Public guidance for /rules. Exact loan limits, dates, penalties, and access
-// terms are intentionally omitted until an approved policy source exists.
-// The stable section anchors remain available for inbound links.
+// Official library rules published by the university. The five stable section
+// anchors remain available for inbound links; the eleven source rules are
+// grouped by topic without changing their meaning.
 $rulesPublicProvider = static function (): array {
     $header = [
         'ru' => [
             'eyebrow' => 'Пользование библиотекой',
             'headline' => 'Правила пользования библиотекой',
             'subtitle_secondary_lang' => 'Library Usage Rules',
-            'preamble' => 'Здесь собраны общие ориентиры по работе с фондом и электронными ресурсами. Срок возврата и доступные действия для конкретной выдачи отображаются в личном кабинете; особые условия можно уточнить у библиотеки.',
+            'preamble' => 'Настоящие Правила определяют порядок организации деятельности научной библиотеки университета и условия пользования библиотечным фондом.',
             'effective_label' => null,
             'effective_date' => null,
             'reviewed_label' => null,
@@ -1037,7 +1045,7 @@ $rulesPublicProvider = static function (): array {
             'eyebrow' => 'Кітапхананы пайдалану',
             'headline' => 'Кітапхананы пайдалану ережелері',
             'subtitle_secondary_lang' => 'Library Usage Rules',
-            'preamble' => 'Бұл бетте кітапхана қорын және электрондық ресурстарды пайдалану жөніндегі жалпы нұсқаулар берілген. Нақты берілімнің қайтару мерзімі мен қолжетімді әрекеттері жеке кабинетте көрсетіледі; ерекше шарттарды кітапханадан нақтылауға болады.',
+            'preamble' => 'Осы Ережелер университеттің ғылыми кітапханасы қызметін ұйымдастыру тәртібін және кітапхана қорын пайдалану шарттарын айқындайды.',
             'effective_label' => null,
             'effective_date' => null,
             'reviewed_label' => null,
@@ -1046,7 +1054,7 @@ $rulesPublicProvider = static function (): array {
             'eyebrow' => 'Using the library',
             'headline' => 'Library Usage Rules',
             'subtitle_secondary_lang' => 'Правила пользования библиотекой',
-            'preamble' => 'This page provides general guidance for using the collection and digital resources. The due date and available actions for a specific loan are shown in the reader account; ask the library about any special conditions.',
+            'preamble' => 'These Rules establish how the university Scientific Library operates and the conditions for using its collection.',
             'effective_label' => null,
             'effective_date' => null,
             'reviewed_label' => null,
@@ -1059,9 +1067,9 @@ $rulesPublicProvider = static function (): array {
             'items' => [
                 ['href' => '#general', 'label' => '1. Общие положения'],
                 ['href' => '#borrowing', 'label' => '2. Выдача и возврат'],
-                ['href' => '#digital', 'label' => '3. Электронный доступ'],
-                ['href' => '#conduct', 'label' => '4. Правила поведения'],
-                ['href' => '#penalties', 'label' => '5. Вопросы и поддержка'],
+                ['href' => '#digital', 'label' => '3. Работа в читальном зале'],
+                ['href' => '#conduct', 'label' => '4. Обязанности читателей'],
+                ['href' => '#penalties', 'label' => '5. Ответственность'],
             ],
         ],
         'kk' => [
@@ -1069,9 +1077,9 @@ $rulesPublicProvider = static function (): array {
             'items' => [
                 ['href' => '#general', 'label' => '1. Жалпы ережелер'],
                 ['href' => '#borrowing', 'label' => '2. Беру және қайтару'],
-                ['href' => '#digital', 'label' => '3. Электрондық қолжетімділік'],
-                ['href' => '#conduct', 'label' => '4. Мінез-құлық ережелері'],
-                ['href' => '#penalties', 'label' => '5. Сұрақтар мен қолдау'],
+                ['href' => '#digital', 'label' => '3. Оқу залында пайдалану'],
+                ['href' => '#conduct', 'label' => '4. Оқырмандардың міндеттері'],
+                ['href' => '#penalties', 'label' => '5. Жауапкершілік'],
             ],
         ],
         'en' => [
@@ -1079,9 +1087,9 @@ $rulesPublicProvider = static function (): array {
             'items' => [
                 ['href' => '#general', 'label' => '1. General provisions'],
                 ['href' => '#borrowing', 'label' => '2. Borrowing and returns'],
-                ['href' => '#digital', 'label' => '3. Digital access'],
-                ['href' => '#conduct', 'label' => '4. Code of conduct'],
-                ['href' => '#penalties', 'label' => '5. Questions and support'],
+                ['href' => '#digital', 'label' => '3. Reading-room use'],
+                ['href' => '#conduct', 'label' => '4. Reader responsibilities'],
+                ['href' => '#penalties', 'label' => '5. Responsibility'],
             ],
         ],
     ];
@@ -1091,36 +1099,30 @@ $rulesPublicProvider = static function (): array {
             'number' => '1',
             'eyebrow' => 'Раздел 1',
             'title' => 'Общие положения',
-            'lede' => 'Каталог открыт для просмотра без авторизации. Для персональных операций используется учётная запись читателя.',
+            'lede' => 'Кто может пользоваться научной библиотекой и как пройти регистрацию.',
             'items' => [
-                'Ищите издания и проверяйте наличие в публичном каталоге.',
-                'Вход требуется только для действий, связанных с учётной записью читателя или ограниченным материалом.',
-                'Не передавайте данные своей учётной записи другим людям.',
-                'Если нужное действие не отображается, уточните условия через официальные контакты библиотеки.',
+                'Право пользования научной библиотекой предоставляется студентам, магистрантам, докторантам и профессорско-преподавательскому составу университета.',
+                'Регистрация осуществляется на основании удостоверения личности или студенческого билета. Читателю выдается читательский билет.',
             ],
         ],
         'kk' => [
             'number' => '1',
             'eyebrow' => '1-бөлім',
             'title' => 'Жалпы ережелер',
-            'lede' => 'Каталогты авторизациясыз көруге болады. Жеке әрекеттер үшін оқырманның есептік жазбасы пайдаланылады.',
+            'lede' => 'Ғылыми кітапхананы кімдер пайдалана алады және тіркелу тәртібі.',
             'items' => [
-                'Басылымдарды іздеп, олардың қолжетімділігін ашық каталогтан тексеріңіз.',
-                'Авторизация оқырманның есептік жазбасына немесе қолжетімділігі шектеулі материалға қатысты әрекеттер үшін ғана қажет.',
-                'Есептік жазбаңыздың деректерін басқа адамдарға бермеңіз.',
-                'Қажетті әрекет көрсетілмесе, кітапхананың ресми байланыс арналары арқылы шарттарды нақтылаңыз.',
+                'Ғылыми кітапхананы пайдалану құқығы университеттің студенттеріне, магистранттарына, докторанттарына және профессор-оқытушылар құрамына беріледі.',
+                'Ғылыми кітапханаға тіркеу жеке куәлік немесе студенттік билет негізінде жүзеге асырылады. Оқырманға оқырман билеті беріледі.',
             ],
         ],
         'en' => [
             'number' => '1',
             'eyebrow' => 'Section 1',
             'title' => 'General provisions',
-            'lede' => 'The catalogue is available without signing in. A reader account is used for personal actions.',
+            'lede' => 'Who may use the Scientific Library and how registration works.',
             'items' => [
-                'Search for titles and check availability in the public catalogue.',
-                'Sign-in is required only for actions linked to a reader account or a restricted material.',
-                'Do not share your account credentials with other people.',
-                'If an action is not shown, confirm the applicable conditions through the library’s official contacts.',
+                'The Scientific Library is available to university students, master’s students, doctoral students, and faculty.',
+                'Registration requires an identity document or student ID. The reader receives a library card.',
             ],
         ],
     ];
@@ -1354,6 +1356,57 @@ $rulesPublicProvider = static function (): array {
             'version_label' => null,
             'version_value' => null,
         ],
+    ];
+
+    // The official page publishes eleven numbered rules. They are arranged
+    // under the page's stable topic anchors below, with no additional policy
+    // claims, loan limits, or penalties inferred by this application.
+    $borrowing = [
+        'ru' => [
+            'number' => '2', 'eyebrow' => 'Раздел 2', 'title' => 'Выдача и возврат',
+            'lede' => 'Порядок временного пользования материалами научной библиотеки.',
+            'groups' => [],
+            'notes' => [
+                'Книги и учебно-методические материалы выдаются для временного пользования через абонементный отдел.',
+                'Литература, полученная по абонементу, должна быть возвращена в научную библиотеку в установленные сроки.',
+            ],
+        ],
+        'kk' => [
+            'number' => '2', 'eyebrow' => '2-бөлім', 'title' => 'Беру және қайтару',
+            'lede' => 'Ғылыми кітапхана материалдарын уақытша пайдалану тәртібі.',
+            'groups' => [],
+            'notes' => [
+                'Кітаптар мен оқу-әдістемелік материалдар ғылыми кітапхананың абонемент бөлімі арқылы уақытша пайдалануға беріледі.',
+                'Абонемент бойынша алынған әдебиет белгіленген мерзімде ғылыми кітапханаға қайтарылуға тиіс.',
+            ],
+        ],
+        'en' => [
+            'number' => '2', 'eyebrow' => 'Section 2', 'title' => 'Borrowing and returns',
+            'lede' => 'The procedure for temporary use of Scientific Library materials.',
+            'groups' => [],
+            'notes' => [
+                'Books and teaching materials are issued for temporary use through the Scientific Library lending department.',
+                'Items borrowed through the lending department must be returned to the Scientific Library by the established due date.',
+            ],
+        ],
+    ];
+
+    $digital = [
+        'ru' => ['number' => '3', 'eyebrow' => 'Раздел 3', 'title' => 'Работа в читальном зале', 'lede' => 'Материалы, которые не выдаются на абонемент.', 'items' => ['Издания редкого фонда, диссертации, справочная литература и периодические издания на абонемент не выдаются и используются только в читальном зале.']],
+        'kk' => ['number' => '3', 'eyebrow' => '3-бөлім', 'title' => 'Оқу залында пайдалану', 'lede' => 'Абонементке берілмейтін материалдар.', 'items' => ['Сирек қор басылымдары, диссертациялар, анықтамалық әдебиет және мерзімді басылымдар абонементке берілмейді және тек ғылыми кітапхананың оқу залында пайдаланылады.']],
+        'en' => ['number' => '3', 'eyebrow' => 'Section 3', 'title' => 'Reading-room use', 'lede' => 'Materials that are not available through the lending department.', 'items' => ['Rare-collection editions, dissertations, reference works, and periodicals are not loaned and may be used only in the Scientific Library reading room.']],
+    ];
+
+    $conduct = [
+        'ru' => ['number' => '4', 'eyebrow' => 'Раздел 4', 'title' => 'Обязанности читателей', 'lede' => 'Бережное отношение к фонду и порядок в библиотеке.', 'items' => ['Читатели обязаны бережно относиться к библиотечным материалам, не допускать их порчи, не делать в них записи и не рвать страницы.', 'В научной библиотеке необходимо соблюдать общественный порядок, тишину и выполнять законные требования сотрудников.']],
+        'kk' => ['number' => '4', 'eyebrow' => '4-бөлім', 'title' => 'Оқырмандардың міндеттері', 'lede' => 'Қорға ұқыпты қарау және кітапханадағы тәртіп.', 'items' => ['Оқырмандар кітапхана материалдарына ұқыпты қарауға, оларды бүлдірмеуге, оларға жазба жазбауға және беттерін жыртпауға міндетті.', 'Ғылыми кітапханада қоғамдық тәртіпті, тыныштықты сақтау және кітапхана қызметкерлерінің заңды талаптарын орындау қажет.']],
+        'en' => ['number' => '4', 'eyebrow' => 'Section 4', 'title' => 'Reader responsibilities', 'lede' => 'Care for the collection and maintain order in the library.', 'items' => ['Readers must handle library materials carefully, avoid damaging them, refrain from writing in them, and not tear pages.', 'Readers must maintain public order and quiet in the Scientific Library and comply with lawful staff instructions.']],
+    ];
+
+    $penalties = [
+        'ru' => ['number' => '5', 'eyebrow' => 'Раздел 5', 'title' => 'Ответственность', 'lede' => 'Меры при нарушении сроков, утрате или повреждении материалов и нарушении Правил.', 'items' => ['При нарушении сроков возврата к читателю применяются меры ответственности в соответствии с Правилами.', 'В случае утраты или приведения полученных материалов в непригодное состояние читатель обязан возместить их стоимость.', 'За нарушение Правил библиотечное обслуживание может быть временно ограничено или приостановлено.'], 'suspension_ladder_label' => '', 'suspension_ladder' => [], 'appeal_label' => 'Источник', 'appeal_text' => 'Правила опубликованы на официальной странице научной библиотеки.'],
+        'kk' => ['number' => '5', 'eyebrow' => '5-бөлім', 'title' => 'Жауапкершілік', 'lede' => 'Қайтару мерзімі бұзылғанда, материалдар жоғалған немесе бүлінген және Ережелер бұзылған кездегі шаралар.', 'items' => ['Қайтару мерзімі бұзылған жағдайда оқырманға осы Ережелерге сәйкес жауапкершілік шаралары қолданылады.', 'Алынған материалдар жоғалған немесе жарамсыз күйге келтірілген жағдайда оқырман олардың құнын өтеуге міндетті.', 'Осы Ережелерді бұзғаны үшін оқырманға кітапханалық қызмет көрсетуді уақытша шектеу немесе тоқтата тұру шаралары қолданылуы мүмкін.'], 'suspension_ladder_label' => '', 'suspension_ladder' => [], 'appeal_label' => 'Дереккөз', 'appeal_text' => 'Ережелер ғылыми кітапхананың ресми бетінде жарияланған.'],
+        'en' => ['number' => '5', 'eyebrow' => 'Section 5', 'title' => 'Responsibility', 'lede' => 'Measures for overdue returns, lost or damaged materials, and violations of the Rules.', 'items' => ['If a return deadline is missed, responsibility measures are applied under these Rules.', 'If borrowed materials are lost or rendered unusable, the reader must reimburse their value.', 'Library service may be temporarily restricted or suspended for violations of these Rules.'], 'suspension_ladder_label' => '', 'suspension_ladder' => [], 'appeal_label' => 'Source', 'appeal_text' => 'The Rules are published on the official Scientific Library page.'],
     ];
 
     return [
@@ -2568,6 +2621,73 @@ $contactsProvider = static function (): array {
                 'kk' => 'Кітапхана директоры',
                 'en' => 'Library Director',
             ],
+            'responsibilities' => [
+                'ru' => 'Руководитель научной библиотеки',
+                'kk' => 'Ғылыми кітапхана басшысы',
+                'en' => 'Head of the Scientific Library',
+            ],
+            'email' => 'zh.pankey@kaztbu.edu.kz',
+            'extension' => '112',
+        ],
+        [
+            'slug' => 'aikebayeva-shu',
+            'name' => 'Айкебаева Ш.У.',
+            'initials' => 'АШ',
+            'photo' => null,
+            'role' => ['ru' => 'Предметный библиотекарь', 'kk' => 'Пәндік кітапханашы', 'en' => 'Subject Librarian'],
+            'responsibilities' => [
+                'ru' => '«Туризм и сервис», «Учет и финансы», «Социально-гуманитарные дисциплины»',
+                'kk' => '«Туризм және сервис», «Есеп және қаржы», «Әлеуметтік-гуманитарлық пәндер»',
+                'en' => 'Tourism and Service; Accounting and Finance; Social and Humanitarian Disciplines',
+            ],
+        ],
+        [
+            'slug' => 'sailaubek-ab',
+            'name' => 'Сайлаубек А.Б.',
+            'initials' => 'СА',
+            'photo' => null,
+            'role' => ['ru' => 'Предметный библиотекарь', 'kk' => 'Пәндік кітапханашы', 'en' => 'Subject Librarian'],
+            'responsibilities' => [
+                'ru' => '«Экономика и управление», «Государственные и иностранные языки», «Физическое воспитание»',
+                'kk' => '«Экономика және басқару», «Мемлекеттік және шет тілдері», «Дене тәрбиесі»',
+                'en' => 'Economics and Management; State and Foreign Languages; Physical Education',
+            ],
+        ],
+        [
+            'slug' => 'raimkulova-na',
+            'name' => 'Раимкулова Н.А.',
+            'initials' => 'РН',
+            'photo' => null,
+            'role' => ['ru' => 'Предметный библиотекарь', 'kk' => 'Пәндік кітапханашы', 'en' => 'Subject Librarian'],
+            'responsibilities' => [
+                'ru' => '«Технология и стандартизация», «Технология легкой промышленности и дизайн»',
+                'kk' => '«Технология және стандарттау», «Жеңіл өнеркәсіп технологиясы және дизайн»',
+                'en' => 'Technology and Standardization; Light Industry Technology and Design',
+            ],
+        ],
+        [
+            'slug' => 'korpeshova-em',
+            'name' => 'Корпешова Э.М.',
+            'initials' => 'КЭ',
+            'photo' => null,
+            'role' => ['ru' => 'Предметный библиотекарь', 'kk' => 'Пәндік кітапханашы', 'en' => 'Subject Librarian'],
+            'responsibilities' => [
+                'ru' => '«Информационные технологии», «Компьютерная инженерия и автоматизация»',
+                'kk' => '«Ақпараттық технологиялар», «Компьютерлік инженерия және автоматтандыру»',
+                'en' => 'Information Technology; Computer Engineering and Automation',
+            ],
+        ],
+        [
+            'slug' => 'yermaganbetova-ma',
+            'name' => 'Ермаганбетова М.А.',
+            'initials' => 'ЕМ',
+            'photo' => null,
+            'role' => ['ru' => 'Предметный библиотекарь', 'kk' => 'Пәндік кітапханашы', 'en' => 'Subject Librarian'],
+            'responsibilities' => [
+                'ru' => '«Химия, химическая технология и экология»',
+                'kk' => '«Химия, химиялық технология және экология»',
+                'en' => 'Chemistry, Chemical Technology and Ecology',
+            ],
         ],
     ];
 
@@ -2578,6 +2698,9 @@ $contactsProvider = static function (): array {
             'initials' => $member['initials'],
             'photo' => $member['photo'],
             'role' => $member['role'][$lang] ?? $member['role']['ru'],
+            'responsibilities' => $member['responsibilities'][$lang] ?? $member['responsibilities']['ru'],
+            'email' => $member['email'] ?? null,
+            'extension' => $member['extension'] ?? null,
         ], $staffMembers);
     };
 
@@ -2638,22 +2761,24 @@ $contactsProvider = static function (): array {
         ],
     ];
 
-    // The official library page confirms the 08:30–17:30 interval but is
-    // internally inconsistent about Saturday. Keep the confirmed interval,
-    // link to the primary source, and ask visitors to verify the day before
-    // travelling rather than publishing a guessed weekly schedule.
+    // Kept verbatim from the university's official library page. The source
+    // currently mentions Saturday in both the working-hours and days-off rows;
+    // reproducing both rows avoids silently inventing a correction.
     $hoursRows = [
         'ru' => [
-            ['days' => 'Подтверждённый интервал', 'hours' => '08:30 – 17:30'],
-            ['days' => 'Перед визитом', 'hours' => 'Уточните рабочие дни на официальной странице'],
+            ['days' => 'Понедельник – суббота', 'hours' => '08:30 – 17:30'],
+            ['days' => 'Суббота, воскресенье', 'hours' => 'Выходной'],
+            ['days' => 'Последний рабочий день месяца', 'hours' => 'Санитарный день'],
         ],
         'kk' => [
-            ['days' => 'Расталған уақыт аралығы', 'hours' => '08:30 – 17:30'],
-            ['days' => 'Келмес бұрын', 'hours' => 'Жұмыс күндерін ресми беттен нақтылаңыз'],
+            ['days' => 'Дүйсенбі – сенбі', 'hours' => '08:30 – 17:30'],
+            ['days' => 'Сенбі, жексенбі', 'hours' => 'Демалыс'],
+            ['days' => 'Әр айдың соңғы жұмыс күні', 'hours' => 'Санитарлық күн'],
         ],
         'en' => [
-            ['days' => 'Confirmed time window', 'hours' => '08:30 – 17:30'],
-            ['days' => 'Before visiting', 'hours' => 'Confirm working days on the official page'],
+            ['days' => 'Monday – Saturday', 'hours' => '08:30 – 17:30'],
+            ['days' => 'Saturday, Sunday', 'hours' => 'Closed'],
+            ['days' => 'Last working day of each month', 'hours' => 'Sanitary day'],
         ],
     ];
 
@@ -2669,7 +2794,10 @@ $contactsProvider = static function (): array {
             'location_address_line_a' => 'Астана, ул. Кайыма Мухамедханова, 37A',
             'location_address_line_b' => 'Главный учебный корпус Казахского университета технологии и бизнеса имени К. Кулажанова.',
             'location_phone' => '+7 (7172) 69-70-60',
+            'location_mobile' => '+7 (775) 232-22-66',
             'location_email' => 'info@kaztbu.edu.kz',
+            'instagram_url' => 'https://www.instagram.com/library_kazutb/',
+            'instagram_handle' => '@library_kazutb',
             'location_directions_cta' => 'Открыть в Google Maps',
             'hours_label' => 'Режим работы',
             'hours_rows' => $hoursRows['ru'],
@@ -2697,7 +2825,10 @@ $contactsProvider = static function (): array {
             'location_address_line_a' => 'Астана, Қайым Мұхамедханов көшесі, 37A',
             'location_address_line_b' => 'Қ. Құлажанов атындағы Қазақ технология және бизнес университетінің бас оқу корпусы.',
             'location_phone' => '+7 (7172) 69-70-60',
+            'location_mobile' => '+7 (775) 232-22-66',
             'location_email' => 'info@kaztbu.edu.kz',
+            'instagram_url' => 'https://www.instagram.com/library_kazutb/',
+            'instagram_handle' => '@library_kazutb',
             'location_directions_cta' => 'Google Maps-те ашу',
             'hours_label' => 'Жұмыс режимі',
             'hours_rows' => $hoursRows['kk'],
@@ -2725,7 +2856,10 @@ $contactsProvider = static function (): array {
             'location_address_line_a' => '37A Kayym Mukhamedkhanov Street, Astana',
             'location_address_line_b' => 'Main academic building of the Kazakh University of Technology and Business named after K. Kulazhanov.',
             'location_phone' => '+7 (7172) 69-70-60',
+            'location_mobile' => '+7 (775) 232-22-66',
             'location_email' => 'info@kaztbu.edu.kz',
+            'instagram_url' => 'https://www.instagram.com/library_kazutb/',
+            'instagram_handle' => '@library_kazutb',
             'location_directions_cta' => 'Open in Google Maps',
             'hours_label' => 'Opening hours',
             'hours_rows' => $hoursRows['en'],
@@ -4391,7 +4525,7 @@ Route::get('/events/{slug}', function (Request $request, string $slug) use ($new
         }
 
         abort(404);
-    } catch (Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+    } catch (HttpException $exception) {
         throw $exception;
     } catch (Throwable $exception) {
         report($exception);
@@ -4496,15 +4630,11 @@ Route::get('/book/{isbn}/read', function ($isbn) {
 Route::permanentRedirect('/internal/dashboard', '/librarian');
 Route::permanentRedirect('/internal/circulation', '/librarian/circulation');
 Route::permanentRedirect('/internal/stewardship', '/librarian/data-cleanup');
+Route::permanentRedirect('/internal/review', '/librarian/data-cleanup');
 
 Route::prefix('internal')->middleware(['library.auth'])->group(function () use ($internalStaffView) {
-    // Remaining transitional surfaces — no confirmed canonical /librarian/* destination yet.
-    // /internal/review — "Quality Issues Overview" (DB-backed read-only review); candidate
-    //   canonical target is undecided between /librarian/data-cleanup and /librarian/repository.
-    // /internal/ai-chat — experimental staff AI assistant; no canonical surface in roadmap yet.
-    Route::get('/review', function (Request $request) use ($internalStaffView) {
-        return $internalStaffView($request, 'internal-review');
-    })->middleware('permission:data_cleanup.access');
+    // Remaining transitional surface — experimental staff AI assistant;
+    // no canonical /librarian destination has been approved yet.
     Route::get('/ai-chat', function (Request $request) use ($internalStaffView) {
         return $internalStaffView($request, 'internal-ai-chat');
     })->middleware('permission:data_cleanup.access');
@@ -4519,6 +4649,12 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         ->middleware('private.response')->name('profile.show');
     Route::patch('/profile/preferences', [LibrarianProfileController::class, 'updatePreferences'])
         ->middleware(['private.response', 'throttle:10,1'])->name('profile.preferences');
+    Route::prefix('settings')->name('settings.')->middleware(['permission:library.settings.manage', 'private.response'])->group(function (): void {
+        Route::get('/library-operations', [LibrarianLibraryOperationSettingController::class, 'index'])
+            ->name('library-operations.index');
+        Route::patch('/library-operations', [LibrarianLibraryOperationSettingController::class, 'update'])
+            ->name('library-operations.update');
+    });
     Route::middleware(['permission:circulation.issue|circulation.return', 'private.response'])->group(function (): void {
         Route::get('/readers', [LibrarianDirectoryReaderController::class, 'index'])->name('readers.index');
         Route::post('/readers/active-directory', [LibrarianDirectoryReaderController::class, 'provision'])
@@ -4530,7 +4666,8 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         Route::post('/tasks', [LibrarianWorkspaceController::class, 'storeTask'])->middleware('permission:tasks.manage_own|tasks.assign')->name('tasks.store');
         Route::patch('/tasks/{task}', [LibrarianWorkspaceController::class, 'updateTask'])->middleware('permission:tasks.manage_own|tasks.assign')->name('tasks.update');
         Route::get('/calendar', [LibrarianWorkspaceController::class, 'calendar'])->middleware('permission:calendar.view')->name('calendar');
-        Route::get('/fund-movements', [LibrarianWorkspaceController::class, 'movements'])->middleware('permission:catalog.search|copies.edit')->name('movements');
+        Route::get('/fund-movements', [LibrarianWorkspaceController::class, 'movements'])->middleware('permission:copies.movements.view')->name('movements');
+        Route::post('/fund-movements', [LibrarianWorkspaceController::class, 'storeMovement'])->middleware('permission:copies.movements.create')->name('movements.store');
         Route::get('/orders', [LibrarianWorkspaceController::class, 'orders'])->middleware('permission:acquisitions.view')->name('orders');
         Route::post('/orders', [LibrarianWorkspaceController::class, 'storeOrder'])->middleware('permission:acquisitions.create_order|acquisitions.manage')->name('orders.store');
         Route::patch('/orders/{order}/items/{item}/receive', [LibrarianWorkspaceController::class, 'receiveOrderItem'])->middleware('permission:acquisitions.receive|acquisitions.manage')->name('orders.items.receive');
@@ -4541,13 +4678,30 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         Route::post('/periodicals/{subscription}/issues', [LibrarianWorkspaceController::class, 'receiveIssue'])->middleware('permission:periodicals.manage')->name('periodicals.issues.store');
     });
     Route::get('/', LibrarianDashboardController::class)->name('overview');
+
+    Route::prefix('acquisitions')->name('acquisitions.')->middleware('permission:acquisitions.view|acquisitions.manage')->group(function (): void {
+        Route::get('/', [LibrarianAcquisitionBatchController::class, 'index'])->name('index');
+        Route::post('/', [LibrarianAcquisitionBatchController::class, 'store'])->middleware('permission:acquisitions.intake|acquisitions.manage')->name('store');
+        Route::get('/{batch}', [LibrarianAcquisitionBatchController::class, 'show'])->name('show');
+        Route::match(['PUT', 'PATCH'], '/{batch}', [LibrarianAcquisitionBatchController::class, 'update'])->middleware('permission:acquisitions.intake|acquisitions.manage')->name('update');
+        Route::post('/{batch}/confirm', [LibrarianAcquisitionBatchController::class, 'confirm'])->middleware('permission:acquisitions.confirm|acquisitions.manage')->name('confirm');
+        Route::post('/{batch}/cancel', [LibrarianAcquisitionBatchController::class, 'cancel'])->middleware('permission:acquisitions.intake|acquisitions.manage')->name('cancel');
+    });
+
+    Route::prefix('ksu')->name('ksu.')->middleware('permission:ksu.view')->group(function (): void {
+        Route::get('/', [LibrarianKsuRegisterController::class, 'index'])->name('index');
+        Route::get('/conflicts', [LibrarianKsuRegisterController::class, 'conflicts'])->middleware('permission:ksu.manage')->name('conflicts');
+        Route::post('/conflicts/resolve-group', [LibrarianKsuRegisterController::class, 'resolveGroup'])->middleware('permission:ksu.resolve')->name('conflicts.resolve-group');
+        Route::post('/conflicts/{conflict}/resolve', [LibrarianKsuRegisterController::class, 'resolve'])->middleware('permission:ksu.resolve')->name('conflicts.resolve');
+        Route::get('/{entry}', [LibrarianKsuRegisterController::class, 'show'])->name('show');
+    });
     Route::post('/executive/alerts/acknowledge', [LibrarianExecutiveDashboardController::class, 'acknowledge'])
         ->middleware(['permission:reports.view_full', 'private.response'])->name('executive.alerts.acknowledge');
     Route::post('/executive/alerts/assign', [LibrarianExecutiveDashboardController::class, 'assign'])
         ->middleware(['permission:tasks.assign', 'private.response'])->name('executive.alerts.assign');
     Route::get('/executive/export/{format}', [LibrarianExecutiveDashboardController::class, 'export'])
         ->whereIn('format', ['csv', 'pdf', 'xlsx', 'docx'])
-        ->middleware(['permission:reports.view_full', 'private.response'])->name('executive.export');
+        ->middleware(['permission:reports.view_full', 'permission:reports.export', 'private.response'])->name('executive.export');
 
     // Cataloguing (Master.md 6-11).
     Route::get('/catalog', [LibrarianCatalogController::class, 'index'])
@@ -4594,6 +4748,10 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
         ->name('catalog.destroy');
 
     // Copies / inventory (Master.md 12).
+    Route::get('/copies/write-off', [LibrarianCopyController::class, 'writeOffForm'])
+        ->middleware('permission:copies.write_off')->name('copies.write-off');
+    Route::post('/copies/write-off', [LibrarianCopyController::class, 'batchWriteOff'])
+        ->middleware('permission:copies.write_off')->name('copies.write-off.store');
     Route::middleware('permission:copies.create|copies.edit')->group(function (): void {
         Route::get('/copies', [LibrarianCopyController::class, 'index'])->name('copies.index');
         Route::get('/copies/create', [LibrarianCopyController::class, 'create'])->name('copies.create');
@@ -4669,9 +4827,13 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
     Route::middleware('permission:reservation.confirm')->group(function (): void {
         Route::get('/reservations', [LibrarianReservationController::class, 'index'])->name('reservations.index');
         Route::post('/reservations/{reservation}/confirm', [LibrarianReservationController::class, 'confirm'])->name('reservations.confirm');
-        Route::post('/reservations/{reservation}/ready', [LibrarianReservationController::class, 'markReady'])->name('reservations.ready');
+        Route::post('/reservations/{reservation}/ready', [LibrarianReservationController::class, 'markReady'])
+            ->middleware('permission:reservation.fulfill')
+            ->name('reservations.ready');
         // 8.3 — extend the pickup hold; the service refuses when anyone is queued.
-        Route::post('/reservations/{reservation}/extend', [LibrarianReservationController::class, 'extend'])->name('reservations.extend');
+        Route::post('/reservations/{reservation}/extend', [LibrarianReservationController::class, 'extend'])
+            ->middleware('permission:reservation.extend')
+            ->name('reservations.extend');
         Route::post('/reservations/{reservation}/transfer', [LibrarianReservationController::class, 'requestTransfer'])->middleware('permission:reservation.manage_transfer')->name('reservations.transfer.request');
         Route::post('/transfers/{transfer}/approve', [LibrarianReservationController::class, 'approveTransfer'])->middleware('permission:reservation.manage_transfer')->name('transfers.approve');
         Route::post('/transfers/{transfer}/send', [LibrarianReservationController::class, 'sendTransfer'])->middleware('permission:reservation.manage_transfer')->name('transfers.send');
@@ -4707,6 +4869,14 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
 
     Route::middleware('permission:data_quality.view')->prefix('data-quality')->name('data-quality.')->group(function (): void {
         Route::get('/', [LibrarianDataQualityController::class, 'index'])->name('index');
+        Route::get('/recovery', [LibrarianRecoveryQualityController::class, 'index'])
+            ->middleware('permission:legacy_recovery.review|legacy_recovery.view')->name('recovery');
+        Route::post('/recovery/fund-raw/{copy}', [LibrarianRecoveryQualityController::class, 'resolveFundRaw'])
+            ->middleware('permission:legacy_recovery.resolve')->name('recovery.fund.resolve');
+        Route::post('/recovery/conflicts/{conflict}', [LibrarianRecoveryQualityController::class, 'resolveConflict'])
+            ->middleware('permission:legacy_recovery.resolve')->name('recovery.conflicts.resolve');
+        Route::post('/recovery/quarantine/{quarantine}/link', [LibrarianRecoveryQualityController::class, 'linkOrphan'])
+            ->middleware('permission:legacy_recovery.resolve')->name('recovery.quarantine.link');
         Route::get('/export.csv', [LibrarianDataQualityController::class, 'export'])->middleware('permission:data_quality.view_reports')->name('export');
         Route::get('/exports/{type}.csv', [LibrarianDataQualityController::class, 'export'])->middleware('permission:data_quality.view_reports')->name('exports');
         Route::post('/scans', [LibrarianDataQualityController::class, 'queueScan'])->middleware('permission:data_quality.scan')->name('scans.store');
@@ -4745,7 +4915,7 @@ Route::prefix('librarian')->middleware(['library.auth', 'librarian.staff', 'oper
     });
 
     // Scientific repository moderation (Master.md 20).
-    Route::middleware('permission:repository.upload|repository.review_metadata|repository.review_rights|repository.request_changes|repository.approve|repository.publish|repository.withdraw')->group(function (): void {
+    Route::middleware('permission:repository.upload|repository.edit|repository.review_metadata|repository.review_rights|repository.request_changes|repository.approve|repository.publish|repository.withdraw')->group(function (): void {
         Route::get('/repository', [LibrarianRepositoryController::class, 'index'])->name('repository');
         Route::get('/repository/create', [LibrarianRepositoryController::class, 'create'])->middleware('permission:repository.upload')->name('repository.create');
         Route::post('/repository', [LibrarianRepositoryController::class, 'store'])->middleware('permission:repository.upload')->name('repository.store');
@@ -4844,52 +5014,109 @@ Route::prefix('dashboard')->middleware(['auth', 'library.auth', 'member.reader',
     // Personal cabinet (Master.md 15) — every screen is backed by the
     // canonical circulation schema and scoped to the signed-in reader inside
     // CabinetController, never merely by what the view chooses to render.
-    Route::get('/', [MemberCabinetController::class, 'dashboard'])->name('dashboard');
+    Route::get('/', [MemberCabinetController::class, 'dashboard'])
+        ->middleware('permission:member.dashboard.view')
+        ->name('dashboard');
 
     // 15.2 / 5.3 — materials on hand and reader-initiated renewal.
-    Route::get('/loans', [MemberCabinetController::class, 'loans'])->name('loans');
-    Route::get('/card', [MemberCabinetController::class, 'ticket'])->name('card');
-    Route::post('/card/printed', [MemberCabinetController::class, 'cardPrinted'])->middleware('throttle:20,1')->name('card.printed');
+    Route::get('/loans', [MemberCabinetController::class, 'loans'])
+        ->middleware('permission:loans.view_own')
+        ->name('loans');
+    Route::get('/card', [MemberCabinetController::class, 'ticket'])
+        ->middleware('permission:reader_card.view_own')
+        ->name('card');
+    Route::post('/card/printed', [MemberCabinetController::class, 'cardPrinted'])
+        ->middleware(['permission:reader_card.print_own', 'throttle:20,1'])
+        ->name('card.printed');
     Route::redirect('/ticket', '/dashboard/card')->name('ticket.legacy');
-    Route::post('/loans/{loan}/renew', [MemberCabinetController::class, 'renewLoan'])->middleware('throttle:10,1')->name('loans.renew');
+    Route::post('/loans/{loan}/renew', [MemberCabinetController::class, 'renewLoan'])
+        ->middleware(['permission:loans.renew_own', 'throttle:10,1'])
+        ->name('loans.renew');
 
     // 13.1, 15.3 — the reader's own reservation queue.
-    Route::get('/reservations', [MemberCabinetController::class, 'reservations'])->name('reservations');
+    Route::get('/reservations', [MemberCabinetController::class, 'reservations'])
+        ->middleware('permission:reservation.view_own')
+        ->name('reservations');
     Route::post('/reservations', [MemberCabinetController::class, 'storeReservation'])
         ->middleware('permission:reservation.create')
         ->name('reservations.store');
     Route::post('/reservations/{reservation}/cancel', [MemberCabinetController::class, 'cancelReservation'])
+        ->middleware('permission:reservation.cancel_own')
         ->name('reservations.cancel');
 
     Route::redirect('/list', '/dashboard/collections')->name('list.legacy');
-    Route::get('/collections', [MemberCollectionController::class, 'index'])->name('collections.index');
-    Route::post('/collections', [MemberCollectionController::class, 'store'])->middleware('throttle:20,1')->name('collections.store');
-    Route::get('/collections/{collection}', [MemberCollectionController::class, 'show'])->name('collections.show');
-    Route::patch('/collections/{collection}', [MemberCollectionController::class, 'update'])->name('collections.update');
-    Route::delete('/collections/{collection}', [MemberCollectionController::class, 'destroy'])->name('collections.destroy');
-    Route::post('/collections/{collection}/items', [MemberCollectionController::class, 'add'])->name('collections.items.add');
-    Route::delete('/collections/{collection}/items/{item}', [MemberCollectionController::class, 'remove'])->name('collections.items.remove');
-    Route::patch('/collections/{collection}/order', [MemberCollectionController::class, 'reorder'])->name('collections.reorder');
-    Route::post('/collections/{collection}/follow', [MemberCollectionController::class, 'follow'])->name('collections.follow');
-    Route::post('/collections/{collection}/copy', [MemberCollectionController::class, 'copy'])->name('collections.copy');
+    Route::get('/collections', [MemberCollectionController::class, 'index'])
+        ->middleware('permission:collections.manage_own|collections.view_public')
+        ->name('collections.index');
+    Route::post('/collections', [MemberCollectionController::class, 'store'])
+        ->middleware(['permission:collections.manage_own', 'throttle:20,1'])
+        ->name('collections.store');
+    Route::get('/collections/{collection}', [MemberCollectionController::class, 'show'])
+        ->middleware('permission:collections.manage_own|collections.view_public')
+        ->name('collections.show');
+    Route::patch('/collections/{collection}', [MemberCollectionController::class, 'update'])
+        ->middleware('permission:collections.manage_own')
+        ->name('collections.update');
+    Route::delete('/collections/{collection}', [MemberCollectionController::class, 'destroy'])
+        ->middleware('permission:collections.manage_own')
+        ->name('collections.destroy');
+    Route::post('/collections/{collection}/items', [MemberCollectionController::class, 'add'])
+        ->middleware('permission:collections.manage_own')
+        ->name('collections.items.add');
+    Route::delete('/collections/{collection}/items/{item}', [MemberCollectionController::class, 'remove'])
+        ->middleware('permission:collections.manage_own')
+        ->name('collections.items.remove');
+    Route::patch('/collections/{collection}/order', [MemberCollectionController::class, 'reorder'])
+        ->middleware('permission:collections.manage_own')
+        ->name('collections.reorder');
+    Route::post('/collections/{collection}/follow', [MemberCollectionController::class, 'follow'])
+        ->middleware('permission:collections.view_public')
+        ->name('collections.follow');
+    Route::post('/collections/{collection}/copy', [MemberCollectionController::class, 'copy'])
+        ->middleware(['permission:collections.view_public', 'permission:collections.manage_own'])
+        ->name('collections.copy');
 
     // 15.4 — closed loans; 15.5 — the reader's own debts (read-only).
-    Route::get('/history', [MemberCabinetController::class, 'history'])->name('history');
-    Route::get('/fines', [MemberCabinetController::class, 'fines'])->name('fines');
-    Route::get('/incidents', [MemberIncidentController::class, 'index'])->name('incidents.index');
-    Route::get('/incidents/{incident}', [MemberIncidentController::class, 'show'])->name('incidents.show');
+    Route::get('/history', [MemberCabinetController::class, 'history'])
+        ->middleware('permission:circulation.view_own_history')
+        ->name('history');
+    Route::get('/fines', [MemberCabinetController::class, 'fines'])
+        ->middleware('permission:fines.view_own')
+        ->name('fines');
+    Route::get('/incidents', [MemberIncidentController::class, 'index'])
+        ->middleware('permission:incidents.view_own')
+        ->name('incidents.index');
+    Route::get('/incidents/{incident}', [MemberIncidentController::class, 'show'])
+        ->middleware('permission:incidents.view_own')
+        ->name('incidents.show');
 
     // In-app reader notifications (Master.md 15.6) — real ReaderNotification feed.
-    Route::get('/notifications', [MemberNotificationController::class, 'index'])->name('notifications');
-    Route::post('/notifications/read-all', [MemberNotificationController::class, 'markAllRead'])->name('notifications.read-all');
-    Route::post('/notifications/{notification}/read', [MemberNotificationController::class, 'markRead'])->name('notifications.read');
+    Route::get('/notifications', [MemberNotificationController::class, 'index'])
+        ->middleware('permission:notifications.view_own')
+        ->name('notifications');
+    Route::post('/notifications/read-all', [MemberNotificationController::class, 'markAllRead'])
+        ->middleware('permission:notifications.manage_own')
+        ->name('notifications.read-all');
+    Route::post('/notifications/{notification}/read', [MemberNotificationController::class, 'markRead'])
+        ->middleware('permission:notifications.manage_own')
+        ->name('notifications.read');
 
-    Route::get('/digital-materials', [MemberPortalController::class, 'digitalMaterials'])->name('digital-materials');
-    Route::get('/search', [MemberPortalController::class, 'search'])->name('search');
+    Route::get('/digital-materials', [MemberPortalController::class, 'digitalMaterials'])
+        ->middleware('permission:digital.view_metadata')
+        ->name('digital-materials');
+    Route::get('/search', [MemberPortalController::class, 'search'])
+        ->middleware('permission:catalog.search')
+        ->name('search');
     Route::get('/profile', [MemberPortalController::class, 'profile'])->name('profile');
-    Route::patch('/profile', [MemberPortalController::class, 'updateProfile'])->middleware('throttle:10,1')->name('profile.update');
-    Route::get('/messages', [MemberPortalController::class, 'messages'])->name('messages');
-    Route::get('/messages/{message}', [MemberPortalController::class, 'message'])->name('messages.show');
+    Route::patch('/profile', [MemberPortalController::class, 'updateProfile'])
+        ->middleware(['permission:profile.update_own', 'throttle:10,1'])
+        ->name('profile.update');
+    Route::get('/messages', [MemberPortalController::class, 'messages'])
+        ->middleware('permission:messages.view_own')
+        ->name('messages');
+    Route::get('/messages/{message}', [MemberPortalController::class, 'message'])
+        ->middleware('permission:messages.view_own')
+        ->name('messages.show');
 
     Route::post('/messages', [ContactMessageSubmissionController::class, 'store'])
         ->middleware(['permission:messages.submit', 'throttle:5,10'])
@@ -4900,15 +5127,23 @@ Route::prefix('dashboard')->middleware(['auth', 'library.auth', 'member.reader',
     Route::get('/messages/{message}/attachments/{attachment}', [ContactMessageSubmissionController::class, 'attachment'])->middleware('permission:messages.view_own')->name('messages.attachments.show');
 });
 
-Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->name('admin.')->group(function (): void {
-    Route::get('/', AdminDashboardController::class)->name('overview');
+// Delegated administrative tools. These URLs retain their historical
+// `/admin` names, but access is determined by the exact capability instead of
+// the broad control-plane role. A librarian responsible for electronic
+// resources must not hit a dead 403 link, while every unrelated admin screen
+// remains behind `control.plane` below.
+Route::prefix('admin')->middleware(['auth', 'library.auth', 'operational.staff'])->name('admin.')->group(function (): void {
+    Route::middleware('permission:integrations.view')->group(function (): void {
+        Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
+        Route::get('/integrations/{integration}', [IntegrationController::class, 'show'])->name('integrations.show');
+    });
+    Route::post('/integrations/check', [IntegrationController::class, 'check'])
+        ->middleware(['permission:integrations.health', 'throttle:10,1'])
+        ->name('integrations.check');
+    Route::post('/integrations/{integration}/health', [IntegrationController::class, 'health'])
+        ->middleware(['permission:integrations.health', 'throttle:10,1'])
+        ->name('integrations.health');
 
-    // Global search — no extra permission gate here: every result group is
-    // filtered inside the controller by the permission guarding its section.
-    Route::get('/search', GlobalSearchController::class)->name('search');
-
-    // CSV import (users / external resources). The controller re-checks the
-    // exact permission per type; the middleware is the coarse gate.
     Route::middleware('permission:users.manage|external_resources.manage')->group(function (): void {
         Route::get('/import/{type}', [ImportController::class, 'form'])
             ->whereIn('type', ['users', 'external-resources'])
@@ -4920,6 +5155,35 @@ Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->n
             ->whereIn('type', ['users', 'external-resources'])
             ->name('imports.commit');
     });
+
+    Route::post('/external-resources/{externalResource}/workflow', [AdminExternalResourceController::class, 'workflow'])
+        ->middleware('permission:external_resources.manage|external_resources.publish')
+        ->name('external-resources.workflow');
+    Route::resource('external-resources', AdminExternalResourceController::class)
+        ->except('show')
+        ->middleware('permission:external_resources.manage');
+});
+
+Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->name('admin.')->group(function (): void {
+    Route::get('/', AdminDashboardController::class)->name('overview');
+
+    // Global search — no extra permission gate here: every result group is
+    // filtered inside the controller by the permission guarding its section.
+    Route::get('/search', GlobalSearchController::class)->name('search');
+
+    Route::prefix('library-recovery')->name('library-recovery.')
+        ->middleware('permission:legacy_recovery.view')->group(function (): void {
+            Route::get('/', [LibraryDataRecoveryController::class, 'index'])->name('index');
+            Route::get('/batches/{batchId}', [LibraryDataRecoveryController::class, 'batch'])->name('batches.show');
+            Route::get('/raw', [LibraryDataRecoveryController::class, 'rawRecords'])->name('raw.index');
+            Route::get('/raw/{recordId}', [LibraryDataRecoveryController::class, 'rawRecord'])->name('raw.show');
+            Route::get('/quarantine', [LibraryDataRecoveryController::class, 'quarantine'])->name('quarantine.index');
+            Route::get('/quarantine/{quarantineId}', [LibraryDataRecoveryController::class, 'quarantineItem'])->name('quarantine.show');
+            Route::get('/conflicts', [LibraryDataRecoveryController::class, 'conflicts'])->name('conflicts.index');
+            Route::get('/conflicts/{conflictId}', [LibraryDataRecoveryController::class, 'conflict'])->name('conflicts.show');
+            Route::get('/review', [LibraryDataRecoveryController::class, 'librarianReview'])
+                ->middleware('permission:legacy_recovery.manage')->name('review');
+        });
 
     Route::middleware('permission:users.manage')->group(function (): void {
         Route::get('/users/export', [UserController::class, 'export'])->name('users.export');
@@ -5001,12 +5265,6 @@ Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->n
         Route::post('/system/backups/{backup}/restore-test', [SystemController::class, 'restoreTest'])->middleware('throttle:1,10')->name('system.backups.restore-test');
     });
 
-    Route::middleware('permission:integrations.view')->group(function (): void {
-        Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
-        Route::get('/integrations/{integration}', [IntegrationController::class, 'show'])->name('integrations.show');
-    });
-    Route::post('/integrations/check', [IntegrationController::class, 'check'])->middleware(['permission:integrations.health', 'throttle:10,1'])->name('integrations.check');
-    Route::post('/integrations/{integration}/health', [IntegrationController::class, 'health'])->middleware(['permission:integrations.health', 'throttle:10,1'])->name('integrations.health');
     Route::post('/integrations/{integration}/toggle', [IntegrationController::class, 'toggle'])->middleware(['permission:integrations.manage', 'throttle:10,1'])->name('integrations.toggle');
     Route::post('/integrations/{integration}/dry-run', [IntegrationController::class, 'dryRun'])->middleware(['permission:integrations.sync', 'throttle:5,1'])->name('integrations.dry-run');
     Route::post('/integrations/{integration}/sync', [IntegrationController::class, 'startSync'])->middleware(['permission:integrations.sync', 'throttle:5,1'])->name('integrations.sync');
@@ -5024,13 +5282,6 @@ Route::prefix('admin')->middleware(['auth', 'library.auth', 'control.plane'])->n
         Route::patch('/funds/{fund}', [FundController::class, 'update'])->name('funds.update');
         Route::delete('/funds/{fund}', [FundController::class, 'destroy'])->name('funds.destroy');
     });
-
-    Route::post('/external-resources/{externalResource}/workflow', [AdminExternalResourceController::class, 'workflow'])
-        ->middleware('permission:external_resources.manage|external_resources.publish')
-        ->name('external-resources.workflow');
-    Route::resource('external-resources', AdminExternalResourceController::class)
-        ->except('show')
-        ->middleware('permission:external_resources.manage');
 
     Route::redirect('/repository', '/librarian/repository')
         ->middleware('permission:repository.upload|repository.approve|repository.publish|repository.remove')

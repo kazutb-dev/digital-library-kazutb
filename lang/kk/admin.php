@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'system' => ['backup_created' => 'Сақтық көшірме жасалып, тексерілді.', 'restore_verified' => 'Қалпына келтіру сынағы оқшауланған :database дерекқорында сәтті аяқталды.'],
     'layout' => [
         'portal_title' => 'Әкімші панелі',
         'portal_subtitle' => 'Жүйелік басқару орталығы',
@@ -25,6 +26,7 @@ return [
         'security' => 'Қауіпсіздік',
         'backups' => 'Сақтық көшірме',
         'librarian_console' => 'Кітапханашы кабинеті',
+        'admin_console' => 'Әкімші кабинеті',
         'logout' => 'Шығу',
     ],
     'dashboard' => [

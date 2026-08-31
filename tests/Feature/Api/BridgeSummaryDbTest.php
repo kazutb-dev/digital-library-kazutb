@@ -12,6 +12,10 @@ class BridgeSummaryDbTest extends TestCase
     {
         parent::setUp();
 
+        // Authorization is covered by DiagnosticApiAuthorizationTest. This
+        // live-schema contract test must remain read-only and must not create a
+        // privileged user in a production-like PostgreSQL database.
+        $this->withoutMiddleware();
         Config::set('database.default', 'pgsql');
         DB::purge('pgsql');
     }

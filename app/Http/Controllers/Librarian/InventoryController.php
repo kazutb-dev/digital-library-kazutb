@@ -14,7 +14,9 @@ use App\Support\Csv;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InventoryController extends Controller
@@ -26,10 +28,27 @@ class InventoryController extends Controller
 
     public function index(): View
     {
+        $hasRecoveredSigla = Schema::hasColumn('book_copies', 'sigla_code');
+        $siglas = BookCopy::query()
+            ->selectRaw($hasRecoveredSigla
+                ? "COALESCE(NULLIF(storage_sigla, ''), NULLIF(sigla_code, '')) AS value"
+                : "NULLIF(storage_sigla, '') AS value")
+            ->where(function ($query) use ($hasRecoveredSigla): void {
+                $query->whereNotNull('storage_sigla');
+                if ($hasRecoveredSigla) {
+                    $query->orWhereNotNull('sigla_code');
+                }
+            })
+            ->distinct()->orderBy('value')->limit(500)->pluck('value')->filter()->values();
+
         return view('librarian.inventory.index', [
             'sessions' => InventorySession::query()->with(['branch', 'fund', 'responsible'])->latest()->paginate(20),
             'branches' => Branch::query()->active()->ordered()->get(),
             'funds' => Fund::query()->orderBy('name')->get(),
+            'siglas' => $siglas,
+            'servicePoints' => BookCopy::query()->whereNotNull('service_point_code')
+                ->where('service_point_code', '!=', '')->distinct()->orderBy('service_point_code')
+                ->limit(500)->pluck('service_point_code'),
             'locationSummary' => $this->locations->summary(),
             'locationZones' => $this->locations->zones(),
         ]);
@@ -38,17 +57,25 @@ class InventoryController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'scope_type' => ['required', Rule::in(['all', 'branch', 'fund', 'sigla', 'service_point'])],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id', 'required_if:scope_type,branch'],
             'fund_id' => ['nullable', 'integer', 'exists:funds,id'],
+            'storage_sigla' => ['nullable', 'string', 'max:64', 'required_if:scope_type,sigla'],
+            'service_point_code' => ['nullable', 'string', 'max:64', 'required_if:scope_type,service_point'],
             'room' => ['nullable', 'string', 'max:100'],
             'section' => ['nullable', 'string', 'max:100'],
-            'shelf_range' => ['required', 'string', 'max:100'],
-            'pilot_limit' => ['required', 'integer', 'in:10,20,50'],
+            'shelf_range' => ['nullable', 'string', 'max:100'],
+            'pilot_limit' => ['nullable', 'integer', 'in:10,20,50,100,500'],
             'inventory_date' => ['required', 'date'],
         ]);
+        if ($data['scope_type'] === 'fund' && empty($data['fund_id'])) {
+            throw ValidationException::withMessages([
+                'fund_id' => __('librarian.inventory.scope_value_required'),
+            ]);
+        }
         if (($data['fund_id'] ?? null) !== null && ! Fund::query()
             ->whereKey((int) $data['fund_id'])
-            ->where('branch_id', (int) $data['branch_id'])
+            ->when(($data['branch_id'] ?? null) !== null, fn ($query) => $query->where('branch_id', (int) $data['branch_id']))
             ->exists()) {
             throw ValidationException::withMessages([
                 'fund_id' => __('librarian.inventory.fund_branch_mismatch'),
@@ -61,20 +88,26 @@ class InventoryController extends Controller
 
     public function show(InventorySession $inventory): View
     {
-        $inventory->load(['branch', 'fund', 'items.copy.bibliographicRecord', 'items.copy.branch', 'items.copy.fund', 'items.copy.history', 'scans.copy']);
-        $items = $inventory->items;
-        $handling = $items->pluck('handling_seconds')->filter(fn ($value) => $value !== null)->sort()->values();
+        $inventory->load(['branch', 'fund']);
+        $itemsQuery = $inventory->items()->with([
+            'copy.bibliographicRecord:id,title', 'copy.branch:id,name', 'copy.fund:id,name',
+            'copy.history' => fn ($query) => $query->whereIn('event_type', ['barcode_label_printed', 'barcode_confirmed']),
+        ]);
+        $items = (clone $itemsQuery)->orderBy('id')->paginate(100)->withQueryString();
+        $handling = (clone $itemsQuery)->whereNotNull('handling_seconds')
+            ->orderBy('handling_seconds')->pluck('handling_seconds');
 
         return view('librarian.inventory.show', [
             'inventory' => $inventory,
+            'items' => $items,
             'analytics' => [
-                'checked' => $items->where('inventory_condition', '!=', 'unverified')->count(),
-                'location_confirmed' => $items->whereNotNull('location_confirmed_at')->count(),
-                'location_corrected' => $items->whereNotNull('location_corrected_at')->count(),
-                'barcodes_assigned' => $items->filter(fn ($item) => filled($item->copy?->barcode))->count(),
-                'labels_printed' => $items->filter(fn ($item) => $item->copy?->history->contains('event_type', 'barcode_label_printed'))->count(),
-                'scan_confirmed' => $items->filter(fn ($item) => $item->copy?->history->contains('event_type', 'barcode_confirmed'))->count(),
-                'requires_review' => $items->whereIn('result', ['requires_review', 'misplaced', 'status_conflict'])->count(),
+                'checked' => $inventory->items()->where('inventory_condition', '!=', 'unverified')->count(),
+                'location_confirmed' => $inventory->items()->whereNotNull('location_confirmed_at')->count(),
+                'location_corrected' => $inventory->items()->whereNotNull('location_corrected_at')->count(),
+                'barcodes_assigned' => $inventory->items()->whereHas('copy', fn ($query) => $query->whereNotNull('barcode')->where('barcode', '!=', ''))->count(),
+                'labels_printed' => $inventory->items()->whereHas('copy.history', fn ($query) => $query->where('event_type', 'barcode_label_printed'))->count(),
+                'scan_confirmed' => $inventory->items()->whereHas('copy.history', fn ($query) => $query->where('event_type', 'barcode_confirmed'))->count(),
+                'requires_review' => $inventory->items()->whereIn('result', ['requires_review', 'misplaced', 'status_conflict', 'written_off'])->count(),
                 'median_handling_seconds' => $handling->isEmpty() ? null : $handling[(int) floor(($handling->count() - 1) / 2)],
             ],
         ]);
@@ -140,15 +173,15 @@ class InventoryController extends Controller
 
     public function export(InventorySession $inventory): StreamedResponse
     {
-        $inventory->load(['items.copy.bibliographicRecord', 'scans']);
-
         return response()->streamDownload(function () use ($inventory): void {
             $stream = fopen('php://output', 'wb');
             Csv::writeRow($stream, ['session', 'inventory_number', 'barcode', 'title', 'expected_status', 'result']);
-            foreach ($inventory->items as $item) {
-                Csv::writeRow($stream, [$inventory->session_number, $item->copy?->inventory_number, $item->copy?->barcode, $item->copy?->bibliographicRecord?->title, $item->expected_status, $item->result]);
-            }
-            foreach ($inventory->scans->whereIn('classification', ['unknown', 'misplaced']) as $scan) {
+            $inventory->items()->with('copy.bibliographicRecord')->orderBy('id')->chunkById(500, function ($items) use ($stream, $inventory): void {
+                foreach ($items as $item) {
+                    Csv::writeRow($stream, [$inventory->session_number, $item->copy?->inventory_number, $item->copy?->barcode, $item->copy?->bibliographicRecord?->title, $item->expected_status, $item->result]);
+                }
+            });
+            foreach ($inventory->scans()->whereIn('classification', ['unknown', 'misplaced', 'written_off'])->cursor() as $scan) {
                 Csv::writeRow($stream, [$inventory->session_number, $scan->code, null, null, null, $scan->classification]);
             }
             fclose($stream);

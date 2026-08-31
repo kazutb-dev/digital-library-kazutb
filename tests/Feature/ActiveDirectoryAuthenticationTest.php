@@ -59,7 +59,10 @@ class ActiveDirectoryAuthenticationTest extends TestCase
         $this->postJson('/api/login', ['login' => 'reader01', 'password' => 'DirectorySecret!'])->assertOk();
         $user = User::query()->where('ad_object_guid', FakeActiveDirectoryClient::GUID)->firstOrFail();
         $user->syncRoles(['librarian']);
-        $user->readerProfile()->create(['ticket_number' => 'AD-READER-0001', 'barcode' => 'ADR00000001', 'category' => 'faculty', 'status' => 'blocked']);
+        $user->readerProfile()->updateOrCreate(
+            ['user_id' => $user->getKey()],
+            ['ticket_number' => 'AD-READER-0001', 'barcode' => 'ADR00000001', 'category' => 'faculty', 'status' => 'blocked'],
+        );
         $this->directory->identity = new ActiveDirectoryUser(FakeActiveDirectoryClient::GUID, 'reader01', 'CN=Reader One,OU=Users,DC=example,DC=test', true, 'reader01@example.test', 'Reader Renamed', mail: 'renamed@example.test');
 
         $this->postJson('/api/login', ['login' => 'reader01@example.test', 'password' => 'DirectorySecret!'])->assertOk();

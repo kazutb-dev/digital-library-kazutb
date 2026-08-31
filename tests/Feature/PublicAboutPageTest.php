@@ -2,8 +2,7 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 /**
@@ -21,23 +20,24 @@ use Tests\TestCase;
  */
 class PublicAboutPageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        config()->set('demo_auth.enabled', true);
-        config()->set('demo_users.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
         $this->withSession(['locale' => 'ru']);
     }
 
     private function loginAs(string $identitySlug): void
     {
-        session()->put('library.user', [
-            'role' => in_array($identitySlug, ['student', 'teacher'], true) ? 'reader' : $identitySlug,
-            'profile_type' => $identitySlug,
-        ]);
-        $this->post('/locale', ['locale' => 'en', 'return_to' => '/about']);
+        $this->setUpAdminControlPlane();
+        $role = in_array($identitySlug, ['student', 'teacher'], true) ? 'member' : $identitySlug;
+        $user = $role === 'admin'
+            ? $this->adminUser
+            : $this->makeControlPlaneUser($role, ['locale' => 'en']);
+        $user->forceFill(['locale' => 'en'])->save();
+        $this->signInToLibraryAs($user);
     }
 
     public function test_guest_can_view_about_page(): void
@@ -119,9 +119,9 @@ class PublicAboutPageTest extends TestCase
         $response->assertSee('Наша миссия', false);
         $response->assertSee('Профиль коллекции', false);
         $response->assertSee('Институциональный справочник', false);
-        $response->assertSee('href="/rules"', false);
-        $response->assertSee('href="/leadership"', false);
-        $response->assertSee('href="/contacts"', false);
+        $response->assertSee('href="/rules?lang=ru"', false);
+        $response->assertSee('href="/leadership?lang=ru"', false);
+        $response->assertSee('href="/contacts?lang=ru"', false);
     }
 
     public function test_about_kk_variant_renders_canonical_copy_and_preserves_lang(): void
@@ -134,9 +134,9 @@ class PublicAboutPageTest extends TestCase
         $response->assertSee('Зерттеуді қолдаймыз.', false);
         $response->assertSee('Біздің миссиямыз', false);
         $response->assertSee('Қор профилі', false);
-        $response->assertSee('href="/rules?lang=kk"', false);
-        $response->assertSee('href="/leadership?lang=kk"', false);
-        $response->assertSee('href="/contacts?lang=kk"', false);
+        $response->assertSee('href="/rules"', false);
+        $response->assertSee('href="/leadership"', false);
+        $response->assertSee('href="/contacts"', false);
     }
 
     public function test_about_surface_never_reintroduces_athenaeum_or_legacy_brand(): void

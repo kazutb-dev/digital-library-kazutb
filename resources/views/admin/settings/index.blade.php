@@ -134,6 +134,26 @@
             </section>
 
             <section class="admin-card xl:col-span-2">
+                <div class="mb-6 flex items-start gap-3">
+                    <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-low text-secondary"><span class="material-symbols-outlined">library_books</span></span>
+                    <div><h2 class="font-headline text-3xl text-primary">{{ __('settings.library_operations.title') }}</h2><p class="mt-1 text-sm text-slate-500">{{ __('settings.library_operations.description') }}</p></div>
+                </div>
+                <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                    <label><span class="admin-label">{{ __('settings.library_operations.inventory_number_prefix') }}</span><input class="admin-input" name="inventory_number_prefix" maxlength="24" value="{{ $value('inventory_number_prefix','INV') }}" required></label>
+                    <label><span class="admin-label">{{ __('settings.library_operations.barcode_prefix') }}</span><input class="admin-input" name="barcode_prefix" maxlength="24" value="{{ $value('barcode_prefix','KAZUTB') }}" required></label>
+                    <label><span class="admin-label">{{ __('settings.library_operations.default_sigla') }}</span><input class="admin-input" name="default_sigla" maxlength="64" value="{{ $value('default_sigla') }}"></label>
+                    <label><span class="admin-label">{{ __('settings.library_operations.default_service_point') }}</span><input class="admin-input" name="default_service_point" maxlength="64" value="{{ $value('default_service_point') }}"></label>
+                    <label><span class="admin-label">{{ __('settings.library_operations.inventory_batch_scan_limit') }}</span><input class="admin-input" type="number" min="10" max="100000" name="inventory_batch_scan_limit" value="{{ $value('inventory_batch_scan_limit',5000) }}" required></label>
+                </div>
+                <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    @foreach(['inventory_numbering_enabled'=>true,'barcode_generation_enabled'=>true,'ksu_numbering_enabled'=>true] as $key=>$default)
+                    <label class="flex items-start gap-3 rounded-xl border p-4"><input type="hidden" name="{{ $key }}" value="0"><input class="mt-1 rounded border-slate-300 text-secondary" type="checkbox" name="{{ $key }}" value="1" @checked((bool)$value($key,$default))><span class="text-sm">{{ __('settings.library_operations.'.$key) }}</span></label>
+                    @endforeach
+                    <label class="flex items-start gap-3 rounded-xl border bg-slate-50 p-4"><input type="hidden" name="ksu_yearly_reset" value="1"><input class="mt-1 rounded border-slate-300 text-secondary" type="checkbox" checked disabled><span class="text-sm">{{ __('settings.library_operations.ksu_yearly_reset') }}<small class="mt-1 block text-slate-500">{{ __('settings.library_operations.ksu_yearly_reset_help') }}</small></span></label>
+                </div>
+            </section>
+
+            <section class="admin-card xl:col-span-2">
                 <div class="mb-6">
                     <h2 class="font-headline text-3xl text-primary">{{ __('settings.data_quality.title') }}</h2>
                     <p class="mt-1 text-sm text-slate-500">{{ __('settings.data_quality.description') }}</p>

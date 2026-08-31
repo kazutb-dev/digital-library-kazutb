@@ -10,6 +10,7 @@ use App\Models\Fund;
 use App\Models\LibraryTask;
 use App\Models\PeriodicalSubscription;
 use App\Models\User;
+use App\Services\Catalog\FundMovementService;
 use App\Services\Library\LibrarianWorkspaceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -129,9 +130,50 @@ class WorkspaceController extends Controller
         return back()->with('success', __('workspace.messages.issue_saved'));
     }
 
-    public function movements(LibrarianWorkspaceService $workspace): View
+    public function movements(Request $request, LibrarianWorkspaceService $workspace): View
     {
-        return $this->view('movements', ['movements' => $workspace->movements()]);
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        return $this->view('movements', [
+            'movements' => $workspace->movements($filters),
+            'movementFilters' => $filters,
+            'branches' => Branch::query()->where('is_active', true)->orderBy('name')->get(),
+            'funds' => Fund::query()->where('is_active', true)->orderBy('name')->get(),
+        ]);
+    }
+
+    public function storeMovement(Request $request, FundMovementService $movements): RedirectResponse
+    {
+        $validated = $request->validate([
+            'copy_codes' => ['required', 'string', 'max:20000'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'fund_id' => ['nullable', 'integer', 'exists:funds,id'],
+            'storage_sigla' => ['nullable', 'string', 'max:64'],
+            'service_point_code' => ['nullable', 'string', 'max:64'],
+            'shelf_index' => ['nullable', 'string', 'max:128'],
+            'shelf_location' => ['nullable', 'string', 'max:255'],
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ]);
+        $codes = preg_split('/[\s,;]+/u', trim($validated['copy_codes'])) ?: [];
+        $result = $movements->move(
+            $codes,
+            collect($validated)->only([
+                'branch_id', 'fund_id', 'storage_sigla', 'service_point_code',
+                'shelf_index', 'shelf_location',
+            ])->all(),
+            $validated['reason'],
+            $request->user(),
+        );
+
+        return redirect()->route('librarian.workspace.movements')
+            ->with('success', __('fund_movements.moved', [
+                'count' => $result['copies']->count(),
+                'batch' => $result['batch_id'],
+            ]));
     }
 
     public function calendar(Request $request, LibrarianWorkspaceService $workspace): View

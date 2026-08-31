@@ -12,8 +12,8 @@ const pages = [
   { route: '/news?lang=ru', sections: ['.public-v2__hero-grid', '.public-v2__body > .public-v2__inset'] },
   { route: '/events?lang=ru', sections: ['.public-v2__hero-grid', '.public-v2__body > .public-v2__inset'] },
   { route: '/contacts?lang=ru', sections: ['.public-page__intro .public-container', '.public-page__body > .public-container', '.contacts-page__visit-grid'] },
-  { route: '/rules?lang=ru', sections: ['.public-v2__hero-grid', '.rules-v2__workspace'] },
-  { route: '/leadership?lang=ru', sections: ['.public-page__intro .public-container', '.public-page__body > .public-container', '.public-card-grid'] },
+  { route: '/rules?lang=ru', sections: ['.public-page__intro .public-container', '.public-page__body > .public-container'] },
+  { route: '/leadership?lang=ru', sections: ['.public-page__intro .public-container', '.public-page__body > .public-container'] },
 ] as const;
 
 test('standard public surfaces share the header content edges', async ({ page }) => {
@@ -61,6 +61,7 @@ test('canonical gutters remain aligned at every required breakpoint', async ({ p
   const viewports = [
     { width: 1920, height: 1080 },
     { width: 1440, height: 900 },
+    { width: 1280, height: 800 },
     { width: 1366, height: 768 },
     { width: 1024, height: 768 },
     { width: 768, height: 1024 },

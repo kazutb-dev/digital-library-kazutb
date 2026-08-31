@@ -33,9 +33,9 @@ Ports:
 
 ### Prerequisites on server
 
-```bash
-sudo bash scripts/dev/install-docker.sh   # installs docker + postgresql-client
-```
+Install Docker Engine with the Compose v2 plugin and the PostgreSQL client from
+the supported packages for the server OS. This repository does not ship or run
+a privileged host-installer script.
 
 ### Initial deploy
 
@@ -50,22 +50,38 @@ git clone git@github.com:almazmurat/library.git .
 cp .env.prod.example .env
 # Edit .env: all REPLACE_WITH_* values
 
-# Deploy
-docker compose -f docker-compose.prod.yml up --build -d
-
-# Run migrations
-docker compose -f docker-compose.prod.yml exec app php artisan migrate --force
+# Build the candidate image. Do not run migrations from the runtime app role.
+docker compose -f docker-compose.prod.yml build
 ```
+
+Before the first activation, discover and verify the actual Compose project,
+database identity and network topology. Follow
+[`docs/runtime/PRODUCTION-STACK.md`](runtime/PRODUCTION-STACK.md) and
+[`docs/runtime/DB-LEAST-PRIVILEGE-MAINTENANCE.md`](runtime/DB-LEAST-PRIVILEGE-MAINTENANCE.md).
+Production migrations are a separate approved operation and must use the
+guarded `library_migrator` profile:
+
+```bash
+php scripts/deploy/run-production-migrations.php --execute
+```
+
+Only after the migration preflight and rollback checks pass should the exact
+affected service be activated. Do not use the runtime `app` container for DDL.
 
 ### Updating production
 
 ```bash
 cd /opt/library
 git pull origin main
-docker compose -f docker-compose.prod.yml up --build -d
-docker compose -f docker-compose.prod.yml exec app php artisan migrate --force
-docker compose -f docker-compose.prod.yml exec app php artisan optimize
+make prod-deploy
 ```
+
+`make prod-deploy` builds the candidate image only. Verify a restorable backup,
+schema compatibility, the effective runtime database and the rollback plan;
+then run the guarded migration wrapper above if the release has pending
+migrations. Activate only the intended application service using the discovered
+production Compose configuration. The container entrypoint performs read-only
+schema compatibility checks and warms Laravel caches.
 
 Or via Makefile:
 
@@ -100,10 +116,9 @@ Configure secrets in GitHub → Settings → Secrets:
 ## Backup
 
 ```bash
-# Backup PROD database
-docker compose -f docker-compose.prod.yml exec postgres \
-  pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" \
-  | gzip > "backup-$(date +%Y%m%d).sql.gz"
+# Create a custom-format dump, verify its TOC and checksum, restore it into a
+# unique temporary *_test database, and validate core counts and foreign keys.
+bash scripts/backup-verify.sh digital_library_recovered
 
 # Backup private repository files (restore together with the matching DB dump)
 docker run --rm \
@@ -111,6 +126,11 @@ docker run --rm \
   -v "$PWD":/backup \
   alpine tar -czf "/backup/repository-private-$(date +%Y%m%d).tar.gz" -C /data .
 ```
+
+The database backup command refuses `*_test` sources and existing artifacts.
+Its restore-verification database is removed on exit; backup and verification
+artifacts are retained. Configure and verify off-site storage separately before
+treating the backup as operationally complete.
 
 ## Health check
 

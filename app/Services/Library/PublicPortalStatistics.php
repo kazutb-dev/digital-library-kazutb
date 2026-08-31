@@ -44,7 +44,15 @@ final class PublicPortalStatistics
                     ->count()
                 : null;
 
-            $publishedRepository = DatabaseSchema::hasTable('repository_items')
+            // Repository publication is a multi-table invariant. During a
+            // rolling deployment the base table can exist before its approval
+            // and version tables; omit the metric until the whole read model
+            // is available instead of turning the public home page into a 500
+            // and exposing a technical SQL error to staff or visitors.
+            $repositoryReady = DatabaseSchema::hasTable('repository_items')
+                && DatabaseSchema::hasTable('repository_approvals')
+                && DatabaseSchema::hasTable('repository_item_versions');
+            $publishedRepository = $repositoryReady
                 ? RepositoryItem::query()->published()->publicMetadata()->count()
                 : null;
 

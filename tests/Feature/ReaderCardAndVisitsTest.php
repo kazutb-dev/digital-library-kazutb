@@ -8,7 +8,10 @@ use App\Models\Branch;
 use App\Models\Catalog\LibraryVisit;
 use App\Models\Catalog\ReaderProfile;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\Catalog\LibraryVisitService;
+use Mockery;
+use RuntimeException;
 use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
@@ -152,6 +155,22 @@ class ReaderCardAndVisitsTest extends TestCase
         $this->assertTrue($second['duplicate']);
         $this->assertSame((int) $first['visit']->getKey(), (int) $second['visit']->getKey());
         $this->assertSame(1, LibraryVisit::query()->count());
+    }
+
+    public function test_visit_and_audit_are_one_atomic_transaction(): void
+    {
+        $reader = $this->reader();
+        $audit = Mockery::mock(AuditLogger::class);
+        $audit->shouldReceive('log')->once()->andThrow(new RuntimeException('audit unavailable'));
+
+        try {
+            (new LibraryVisitService($audit))->record($reader, null, $this->librarian);
+            $this->fail('The failed audit must abort the attendance mutation.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('audit unavailable', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('library_visits', 0);
     }
 
     public function test_a_scan_after_the_dedupe_window_is_a_new_visit(): void

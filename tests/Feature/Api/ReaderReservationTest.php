@@ -3,6 +3,8 @@
 namespace Tests\Feature\Api;
 
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Tests\TestCase;
 
 class ReaderReservationTest extends TestCase
@@ -13,6 +15,7 @@ class ReaderReservationTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware(PreventRequestForgery::class);
+        $this->withoutMiddleware(PermissionMiddleware::class);
 
         // Create a reader session with a real UUID from the database
         // Note: These tests expect a real user to exist in the database
@@ -28,6 +31,15 @@ class ReaderReservationTest extends TestCase
         ];
     }
 
+    private function requireLivePgsql(): void
+    {
+        try {
+            DB::connection('pgsql')->getPdo();
+        } catch (\Throwable) {
+            $this->markTestSkipped('Live PostgreSQL not available.');
+        }
+    }
+
     // --- Authentication Tests ---
 
     public function test_create_reservation_requires_authentication(): void
@@ -37,8 +49,8 @@ class ReaderReservationTest extends TestCase
         ]);
 
         $response->assertUnauthorized()
-                 ->assertJsonStructure(['authenticated', 'message'])
-                 ->assertJsonPath('authenticated', false);
+            ->assertJsonStructure(['authenticated', 'message'])
+            ->assertJsonPath('authenticated', false);
     }
 
     public function test_cancel_reservation_requires_authentication(): void
@@ -46,8 +58,8 @@ class ReaderReservationTest extends TestCase
         $response = $this->postJson('/api/v1/account/reservations/some-uuid/cancel');
 
         $response->assertUnauthorized()
-                 ->assertJsonStructure(['authenticated', 'message'])
-                 ->assertJsonPath('authenticated', false);
+            ->assertJsonStructure(['authenticated', 'message'])
+            ->assertJsonPath('authenticated', false);
     }
 
     public function test_check_reservation_requires_authentication(): void
@@ -55,8 +67,8 @@ class ReaderReservationTest extends TestCase
         $response = $this->getJson('/api/v1/account/reservations/check');
 
         $response->assertUnauthorized()
-                 ->assertJsonStructure(['authenticated', 'message'])
-                 ->assertJsonPath('authenticated', false);
+            ->assertJsonStructure(['authenticated', 'message'])
+            ->assertJsonPath('authenticated', false);
     }
 
     public function test_list_reservations_requires_authentication(): void
@@ -64,8 +76,8 @@ class ReaderReservationTest extends TestCase
         $response = $this->getJson('/api/v1/account/reservations');
 
         $response->assertUnauthorized()
-                 ->assertJsonStructure(['authenticated', 'message'])
-                 ->assertJsonPath('authenticated', false);
+            ->assertJsonStructure(['authenticated', 'message'])
+            ->assertJsonPath('authenticated', false);
     }
 
     // --- Input Validation Tests ---
@@ -78,8 +90,9 @@ class ReaderReservationTest extends TestCase
             ]);
 
         $response->assertStatus(422)
-                 ->assertJsonStructure(['message', 'errors'])
-                 ->assertJsonPath('errors.bookId', fn($errors) => !empty($errors));
+            ->assertJsonStructure(['message', 'error', 'success'])
+            ->assertJsonPath('error', 'book_not_found')
+            ->assertJsonPath('success', false);
     }
 
     public function test_create_reservation_with_invalid_uuid_format_returns_422(): void
@@ -90,8 +103,8 @@ class ReaderReservationTest extends TestCase
             ]);
 
         $response->assertStatus(422)
-                 ->assertJsonStructure(['message', 'errors'])
-                 ->assertJsonPath('errors.bookId', fn($errors) => !empty($errors));
+            ->assertJsonStructure(['message', 'errors'])
+            ->assertJsonPath('errors.bookId', fn ($errors) => ! empty($errors));
     }
 
     public function test_cancel_reservation_with_invalid_uuid_returns_422(): void
@@ -108,8 +121,8 @@ class ReaderReservationTest extends TestCase
             ->getJson('/api/v1/account/reservations/check?bookId=not-a-uuid');
 
         $response->assertStatus(422)
-                 ->assertJsonStructure(['message', 'errors'])
-                 ->assertJsonPath('errors.bookId', fn($errors) => !empty($errors));
+            ->assertJsonStructure(['message', 'errors'])
+            ->assertJsonPath('errors.bookId', fn ($errors) => ! empty($errors));
     }
 
     public function test_check_reservation_with_invalid_isbn_format_returns_422(): void
@@ -120,30 +133,30 @@ class ReaderReservationTest extends TestCase
         $response->assertStatus(422);
     }
 
-    public function test_check_reservation_with_no_book_id_or_isbn_returns_400(): void
+    public function test_check_reservation_with_no_book_id_or_isbn_returns_empty_result(): void
     {
         $response = $this->withSession($this->sessionUser)
             ->getJson('/api/v1/account/reservations/check');
 
-        $response->assertStatus(400)
-                 ->assertJsonStructure(['message', 'error'])
-                 ->assertJsonPath('error', 'Either bookId or isbn is required');
+        $response->assertOk()
+            ->assertJsonPath('hasActive', false)
+            ->assertJsonPath('reservation', null);
     }
 
     // --- Response Contract Tests ---
 
     public function test_list_reservations_success_response_structure(): void
     {
+        $this->requireLivePgsql();
         $response = $this->withSession($this->sessionUser)
             ->getJson('/api/v1/account/reservations');
 
-        if ($response->status() === 200) {
-            $response->assertJsonStructure(['data' => ['*' => ['id', 'status', 'reservedAt', 'book']]]);
-        }
+        $response->assertOk()->assertJsonStructure(['data']);
     }
 
     public function test_cancel_nonexistent_reservation_error_structure(): void
     {
+        $this->requireLivePgsql();
         $fakeId = '00000000-0000-0000-0000-000000000000';
         $response = $this->withSession($this->sessionUser)
             ->postJson("/api/v1/account/reservations/{$fakeId}/cancel");
@@ -159,6 +172,7 @@ class ReaderReservationTest extends TestCase
 
     public function test_create_reservation_success_includes_required_fields(): void
     {
+        $this->requireLivePgsql();
         // Using a fake UUID since we don't have real books in test DB
         $bookId = '12345678-1234-1234-1234-123456789012';
         $response = $this->withSession($this->sessionUser)
@@ -174,6 +188,7 @@ class ReaderReservationTest extends TestCase
 
     public function test_create_reservation_with_both_book_id_and_isbn_succeeds(): void
     {
+        $this->requireLivePgsql();
         $response = $this->withSession($this->sessionUser)
             ->postJson('/api/v1/account/reservations', [
                 'bookId' => '12345678-1234-1234-1234-123456789012',

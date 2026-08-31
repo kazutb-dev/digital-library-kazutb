@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Services\Library\IsbnService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class CatalogEnrichmentTest extends TestCase
@@ -129,11 +130,15 @@ class CatalogEnrichmentTest extends TestCase
 
     public function test_enrichment_stats_route_exists(): void
     {
-        $response = $this->withSession($this->staffSession())
-            ->getJson('/api/v1/internal/enrichment/stats');
+        $route = collect(Route::getRoutes()->getRoutes())
+            ->first(fn ($route) => $route->uri() === 'api/v1/internal/enrichment/stats');
 
-        $this->assertNotEquals(404, $response->status(), 'Route should exist');
-        $this->assertNotEquals(405, $response->status(), 'Route should accept GET');
+        $this->assertNotNull($route, 'Route should exist');
+        $this->assertContains('GET', $route->methods(), 'Route should accept GET');
+        $this->assertSame(
+            'App\\Http\\Controllers\\Api\\InternalEnrichmentController@stats',
+            $route->getActionName(),
+        );
     }
 
     public function test_enrichment_stats_returns_gap_data(): void

@@ -6,6 +6,13 @@ use Tests\TestCase;
 
 class IntegrationBoundarySkeletonTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['services.integration.allowed_tokens' => 'integration-token']);
+    }
+
     public function test_missing_bearer_token_is_rejected(): void
     {
         $response = $this

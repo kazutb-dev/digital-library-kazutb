@@ -9,6 +9,47 @@
   $mandate = $leadership['mandate'][$lang];
   $supportCta = $leadership['support_cta'][$lang];
   $profiles = collect($leadership['profiles'])->sortBy('order')->values();
+  $leadershipPageCopy = [
+    'ru' => [
+      'hero_eyebrow' => 'О библиотеке',
+      'basis_label' => 'Основание публикации',
+      'basis_value' => 'Официальная страница научной библиотеки',
+      'contact_label' => 'Для обращений',
+      'contact_value' => 'Официальные контакты библиотеки',
+      'directory_eyebrow' => 'Ответственное лицо',
+      'directory_title' => 'Подтверждённые сведения',
+      'directory_body' => 'Публикуем только те данные, которые подтверждены официальным источником университета.',
+      'verified' => 'Сведения подтверждены',
+      'email' => 'E-mail',
+      'extension' => 'Внутренний телефон',
+    ],
+    'kk' => [
+      'hero_eyebrow' => 'Кітапхана туралы',
+      'basis_label' => 'Жариялау негізі',
+      'basis_value' => 'Ғылыми кітапхананың ресми беті',
+      'contact_label' => 'Өтініштер үшін',
+      'contact_value' => 'Кітапхананың ресми байланыс арналары',
+      'directory_eyebrow' => 'Жауапты тұлға',
+      'directory_title' => 'Расталған мәліметтер',
+      'directory_body' => 'Университеттің ресми дереккөзімен расталған мәліметтер ғана жарияланады.',
+      'verified' => 'Мәліметтер расталған',
+      'email' => 'E-mail',
+      'extension' => 'Ішкі телефон',
+    ],
+    'en' => [
+      'hero_eyebrow' => 'About the library',
+      'basis_label' => 'Publication basis',
+      'basis_value' => 'Official Scientific Library page',
+      'contact_label' => 'For inquiries',
+      'contact_value' => 'Official library contact channels',
+      'directory_eyebrow' => 'Responsible person',
+      'directory_title' => 'Confirmed information',
+      'directory_body' => 'Only details confirmed by an official university source are published here.',
+      'verified' => 'Information confirmed',
+      'email' => 'Email',
+      'extension' => 'Extension',
+    ],
+  ][$lang];
 @endphp
 
 @section('title', $header['headline'].' — '.__('brand.university.full'))
@@ -19,20 +60,24 @@
   <header class="public-page__intro public-page__intro--editorial" data-section="leadership-header">
     <div class="public-container public-page__intro-grid">
       <div>
-        <p class="public-eyebrow">{{ $header['eyebrow'] }}</p>
+        <p class="public-eyebrow">{{ $leadershipPageCopy['hero_eyebrow'] }}</p>
         <h1 class="public-page__title">{{ $header['headline'] }}</h1>
         <p class="public-page__lead">{{ $header['lede'] }}</p>
       </div>
-      @if(!empty($mandate['reports_to_value']))
-        <dl class="public-page__summary" data-test-id="leadership-reports-to">
-          <div><dt>{{ $mandate['reports_to_label'] }}</dt><dd>{{ $mandate['reports_to_value'] }}</dd></div>
-        </dl>
-      @endif
+      <dl class="public-page__summary">
+        <div><dt>{{ $leadershipPageCopy['basis_label'] }}</dt><dd>{{ $leadershipPageCopy['basis_value'] }}</dd></div>
+        <div><dt>{{ $leadershipPageCopy['contact_label'] }}</dt><dd>{{ $leadershipPageCopy['contact_value'] }}</dd></div>
+        @if(!empty($mandate['reports_to_value']))
+          <div data-test-id="leadership-reports-to"><dt>{{ $mandate['reports_to_label'] }}</dt><dd>{{ $mandate['reports_to_value'] }}</dd></div>
+        @endif
+      </dl>
     </div>
   </header>
 
   <div class="public-page__body">
     <div class="public-container public-stack">
+      @include('partials.library-info-nav')
+
       @if(!empty($mandate['paragraph']))
         <section class="public-panel leadership-page__mandate" data-section="leadership-mandate">
           <p class="public-eyebrow">{{ $mandate['eyebrow'] }}</p>
@@ -41,8 +86,13 @@
         </section>
       @endif
 
-      <section aria-label="{{ $header['eyebrow'] }}" data-section="leadership-directory">
-        <div class="public-card-grid public-card-grid--three">
+      <section class="leadership-page__directory" aria-labelledby="leadership-directory-title" data-section="leadership-directory">
+        <div class="public-section-head">
+          <p class="public-eyebrow">{{ $leadershipPageCopy['directory_eyebrow'] }}</p>
+          <h2 id="leadership-directory-title">{{ $leadershipPageCopy['directory_title'] }}</h2>
+          <p>{{ $leadershipPageCopy['directory_body'] }}</p>
+        </div>
+        <div>
           @foreach($profiles as $profile)
             @php
               $fullName = $profile['full_name'][$lang] ?? null;
@@ -54,7 +104,7 @@
               <div class="leadership-page__portrait">
                 @if($hasPortrait)
                   <img src="/{{ ltrim($portraitPath, '/') }}"
-                       alt="{{ $fullName }}"
+                       alt="{{ $fullName ?: $roleTitle }}"
                        loading="eager"
                        decoding="async">
                 @else
@@ -62,12 +112,15 @@
                 @endif
               </div>
               <div>
+                <span class="leadership-page__verified"><span class="material-symbols-outlined" aria-hidden="true">verified</span>{{ $leadershipPageCopy['verified'] }}</span>
                 <h3>{{ $fullName ?: $roleTitle }}</h3>
                 @if($fullName)<p class="leadership-page__role">{{ $roleTitle }}</p>@endif
                 @if(!empty($profile['role_scope_line'][$lang]))<p class="leadership-page__scope">{{ $profile['role_scope_line'][$lang] }}</p>@endif
                 @if(!empty($profile['role_description'][$lang]))<p>{{ $profile['role_description'][$lang] }}</p>@endif
+                @if(!empty($profile['email']))<p><strong>{{ $leadershipPageCopy['email'] }}:</strong> <a href="mailto:{{ $profile['email'] }}">{{ $profile['email'] }}</a></p>@endif
+                @if(!empty($profile['extension']))<p><strong>{{ $leadershipPageCopy['extension'] }}:</strong> {{ $profile['extension'] }}</p>@endif
                 @if(!empty($profile['source_url']))
-                  <p><a href="{{ $profile['source_url'] }}" target="_blank" rel="noopener noreferrer">{{ $profile['source_label'][$lang] }}</a></p>
+                  <p><a class="leadership-page__source" href="{{ $profile['source_url'] }}" target="_blank" rel="noopener noreferrer">{{ $profile['source_label'][$lang] }}<span class="material-symbols-outlined" aria-hidden="true">open_in_new</span></a></p>
                 @endif
               </div>
             </article>

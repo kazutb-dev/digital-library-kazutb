@@ -36,14 +36,22 @@ Route::middleware('web')->group(function (): void {
     // Reader-authenticated routes — middleware enforces library.user session check.
     Route::middleware('library.auth')->group(function (): void {
         Route::middleware('member.reader')->group(function (): void {
-            Route::get('/v1/account/summary', [AccountController::class, 'summary']);
-            Route::get('/v1/account/loans', [AccountController::class, 'loans']);
-            Route::get('/v1/account/loans/summary', [AccountController::class, 'loanSummary']);
-            Route::post('/v1/account/loans/{loanId}/renew', [AccountController::class, 'renewLoan']);
-            Route::get('/v1/account/reservations', [AccountController::class, 'reservations']);
-            Route::post('/v1/account/reservations', [AccountController::class, 'createReservation']);
-            Route::post('/v1/account/reservations/{id}/cancel', [AccountController::class, 'cancelReservation']);
-            Route::get('/v1/account/reservations/check', [AccountController::class, 'checkReservation']);
+            Route::get('/v1/account/summary', [AccountController::class, 'summary'])
+                ->middleware('permission:member.dashboard.view');
+            Route::get('/v1/account/loans', [AccountController::class, 'loans'])
+                ->middleware('permission:loans.view_own');
+            Route::get('/v1/account/loans/summary', [AccountController::class, 'loanSummary'])
+                ->middleware('permission:loans.view_own');
+            Route::post('/v1/account/loans/{loanId}/renew', [AccountController::class, 'renewLoan'])
+                ->middleware('permission:loans.renew_own');
+            Route::get('/v1/account/reservations', [AccountController::class, 'reservations'])
+                ->middleware('permission:reservation.view_own');
+            Route::post('/v1/account/reservations', [AccountController::class, 'createReservation'])
+                ->middleware('permission:reservation.create');
+            Route::post('/v1/account/reservations/{id}/cancel', [AccountController::class, 'cancelReservation'])
+                ->middleware('permission:reservation.cancel_own');
+            Route::get('/v1/account/reservations/check', [AccountController::class, 'checkReservation'])
+                ->middleware('permission:reservation.view_own');
         });
         Route::get('/v1/me', [AuthController::class, 'me']);
         Route::post('/v1/logout', [AuthController::class, 'logout']);
@@ -150,10 +158,32 @@ Route::prefix('v1')->group(function (): void {
             });
         });
 
-    Route::get('/bridge/summary', [BridgeController::class, 'summary']);
-    Route::get('/bridge/users', [BridgeController::class, 'users']);
-    Route::get('/bridge/copies', [BridgeController::class, 'copies']);
-    Route::get('/bridge/books', [BridgeController::class, 'books']);
+    // Recovery/bridge diagnostics expose linkage identifiers and, for users,
+    // directory-backed personal data. They are session-authenticated internal
+    // control-plane APIs, never part of the public catalogue contract.
+    Route::middleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        'library.auth',
+        'internal.circulation.staff',
+    ])->group(function (): void {
+        Route::middleware('permission:legacy_recovery.view')->group(function (): void {
+            Route::get('/bridge/summary', [BridgeController::class, 'summary']);
+            Route::get('/bridge/users', [BridgeController::class, 'users']);
+            Route::get('/bridge/copies', [BridgeController::class, 'copies']);
+            Route::get('/bridge/books', [BridgeController::class, 'books']);
+        });
+
+        Route::middleware('permission:data_quality.view')->group(function (): void {
+            Route::get('/library/health-summary', [LibraryController::class, 'healthSummary']);
+            Route::get('/review/issues-summary', [ReviewController::class, 'issuesSummary']);
+        });
+
+        Route::get('/review/issues', [ReviewController::class, 'issues'])
+            ->middleware('permission:data_quality.triage');
+    });
 
     // Canonical public catalog APIs (WS1 converged).
     Route::get('/book-db/{isbn}', [BookController::class, 'dbShow'])->middleware([
@@ -190,10 +220,6 @@ Route::prefix('v1')->group(function (): void {
         AddQueuedCookiesToResponse::class,
         StartSession::class,
     ]);
-
-    Route::get('/library/health-summary', [LibraryController::class, 'healthSummary']);
-    Route::get('/review/issues', [ReviewController::class, 'issues']);
-    Route::get('/review/issues-summary', [ReviewController::class, 'issuesSummary']);
 
     // WS1 convergence freeze:
     // Legacy /v1/catalog and /v1/catalog/{isbn} routes removed (delete-after-confirmation wave).

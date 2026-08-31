@@ -2,8 +2,7 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 /**
@@ -18,25 +17,15 @@ use Tests\TestCase;
  */
 class LeadershipPageTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        config()->set('demo_auth.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
-    }
+    use BuildsAdminControlPlane;
 
     private function loginAs(string $identitySlug): void
     {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
-        ]);
+        $this->setUpAdminControlPlane();
+        $user = $identitySlug === 'admin'
+            ? $this->adminUser
+            : $this->makeControlPlaneUser($identitySlug, ['locale' => 'ru']);
+        $this->signInToLibraryAs($user);
     }
 
     public function test_guest_can_access_leadership_page(): void
@@ -76,6 +65,17 @@ class LeadershipPageTest extends TestCase
         $response->assertDontSee('Корпешова', false);
         $response->assertDontSee('Сайлаубек', false);
         $response->assertDontSee('/images/staff/', false);
+    }
+
+    public function test_leadership_page_explains_source_and_verification_state(): void
+    {
+        $response = $this->get('/leadership?lang=ru');
+
+        $response->assertOk()
+            ->assertSee('Основание публикации', false)
+            ->assertSee('Официальная страница научной библиотеки', false)
+            ->assertSee('Сведения подтверждены', false)
+            ->assertSee('class="leadership-page__source"', false);
     }
 
     public function test_leadership_page_renders_russian_locale_by_default(): void

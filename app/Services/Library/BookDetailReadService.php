@@ -41,6 +41,14 @@ class BookDetailReadService
             ? "LOWER(REGEXP_REPLACE(COALESCE(isbn, ''), '[^0-9Xx]', '', 'g'))"
             : "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(isbn, ''), '-', ''), ' ', ''), '.', ''), '/', ''))";
 
+        $eagerLoads = ['translations'];
+        if (DatabaseSchema::hasTable('contributors') && DatabaseSchema::hasTable('bibliographic_record_contributor')) {
+            $eagerLoads[] = 'contributors';
+        }
+        if (DatabaseSchema::hasTable('subjects') && DatabaseSchema::hasTable('bibliographic_record_subject')) {
+            $eagerLoads[] = 'subjects';
+        }
+
         $record = BibliographicRecord::query()
             ->where(function (Builder $builder) use ($identifier, $isbnExpression, $normalizedIsbn): void {
                 $builder
@@ -50,10 +58,10 @@ class BookDetailReadService
                     $builder->orWhere('id', (int) $identifier);
                 }
             })
-            ->with('translations')
+            ->with($eagerLoads)
             ->withCount([
                 'copies' => fn (Builder $copies) => $copies->whereNotIn('status', ['written_off', 'lost']),
-                'copies as available_copies_count' => fn (Builder $copies) => $copies->where('status', 'available'),
+                'copies as available_copies_count' => fn (Builder $copies) => $copies->availableForCirculation(),
             ])
             ->first();
 
@@ -68,7 +76,7 @@ class BookDetailReadService
             ->with(['branch', 'fund'])
             ->get();
 
-        $available = $copies->where('status', 'available')->count();
+        $available = $copies->filter(fn (BookCopy $copy): bool => $copy->status === 'available' && $copy->isCirculatable())->count();
         $issued = $copies->whereIn('status', ['issued', 'overdue'])->count();
         $total = $copies->count();
         $readerLoan = $viewer === null
@@ -89,6 +97,36 @@ class BookDetailReadService
                 ->first();
 
         $languageCode = PublicCatalogLanguage::normalize((string) $record->language);
+        $contributors = $record->relationLoaded('contributors')
+            ? $record->contributors->map(static fn ($contributor): array => [
+                'name' => (string) $contributor->name,
+                'role' => (string) ($contributor->pivot?->role ?? 'author'),
+                'kind' => (string) ($contributor->kind ?? 'person'),
+            ])->values()
+            : collect();
+        $subjects = $record->relationLoaded('subjects')
+            ? $record->subjects->map(static fn ($subject): array => [
+                'term' => (string) $subject->term,
+                'scheme' => (string) ($subject->scheme ?? 'topical'),
+            ])->values()
+            : collect();
+        $classification = $subjects
+            ->map(static fn (array $subject): array => [
+                'id' => $subject['term'],
+                'label' => $subject['term'],
+                'sourceKind' => 'subject',
+                'scheme' => $subject['scheme'],
+            ]);
+        if (filled($record->category) && ! $classification->contains(fn (array $item): bool => $item['label'] === $record->category)) {
+            $classification->push([
+                'id' => (string) $record->category,
+                'label' => (string) $record->category,
+                'sourceKind' => 'category',
+                'scheme' => 'local',
+            ]);
+        }
+        $authorNames = $record->allAuthors();
+        $primaryAuthorRaw = trim((string) ($record->primary_author ?? '')) ?: (string) ($authorNames[0] ?? '');
 
         return [
             'id' => (string) $record->getKey(),
@@ -99,19 +137,22 @@ class BookDetailReadService
                 'original' => $localized['original_title'],
                 'isFallback' => $localized['is_fallback'],
             ],
-            'primaryAuthor' => $record->primary_author ?: __('common.catalog.author_unknown'),
+            'primaryAuthor' => $primaryAuthorRaw ?: __('common.catalog.author_unknown'),
             // Unsubstituted source values. The display fields above fall back to
             // "author/publisher not specified" labels, which are fine on screen
             // but must never end up inside a generated bibliographic reference.
-            'primaryAuthorRaw' => (string) ($record->primary_author ?? ''),
+            'primaryAuthorRaw' => $primaryAuthorRaw,
             'publisherRaw' => (string) ($record->publisher ?? ''),
             'authors' => array_map(
                 static fn (string $name): array => ['name' => $name],
-                $record->allAuthors(),
+                $authorNames,
             ),
             'publisher' => [
                 'name' => (string) ($record->publisher ?: __('common.catalog.publisher_unknown')),
             ],
+            'publicationPlace' => (string) ($record->publication_place ?? ''),
+            'statementOfResponsibility' => (string) ($record->statement_of_responsibility ?? ''),
+            'editionStatement' => (string) ($record->edition_statement ?? ''),
             'publicationYear' => $record->publication_year,
             'language' => [
                 'code' => $languageCode,
@@ -122,6 +163,32 @@ class BookDetailReadService
                 'raw' => (string) ($record->isbn ?? ''),
                 'isValid' => $this->isValidIsbn((string) ($record->isbn ?? '')),
             ],
+            'issn' => [
+                'raw' => (string) ($record->issn ?? ''),
+            ],
+            'bbkCode' => (string) ($record->bbk_code ?? ''),
+            'localClassification' => (string) ($record->local_classification ?? ''),
+            'physicalExtent' => (string) ($record->physical_extent ?? ''),
+            'physicalDetails' => (string) ($record->physical_details ?? ''),
+            'dimensions' => (string) ($record->dimensions ?? ''),
+            'accompanyingMaterial' => (string) ($record->accompanying_material ?? ''),
+            'seriesTitle' => (string) ($record->series_title ?? ''),
+            'seriesNumber' => (string) ($record->series_number ?? ''),
+            'volume' => (string) ($record->volume ?? ''),
+            'issue' => (string) ($record->issue ?? ''),
+            'partNumber' => (string) ($record->part_number ?? ''),
+            'partTitle' => (string) ($record->part_title ?? ''),
+            'materialDesignation' => (string) ($record->material_designation ?? ''),
+            'controlNumber' => (string) ($record->control_number ?? ''),
+            'countryCode' => (string) ($record->country_code ?? ''),
+            'ksuLiteratureType' => (string) ($record->ksu_literature_type ?? ''),
+            'faculty' => (string) ($record->faculty ?? ''),
+            'department' => (string) ($record->department ?? ''),
+            'disciplines' => (string) ($record->disciplines ?? ''),
+            'specialty' => (string) ($record->specialty ?? ''),
+            'recordCreatedOn' => optional($record->record_created_on)->format('Y-m-d') ?? '',
+            'contributors' => $contributors->all(),
+            'subjects' => $subjects->all(),
             'resourceType' => (string) $record->resource_type,
             'annotation' => $localized['annotation'],
             'originalAnnotation' => $localized['original_annotation'],
@@ -158,15 +225,13 @@ class BookDetailReadService
                     'reviewReasonCodes' => $record->missingRequiredFields(),
                 ],
             ] : []),
-            'classification' => $record->category !== null && $record->category !== ''
-                ? [['id' => $record->category, 'label' => $record->category, 'sourceKind' => 'subject']]
-                : [],
+            'classification' => $classification->values()->all(),
             'udc' => [
-                'raw' => $viewer !== null ? $udcCode : '',
+                // UDC is public catalogue metadata. It is safe for guests;
+                // copy identifiers and exact storage data are gated elsewhere.
+                'raw' => $udcCode,
                 'description' => $udcReference?->localizedDescription() ?? '',
-                'display' => $viewer !== null
-                    ? trim($udcCode.($udcReference ? ' — '.$udcReference->localizedDescription() : ''))
-                    : ($udcReference?->localizedDescription() ?? ''),
+                'display' => trim($udcCode.($udcReference ? ' — '.$udcReference->localizedDescription() : '')),
                 'source' => $udcCode !== '' ? 'udc' : '',
             ],
             'electronicMaterials' => $record->electronicMaterials()
@@ -179,7 +244,6 @@ class BookDetailReadService
                     'accessLevel' => (string) $material->access_level,
                     'licenseTerms' => (string) ($material->license_terms ?? ''),
                     'allowDownload' => (bool) $material->allow_download,
-                    'externalUrl' => $material->external_url,
                 ])
                 ->all(),
             'relatedMaterials' => $record->relatedRecords()
@@ -195,7 +259,6 @@ class BookDetailReadService
                 ])
                 ->all(),
             'similarMaterials' => $this->similarMaterials($record),
-            'source' => 'catalog.bibliographic_records',
         ];
     }
 
@@ -287,13 +350,13 @@ class BookDetailReadService
                     'address' => $showExactLocation ? (string) ($first->branch?->address ?? '') : '',
                     'shelf' => $showExactLocation ? (string) ($first->shelf_location ?? '') : '',
                     'exactLocationPending' => $showExactLocation
-                        && $group->where('status', 'available')->isNotEmpty()
-                        && $group->where('status', 'available')->every(
+                        && $group->filter(fn (BookCopy $copy): bool => $copy->status === 'available' && $copy->isCirculatable())->isNotEmpty()
+                        && $group->filter(fn (BookCopy $copy): bool => $copy->status === 'available' && $copy->isCirculatable())->every(
                             static fn (BookCopy $copy): bool => blank($copy->shelf_location),
                         ),
                     'copies' => [
                         'total' => $group->count(),
-                        'available' => $group->where('status', 'available')->count(),
+                        'available' => $group->filter(fn (BookCopy $copy): bool => $copy->status === 'available' && $copy->isCirculatable())->count(),
                         'unavailable' => $group->whereNotIn('status', ['available'])->count(),
                         'review' => 0,
                         'problem' => $group->whereIn('status', ['lost', 'under_repair'])->count(),

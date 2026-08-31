@@ -7,14 +7,18 @@ use App\Models\ActivityLog;
 use App\Models\Branch;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BibliographicRecordTranslation;
+use App\Models\Catalog\Contributor;
+use App\Models\Catalog\LegacyMarcRecord;
+use App\Models\Catalog\Subject;
 use App\Models\Catalog\UdcCode;
-use App\Models\Fund;
 use App\Models\DataQualityIssue;
+use App\Models\Fund;
 use App\Models\Setting;
 use App\Services\AuditLogger;
 use App\Services\Catalog\DuplicateRecordFinder;
 use App\Services\DataQuality\DataQualityScanner;
 use App\Services\DataQuality\DuplicateDetectionService;
+use App\Support\DatabaseSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -50,7 +54,7 @@ class CatalogController extends Controller
 
         $query = BibliographicRecord::query()->withCount([
             'copies',
-            'copies as available_copies_count' => fn (Builder $builder) => $builder->where('status', 'available'),
+            'copies as available_copies_count' => fn (Builder $builder) => $builder->availableForCirculation(),
         ]);
 
         if ($search = trim((string) ($filters['search'] ?? ''))) {
@@ -111,14 +115,18 @@ class CatalogController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         return view('librarian.catalog.form', [
             'record' => new BibliographicRecord(['language' => 'ru', 'resource_type' => 'book']),
             'branches' => Branch::query()->orderBy('name')->get(),
             'funds' => Fund::query()->orderBy('name')->get(),
+            'contributors' => collect(),
+            'subjects' => collect(),
+            'rawMarcRecords' => collect(),
             'history' => collect(),
             'qualityIssues' => collect(),
+            'returnTo' => $request->query('return_to') === 'acquisitions' ? 'acquisitions' : null,
         ]);
     }
 
@@ -142,10 +150,16 @@ class CatalogController extends Controller
         }
 
         $record = DB::transaction(function () use ($validated, $request, $audit): BibliographicRecord {
-            $record = new BibliographicRecord(collect($validated)->except('translations')->all());
+            $record = new BibliographicRecord(collect($validated)->except(['translations', 'contributors', 'subjects'])->all());
             $record->is_draft = $record->missingRequiredFields() !== [];
             $record->responsible_librarian_id = $request->user()->getKey();
             $record->save();
+            if (array_key_exists('contributors', $validated)) {
+                $this->syncContributors($record, (array) $validated['contributors']);
+            }
+            if (array_key_exists('subjects', $validated)) {
+                $this->syncSubjects($record, (array) $validated['subjects']);
+            }
             $this->syncTranslations($record, (array) ($validated['translations'] ?? []), $request, $audit);
 
             $audit->logRequired(
@@ -173,16 +187,44 @@ class CatalogController extends Controller
         $scanner->scanModel($record, 'bibliographic_record');
         $persistentDuplicates->detectAndStore($record);
 
+        $success = $record->is_draft
+            ? __('librarian.catalog.saved_as_draft', ['fields' => implode(', ', $record->missingRequiredFields())])
+            : __('common.created_successfully');
+
+        if ($request->input('return_to') === 'acquisitions'
+            && $request->user()?->canAny(['acquisitions.intake', 'acquisitions.manage'])) {
+            return redirect()
+                ->route('librarian.acquisitions.index', ['record_q' => $record->title])
+                ->with('success', $success);
+        }
+
         return redirect()
             ->route('librarian.catalog.edit', $record)
-            ->with('success', $record->is_draft
-                ? __('librarian.catalog.saved_as_draft', ['fields' => implode(', ', $record->missingRequiredFields())])
-                : __('common.created_successfully'));
+            ->with('success', $success);
     }
 
     public function edit(Request $request, BibliographicRecord $record): View
     {
-        $record->load(['copies.branch', 'copies.fund', 'electronicMaterials.uploadedBy', 'relatedRecords', 'translations.translator', 'translations.reviewer']);
+        $relations = ['copies.branch', 'copies.fund', 'electronicMaterials.uploadedBy', 'relatedRecords', 'translations.translator', 'translations.reviewer'];
+        if (DatabaseSchema::hasTable('contributors') && DatabaseSchema::hasTable('bibliographic_record_contributor')) {
+            $relations[] = 'contributors';
+        }
+        if (DatabaseSchema::hasTable('subjects') && DatabaseSchema::hasTable('bibliographic_record_subject')) {
+            $relations[] = 'subjects';
+        }
+        $record->load($relations);
+
+        $rawMarcRecords = collect();
+        if ($request->user()?->can('catalog.view_raw_marc')
+            && DatabaseSchema::hasTable('legacy_marc_records')
+            && DatabaseSchema::hasTable('legacy_marc_fields')) {
+            $rawMarcRecords = $record->rawMarcRecords()->get()
+                ->each(function (LegacyMarcRecord $legacyRecord): void {
+                    // `legacy_marc_fields` is keyed by batch + source document,
+                    // so load it on the concrete record to preserve that pair.
+                    $legacyRecord->setRelation('fields', $legacyRecord->fields()->get());
+                });
+        }
 
         $sourceIssue = $request->query('from') === 'data-quality'
             ? DataQualityIssue::query()->whereKey($request->integer('issue'))
@@ -193,6 +235,9 @@ class CatalogController extends Controller
             'record' => $record,
             'branches' => Branch::query()->orderBy('name')->get(),
             'funds' => Fund::query()->orderBy('name')->get(),
+            'contributors' => $record->relationLoaded('contributors') ? $record->contributors : collect(),
+            'subjects' => $record->relationLoaded('subjects') ? $record->subjects : collect(),
+            'rawMarcRecords' => $rawMarcRecords,
             // ДИР 6.3 "история исправлений" — scoped to this record, so a
             // librarian without /admin/logs access can still audit their own
             // corrections (31.3).
@@ -232,9 +277,15 @@ class CatalogController extends Controller
 
         DB::transaction(function () use ($validated, $record, $request, $audit): void {
             $old = $this->snapshot($record);
-            $record->fill(collect($validated)->except('translations')->all());
+            $record->fill(collect($validated)->except(['translations', 'contributors', 'subjects'])->all());
             $record->is_draft = $record->missingRequiredFields() !== [];
             $record->save();
+            if (array_key_exists('contributors', $validated)) {
+                $this->syncContributors($record, (array) $validated['contributors']);
+            }
+            if (array_key_exists('subjects', $validated)) {
+                $this->syncSubjects($record, (array) $validated['subjects']);
+            }
             $this->syncTranslations($record, (array) ($validated['translations'] ?? []), $request, $audit);
 
             // 31.3: every correction keeps its before/after history.
@@ -457,17 +508,55 @@ class CatalogController extends Controller
             'primary_author' => ['nullable', 'string', 'max:255'],
             'additional_authors' => ['nullable', 'string', 'max:2000'],
             'publisher' => ['nullable', 'string', 'max:255'],
+            'publication_place' => ['nullable', 'string', 'max:255'],
+            'statement_of_responsibility' => ['nullable', 'string', 'max:1000'],
+            'edition_statement' => ['nullable', 'string', 'max:255'],
             'publication_year' => ['nullable', 'integer', 'min:1500', 'max:2100'],
             'language' => ['required', Rule::in(BibliographicRecord::LANGUAGES)],
             'udc_code' => ['nullable', 'string', 'max:64'],
+            'bbk_code' => ['nullable', 'string', 'max:64'],
+            'local_classification' => ['nullable', 'string', 'max:128'],
             'author_mark' => ['nullable', 'string', 'max:16'],
             'category' => ['nullable', 'string', 'max:128'],
             'annotation' => ['nullable', 'string', 'max:10000'],
             'keywords' => ['nullable', 'string', 'max:2000'],
             'isbn' => ['nullable', 'string', 'max:32'],
+            'issn' => ['nullable', 'string', 'max:32'],
+            'physical_extent' => ['nullable', 'string', 'max:255'],
+            'physical_details' => ['nullable', 'string', 'max:255'],
+            'dimensions' => ['nullable', 'string', 'max:64'],
+            'accompanying_material' => ['nullable', 'string', 'max:255'],
+            'series_title' => ['nullable', 'string', 'max:500'],
+            'series_number' => ['nullable', 'string', 'max:64'],
+            'volume' => ['nullable', 'string', 'max:64'],
+            'issue' => ['nullable', 'string', 'max:64'],
+            'part_number' => ['nullable', 'string', 'max:64'],
+            'part_title' => ['nullable', 'string', 'max:500'],
+            'control_number' => ['nullable', 'string', 'max:128'],
+            'country_code' => ['nullable', 'string', 'max:8'],
+            'cataloging_language' => ['nullable', 'string', 'max:16'],
+            'source_agency' => ['nullable', 'string', 'max:128'],
+            'material_designation' => ['nullable', 'string', 'max:128'],
+            'ksu_literature_type' => ['nullable', 'string', 'max:128'],
+            'faculty' => ['nullable', 'string', 'max:255'],
+            'department' => ['nullable', 'string', 'max:255'],
+            'disciplines' => ['nullable', 'string', 'max:500'],
+            'specialty' => ['nullable', 'string', 'max:1000'],
+            'record_created_on' => ['nullable', 'date'],
             'resource_type' => ['required', Rule::in(BibliographicRecord::RESOURCE_TYPES)],
             'cover_path' => ['nullable', 'string', 'max:2048'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'contributors' => ['nullable', 'array', 'max:100'],
+            'contributors.*' => ['array'],
+            'contributors.*.name' => ['nullable', 'string', 'max:500'],
+            'contributors.*.role' => ['nullable', Rule::in(Contributor::ROLES)],
+            'contributors.*.kind' => ['nullable', Rule::in(Contributor::KINDS)],
+            'contributors.*.marc_tag' => ['nullable', 'string', 'max:8'],
+            'subjects' => ['nullable', 'array', 'max:100'],
+            'subjects.*' => ['array'],
+            'subjects.*.term' => ['nullable', 'string', 'max:500'],
+            'subjects.*.scheme' => ['nullable', Rule::in(Subject::SCHEMES)],
+            'subjects.*.marc_tag' => ['nullable', 'string', 'max:8'],
             // ДИР 6.3 — a human may queue a technically complete record for
             // review, so this is deliberately independent of is_draft.
             'needs_manual_review' => ['nullable', 'boolean'],
@@ -483,6 +572,33 @@ class CatalogController extends Controller
 
         $validated['additional_authors'] = $this->listFromText($validated['additional_authors'] ?? null);
         $validated['keywords'] = $this->listFromText($validated['keywords'] ?? null);
+        if ($request->exists('contributors')) {
+            $validated['contributors'] = collect((array) ($validated['contributors'] ?? []))
+                ->map(static fn (array $contributor): array => [
+                    'name' => trim((string) ($contributor['name'] ?? '')),
+                    'role' => (string) ($contributor['role'] ?? 'author'),
+                    'kind' => (string) ($contributor['kind'] ?? 'person'),
+                    'marc_tag' => trim((string) ($contributor['marc_tag'] ?? '')) ?: null,
+                ])
+                ->filter(static fn (array $contributor): bool => $contributor['name'] !== '')
+                ->values()
+                ->all();
+        } else {
+            unset($validated['contributors']);
+        }
+        if ($request->exists('subjects')) {
+            $validated['subjects'] = collect((array) ($validated['subjects'] ?? []))
+                ->map(static fn (array $subject): array => [
+                    'term' => trim((string) ($subject['term'] ?? '')),
+                    'scheme' => (string) ($subject['scheme'] ?? 'topical'),
+                    'marc_tag' => trim((string) ($subject['marc_tag'] ?? '')) ?: null,
+                ])
+                ->filter(static fn (array $subject): bool => $subject['term'] !== '')
+                ->values()
+                ->all();
+        } else {
+            unset($validated['subjects']);
+        }
         $validated['needs_manual_review'] = $request->boolean('needs_manual_review');
         $validated['translations'] = collect((array) ($validated['translations'] ?? []))
             ->only(BibliographicRecordTranslation::LOCALES)
@@ -564,6 +680,101 @@ class CatalogController extends Controller
         }
     }
 
+    /** @param list<array{name:string,role:string,kind:string,marc_tag:?string}> $contributors */
+    private function syncContributors(BibliographicRecord $record, array $contributors): void
+    {
+        if (! DatabaseSchema::hasTable('contributors') || ! DatabaseSchema::hasTable('bibliographic_record_contributor')) {
+            return;
+        }
+
+        $rows = [];
+        $seen = [];
+        $now = now('UTC');
+
+        foreach ($contributors as $payload) {
+            $name = trim((string) ($payload['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $normalized = Contributor::normalizeName($name);
+            $contributor = Contributor::query()->firstOrCreate(
+                ['normalized_name' => $normalized],
+                ['name' => $name, 'kind' => (string) ($payload['kind'] ?? 'person')],
+            );
+            $role = (string) ($payload['role'] ?? 'author');
+            $deduplicationKey = $contributor->getKey().'|'.$role;
+            if (isset($seen[$deduplicationKey])) {
+                continue;
+            }
+            $seen[$deduplicationKey] = true;
+
+            $rows[] = [
+                'bibliographic_record_id' => $record->getKey(),
+                'contributor_id' => $contributor->getKey(),
+                'role' => $role,
+                'position' => count($rows),
+                'marc_tag' => $payload['marc_tag'] ?? null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        DB::table('bibliographic_record_contributor')
+            ->where('bibliographic_record_id', $record->getKey())
+            ->delete();
+        if ($rows !== []) {
+            DB::table('bibliographic_record_contributor')->insert($rows);
+        }
+        $record->unsetRelation('contributors');
+    }
+
+    /** @param list<array{term:string,scheme:string,marc_tag:?string}> $subjects */
+    private function syncSubjects(BibliographicRecord $record, array $subjects): void
+    {
+        if (! DatabaseSchema::hasTable('subjects') || ! DatabaseSchema::hasTable('bibliographic_record_subject')) {
+            return;
+        }
+
+        $rows = [];
+        $seen = [];
+        $now = now('UTC');
+
+        foreach ($subjects as $payload) {
+            $term = trim((string) ($payload['term'] ?? ''));
+            if ($term === '') {
+                continue;
+            }
+
+            $scheme = (string) ($payload['scheme'] ?? 'topical');
+            $subject = Subject::query()->firstOrCreate(
+                ['normalized_term' => Subject::normalizeTerm($term), 'scheme' => $scheme],
+                ['term' => $term],
+            );
+            if (isset($seen[$subject->getKey()])) {
+                continue;
+            }
+            $seen[$subject->getKey()] = true;
+
+            $rows[] = [
+                'bibliographic_record_id' => $record->getKey(),
+                'subject_id' => $subject->getKey(),
+                'position' => count($rows),
+                'marc_tag' => $payload['marc_tag'] ?? null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        DB::table('bibliographic_record_subject')
+            ->where('bibliographic_record_id', $record->getKey())
+            ->delete();
+        if ($rows !== []) {
+            DB::table('bibliographic_record_subject')->insert($rows);
+        }
+        $record->unsetRelation('subjects');
+    }
+
     /**
      * @return list<string>
      */
@@ -583,9 +794,30 @@ class CatalogController extends Controller
     {
         return $record->only([
             'title', 'subtitle', 'primary_author', 'additional_authors', 'publisher',
+            'publication_place', 'statement_of_responsibility', 'edition_statement',
             'publication_year', 'language', 'udc_code', 'author_mark', 'category',
-            'annotation', 'keywords', 'isbn', 'resource_type', 'cover_path', 'notes', 'is_draft',
+            'bbk_code', 'local_classification', 'annotation', 'keywords', 'isbn', 'issn',
+            'physical_extent', 'physical_details', 'dimensions', 'accompanying_material',
+            'series_title', 'series_number', 'volume', 'issue', 'part_number', 'part_title',
+            'control_number', 'country_code', 'cataloging_language', 'source_agency',
+            'material_designation', 'ksu_literature_type', 'faculty', 'department',
+            'disciplines', 'specialty', 'record_created_on',
+            'resource_type', 'cover_path', 'notes', 'is_draft',
             'needs_manual_review', 'review_note',
-        ]);
+        ]) + [
+            'contributors' => DatabaseSchema::hasTable('bibliographic_record_contributor')
+                ? $record->contributors()->get()->map(fn (Contributor $contributor): array => [
+                    'name' => $contributor->name,
+                    'role' => $contributor->pivot?->role,
+                    'kind' => $contributor->kind,
+                ])->values()->all()
+                : [],
+            'subjects' => DatabaseSchema::hasTable('bibliographic_record_subject')
+                ? $record->subjects()->get()->map(fn (Subject $subject): array => [
+                    'term' => $subject->term,
+                    'scheme' => $subject->scheme,
+                ])->values()->all()
+                : [],
+        ];
     }
 }

@@ -141,7 +141,9 @@
                             $record = $reservation->bibliographicRecord;
                             $copy = $reservation->assignedCopy;
                             $isCancellable = $reservation->isCancellable();
-                            $canMarkReady = in_array($reservation->status, ['pending', 'confirmed'], true) && $copy !== null;
+                            $canMarkReady = auth()->user()?->can('reservation.fulfill')
+                                && in_array($reservation->status, ['pending', 'confirmed'], true)
+                                && $copy !== null;
                             $canCancel = $isCancellable && (auth()->user()?->can('reservation.cancel_any') ?? false);
                             $hasActions = $reservation->status === 'pending' || $canMarkReady || $canCancel;
 
@@ -156,7 +158,8 @@
                             $logistics = $reservation->logisticsState();
 
                             // 8.3: a hold may only be stretched while nobody is next in line.
-                            $canExtend = $reservation->status === 'ready_for_pickup';
+                            $canExtend = auth()->user()?->can('reservation.extend')
+                                && $reservation->status === 'ready_for_pickup';
                             $canPassToNext = in_array($reservation->status, ['confirmed', 'ready_for_pickup'], true)
                                 && $copy !== null
                                 && (auth()->user()?->can('reservation.cancel_any') ?? false);
@@ -247,7 +250,7 @@
                                             @csrf
                                             {{-- 8 action "assign a copy": with more than one candidate the
                                                  librarian picks; a single option needs no choice. --}}
-                                            @if ($pickable->count() > 1)
+                                            @if (auth()->user()?->can('reservation.assign_copy') && $pickable->count() > 1)
                                                 <label class="mb-1.5 block text-left">
                                                     <span class="admin-label">{{ __('librarian.reservations.assign_copy') }}</span>
                                                     <select class="admin-input py-1.5 text-xs" name="assigned_copy_id">

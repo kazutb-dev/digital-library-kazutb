@@ -3,21 +3,22 @@
 @php
   $memberReader = $memberReader ?? session('library.user');
   $displayName = $memberReader['display_name'] ?? ($memberReader['name'] ?? ($memberReader['login'] ?? auth()->user()?->name));
+  $memberCapabilities = $memberCapabilities ?? [];
 
-  $services = [
+  $services = collect([
       ['label' => __('librarian.member.dashboard.services.catalog'), 'href' => '/catalog', 'icon' => 'menu_book'],
       ['label' => __('librarian.member.dashboard.services.resources'), 'href' => '/resources', 'icon' => 'travel_explore'],
-      ['label' => __('librarian.member.dashboard.services.contacts'), 'href' => route('member.messages'), 'icon' => 'contact_support'],
-  ];
+      ['label' => __('librarian.member.dashboard.services.contacts'), 'href' => route('member.messages'), 'icon' => 'contact_support', 'visible' => (bool) ($memberCapabilities['messages'] ?? false)],
+  ])->filter(fn (array $service): bool => (bool) ($service['visible'] ?? true))->values();
 
-  $stats = [
-      ['label' => __('librarian.member.dashboard.stats.loans'), 'value' => $openLoans->count(), 'href' => route('member.loans'), 'tone' => 'plain'],
-      ['label' => __('librarian.member.dashboard.stats.overdue'), 'value' => $overdueCount, 'href' => route('member.loans'), 'tone' => $overdueCount > 0 ? 'error' : 'plain'],
-      ['label' => __('librarian.member.dashboard.stats.reservations'), 'value' => $activeReservations->count(), 'href' => route('member.reservations'), 'tone' => 'plain'],
-      ['label' => __('librarian.member.dashboard.stats.fines'), 'value' => number_format($pendingFinesTotal, 0, ',', ' '), 'href' => route('member.fines'), 'tone' => $pendingFinesTotal > 0 ? 'error' : 'plain'],
-      ['label' => __('librarian.member.dashboard.stats.unread'), 'value' => $unreadNotifications, 'href' => route('member.notifications'), 'tone' => $unreadNotifications > 0 ? 'secondary' : 'plain'],
-      ['label' => __('librarian.member.dashboard.stats.shortlist'), 'value' => $shortlistTotal, 'href' => route('member.collections.index'), 'tone' => 'plain'],
-  ];
+  $stats = collect([
+      ['label' => __('librarian.member.dashboard.stats.loans'), 'value' => $openLoans->count(), 'href' => route('member.loans'), 'tone' => 'plain', 'visible' => (bool) ($memberCapabilities['loans'] ?? false)],
+      ['label' => __('librarian.member.dashboard.stats.overdue'), 'value' => $overdueCount, 'href' => route('member.loans'), 'tone' => $overdueCount > 0 ? 'error' : 'plain', 'visible' => (bool) ($memberCapabilities['loans'] ?? false)],
+      ['label' => __('librarian.member.dashboard.stats.reservations'), 'value' => $activeReservations->count(), 'href' => route('member.reservations'), 'tone' => 'plain', 'visible' => (bool) ($memberCapabilities['reservations'] ?? false)],
+      ['label' => __('librarian.member.dashboard.stats.fines'), 'value' => number_format($pendingFinesTotal, 0, ',', ' '), 'href' => route('member.fines'), 'tone' => $pendingFinesTotal > 0 ? 'error' : 'plain', 'visible' => (bool) ($memberCapabilities['fines'] ?? false)],
+      ['label' => __('librarian.member.dashboard.stats.unread'), 'value' => $unreadNotifications, 'href' => route('member.notifications'), 'tone' => $unreadNotifications > 0 ? 'secondary' : 'plain', 'visible' => (bool) ($memberCapabilities['notifications'] ?? false)],
+      ['label' => __('librarian.member.dashboard.stats.shortlist'), 'value' => $shortlistTotal, 'href' => route('member.collections.index'), 'tone' => 'plain', 'visible' => (bool) ($memberCapabilities['collections'] ?? false)],
+  ])->filter(fn (array $stat): bool => (bool) ($stat['visible'] ?? false))->values();
 @endphp
 
 @section('content')
@@ -66,6 +67,7 @@
   @endif
 
   <!-- Reader ticket -->
+  @if ($memberCapabilities['card'] ?? false)
   <section class="mb-10 bg-surface-container-lowest rounded-xl p-6 md:p-8" aria-label="{{ __('librarian.member.dashboard.ticket_card') }}">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       <div>
@@ -84,6 +86,7 @@
           {{ __('librarian.circulation.reader_statuses.'.$profile->status) }}
         </p>
       </div>
+      @if ($memberCapabilities['loans'] ?? false)
       <div>
         <p class="font-label text-xs text-on-surface-variant uppercase tracking-widest mb-1">{{ __('librarian.circulation.limits') }}</p>
         <p class="font-body text-base text-on-surface font-medium">
@@ -93,8 +96,10 @@
           {{ __('librarian.circulation.loans_remaining', ['count' => $loansRemaining]) }}
         </p>
       </div>
+      @endif
     </div>
   </section>
+  @endif
 
   <!-- Counters -->
   <section class="mb-10 grid grid-cols-2 lg:grid-cols-6 gap-4" aria-label="{{ __('librarian.member.common.eyebrow') }}">
@@ -116,6 +121,7 @@
   <div class="grid grid-cols-12 gap-6 md:gap-10">
 
     <!-- Nearest due date -->
+    @if ($memberCapabilities['loans'] ?? false)
     <section class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 md:p-10 flex flex-col justify-between">
       <span class="font-label text-xs text-secondary uppercase tracking-widest font-semibold block mb-4">{{ __('librarian.member.dashboard.priority') }}</span>
 
@@ -174,6 +180,7 @@
         </div>
       @endif
     </section>
+    @endif
 
     <!-- Library services -->
     <section class="col-span-12 lg:col-span-4 bg-primary-container rounded-xl p-8 md:p-10 text-on-primary-container flex flex-col">
@@ -194,6 +201,7 @@
     </section>
 
     <!-- Active reservations -->
+    @if ($memberCapabilities['reservations'] ?? false)
     <section class="col-span-12 lg:col-span-7 mt-2">
       <div class="flex items-end justify-between mb-5">
         <h3 class="font-headline text-2xl md:text-3xl text-primary">{{ __('librarian.member.dashboard.sections.reservations') }}</h3>
@@ -239,8 +247,10 @@
         </ul>
       @endif
     </section>
+    @endif
 
     <!-- Recent notifications -->
+    @if ($memberCapabilities['notifications'] ?? false)
     <section class="col-span-12 lg:col-span-5 mt-2">
       <div class="flex items-end justify-between mb-5">
         <h3 class="font-headline text-2xl md:text-3xl text-primary">{{ __('librarian.member.dashboard.sections.notifications') }}</h3>
@@ -269,8 +279,10 @@
         </ul>
       @endif
     </section>
+    @endif
 
     <!-- Shortlist preview -->
+    @if (($memberCapabilities['collections'] ?? false) && ($memberCapabilities['shortlist'] ?? false))
     <section class="col-span-12 mt-4">
       <div class="flex items-end justify-between mb-5">
         <h3 class="font-headline text-2xl md:text-3xl text-primary">{{ __('librarian.member.dashboard.sections.shortlist') }}</h3>
@@ -307,6 +319,7 @@
         </a>
       </div>
     </section>
+    @endif
 
     @if($recommendations->isNotEmpty())
       <section class="col-span-12 mt-4" aria-labelledby="recommendations-title">

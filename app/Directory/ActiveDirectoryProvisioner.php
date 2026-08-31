@@ -3,6 +3,7 @@
 namespace App\Directory;
 
 use App\Exceptions\LibraryAuthenticationException;
+use App\Models\Catalog\ReaderProfile;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
@@ -12,7 +13,10 @@ use Illuminate\Support\Str;
 
 final readonly class ActiveDirectoryProvisioner
 {
-    public function __construct(private AuditLogger $audit) {}
+    public function __construct(
+        private AuditLogger $audit,
+        private ActiveDirectoryReaderCategoryResolver $readerCategories,
+    ) {}
 
     public function provision(ActiveDirectoryUser $identity, Request $request, bool $authenticated = true): User
     {
@@ -73,9 +77,24 @@ final readonly class ActiveDirectoryProvisioner
             }
             $user->save();
             if ($created || $user->roles()->doesntExist()) {
-                $user->syncRoles(['member']);
+                // Reader classification is never authorization. Preserve a
+                // locally assigned legacy staff role when completing the RBAC
+                // bridge for an older account; new AD identities remain members.
+                $role = $created ? 'member' : match (mb_strtolower(trim((string) $user->role))) {
+                    'admin',
+                    'librarian',
+                    'director',
+                    'senior_librarian',
+                    'acquisitions',
+                    'cataloguer',
+                    'bibliographer' => mb_strtolower(trim((string) $user->role)),
+                    default => 'member',
+                };
+                $user->syncRoles([$role]);
             }
             $user->refresh()->load('roles');
+            $this->syncReaderProfile($user, $this->readerCategories->resolve($identity));
+            $user->refresh()->load(['roles', 'readerProfile']);
             $after = $this->snapshot($user);
             if ($created || $before !== $after) {
                 $this->audit->logRequired(
@@ -106,6 +125,26 @@ final readonly class ActiveDirectoryProvisioner
             'department' => $user->department,
             'roles' => $user->getRoleNames()->values()->all(),
             'reader_profile_id' => $user->readerProfile?->getKey(),
+            'reader_profile_category' => $user->readerProfile?->category,
         ];
+    }
+
+    private function syncReaderProfile(User $user, string $category): void
+    {
+        // `staff` is the established database category; `employee` is its
+        // session/UI presentation and is resolved by AuthSessionManager.
+        $storedCategory = $category === 'employee' ? 'staff' : $category;
+        $profile = $user->readerProfile()->lockForUpdate()->first();
+        $created = $profile === null;
+        $profile ??= ReaderProfile::forUser($user);
+
+        // Detailed categories entered by library staff are authoritative. The
+        // three broad AD-owned categories may be refreshed when directory
+        // evidence changes, while ticket, block and circulation state survive.
+        if ($created || in_array($profile->category, ['student', 'teacher', 'staff'], true)) {
+            if ($profile->category !== $storedCategory) {
+                $profile->forceFill(['category' => $storedCategory])->save();
+            }
+        }
     }
 }

@@ -33,10 +33,13 @@ class ReservationQueueService
     public function create(User $reader, BibliographicRecord $record, ?User $actor = null, ?int $pickupBranchId = null, string $source = 'web'): Reservation
     {
         return DB::transaction(function () use ($reader, $record, $actor, $pickupBranchId, $source): Reservation {
+            // This reader row is the mutex for the global active-reservation
+            // limit, including the zero-active-row case.
+            $reader = User::query()->whereKey($reader->getKey())->lockForUpdate()->firstOrFail();
+            $profile = ReaderProfile::forUser($reader);
             // Serialise all allocation decisions for one edition. The database
             // partial unique indexes remain the final safety net.
             $record = BibliographicRecord::query()->whereKey($record->getKey())->lockForUpdate()->firstOrFail();
-            $profile = ReaderProfile::forUser($reader);
             if ($profile->status !== 'active') {
                 throw CirculationException::because('reader_blocked', ['reason' => (string) $profile->block_reason]);
             }
@@ -84,7 +87,7 @@ class ReservationQueueService
             // else walks away with it; the librarian still confirms manually.
             $copy = BookCopy::query()
                 ->where('bibliographic_record_id', $record->getKey())
-                ->where('status', 'available')
+                ->availableForCirculation()
                 ->whereNotIn('condition', ['damaged'])
                 ->where('access_restriction', '!=', 'reading_room')
                 ->when($pickupBranchId, fn ($query) => $query->orderByRaw('CASE WHEN branch_id = ? THEN 0 ELSE 1 END', [$pickupBranchId]))
@@ -164,7 +167,7 @@ class ReservationQueueService
             );
 
             return $reservation->refresh();
-        });
+        }, 3);
     }
 
     /**
@@ -190,7 +193,7 @@ class ReservationQueueService
             if ($reservation->assigned_copy_id === null) {
                 $copy = BookCopy::query()
                     ->where('bibliographic_record_id', $reservation->bibliographic_record_id)
-                    ->where('status', 'available')
+                    ->availableForCirculation()
                     ->lockForUpdate()
                     ->first();
                 if ($copy === null) {
@@ -710,7 +713,7 @@ class ReservationQueueService
         if ((int) $chosen->bibliographic_record_id !== (int) $reservation->bibliographic_record_id) {
             throw CirculationException::because('reservation_copy_mismatch');
         }
-        if ($chosen->status !== 'available') {
+        if ($chosen->status !== 'available' || ! $chosen->isCirculatable()) {
             throw CirculationException::because('reservation_copy_unavailable');
         }
 

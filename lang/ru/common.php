@@ -6,11 +6,12 @@ return [
         'author_unknown' => 'Автор не указан',
         'publisher_unknown' => 'Издатель не указан',
         'title_unknown' => 'Без названия',
+        'book_not_found' => 'Книга не найдена',
         'fund_unassigned' => 'Фонд не указан',
         'branch_unassigned' => 'Библиотечная точка не указана',
     ],
     'public_landing' => [
-        'title' => 'Научная библиотека КазУТБ',
+        'title' => 'Научная библиотека Казахского университета технологии и бизнеса имени К. Кулажанова',
         'description' => 'Публичный каталог, электронные ресурсы и сервисы библиотеки.',
         'stats' => [
             'catalog_titles' => 'наименований в электронном каталоге',
@@ -26,6 +27,7 @@ return [
     'unavailable' => 'Недоступно',
     'configured' => 'Настроено',
     'not_configured' => 'Не настроено',
+    'empty' => 'Нет данных для отображения.',
     'created_successfully' => 'Запись создана.',
     'updated_successfully' => 'Изменения сохранены.',
     'deleted_successfully' => 'Запись удалена.',

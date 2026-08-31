@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Tests\TestCase;
 
 /**
@@ -15,27 +13,6 @@ use Tests\TestCase;
  */
 class ContactsCanonicalPageTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        config()->set('demo_auth.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
-    }
-
-    private function loginAs(string $identitySlug): void
-    {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
-        ]);
-    }
-
     public function test_guest_can_view_canonical_contacts_page(): void
     {
         $response = $this->get('/contacts?lang=en');
@@ -74,11 +51,11 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertOk();
         $response->assertSeeInOrder([
             'data-section="contacts-canonical-hero"',
+            'data-section="contacts-canonical-visit-rules"',
             'data-section="contacts-canonical-support"',
             'data-section="contacts-canonical-location"',
             'data-section="contacts-canonical-inquiry-form"',
             'data-section="contacts-canonical-staff"',
-            'data-section="contacts-canonical-visit-rules"',
         ], false);
     }
 
@@ -99,7 +76,7 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertDontSee('KazUTB Digital Library', false);
     }
 
-    public function test_contacts_page_renders_one_verified_staff_profile_and_no_unverified_rooms(): void
+    public function test_contacts_page_renders_official_library_team_and_no_unverified_rooms(): void
     {
         $response = $this->get('/contacts?lang=en');
 
@@ -111,10 +88,16 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertDontSee('Room 1/203', false);
         $response->assertSee('data-section="contacts-canonical-staff"', false);
         $response->assertSee('data-staff-slug="pankey-zh"', false);
+        $response->assertSee('data-staff-slug="aikebayeva-shu"', false);
+        $response->assertSee('data-staff-slug="sailaubek-ab"', false);
+        $response->assertSee('data-staff-slug="raimkulova-na"', false);
+        $response->assertSee('data-staff-slug="korpeshova-em"', false);
+        $response->assertSee('data-staff-slug="yermaganbetova-ma"', false);
         $response->assertSee('Панкей Ж.', false);
-        $response->assertDontSee('Корпешова Эльмира Мауткановна', false);
-        $response->assertDontSee('Сайлаубек Айман Бастарбекқызы', false);
-        $this->assertSame(1, substr_count($response->getContent(), 'data-staff-slot'));
+        $response->assertSee('Корпешова Э.М.', false);
+        $response->assertSee('Сайлаубек А.Б.', false);
+        $response->assertSee('Extension: 112', false);
+        $this->assertSame(6, substr_count($response->getContent(), 'data-staff-slot'));
     }
 
     public function test_contacts_page_uses_only_the_two_source_backed_contact_channels(): void
@@ -182,15 +165,31 @@ class ContactsCanonicalPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('37A Kayym Mukhamedkhanov Street, Astana', false);
         $response->assertSee('+7 (7172) 69-70-60', false);
+        $response->assertSee('+7 (775) 232-22-66', false);
         $response->assertSee('info@kaztbu.edu.kz', false);
+        $response->assertSee('@library_kazutb', false);
         $response->assertSee('Opening hours', false);
-        $response->assertSee('Confirmed time window', false);
+        $response->assertSee('Monday – Saturday', false);
         $response->assertSee('08:30 – 17:30', false);
-        $response->assertSee('Confirm working days on the official page', false);
+        $response->assertSee('Saturday, Sunday', false);
+        $response->assertSee('Closed', false);
+        $response->assertSee('Last working day of each month', false);
+        $response->assertSee('Sanitary day', false);
         $response->assertSee('data-test-id="contacts-official-hours-source"', false);
         $response->assertSee('https://www.kaztbu.edu.kz/biblioteka', false);
         $response->assertDontSee('Mon – Fri', false);
         $response->assertDontSee('+7 (7172) 64-58-58', false);
+    }
+
+    public function test_contacts_hero_exposes_immediate_contact_actions(): void
+    {
+        $response = $this->get('/contacts?lang=ru');
+
+        $response->assertOk()
+            ->assertSee('class="public-page__hero-actions"', false)
+            ->assertSee('href="tel:+77172697060"', false)
+            ->assertSee('href="mailto:info@kaztbu.edu.kz"', false)
+            ->assertSee('Построить маршрут', false);
     }
 
     public function test_contacts_ru_variant_renders_canonical_copy(): void

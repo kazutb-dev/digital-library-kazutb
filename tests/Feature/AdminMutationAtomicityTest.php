@@ -50,7 +50,7 @@ class AdminMutationAtomicityTest extends TestCase
         $this->assertDatabaseMissing('news', ['title' => 'Atomic news probe']);
     }
 
-    public function test_non_publisher_cannot_reschedule_owned_news(): void
+    public function test_non_publisher_cannot_reschedule_owned_news_through_content_form(): void
     {
         $editor = $this->makeControlPlaneUser('member');
         $editor->givePermissionTo('news.edit_own');
@@ -73,10 +73,10 @@ class AdminMutationAtomicityTest extends TestCase
                 'body' => 'Attempted reschedule.',
                 'publish_at' => $publishAt->copy()->addHour()->format('Y-m-d H:i:s'),
             ]))
-            ->assertForbidden();
+            ->assertRedirect();
 
         $news->refresh();
-        $this->assertSame('Initial body.', $news->body);
+        $this->assertSame('Attempted reschedule.', $news->body);
         $this->assertTrue($news->publish_at->equalTo($publishAt));
         $this->assertSame($this->adminUser->getKey(), $news->published_by);
     }
@@ -113,7 +113,7 @@ class AdminMutationAtomicityTest extends TestCase
         $this->assertSame($this->adminUser->getKey(), $news->published_by);
     }
 
-    public function test_published_status_rejects_future_publication_date(): void
+    public function test_creation_form_cannot_bypass_editorial_workflow_with_published_status(): void
     {
         $this->signInToLibraryAs($this->adminUser)
             ->from('/admin/news/create')
@@ -121,10 +121,15 @@ class AdminMutationAtomicityTest extends TestCase
                 'status' => 'published',
                 'publish_at' => Carbon::now('UTC')->addDay()->format('Y-m-d H:i'),
             ]))
-            ->assertRedirect('/admin/news/create')
-            ->assertSessionHasErrors('publish_at');
+            ->assertRedirect('/admin/news/1/edit')
+            ->assertSessionDoesntHaveErrors();
 
-        $this->assertDatabaseCount('news', 0);
+        $this->assertDatabaseHas('news', [
+            'id' => 1,
+            'status' => 'draft',
+            'published_at' => null,
+            'scheduled_publish_at' => null,
+        ]);
     }
 
     /**

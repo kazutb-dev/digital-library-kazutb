@@ -2,10 +2,9 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Cache;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 /**
@@ -32,23 +31,24 @@ use Tests\TestCase;
  */
 class PublicHomepagePageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        config()->set('demo_auth.enabled', true);
-        config()->set('demo_users.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
         $this->withSession(['locale' => 'ru']);
     }
 
     private function loginAs(string $identitySlug): void
     {
-        session()->put('library.user', [
-            'role' => in_array($identitySlug, ['student', 'teacher'], true) ? 'reader' : $identitySlug,
-            'profile_type' => $identitySlug,
-        ]);
-        $this->post('/locale', ['locale' => 'en', 'return_to' => '/']);
+        $this->setUpAdminControlPlane();
+        $role = in_array($identitySlug, ['student', 'teacher'], true) ? 'member' : $identitySlug;
+        $user = $role === 'admin'
+            ? $this->adminUser
+            : $this->makeControlPlaneUser($role, ['locale' => 'en']);
+        $user->forceFill(['locale' => 'en'])->save();
+        $this->signInToLibraryAs($user);
     }
 
     // ─────────────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@
             @foreach($hubIntegrations as $hub)
                 <article class="admin-card flex flex-col">
                     <div class="flex items-start justify-between gap-3"><div><p class="text-xs font-bold uppercase tracking-wider text-secondary">{{ __('integration_hub.types.'.$hub->type) }}</p><h3 class="mt-1 text-xl font-bold">{{ $hub->name }}</h3></div><x-admin.status-badge :status="$hub->health_status" :label="__('integration_hub.statuses.'.$hub->health_status)" /></div>
-                    <p class="mt-3 text-xs text-slate-500">{{ $hub->transport }} · {{ $hub->direction }} · {{ $hub->sync_mode }}</p>
+                    <p class="mt-3 text-xs text-slate-500">{{ __('integration_hub.transports.'.strtolower($hub->transport)) }} · {{ __('integration_hub.directions.'.$hub->direction) }} · {{ __('integration_hub.sync_modes.'.$hub->sync_mode) }}</p>
                     @unless($hub->enabled)<p class="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{{ __('integration_hub.not_connected') }}</p>@endunless
                     <dl class="mt-4 grid grid-cols-3 gap-2 text-center text-xs"><div class="rounded-lg bg-surface-low p-2"><dt>{{ __('integration_hub.pending') }}</dt><dd class="mt-1 font-bold">{{ $hub->pending_queue_count }}</dd></div><div class="rounded-lg bg-surface-low p-2"><dt>{{ __('integration_hub.dlq') }}</dt><dd class="mt-1 font-bold">{{ $hub->dlq_count }}</dd></div><div class="rounded-lg bg-surface-low p-2"><dt>{{ __('integration_hub.conflicts') }}</dt><dd class="mt-1 font-bold">{{ $hub->conflicts_count }}</dd></div></dl>
                     <a class="admin-btn admin-btn-secondary mt-5" href="{{ route('admin.integrations.show', $hub) }}">{{ __('integration_hub.open') }}</a>
@@ -126,7 +126,7 @@
         </form>
         @if($directoryError)<p class="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800">{{ __('auth.provider_unavailable') }}</p>@endif
         @if($directoryQuery !== '' && !$directoryError)
-            <div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>{{ __('common.fields.name') }}</th><th>Login</th><th>Email</th><th>Department</th><th>Status</th></tr></thead><tbody>
+            <div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>{{ __('common.fields.name') }}</th><th>{{ __('integration_hub.columns.login') }}</th><th>{{ __('integration_hub.columns.email') }}</th><th>{{ __('integration_hub.columns.department') }}</th><th>{{ __('integration_hub.columns.status') }}</th></tr></thead><tbody>
                 @forelse($directoryUsers as $directoryUser)
                     <tr><td>{{ $directoryUser->displayName }}</td><td>{{ $directoryUser->samAccountName }}</td><td>{{ $directoryUser->mail }}</td><td>{{ $directoryUser->department }}</td><td>{{ $directoryUser->enabled ? __('common.status.active') : __('common.status.disabled') }}</td></tr>
                 @empty<tr><td colspan="5" class="text-center text-slate-500">{{ $adCopy['none'] }}</td></tr>@endforelse

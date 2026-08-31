@@ -160,6 +160,7 @@ trait BuildsAdminControlPlane
             'database/migrations/2026_07_31_090000_create_data_quality_control_center.php',
             'database/migrations/2026_08_03_000000_create_production_circulation_workflows.php',
             'database/migrations/2026_08_04_000000_build_full_reader_cabinet.php',
+            'database/migrations/2026_08_05_000000_expand_news_editorial_workflow.php',
             'database/migrations/2026_08_06_000000_build_message_appeals_workflow.php',
             // Unified digital services also completes the scholarly repository
             // and supplies the access-event tables used by the four canonical
@@ -173,6 +174,7 @@ trait BuildsAdminControlPlane
             'database/migrations/2026_08_13_030000_create_integration_hub.php',
             'database/migrations/2026_08_13_040000_add_multilingual_catalogue_and_executive_controls.php',
             'database/migrations/2026_08_19_000000_extend_inventory_physical_verification.php',
+            'database/migrations/2026_08_29_121000_extend_inventory_sessions_for_recovered_scopes.php',
         ];
     }
 }

@@ -35,4 +35,22 @@ return [
 
     'track_reading_progress' => (bool) env('DIGITAL_TRACK_READING_PROGRESS', true),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Low-memory delivery of local files
+    |--------------------------------------------------------------------------
+    |
+    | In production nginx serves authorised files after Laravel has checked the
+    | access policy. Tests and non-nginx development servers keep using the
+    | framework's BinaryFileResponse implementation.
+    |
+    */
+
+    'x_accel_redirect' => (bool) env(
+        'DIGITAL_X_ACCEL_REDIRECT',
+        env('APP_ENV', 'production') === 'production',
+    ),
+
+    'x_accel_prefix' => '/__protected-library-files/',
+
 ];

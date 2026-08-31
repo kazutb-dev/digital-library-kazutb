@@ -2,31 +2,18 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use App\Models\Catalog\ReaderProfile;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class MemberListPageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
     protected function setUp(): void
     {
         parent::setUp();
-
-        config()->set('demo_auth.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
-    }
-
-    private function loginAs(string $identitySlug): void
-    {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
-        ]);
+        $this->setUpAdminControlPlane();
     }
 
     public function test_guest_is_redirected_to_login(): void
@@ -37,44 +24,34 @@ class MemberListPageTest extends TestCase
         $response->assertRedirectContains('/login');
     }
 
-    public function test_student_can_view_shortlist(): void
+    public function test_member_can_view_localized_shortlist(): void
     {
-        $this->loginAs('student');
+        $member = $this->makeControlPlaneUser('member', ['locale' => 'ru']);
+        ReaderProfile::forUser($member);
 
-        $response = $this->get('/dashboard/list');
+        $legacyResponse = $this->signInToLibraryAs($member)->get('/dashboard/list?lang=ru');
+        $legacyResponse->assertRedirect('/dashboard/collections');
+
+        $response = $this->get('/dashboard/collections?lang=ru');
 
         $response->assertOk();
-        $response->assertSee('My shortlist', false);
-        $response->assertSee('All items', false);
-        $response->assertSee('Reserve', false);
-        $response->assertSee('Cite', false);
+        $response->assertSee('Мои подборки', false);
+        $response->assertSee('Личные подборки', false);
+        $response->assertSee('Создайте первую подборку.', false);
+        $response->assertDontSee('My collections', false);
     }
 
-    public function test_teacher_can_view_shortlist(): void
+    public function test_librarian_is_redirected_to_staff_workspace(): void
     {
-        $this->loginAs('teacher');
-
-        $response = $this->get('/dashboard/list');
-
-        $response->assertOk();
-        $response->assertSee('My shortlist', false);
+        $this->signInToLibraryAs($this->makeControlPlaneUser('librarian'))
+            ->get('/dashboard/list')
+            ->assertRedirect('/librarian');
     }
 
-    public function test_librarian_is_forbidden(): void
+    public function test_admin_is_redirected_to_admin_workspace(): void
     {
-        $this->loginAs('librarian');
-
-        $response = $this->get('/dashboard/list');
-
-        $response->assertForbidden();
-    }
-
-    public function test_admin_is_forbidden(): void
-    {
-        $this->loginAs('admin');
-
-        $response = $this->get('/dashboard/list');
-
-        $response->assertForbidden();
+        $this->signInToLibraryAs($this->adminUser)
+            ->get('/dashboard/list')
+            ->assertRedirect('/admin');
     }
 }

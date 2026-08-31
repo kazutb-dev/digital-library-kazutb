@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Api;
 
+use App\Http\Middleware\EnsureInternalCirculationStaff;
 use App\Models\Library\CirculationAuditEvent;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Tests\TestCase;
 
 class InternalDocumentFlagWorkflowTest extends TestCase
@@ -161,6 +163,8 @@ class InternalDocumentFlagWorkflowTest extends TestCase
 
     public function test_flag_rejects_invalid_uuid(): void
     {
+        $this->withoutMiddleware([EnsureInternalCirculationStaff::class, PermissionMiddleware::class]);
+
         $response = $this->withSession($this->staffSession())->postJson(
             '/api/v1/internal/review/documents/not-a-uuid/flag',
             ['reason_codes' => ['SOME_CODE']]

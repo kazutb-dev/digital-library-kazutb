@@ -14,6 +14,7 @@ class ReservationMutateRetirementConsistencyTest extends TestCase
     {
         parent::setUp();
 
+        Config::set('services.integration.allowed_tokens', 'integration-test-token');
         Config::set('database.default', 'pgsql');
         DB::purge('pgsql');
 

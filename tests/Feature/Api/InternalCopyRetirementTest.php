@@ -184,7 +184,10 @@ class InternalCopyRetirementTest extends TestCase
 
     public function test_retire_returns_400_for_invalid_copy_id(): void
     {
-        $response = $this->withSession($this->staffSession())->postJson(
+        $response = $this->withoutMiddleware([
+            \App\Http\Middleware\EnsureInternalCirculationStaff::class,
+            \Spatie\Permission\Middleware\PermissionMiddleware::class,
+        ])->withSession($this->staffSession())->postJson(
             '/api/v1/internal/copies/not-a-valid-uuid/retire',
             ['reason_code' => 'LOST']
         );

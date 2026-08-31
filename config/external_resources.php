@@ -32,7 +32,7 @@ return [
             'publication_status' => env('EXTERNAL_RESOURCE_IPR_EXPIRES_AT') ? 'published' : 'draft',
             // Supplied from the verified production contract, never guessed.
             'expiry_date' => env('EXTERNAL_RESOURCE_IPR_EXPIRES_AT'),
-            'url' => 'https://www.iprbookshop.ru/',
+            'url' => 'https://ipr-smart.ru/',
             'logo' => '/images/resources/ipr-smart.ico',
             'category' => 'electronic_library',
             'available_roles' => ['student', 'teacher', 'library_staff'],
@@ -121,6 +121,49 @@ return [
         ],
 
         [
+            'slug' => 'kazneb',
+            'title' => 'Казахстанская национальная электронная библиотека (КазНЭБ)',
+            'name_translations' => ['ru' => 'Казахстанская национальная электронная библиотека (КазНЭБ)', 'kk' => 'Қазақстан ұлттық электрондық кітапханасы (ҚазҰЭК)', 'en' => 'Kazakhstan National Electronic Library (KazNEB)'],
+            'provider' => 'КазНЭБ',
+            'description' => 'Национальная электронная коллекция книг и документов Казахстана.',
+            'description_translations' => ['ru' => 'Национальная электронная коллекция книг и документов Казахстана.', 'kk' => 'Қазақстанның кітаптары мен құжаттарының ұлттық электрондық жинағы.', 'en' => 'A national digital collection of books and documents from Kazakhstan.'],
+            'resource_type' => 'open_access', 'access_type' => 'open', 'status' => 'active', 'publication_status' => 'published',
+            'expiry_date' => null, 'url' => 'https://kazneb.kz/', 'logo' => null, 'category' => 'electronic_library',
+            'available_roles' => ['guest', 'student', 'teacher', 'library_staff'], 'content_types' => ['electronic_books', 'catalogues'],
+            'access_method' => 'public_url', 'guest_access' => true, 'notes' => 'Свободный доступ.',
+        ],
+
+        [
+            'slug' => 'kitap-kz', 'title' => 'Kitap', 'provider' => 'Kitap.kz',
+            'description' => 'Казахстанская электронная библиотека книг и аудиоматериалов.',
+            'description_translations' => ['ru' => 'Казахстанская электронная библиотека книг и аудиоматериалов.', 'kk' => 'Кітаптар мен аудиоматериалдардың қазақстандық электрондық кітапханасы.', 'en' => 'A Kazakhstani digital library of books and audio materials.'],
+            'resource_type' => 'open_access', 'access_type' => 'open', 'status' => 'active', 'publication_status' => 'published',
+            'expiry_date' => null, 'url' => 'https://kitap.kz/', 'logo' => null, 'category' => 'electronic_library',
+            'available_roles' => ['guest', 'student', 'teacher', 'library_staff'], 'content_types' => ['electronic_books', 'audiobooks'],
+            'access_method' => 'public_url', 'guest_access' => true, 'notes' => 'Свободный доступ.',
+        ],
+
+        [
+            'slug' => 'cambridge-textbooks', 'title' => 'Cambridge Textbooks', 'provider' => 'Cambridge University Press',
+            'description' => 'Учебники Cambridge University Press по различным академическим дисциплинам.',
+            'description_translations' => ['ru' => 'Учебники Cambridge University Press по различным академическим дисциплинам.', 'kk' => 'Cambridge University Press баспасының түрлі академиялық пәндер бойынша оқулықтары.', 'en' => 'Cambridge University Press textbooks across academic disciplines.'],
+            'resource_type' => 'open_access', 'access_type' => 'open', 'status' => 'active', 'publication_status' => 'published',
+            'expiry_date' => null, 'url' => 'https://www.cambridge.org/core/publications/textbooks', 'logo' => null, 'category' => 'electronic_library',
+            'available_roles' => ['guest', 'student', 'teacher', 'library_staff'], 'content_types' => ['electronic_books', 'educational_materials'],
+            'access_method' => 'public_url', 'guest_access' => true, 'notes' => 'Доступ к полному тексту зависит от конкретного издания.',
+        ],
+
+        [
+            'slug' => 'sciencedirect', 'title' => 'ScienceDirect', 'provider' => 'Elsevier',
+            'description' => 'Платформа научных журналов и книг Elsevier.',
+            'description_translations' => ['ru' => 'Платформа научных журналов и книг Elsevier.', 'kk' => 'Elsevier ғылыми журналдары мен кітаптарының платформасы.', 'en' => 'Elsevier’s platform for scientific journals and books.'],
+            'resource_type' => 'open_access', 'access_type' => 'open', 'status' => 'active', 'publication_status' => 'published',
+            'expiry_date' => null, 'url' => 'https://www.sciencedirect.com/', 'logo' => null, 'category' => 'research_database',
+            'available_roles' => ['guest', 'student', 'teacher', 'library_staff'], 'content_types' => ['scientific_articles', 'journals', 'electronic_books'],
+            'access_method' => 'public_url', 'guest_access' => true, 'notes' => 'Поиск и открытые материалы доступны без авторизации.',
+        ],
+
+        [
             'slug' => 'doaj',
             'title' => 'Directory of Open Access Journals (DOAJ)',
             'provider' => 'DOAJ',
@@ -187,12 +230,10 @@ return [
             ],
             'resource_type' => 'partner',
             'access_type' => 'remote_auth',
-            // Named by the specification, but URL and agreement details were
-            // not supplied. Staff can complete and submit this draft.
             'status' => 'inactive',
             'publication_status' => 'draft',
             'expiry_date' => env('EXTERNAL_RESOURCE_ATU_EXPIRES_AT'),
-            'url' => null,
+            'url' => 'https://library.atu.edu.kz/',
             'logo' => '/images/resources/partner-library.svg',
             'category' => 'electronic_library',
             'available_roles' => ['student', 'teacher', 'library_staff'],
@@ -218,7 +259,7 @@ return [
             'status' => 'inactive',
             'publication_status' => 'draft',
             'expiry_date' => env('EXTERNAL_RESOURCE_RNTB_EXPIRES_AT'),
-            'url' => null,
+            'url' => 'https://rlst.by/',
             'logo' => '/images/resources/partner-library.svg',
             'category' => 'research_database',
             'available_roles' => ['student', 'teacher', 'library_staff'],
@@ -308,9 +349,9 @@ return [
 
         [
             'slug' => 'kazutb-catalogue',
-            'title' => 'Электронный каталог библиотеки КазУТБ',
-            'name_translations' => ['ru' => 'Электронный каталог библиотеки КазУТБ', 'kk' => 'ҚазТБУ кітапханасының электрондық каталогы', 'en' => 'KazUTB Library Electronic Catalogue'],
-            'provider' => 'Научная библиотека КазУТБ',
+            'title' => 'Электронный каталог научной библиотеки',
+            'name_translations' => ['ru' => 'Электронный каталог научной библиотеки', 'kk' => 'Ғылыми кітапхананың электрондық каталогы', 'en' => 'Scientific Library Electronic Catalogue'],
+            'provider' => 'Научная библиотека Казахского университета технологии и бизнеса имени К. Кулажанова',
             'description' => 'Внутренний ресурс библиотеки для поиска печатных и электронных изданий, проверки наличия и формирования подборки.',
             'resource_type' => 'internal',
             'access_type' => 'open',
@@ -336,22 +377,22 @@ return [
     'categories' => [
         'electronic_library' => [
             'label' => 'Электронная библиотека',
-            'icon' => '📚',
+            'icon' => 'local_library',
             'color' => 'blue',
         ],
         'research_database' => [
             'label' => 'Научная база данных',
-            'icon' => '🔬',
+            'icon' => 'science',
             'color' => 'violet',
         ],
         'open_access' => [
             'label' => 'Открытый доступ',
-            'icon' => '🔓',
+            'icon' => 'lock_open',
             'color' => 'green',
         ],
         'analytics' => [
             'label' => 'Аналитика и СМИ',
-            'icon' => '📊',
+            'icon' => 'monitoring',
             'color' => 'pink',
         ],
     ],

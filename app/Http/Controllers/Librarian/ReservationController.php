@@ -118,6 +118,10 @@ class ReservationController extends Controller
             'assigned_copy_id' => ['nullable', 'integer', 'exists:book_copies,id'],
         ]);
 
+        if (isset($validated['assigned_copy_id'])) {
+            abort_unless($request->user()?->can('reservation.assign_copy'), 403);
+        }
+
         $chosen = isset($validated['assigned_copy_id'])
             ? BookCopy::query()->find($validated['assigned_copy_id'])
             : null;

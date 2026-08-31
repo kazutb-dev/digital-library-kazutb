@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Api;
 
+use App\Http\Middleware\EnsureInternalCirculationStaff;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Tests\TestCase;
 
 class InternalBulkReviewTest extends TestCase
@@ -80,6 +82,8 @@ class InternalBulkReviewTest extends TestCase
 
     public function test_bulk_resolve_copies_validates_ids_required(): void
     {
+        $this->withoutMiddleware([EnsureInternalCirculationStaff::class, PermissionMiddleware::class]);
+
         $response = $this->withSession($this->staffSession())
             ->postJson('/api/v1/internal/review/copies/bulk-resolve', []);
 
@@ -89,6 +93,8 @@ class InternalBulkReviewTest extends TestCase
 
     public function test_bulk_resolve_copies_validates_ids_are_uuids(): void
     {
+        $this->withoutMiddleware([EnsureInternalCirculationStaff::class, PermissionMiddleware::class]);
+
         $response = $this->withSession($this->staffSession())
             ->postJson('/api/v1/internal/review/copies/bulk-resolve', [
                 'ids' => ['not-a-uuid', 'also-bad'],
@@ -100,6 +106,8 @@ class InternalBulkReviewTest extends TestCase
 
     public function test_bulk_resolve_copies_validates_max_200(): void
     {
+        $this->withoutMiddleware([EnsureInternalCirculationStaff::class, PermissionMiddleware::class]);
+
         $ids = array_map(fn () => fake()->uuid(), range(1, 201));
 
         $response = $this->withSession($this->staffSession())
@@ -113,6 +121,8 @@ class InternalBulkReviewTest extends TestCase
 
     public function test_bulk_flag_documents_validates_reason_codes_required(): void
     {
+        $this->withoutMiddleware([EnsureInternalCirculationStaff::class, PermissionMiddleware::class]);
+
         $response = $this->withSession($this->staffSession())
             ->postJson('/api/v1/internal/review/documents/bulk-flag', [
                 'ids' => ['00000000-0000-0000-0000-000000000001'],

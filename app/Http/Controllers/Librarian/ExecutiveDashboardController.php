@@ -73,7 +73,12 @@ final class ExecutiveDashboardController extends Controller
         DirectorAnalyticsService $analytics,
         OfficeOpenXmlExporter $office,
     ): BinaryFileResponse {
-        abort_unless($request->user()?->hasRole('director') && $request->user()->can('reports.view_full'), 403);
+        abort_unless(
+            $request->user()?->hasRole('director')
+                && $request->user()->can('reports.view_full')
+                && $request->user()->can('reports.export'),
+            403,
+        );
         abort_unless(in_array($format, ['csv', 'pdf', 'xlsx', 'docx'], true), 404);
         $filters = $request->validate([
             'period' => ['nullable', Rule::in(['today', 'week', 'month', 'quarter', 'year', 'custom'])],

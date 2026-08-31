@@ -6,7 +6,7 @@
     <x-admin.flash />
     <header class="flex flex-wrap items-end justify-between gap-4">
         <div><h1 class="font-headline text-4xl text-primary">{{ __('data_quality.title') }}</h1><p class="mt-1 text-sm text-slate-500">{{ __('data_quality.subtitle') }}</p></div>
-        <nav class="flex flex-wrap gap-2"><a class="admin-btn admin-btn-secondary" href="{{ route('librarian.data-quality.duplicates', $localeQuery) }}">{{ __('data_quality.nav.duplicates') }}</a>@can('data_quality.view_reports')<a class="admin-btn admin-btn-secondary" href="{{ route('librarian.data-quality.export', array_merge(request()->query(), $localeQuery)) }}">{{ __('data_quality.actions.export') }}</a>@endcan</nav>
+        <nav class="flex flex-wrap gap-2">@canany(['legacy_recovery.review','legacy_recovery.view'])<a class="admin-btn admin-btn-secondary" href="{{ route('librarian.data-quality.recovery', $localeQuery) }}">{{ __('recovery_quality.title') }}</a>@endcanany<a class="admin-btn admin-btn-secondary" href="{{ route('librarian.data-quality.duplicates', $localeQuery) }}">{{ __('data_quality.nav.duplicates') }}</a>@can('data_quality.view_reports')<a class="admin-btn admin-btn-secondary" href="{{ route('librarian.data-quality.export', array_merge(request()->query(), $localeQuery)) }}">{{ __('data_quality.actions.export') }}</a>@endcan</nav>
     </header>
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="{{ __('data_quality.inbox.title') }}">

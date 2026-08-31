@@ -62,7 +62,9 @@ class IncidentReplacementWorkflowTest extends TestCase
         ]);
         $case = CirculationIncidentCase::query()->firstOrFail();
         $this->assertSame('severe', $case->damage_severity);
-        $this->assertSame('written_off', $this->copy->fresh()->status);
+        $this->assertSame('under_repair', $this->copy->fresh()->status);
+        $this->assertSame('write_off', $case->preliminary_action);
+        $this->assertNull($this->copy->fresh()->writeoff_date ?? null);
         $this->assertSame(1, Fine::query()->where('reason', 'damaged')->count());
     }
 
@@ -179,9 +181,9 @@ class IncidentReplacementWorkflowTest extends TestCase
     public function test_authorized_non_replacement_resolution_and_cancellation_are_audited(): void
     {
         $case = $this->openLost();
-        $resolved = $this->incidents->resolveWithoutReplacement($case, $this->adminUser, 'write_off', 'Irrecoverable loss', true);
+        $resolved = $this->incidents->resolveWithoutReplacement($case, $this->adminUser, 'repair', 'Recoverable after specialist repair', true);
         $this->assertSame('resolved', $resolved->status);
-        $this->assertSame('written_off', $this->copy->fresh()->status);
+        $this->assertSame('under_repair', $this->copy->fresh()->status);
         $this->assertDatabaseHas('activity_logs', ['action_type' => 'incident.resolved', 'entity_id' => (string) $case->id]);
 
         $otherReader = $this->makeControlPlaneUser('member');

@@ -306,9 +306,11 @@
                 </form>
 
                 <div class="mt-3 flex flex-wrap gap-2">
-                    @foreach(['pdf','xlsx','docx','csv'] as $format)
-                        <a class="admin-btn admin-btn-secondary" href="{{ route('librarian.executive.export', ['format' => $format] + request()->only(['period','from','to','compare'])) }}">{{ strtoupper($format) }}</a>
-                    @endforeach
+                    @can('reports.export')
+                        @foreach(['pdf','xlsx','docx','csv'] as $format)
+                            <a class="admin-btn admin-btn-secondary" href="{{ route('librarian.executive.export', ['format' => $format] + request()->only(['period','from','to','compare'])) }}">{{ strtoupper($format) }}</a>
+                        @endforeach
+                    @endcan
                     <button class="admin-btn admin-btn-secondary" type="button" onclick="window.print()">{{ __('common.actions.print') }}</button>
                 </div>
 

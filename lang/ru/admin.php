@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'system' => ['backup_created' => 'Резервная копия создана и проверена.', 'restore_verified' => 'Проверка восстановления успешно выполнена в изолированной базе :database.'],
     'layout' => [
         'portal_title' => 'Панель администратора',
         'portal_subtitle' => 'Центр системного управления',
@@ -25,6 +26,7 @@ return [
         'security' => 'Безопасность',
         'backups' => 'Резервное копирование',
         'librarian_console' => 'Кабинет библиотекаря',
+        'admin_console' => 'Кабинет администратора',
         'logout' => 'Выйти',
     ],
     'dashboard' => [

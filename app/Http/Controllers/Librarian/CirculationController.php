@@ -393,7 +393,7 @@ class CirculationController extends Controller
             )
             ->withCount([
                 'copies',
-                'copies as available_copies_count' => fn (Builder $query) => $query->where('status', 'available'),
+                'copies as available_copies_count' => fn (Builder $query) => $query->availableForCirculation(),
             ])
             ->orderBy('id')
             ->limit(5)

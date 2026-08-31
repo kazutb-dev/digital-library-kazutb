@@ -2,31 +2,22 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use App\Models\User;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class LibrarianCirculationPageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    private User $librarian;
+
     protected function setUp(): void
     {
         parent::setUp();
-
-        config()->set('demo_auth.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
-    }
-
-    private function loginAs(string $identitySlug): void
-    {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
-        ]);
+        $this->setUpAdminControlPlane();
+        $this->adminUser->forceFill(['locale' => 'ru'])->save();
+        $this->librarian = $this->makeControlPlaneUser('librarian', ['locale' => 'ru']);
     }
 
     public function test_guest_is_redirected_to_login(): void
@@ -39,30 +30,30 @@ class LibrarianCirculationPageTest extends TestCase
 
     public function test_librarian_can_view_circulation(): void
     {
-        $this->loginAs('librarian');
+        $this->signInToLibraryAs($this->librarian);
 
         $response = $this->get('/librarian/circulation');
 
         $response->assertOk();
-        $response->assertSee('Circulation Desk', false);
-        $response->assertSee('Rapid Scan', false);
-        $response->assertSee('Recent Transactions', false);
-        $response->assertSee('Current Loans', false);
+        $response->assertSee('Обслуживание читателей', false);
+        $response->assertSee('Выдача материала', false);
+        $response->assertSee('Возврат материала', false);
+        $response->assertSee('Просроченные выдачи', false);
     }
 
     public function test_admin_can_view_circulation(): void
     {
-        $this->loginAs('admin');
+        $this->signInToLibraryAs($this->adminUser);
 
         $response = $this->get('/librarian/circulation');
 
         $response->assertOk();
-        $response->assertSee('Circulation Desk', false);
+        $response->assertSee('Обслуживание читателей', false);
     }
 
     public function test_student_is_forbidden(): void
     {
-        $this->loginAs('student');
+        $this->signInToLibraryAs($this->makeControlPlaneUser('member', ['locale' => 'ru']));
 
         $response = $this->get('/librarian/circulation');
 
@@ -71,7 +62,7 @@ class LibrarianCirculationPageTest extends TestCase
 
     public function test_teacher_is_forbidden(): void
     {
-        $this->loginAs('teacher');
+        $this->signInToLibraryAs($this->makeControlPlaneUser('member', ['locale' => 'ru']));
 
         $response = $this->get('/librarian/circulation');
 

@@ -30,7 +30,17 @@ class LibrarianConsoleTest extends TestCase
     {
         parent::setUp();
         $this->setUpAdminControlPlane();
-        $this->librarian = $this->makeControlPlaneUser('librarian');
+        foreach ([
+            'database/migrations/2026_08_28_100000_create_marc_recovery_model.php',
+            'database/migrations/2026_08_28_100100_extend_catalogue_for_marc_recovery.php',
+            'database/migrations/2026_08_29_120000_create_acquisition_batches_and_safe_number_sequences.php',
+        ] as $migrationPath) {
+            (require base_path($migrationPath))->up();
+        }
+        // Assertions in this acceptance scenario verify the Russian staff UI.
+        // Keep the test user's locale explicit so middleware does not switch
+        // the response back to the control-plane fixture default (Kazakh).
+        $this->librarian = $this->makeControlPlaneUser('librarian', ['locale' => 'ru']);
     }
 
     /**
@@ -309,16 +319,23 @@ class LibrarianConsoleTest extends TestCase
     public function test_writing_off_a_copy_requires_a_comment_and_is_audited(): void
     {
         $copy = BookCopy::factory()->create(['status' => 'available']);
+        $senior = $this->makeControlPlaneUser('senior_librarian', ['locale' => 'ru']);
+        $writeOff = [
+            'action' => 'write_off',
+            'writeoff_date' => now()->toDateString(),
+            'writeoff_act' => 'ACT-CONSOLE-001',
+            'writeoff_reason' => 'Физический износ, восстановление невозможно',
+        ];
 
-        $this->signInToLibraryAs($this->librarian)
+        $this->signInToLibraryAs($senior)
             ->withoutMiddleware(PreventRequestForgery::class)
-            ->post(route('librarian.copies.status', $copy), ['action' => 'write_off'])
+            ->post(route('librarian.copies.status', $copy), $writeOff)
             ->assertSessionHasErrors('comment');
 
-        $this->signInToLibraryAs($this->librarian)
+        $this->signInToLibraryAs($senior)
             ->withoutMiddleware(PreventRequestForgery::class)
             ->post(route('librarian.copies.status', $copy), [
-                'action' => 'write_off',
+                ...$writeOff,
                 'comment' => 'Физический износ, восстановление невозможно',
             ])
             ->assertRedirect();
@@ -334,14 +351,18 @@ class LibrarianConsoleTest extends TestCase
     {
         $copy = BookCopy::factory()->create(['status' => 'available']);
         $reader = $this->makeControlPlaneUser('member');
+        $senior = $this->makeControlPlaneUser('senior_librarian', ['locale' => 'ru']);
         ReaderProfile::forUser($reader);
         app(CirculationService::class)->issue($reader, $copy, $this->librarian);
 
-        $this->signInToLibraryAs($this->librarian)
+        $this->signInToLibraryAs($senior)
             ->withoutMiddleware(PreventRequestForgery::class)
             ->post(route('librarian.copies.status', $copy), [
                 'action' => 'write_off',
                 'comment' => 'Попытка списать выданный экземпляр',
+                'writeoff_date' => now()->toDateString(),
+                'writeoff_act' => 'ACT-CONSOLE-LOAN-001',
+                'writeoff_reason' => 'Экземпляр признан непригодным к использованию',
             ])
             ->assertSessionHasErrors('action');
 

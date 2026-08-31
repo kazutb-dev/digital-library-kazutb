@@ -18,6 +18,7 @@ class AdminCsvImportTest extends TestCase
     {
         parent::setUp();
         $this->setUpAdminControlPlane();
+        $this->adminUser->forceFill(['locale' => 'ru'])->save();
     }
 
     private function csv(string $content): UploadedFile
@@ -76,7 +77,7 @@ class AdminCsvImportTest extends TestCase
 
     public function test_admin_role_rows_require_roles_manage_permission(): void
     {
-        $operator = $this->makeControlPlaneUser('member');
+        $operator = $this->makeControlPlaneUser('member', ['locale' => 'ru']);
         $operator->givePermissionTo('users.manage');
 
         $this->signInToLibraryAs($operator)

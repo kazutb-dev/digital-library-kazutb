@@ -18,22 +18,50 @@
   $penalties = $rules['penalties'][$lang];
   $footerMeta = $rules['footer_meta'][$lang];
   $lastReviewedAt = $rules['last_reviewed_at'];
+  $rulesPageCopy = [
+      'ru' => [
+          'scope_label' => 'Структура документа',
+          'scope_value' => '5 тематических разделов',
+          'terms_label' => 'Сроки и доступные действия',
+          'terms_value' => 'Показываются в личном кабинете',
+      ],
+      'kk' => [
+          'scope_label' => 'Құжат құрылымы',
+          'scope_value' => '5 тақырыптық бөлім',
+          'terms_label' => 'Мерзімдер мен қолжетімді әрекеттер',
+          'terms_value' => 'Жеке кабинетте көрсетіледі',
+      ],
+      'en' => [
+          'scope_label' => 'Document structure',
+          'scope_value' => '5 topic sections',
+          'terms_label' => 'Due dates and available actions',
+          'terms_value' => 'Shown in the reader account',
+      ],
+  ][$lang];
 @endphp
 
 @section('title', $header['headline'] . ' — ' . __('brand.university.full'))
 @section('meta_description', $header['preamble'])
 
 @section('content')
-  <div class="rules-canonical public-v2 rules-v2">
-    <header class="public-v2__hero rules-v2__hero" data-section="rules-header">
-      <div class="public-v2__inset public-v2__hero-grid">
+  <div class="public-page rules-page rules-canonical">
+    <header class="public-page__intro public-page__intro--editorial" data-section="rules-header">
+      <div class="public-container public-page__intro-grid">
         <div>
-          <p class="public-v2__kicker">{{ $header['eyebrow'] }}</p>
-          <h1 class="public-v2__title">{{ $header['headline'] }}</h1>
-          <p class="public-v2__lead">{{ $header['preamble'] }}</p>
+          <p class="public-eyebrow">{{ $header['eyebrow'] }}</p>
+          <h1 class="public-page__title">{{ $header['headline'] }}</h1>
+          <p class="public-page__lead">{{ $header['preamble'] }}</p>
         </div>
-        @if(!empty($header['effective_date']) || !empty($lastReviewedAt))
-          <dl class="rules-canonical__doc-meta public-v2__hero-note">
+        <dl class="rules-canonical__doc-meta public-page__summary">
+          <div>
+            <dt>{{ $rulesPageCopy['scope_label'] }}</dt>
+            <dd>{{ $rulesPageCopy['scope_value'] }}</dd>
+          </div>
+          <div>
+            <dt>{{ $rulesPageCopy['terms_label'] }}</dt>
+            <dd>{{ $rulesPageCopy['terms_value'] }}</dd>
+          </div>
+          @if(!empty($header['effective_date']) || !empty($lastReviewedAt))
             @if(!empty($header['effective_date']))
               <div data-test-id="rules-effective-date">
                 <dt>{{ $header['effective_label'] }}</dt>
@@ -46,21 +74,23 @@
                 <dd><time datetime="{{ $lastReviewedAt }}">{{ $lastReviewedAt }}</time></dd>
               </div>
             @endif
-          </dl>
-        @endif
+          @endif
+        </dl>
       </div>
     </header>
 
-    <div class="public-v2__body">
-    <div class="public-v2__inset rules-v2__workspace">
-    <aside class="rules-canonical__toc" data-section="rules-toc" aria-label="{{ $toc['label'] }}">
+    <div class="public-page__body rules-page__body">
+    <div class="public-container public-stack rules-page__stack">
+    @include('partials.library-info-nav')
+    <div class="rules-page__workspace">
+    <nav class="rules-canonical__toc" data-section="rules-toc" aria-label="{{ $toc['label'] }}">
       <h2>{{ $toc['label'] }}</h2>
       <ul>
         @foreach($toc['items'] as $item)
           <li><a href="{{ $item['href'] }}">{{ $item['label'] }}</a></li>
         @endforeach
       </ul>
-    </aside>
+    </nav>
 
     <article class="rules-canonical__article">
       {{-- 1. General provisions --}}
@@ -186,433 +216,29 @@
     </article>
     </div>
     </div>
+    </div>
   </div>
 @endsection
 
-@section('head')
-<style>
-  .rules-canonical {
-    width: 100%;
-    max-width: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 64px;
-    font-family: 'Manrope', sans-serif;
-  }
+@section('scripts')
+<script>
+  (() => {
+    const links = [...document.querySelectorAll('.rules-canonical__toc a[href^="#"]')];
+    const sections = links.map((link) => document.querySelector(link.getAttribute('href'))).filter(Boolean);
+    if (!links.length || !sections.length || !('IntersectionObserver' in window)) return;
 
-  .rules-canonical__toc {
-    display: none;
-  }
+    const markCurrent = (id) => links.forEach((link) => {
+      if (link.getAttribute('href') === `#${id}`) link.setAttribute('aria-current', 'true');
+      else link.removeAttribute('aria-current');
+    });
 
-  .rules-canonical__article {
-    max-width: 768px;
-    width: 100%;
-    flex: 1;
-  }
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+      if (visible[0]) markCurrent(visible[0].target.id);
+    }, { rootMargin: '-20% 0px -65% 0px', threshold: 0 });
 
-  .rules-canonical__header {
-    margin-bottom: 72px;
-  }
-
-  .rules-canonical__policy {
-    margin: 0 0 16px;
-    font-size: 0.875rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: #006a6a;
-  }
-
-  .rules-canonical__header h1 {
-    margin: 0 0 24px;
-    font-family: 'Newsreader', serif;
-    font-size: clamp(2.35rem, 5vw, 3.75rem);
-    line-height: 1.08;
-    letter-spacing: -0.015em;
-    color: #000613;
-  }
-
-  .rules-canonical__header h1 span {
-    display: block;
-    margin-top: 6px;
-    font-size: clamp(1.45rem, 3.1vw, 1.875rem);
-    font-weight: 500;
-    line-height: 1.18;
-    color: #43474e;
-  }
-
-  .rules-canonical__lead {
-    margin: 0 0 28px;
-    font-size: 1.125rem;
-    line-height: 1.72;
-    color: #43474e;
-  }
-
-  .rules-canonical__doc-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin: 0;
-  }
-
-  .rules-canonical__doc-meta > div {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    padding: 10px 16px;
-    background: #ffffff;
-    border: 1px solid rgba(196, 198, 207, 0.6);
-    border-radius: 6px;
-  }
-
-  .rules-canonical__doc-meta dt {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #43474e;
-  }
-
-  .rules-canonical__doc-meta dd {
-    margin: 0;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #000613;
-  }
-
-  .rules-canonical__section {
-    margin-bottom: 88px;
-    scroll-margin-top: 128px;
-  }
-
-  .rules-canonical__section h2 {
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-    margin: 0 0 28px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #d9dadb;
-    font-family: 'Newsreader', serif;
-    font-size: clamp(1.9rem, 3.2vw, 2.3rem);
-    line-height: 1.12;
-    color: #000613;
-  }
-
-  .rules-canonical__num {
-    font-family: 'Newsreader', serif;
-    font-size: 0.62em;
-    color: #006a6a;
-  }
-
-  .rules-canonical__section-lede {
-    margin: 0 0 28px;
-    font-size: 1rem;
-    line-height: 1.7;
-    color: #43474e;
-  }
-
-  .rules-canonical__panel {
-    padding: 32px;
-    border-radius: 8px;
-    background: #ffffff;
-  }
-
-  .rules-canonical__panel--elevated {
-    box-shadow: 0 24px 48px -12px rgba(0, 6, 19, 0.04);
-  }
-
-  .rules-canonical__panel--soft {
-    background: #eef1f1;
-  }
-
-  .rules-canonical__panel p {
-    margin: 0;
-    font-size: 0.9375rem;
-    line-height: 1.78;
-    color: #191c1d;
-  }
-
-  .rules-canonical__panel ul {
-    margin: 22px 0 0;
-    padding-left: 20px;
-    font-size: 0.9375rem;
-    line-height: 1.78;
-    color: #43474e;
-    display: grid;
-    gap: 10px;
-  }
-
-  .rules-canonical__audience-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 24px;
-    margin-bottom: 24px;
-  }
-
-  .rules-canonical__icon {
-    display: inline-flex;
-    margin-bottom: 12px;
-    font-size: 1.9rem;
-    color: #006a6a;
-  }
-
-  .rules-canonical__audience h3 {
-    margin: 0 0 16px;
-    font-family: 'Newsreader', serif;
-    font-size: 1.3rem;
-    line-height: 1.25;
-    color: #000613;
-  }
-
-  .rules-canonical__audience-rows {
-    display: grid;
-    gap: 10px;
-    margin: 0;
-  }
-
-  .rules-canonical__audience-rows > div {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eef1f1;
-  }
-
-  .rules-canonical__audience-rows > div:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
-  }
-
-  .rules-canonical__audience-rows dt {
-    font-size: 0.8125rem;
-    color: #43474e;
-  }
-
-  .rules-canonical__audience-rows dd {
-    margin: 0;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: #000613;
-    text-align: right;
-  }
-
-  .rules-canonical__notes {
-    margin: 0;
-    padding-left: 20px;
-    font-size: 0.875rem;
-    line-height: 1.7;
-    color: #43474e;
-    display: grid;
-    gap: 8px;
-  }
-
-  .rules-canonical__subheading {
-    margin: 36px 0 18px;
-    font-family: 'Newsreader', serif;
-    font-size: 1.4rem;
-    color: #000613;
-  }
-
-  .rules-canonical__ladder {
-    list-style: none;
-    margin: 0 0 28px;
-    padding: 0;
-    display: grid;
-    gap: 14px;
-  }
-
-  .rules-canonical__ladder li {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-    background: #ffffff;
-    border-left: 4px solid #006a6a;
-    border-radius: 8px;
-    padding: 18px 22px;
-  }
-
-  .rules-canonical__ladder-step {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background: rgba(0, 106, 106, 0.1);
-    color: #006a6a;
-    font-family: 'Newsreader', serif;
-    font-size: 1rem;
-    font-weight: 600;
-  }
-
-  .rules-canonical__ladder strong {
-    display: block;
-    font-size: 0.9375rem;
-    color: #000613;
-    margin-bottom: 4px;
-  }
-
-  .rules-canonical__ladder p {
-    margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.65;
-    color: #43474e;
-  }
-
-  .rules-canonical__callout {
-    padding: 16px 20px;
-    border-radius: 6px;
-    background: #e1e3e4;
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
-  .rules-canonical__callout .material-symbols-outlined {
-    font-size: 1.3rem;
-    color: #006a6a;
-    line-height: 1.4;
-  }
-
-  .rules-canonical__callout p {
-    margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.65;
-    color: #43474e;
-  }
-
-  .rules-canonical__callout strong {
-    color: #000613;
-  }
-
-  .rules-canonical__footer-meta {
-    padding: 36px;
-    border-radius: 8px;
-    background: #ffffff;
-    border-top: 4px solid #006a6a;
-  }
-
-  .rules-canonical__footer-meta h2 {
-    margin: 0 0 14px;
-    font-family: 'Newsreader', serif;
-    font-size: 1.7rem;
-    line-height: 1.2;
-    color: #000613;
-  }
-
-  .rules-canonical__footer-body {
-    margin: 0 0 24px;
-    font-size: 0.9375rem;
-    line-height: 1.7;
-    color: #43474e;
-    max-width: 560px;
-  }
-
-  .rules-canonical__footer-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 20px;
-  }
-
-  .rules-canonical__footer-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 11px 24px;
-    border-radius: 6px;
-    border: 1px solid rgba(0, 106, 106, 0.4);
-    color: #006a6a;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-decoration: none;
-    transition: background-color 0.2s ease, color 0.2s ease;
-  }
-
-  .rules-canonical__footer-link:hover {
-    background: rgba(0, 106, 106, 0.08);
-  }
-
-  .rules-canonical__footer-link--primary {
-    background: #006a6a;
-    border-color: #006a6a;
-    color: #ffffff;
-  }
-
-  .rules-canonical__footer-link--primary:hover {
-    background: #00524f;
-    color: #ffffff;
-  }
-
-  .rules-canonical__version {
-    margin: 0;
-    font-size: 0.75rem;
-    letter-spacing: 0.04em;
-    color: #74777f;
-  }
-
-  @media (min-width: 640px) {
-    .rules-canonical__audience-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (min-width: 768px) {
-    .rules-canonical {
-      padding: 128px 48px 120px;
-      flex-direction: row;
-      gap: 64px;
-      align-items: flex-start;
-    }
-
-    .rules-canonical__toc {
-      display: block;
-      width: 256px;
-      flex-shrink: 0;
-      position: sticky;
-      top: 128px;
-      height: fit-content;
-    }
-
-    .rules-canonical__toc h2 {
-      margin: 0 0 24px;
-      padding-left: 16px;
-      border-left: 1px solid rgba(196, 198, 207, 0.7);
-      font-family: 'Newsreader', serif;
-      font-size: 1.5rem;
-      font-weight: 500;
-      color: #000613;
-    }
-
-    .rules-canonical__toc ul {
-      margin: 0;
-      padding: 0 0 0 16px;
-      border-left: 1px solid rgba(196, 198, 207, 0.7);
-      list-style: none;
-      display: grid;
-      gap: 16px;
-    }
-
-    .rules-canonical__toc a {
-      text-decoration: none;
-      font-size: 0.9375rem;
-      line-height: 1.5;
-      color: #43474e;
-      transition: color 0.2s ease;
-    }
-
-    .rules-canonical__toc a:hover,
-    .rules-canonical__toc a:focus-visible {
-      color: #006a6a;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .rules-canonical__audience-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-  }
-</style>
+    sections.forEach((section) => observer.observe(section));
+    markCurrent(location.hash.slice(1) || sections[0].id);
+  })();
+</script>
 @endsection

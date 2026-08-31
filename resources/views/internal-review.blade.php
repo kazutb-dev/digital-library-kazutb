@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internal Review</title>
+    <title>Внутренняя проверка качества</title>
     <style>
         :root {
             --bg: #f8f9fa;
@@ -285,17 +285,17 @@
 <body>
     <main class="shell">
         <section class="hero">
-            <div class="eyebrow">Internal Read-Only Review</div>
-            <h1>Quality Issues Overview</h1>
+            <div class="eyebrow">Внутренняя проверка · только просмотр</div>
+            <h1>Обзор замечаний по качеству данных</h1>
             <p class="subtitle">
-                Лёгкая внутренняя страница просмотра quality issues, читающая уже существующий DB-backed endpoint без write-операций.
+                Внутренняя страница показывает найденные замечания и не изменяет данные платформы.
             </p>
             <div class="nav-row">
-                <a class="nav-link primary" href="/internal/dashboard">Вернуться к dashboard</a>
+                <a class="nav-link primary" href="/internal/dashboard">Вернуться на внутреннюю панель</a>
                 <a class="nav-link" href="/catalog">Перейти в каталог</a>
             </div>
             <div class="status-row" id="status-row">
-                <div class="status-chip">Загрузка issues…</div>
+                <div class="status-chip">Загрузка замечаний…</div>
             </div>
             <div class="error-box" id="review-error"></div>
         </section>
@@ -303,43 +303,43 @@
         <section class="panel">
             <div class="toolbar">
                 <div class="field">
-                    <label for="severity-filter">Severity</label>
+                    <label for="severity-filter">Важность</label>
                     <select id="severity-filter" class="select">
-                        <option value="">All</option>
-                        <option value="critical">CRITICAL</option>
-                        <option value="high">HIGH</option>
-                        <option value="medium">MEDIUM</option>
-                        <option value="low">LOW</option>
+                        <option value="">Все уровни</option>
+                        <option value="critical">Срочно</option>
+                        <option value="high">Важно</option>
+                        <option value="medium">Нужно проверить</option>
+                        <option value="low">Можно улучшить</option>
                     </select>
                 </div>
 
                 <div class="field">
-                    <label for="status-filter">Status</label>
+                    <label for="status-filter">Статус</label>
                     <select id="status-filter" class="select">
-                        <option value="">All</option>
-                        <option value="open">OPEN</option>
+                        <option value="">Все статусы</option>
+                        <option value="open">Нужно проверить</option>
                     </select>
                 </div>
 
-                <button id="apply-filters" class="button">Apply Filters</button>
-                <button id="reset-filters" class="button secondary">Reset</button>
+                <button id="apply-filters" class="button">Применить фильтры</button>
+                <button id="reset-filters" class="button secondary">Сбросить</button>
             </div>
         </section>
 
         <section class="panel">
-            <div class="meta" id="review-meta">Загрузка списка issues…</div>
+            <div class="meta" id="review-meta">Загрузка списка замечаний…</div>
             <div class="table-wrap">
                 <table>
                     <thead>
                         <tr>
-                            <th>Issue Code</th>
-                            <th>Severity</th>
-                            <th>Status</th>
-                            <th>Source Schema</th>
-                            <th>Source Table</th>
-                            <th>Source Key</th>
-                            <th>Summary</th>
-                            <th>Created At</th>
+                            <th>Код замечания</th>
+                            <th>Важность</th>
+                            <th>Статус</th>
+                            <th>Схема-источник</th>
+                            <th>Таблица-источник</th>
+                            <th>Ключ записи</th>
+                            <th>Описание</th>
+                            <th>Обнаружено</th>
                         </tr>
                     </thead>
                     <tbody id="issues-body">
@@ -352,8 +352,8 @@
             <div class="pager">
                 <div id="page-info" class="meta"></div>
                 <div class="pager-actions">
-                    <button id="prev-page" class="button secondary">Previous</button>
-                    <button id="next-page" class="button secondary">Next</button>
+                    <button id="prev-page" class="button secondary">Назад</button>
+                    <button id="next-page" class="button secondary">Вперёд</button>
                 </div>
             </div>
         </section>
@@ -374,6 +374,14 @@
         function badgeClass(value) {
             const normalized = String(value || '').toLowerCase();
             return normalized;
+        }
+
+        function severityLabel(value) {
+            return { critical: 'Срочно', high: 'Важно', medium: 'Нужно проверить', low: 'Можно улучшить' }[value] || value || '—';
+        }
+
+        function statusLabel(value) {
+            return { open: 'Нужно проверить', resolved: 'Исправлено', ignored: 'Отложено' }[value] || value || '—';
         }
 
         function buildQuery() {
@@ -404,7 +412,7 @@
 
         function renderStatus(ok) {
             document.getElementById('status-row').innerHTML = `
-                <div class="status-chip ${ok ? 'ok' : 'warn'}">Review issues endpoint: ${ok ? 'OK' : 'Unavailable'}</div>
+                <div class="status-chip ${ok ? 'ok' : 'warn'}">Источник данных: ${ok ? 'доступен' : 'временно недоступен'}</div>
             `;
         }
 
@@ -417,19 +425,19 @@
 
             totalPages = Number(meta.totalPages || meta.total_pages || 1);
 
-            metaBox.textContent = `Total issues: ${Number(meta.total || 0).toLocaleString('ru-RU')}`;
-            pageInfo.textContent = `Page ${meta.page || currentPage} of ${totalPages}`;
+            metaBox.textContent = `Всего замечаний: ${Number(meta.total || 0).toLocaleString('ru-RU')}`;
+            pageInfo.textContent = `Страница ${meta.page || currentPage} из ${totalPages}`;
 
             if (!issues.length) {
-                tbody.innerHTML = '<tr><td colspan="8" class="empty">Issues not found for current filters.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="empty">По выбранным фильтрам замечаний не найдено.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = issues.map((item) => `
                 <tr>
                     <td>${escapeHtml(item.issueCode)}</td>
-                    <td><span class="badge ${badgeClass(item.severity)}">${escapeHtml(item.severity)}</span></td>
-                    <td><span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status)}</span></td>
+                    <td><span class="badge ${badgeClass(item.severity)}">${escapeHtml(severityLabel(item.severity))}</span></td>
+                    <td><span class="badge ${badgeClass(item.status)}">${escapeHtml(statusLabel(item.status))}</span></td>
                     <td>${escapeHtml(item.sourceSchema)}</td>
                     <td>${escapeHtml(item.sourceTable)}</td>
                     <td>${escapeHtml(item.sourceKey)}</td>
@@ -455,9 +463,9 @@
                 updatePagerButtons();
             } catch (error) {
                 renderStatus(false);
-                document.getElementById('issues-body').innerHTML = '<tr><td colspan="8" class="empty">Не удалось загрузить issues.</td></tr>';
+                document.getElementById('issues-body').innerHTML = '<tr><td colspan="8" class="empty">Не удалось загрузить замечания.</td></tr>';
                 errorBox.style.display = 'block';
-                errorBox.textContent = 'Endpoint /api/v1/review/issues временно недоступен. Страница остаётся в read-only режиме.';
+                errorBox.textContent = 'Источник данных временно недоступен. Страница работает только в режиме просмотра; попробуйте обновить её позже.';
             }
         }
 

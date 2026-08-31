@@ -40,13 +40,12 @@ class InternalToLibrarianRedirectsTest extends TestCase
         $response->assertRedirect('/librarian/data-cleanup');
     }
 
-    public function test_internal_review_remains_transitional(): void
+    public function test_internal_review_redirects_to_data_cleanup(): void
     {
-        // Guest still gated by library.auth.
         $response = $this->get('/internal/review');
 
-        $response->assertStatus(302);
-        $response->assertRedirectContains('/login');
+        $response->assertStatus(301);
+        $response->assertRedirect('/librarian/data-cleanup');
     }
 
     public function test_internal_ai_chat_remains_transitional(): void

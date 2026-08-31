@@ -55,44 +55,25 @@
             "bash scripts/dev/test-postgres.sh"
         ],
         "qa:ci": [
-            "bash scripts/dev/run-ci-gates.sh"
-        ],
-        "qa:coverage-threshold": [
-            "@php scripts/dev/check-coverage-threshold.php build/test-results/clover.xml 4"
-        ],
-        "qa:evidence": [
-            "bash scripts/dev/run-verification-evidence.sh"
+            "composer validate --strict --no-check-publish",
+            "@php vendor/bin/pint --test",
+            "@test:critical-paths",
+            "npm run build"
         ],
         "test:internal": [
-            "./scripts/dev/test-internal-core.sh"
+            "@php vendor/bin/phpunit --filter='Internal(Circulation|Copy)|InternalDocumentReviewWorkflow|InternalReviewWorkflow|InternalDashboardPage|InternalReviewPage'"
         ],
         "test:reservation-core": [
-            "./scripts/dev/test-reservation-circulation-copy.sh"
+            "@php vendor/bin/phpunit --filter='Reservation(Read|Mutate)|InternalCirculation(CheckoutReturn|Readback)|InternalCopy(Read|Mutation|Retirement)'"
         ],
         "test:integration-reservations": [
-            "./scripts/dev/test-integration-reservations.sh"
+            "@php vendor/bin/phpunit tests/Feature/Api/Integration/ReservationMutateTest.php tests/Feature/Api/Integration/ReservationReadTest.php tests/Feature/Api/Integration/ReservationMutateRetirementConsistencyTest.php"
         ],
         "test:stewardship": [
-            "./scripts/dev/test-stewardship.sh"
+            "@php vendor/bin/phpunit --filter='Internal(Reader|Document)?ReviewWorkflow|ReviewIssues(Summary)?Db|IdentityMatchAudit|IdentityMappingE2E|Bridge(Users|Copies|BooksDocuments|Summary)Diagnostics?Db|LibraryHealthSummaryDb'"
         ],
-        "dev:check": [
-            "./scripts/dev/check-dev-env.sh"
-        ],
-        "dev:session-snapshot": [
-            "bash scripts/dev/session-snapshot.sh"
-        ],
-        "dev:vault-sync": [
-            "bash scripts/dev/vault-sync.sh"
-        ],
-        "dev:vault-watch": [
-            "bash scripts/dev/vault-watch.sh"
-        ],
-        "dev:install-vault-hooks": [
-            "bash scripts/dev/install-vault-hooks.sh"
-        ],
-
         "dev:catalog-paths": [
-            "bash scripts/dev/check-public-catalog-paths.sh"
+            "@php vendor/bin/phpunit --filter='ReaderConvergenceTest|CatalogPageTest|BookPageTest|CatalogRecoveryIntegrationTest'"
         ],
         "test:catalog-paths": [
             "@dev:catalog-paths"
@@ -101,7 +82,7 @@
             "@php vendor/bin/phpunit --filter='BibliographyFormatterTest|CatalogDbSearchTest|BookDetailDbTest|AuthSessionMeTest|AuthSessionLifecycleTest|LoginTest|ReservationReadTest|ReservationMutateTest|AccountReservationsTest|InternalCirculationCheckoutReturnTest|InternalCirculationRenewalTest|InternalCirculationReadbackTest|DocumentManagementTest|IntegrationRateLimitTest'"
         ],
         "dev:critical-paths": [
-            "bash scripts/dev/check-runtime-critical-paths.sh"
+            "@test:critical-paths"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

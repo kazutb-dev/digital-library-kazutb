@@ -8,11 +8,13 @@ use App\Models\Branch;
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\ReaderProfile;
+use App\Models\Fund;
 use App\Services\Catalog\CirculationService;
 use App\Services\Catalog\CopyTransferService;
 use App\Services\Catalog\InventoryService;
 use App\Services\Catalog\MachineCodeService;
 use App\Services\Catalog\ReservationQueueService;
+use Illuminate\Validation\ValidationException;
 use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
@@ -77,7 +79,7 @@ class ProductionCirculationPlatformTest extends TestCase
 
         $this->assertSame(2, $session->expected_count);
         $inventory->scan($session, $found->barcode, $this->adminUser);
-        $duplicate = $inventory->scan($session, $found->barcode, $this->adminUser);
+        $duplicate = $inventory->scan($session, $found->inventory_number, $this->adminUser);
         $unknown = $inventory->scan($session, 'UNKNOWN-'.str()->random(8), $this->adminUser);
         $session = $inventory->complete($session, $this->adminUser);
 
@@ -89,6 +91,62 @@ class ProductionCirculationPlatformTest extends TestCase
         $this->assertSame('available', $missing->fresh()->status);
         $this->assertSame('review', $session->status);
         $this->assertSame('approved', $inventory->approve($session, $this->adminUser)->status);
+    }
+
+    public function test_inventory_rejects_an_identifier_shared_across_barcode_and_inventory_fields(): void
+    {
+        $branch = Branch::query()->active()->firstOrFail();
+        BookCopy::factory()->create([
+            'branch_id' => $branch->getKey(),
+            'inventory_number' => 'INV-AMBIGUOUS-A',
+            'barcode' => 'SHARED-CODE',
+        ]);
+        BookCopy::factory()->create([
+            'branch_id' => $branch->getKey(),
+            'inventory_number' => 'SHARED-CODE',
+            'barcode' => 'BAR-AMBIGUOUS-B',
+        ]);
+        $inventory = app(InventoryService::class);
+        $session = $inventory->start($inventory->create([
+            'branch_id' => $branch->getKey(),
+            'inventory_date' => today(),
+        ], $this->adminUser), $this->adminUser);
+
+        try {
+            $inventory->scan($session, 'SHARED-CODE', $this->adminUser);
+            $this->fail('An ambiguous operational code must not select an arbitrary copy.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('code', $exception->errors());
+        }
+
+        $this->assertDatabaseCount('inventory_scans', 0);
+    }
+
+    public function test_branch_and_nested_fund_inventory_sessions_cannot_run_concurrently(): void
+    {
+        $branch = Branch::query()->active()->firstOrFail();
+        $fund = Fund::query()->firstOrCreate(
+            ['branch_id' => $branch->getKey(), 'code' => 'INV-OVERLAP'],
+            ['name' => 'Inventory overlap test fund', 'fund_type' => 'main', 'is_active' => true],
+        );
+        BookCopy::factory()->create([
+            'branch_id' => $branch->getKey(),
+            'fund_id' => $fund->getKey(),
+        ]);
+        $inventory = app(InventoryService::class);
+        $inventory->start($inventory->create([
+            'scope_type' => 'branch',
+            'branch_id' => $branch->getKey(),
+            'inventory_date' => today(),
+        ], $this->adminUser), $this->adminUser);
+        $nested = $inventory->create([
+            'scope_type' => 'fund',
+            'fund_id' => $fund->getKey(),
+            'inventory_date' => today(),
+        ], $this->adminUser);
+
+        $this->expectException(CirculationException::class);
+        $inventory->start($nested, $this->adminUser);
     }
 
     public function test_manual_due_date_requires_permission_reason_and_is_audited(): void

@@ -181,7 +181,7 @@
                                     <span class="mt-1 block font-mono text-[11px] text-slate-500">{{ $managedUser->ad_samaccountname ?: $managedUser->ad_login }}</span>
                                 @endif
                                 @if($managedUser->readerProfile)
-                                    <span class="mt-1 block text-[11px] text-slate-500">{{ $managedUser->readerProfile->category }} · {{ $managedUser->readerProfile->status }}</span>
+                                    <span class="mt-1 block text-[11px] text-slate-500">{{ __('librarian.circulation.reader_categories.'.$managedUser->readerProfile->category) }} · {{ __('librarian.circulation.reader_statuses.'.$managedUser->readerProfile->status) }}</span>
                                 @endif
                             </td>
                             <td class="whitespace-nowrap text-slate-600">

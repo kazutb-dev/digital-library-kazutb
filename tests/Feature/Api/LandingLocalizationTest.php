@@ -53,7 +53,7 @@ class LandingLocalizationTest extends TestCase
         return [
             'ru' => [
                 'ru',
-                'Научная библиотека КазУТБ',
+                'Научная библиотека Казахского университета технологии и бизнеса имени К. Кулажанова',
                 'Публичный каталог, электронные ресурсы и сервисы библиотеки.',
                 [
                     'catalog_titles' => 'наименований в электронном каталоге',
@@ -64,7 +64,7 @@ class LandingLocalizationTest extends TestCase
             ],
             'kk' => [
                 'kk',
-                'ҚазТБУ ғылыми кітапханасы',
+                'Қ. Құлажанов атындағы Қазақ технология және бизнес университетінің ғылыми кітапханасы',
                 'Кітапхананың ашық каталогы, электрондық ресурстары мен қызметтері.',
                 [
                     'catalog_titles' => 'электрондық каталогтағы атау',
@@ -75,7 +75,7 @@ class LandingLocalizationTest extends TestCase
             ],
             'en' => [
                 'en',
-                'KazUTB Scientific Library',
+                'Kazakh University of Technology and Business named after K. Kulazhanov Scientific Library',
                 "The library's public catalogue, electronic resources, and services.",
                 [
                     'catalog_titles' => 'titles in the electronic catalogue',

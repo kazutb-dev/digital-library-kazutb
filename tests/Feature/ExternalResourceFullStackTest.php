@@ -29,7 +29,7 @@ class ExternalResourceFullStackTest extends TestCase
         $this->withoutMiddleware(PreventRequestForgery::class);
     }
 
-    public function test_seeded_catalogue_keeps_unverified_partners_and_licences_as_private_drafts(): void
+    public function test_seeded_catalogue_keeps_unapproved_partner_agreements_and_licences_as_private_drafts(): void
     {
         $this->assertEqualsCanonicalizing(
             ['licensed', 'open_access', 'partner', 'internal'],
@@ -48,7 +48,10 @@ class ExternalResourceFullStackTest extends TestCase
         ExternalResource::query()->where('resource_type', 'partner')->each(function (ExternalResource $resource): void {
             $this->assertSame('draft', $resource->publication_status);
             $this->assertFalse($resource->is_active);
-            $this->assertNull($resource->url);
+            $this->assertContains('agreement_end_date', $resource->publicationReadinessIssues());
+            if ($resource->url !== null) {
+                $this->assertTrue(ExternalResource::isSafeDestination($resource->url, $resource->resource_type));
+            }
         });
         ExternalResource::query()->where('resource_type', 'licensed')->each(function (ExternalResource $resource): void {
             $this->assertSame('draft', $resource->publication_status);
@@ -70,14 +73,16 @@ class ExternalResourceFullStackTest extends TestCase
         $this->assertDatabaseHas('external_resources', ['slug' => 'doaj', 'publication_status' => 'published', 'is_active' => 1]);
         $response = $this->get('/resources?lang=ru')->assertOk();
         foreach ([
-            'Лицензионные ресурсы', 'Открытый доступ', 'Партнёрские ресурсы',
+            'Открытый доступ',
             'Внутренние ресурсы библиотеки', 'Directory of Open Access Journals',
-            'Электронный каталог библиотеки КазУТБ', 'Кому доступно', 'Как пользоваться',
+            'Электронный каталог научной библиотеки', 'Кому доступно', 'Как пользоваться',
             'Сотрудник библиотеки', 'Тип контента', 'Только из кампуса', 'Подробнее',
         ] as $copy) {
             $response->assertSee($copy, false);
         }
         $response
+            ->assertDontSee('Лицензионные ресурсы', false)
+            ->assertDontSee('Партнёрские ресурсы', false)
             ->assertSee('data-resource-facet="audience"', false)
             ->assertSee('data-resource-facet="accessScope"', false)
             ->assertSee('data-resource-facet="content"', false)

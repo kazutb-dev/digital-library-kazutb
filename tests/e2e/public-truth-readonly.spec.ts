@@ -91,6 +91,7 @@ const PUBLIC_SURFACES = [
 const REQUIRED_VIEWPORTS = [
   { name: 'desktop-1920', width: 1920, height: 1080 },
   { name: 'desktop-1440', width: 1440, height: 900 },
+  { name: 'desktop-1280', width: 1280, height: 800 },
   { name: 'tablet-landscape-1024', width: 1024, height: 768 },
   { name: 'tablet-portrait-768', width: 768, height: 1024 },
   { name: 'mobile-390', width: 390, height: 844 },

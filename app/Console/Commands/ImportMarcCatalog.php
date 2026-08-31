@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Catalog\BibliographicRecord;
 use App\Models\Catalog\BookCopy;
+use App\Services\Catalog\MarcAcademicFields;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use PDO;
@@ -185,7 +186,12 @@ class ImportMarcCatalog extends Command
                 dbo.GetSubfield(CAST(ITEM AS nvarchar(max)), '090', 'a', 1) AS udc_code_detailed,
                 dbo.GetSubfield(CAST(ITEM AS nvarchar(max)), '080', 'a', 1) AS udc_code,
                 dbo.GetSubfield(CAST(ITEM AS nvarchar(max)), '520', 'a', 1) AS annotation,
-                dbo.GetSubfieldsConcat(CAST(ITEM AS nvarchar(max)), '653', 'a') AS keywords
+                dbo.GetSubfieldsConcat(CAST(ITEM AS nvarchar(max)), '653', 'a') AS keywords,
+                dbo.GetSubfieldsConcat(CAST(ITEM AS nvarchar(max)), '952', 'a') AS ksu_literature_type,
+                dbo.GetSubfield(CAST(ITEM AS nvarchar(max)), '952', 'd', 1) AS faculty,
+                dbo.GetSubfield(CAST(ITEM AS nvarchar(max)), '952', 'e', 1) AS department,
+                dbo.GetSubfieldsConcat(CAST(ITEM AS nvarchar(max)), '952', 'i') AS disciplines,
+                dbo.GetSubfieldsConcat(CAST(ITEM AS nvarchar(max)), '952', 'j') AS specialty
             FROM dbo.DOC
             WHERE DOC_ID > %d
             ORDER BY DOC_ID
@@ -298,6 +304,18 @@ class ImportMarcCatalog extends Command
             'resource_type' => $this->resourceType($source),
             'notes' => $this->importNotes($sourceId, $qualityIssues),
         ];
+
+        $academic = MarcAcademicFields::fromValues(
+            literatureTypes: $this->clean($source['ksu_literature_type'] ?? null),
+            faculty: $this->clean($source['faculty'] ?? null),
+            department: $this->clean($source['department'] ?? null),
+            disciplines: $this->clean($source['disciplines'] ?? null),
+            specialties: $this->clean($source['specialty'] ?? null),
+            fixed008: null,
+        );
+        foreach (['ksu_literature_type', 'faculty', 'department', 'disciplines', 'specialty'] as $field) {
+            $attributes[$field] = $academic[$field];
+        }
 
         $probe = new BibliographicRecord($attributes);
         $attributes['is_draft'] = $probe->missingRequiredFields() !== [] || $qualityIssues !== [];

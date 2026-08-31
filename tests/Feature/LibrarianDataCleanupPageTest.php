@@ -2,79 +2,45 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use App\Models\User;
+use Tests\Concerns\BuildsAdminControlPlane;
 use Tests\TestCase;
 
 class LibrarianDataCleanupPageTest extends TestCase
 {
+    use BuildsAdminControlPlane;
+
+    private User $librarian;
+
     protected function setUp(): void
     {
         parent::setUp();
-
-        config()->set('demo_auth.enabled', true);
-        $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
-    }
-
-    private function loginAs(string $identitySlug): void
-    {
-        $identity = config("demo_auth.identities.{$identitySlug}");
-
-        $this->get('/login');
-        $this->post('/login', [
-            '_token' => csrf_token(),
-            'login' => $identity['login'],
-            'password' => $identity['password'],
-            'device_name' => 'phpunit',
-        ]);
+        $this->setUpAdminControlPlane();
+        $this->adminUser->forceFill(['locale' => 'ru'])->save();
+        $this->librarian = $this->makeControlPlaneUser('librarian', ['locale' => 'ru']);
     }
 
     public function test_guest_is_redirected_to_login(): void
     {
-        $response = $this->get('/librarian/data-cleanup');
-
-        $response->assertStatus(302);
-        $response->assertRedirectContains('/login');
+        $this->get('/librarian/data-cleanup')->assertRedirectContains('/login');
     }
 
-    public function test_librarian_can_view_data_cleanup(): void
+    public function test_librarian_and_admin_can_view_localized_data_cleanup(): void
     {
-        $this->loginAs('librarian');
-
-        $response = $this->get('/librarian/data-cleanup');
-
-        $response->assertOk();
-        $response->assertSee('Data Stewardship', false);
-        $response->assertSee('Critical Anomalies', false);
-        $response->assertSee('System Health Index', false);
-        $response->assertSee('Anomaly Type', false);
+        foreach ([$this->librarian, $this->adminUser] as $staff) {
+            $this->signInToLibraryAs($staff)->get('/librarian/data-cleanup?lang=ru')->assertOk()
+                ->assertSee('Контроль качества каталога', false)
+                ->assertSee('Прогресс за сегодня', false)
+                ->assertSee('Незавершённые записи', false)
+                ->assertSee('Экземпляры без места хранения', false)
+                ->assertDontSee('Data Stewardship', false)
+                ->assertDontSee('Critical Anomalies', false);
+        }
     }
 
-    public function test_admin_can_view_data_cleanup(): void
+    public function test_member_is_forbidden(): void
     {
-        $this->loginAs('admin');
-
-        $response = $this->get('/librarian/data-cleanup');
-
-        $response->assertOk();
-        $response->assertSee('Data Stewardship', false);
-    }
-
-    public function test_student_is_forbidden(): void
-    {
-        $this->loginAs('student');
-
-        $response = $this->get('/librarian/data-cleanup');
-
-        $response->assertForbidden();
-    }
-
-    public function test_teacher_is_forbidden(): void
-    {
-        $this->loginAs('teacher');
-
-        $response = $this->get('/librarian/data-cleanup');
-
-        $response->assertForbidden();
+        $member = $this->makeControlPlaneUser('member', ['locale' => 'ru']);
+        $this->signInToLibraryAs($member)->get('/librarian/data-cleanup')->assertForbidden();
     }
 }

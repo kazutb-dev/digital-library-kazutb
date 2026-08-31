@@ -8,7 +8,7 @@
 
     <nav class="mb-6 flex flex-wrap gap-2" aria-label="{{ __('workspace.navigation') }}">
         @foreach(['search', 'tasks', 'calendar', 'movements', 'orders', 'edd', 'periodicals'] as $workspaceSection)
-            @can(match($workspaceSection) {'tasks' => 'tasks.view', 'calendar' => 'calendar.view', 'orders' => 'acquisitions.view', 'edd' => 'edd.view', 'periodicals' => 'periodicals.view', default => 'catalog.search'})
+            @can(match($workspaceSection) {'tasks' => 'tasks.view', 'calendar' => 'calendar.view', 'movements' => 'copies.movements.view', 'orders' => 'acquisitions.view', 'edd' => 'edd.view', 'periodicals' => 'periodicals.view', default => 'catalog.search'})
                 <a @class(['admin-btn', 'admin-btn-primary' => $section === $workspaceSection, 'admin-btn-secondary' => $section !== $workspaceSection]) href="{{ route('librarian.workspace.'.$workspaceSection) }}">{{ __('workspace.sections.'.$workspaceSection.'.short') }}</a>
             @endcan
         @endforeach
@@ -85,7 +85,63 @@
         <div class="space-y-4">@forelse($subscriptions as $subscription)<article class="admin-card"><div class="flex flex-wrap justify-between gap-3"><div><h2 class="font-headline text-xl text-primary">{{ $subscription->title_snapshot }} · {{ $subscription->year }}</h2><p class="text-sm text-slate-600">{{ __('workspace.fields.expected_issues') }}: {{ $subscription->expected_issues }} · {{ __('workspace.fields.received_issues') }}: {{ $subscription->issues->where('status','received')->count() }}</p></div><span>{{ __('workspace.statuses.'.$subscription->status) }}</span></div>@can('periodicals.manage')<form method="POST" action="{{ route('librarian.workspace.periodicals.issues.store', $subscription) }}" class="mt-4 flex flex-wrap gap-3">@csrf<input class="admin-input max-w-40" name="issue_number" required placeholder="№"><input class="admin-input max-w-48" type="date" name="received_at"><input type="hidden" name="status" value="received"><button class="admin-btn admin-btn-secondary">{{ __('workspace.actions.receive_issue') }}</button></form>@endcan</article>@empty<div class="admin-card py-8 text-center text-slate-500">{{ __('workspace.empty.periodicals') }}</div>@endforelse{{ $subscriptions->links() }}</div>
 
     @elseif($section === 'movements')
-        <section class="admin-card overflow-x-auto"><table class="admin-table"><thead><tr><th>{{ __('workspace.fields.date') }}</th><th>{{ __('workspace.fields.operation') }}</th><th>{{ __('workspace.fields.copy') }}</th><th>{{ __('workspace.fields.title') }}</th><th>{{ __('workspace.fields.responsible') }}</th></tr></thead><tbody>@forelse($movements as $movement)<tr><td>{{ $movement->occurred_at?->timezone(config('app.library_timezone'))->format('d.m.Y H:i') }}</td><td>{{ trans()->has('librarian.copies.events.'.$movement->event_type) ? __('librarian.copies.events.'.$movement->event_type) : __('analytics.statuses.unknown') }}</td><td>{{ $movement->copy?->inventory_number ?? '—' }}</td><td>{{ $movement->copy?->bibliographicRecord?->title ?? '—' }}</td><td>{{ $movement->actor?->name ?? '—' }}</td></tr>@empty<tr><td colspan="5" class="py-8 text-center text-slate-500">{{ __('workspace.empty.movements') }}</td></tr>@endforelse</tbody></table>{{ $movements->links() }}</section>
+        @can('copies.movements.create')
+            <form method="POST" action="{{ route('librarian.workspace.movements.store') }}" class="admin-card mb-6">
+                @csrf
+                <div class="mb-5">
+                    <h2 class="font-headline text-2xl text-primary">{{ __('fund_movements.create.title') }}</h2>
+                    <p class="mt-1 text-sm text-slate-600">{{ __('fund_movements.create.description') }}</p>
+                </div>
+                <div class="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+                    <label class="lg:col-span-2 xl:row-span-2">
+                        <span class="admin-label">{{ __('fund_movements.fields.copy_codes') }}</span>
+                        <textarea class="admin-input min-h-36 font-mono" name="copy_codes" required maxlength="20000" placeholder="{{ __('fund_movements.placeholders.copy_codes') }}">{{ old('copy_codes') }}</textarea>
+                        <span class="mt-1 block text-xs text-slate-500">{{ __('fund_movements.hints.copy_codes') }}</span>
+                    </label>
+                    <label><span class="admin-label">{{ __('fund_movements.fields.branch') }}</span><select class="admin-input" name="branch_id"><option value="">—</option>@foreach($branches as $branch)<option value="{{ $branch->id }}" @selected((string)old('branch_id') === (string)$branch->id)>{{ $branch->name }}</option>@endforeach</select></label>
+                    <label><span class="admin-label">{{ __('fund_movements.fields.fund') }}</span><select class="admin-input" name="fund_id"><option value="">—</option>@foreach($funds as $fund)<option value="{{ $fund->id }}" @selected((string)old('fund_id') === (string)$fund->id)>{{ $fund->name }}</option>@endforeach</select></label>
+                    <label><span class="admin-label">{{ __('fund_movements.fields.sigla') }}</span><input class="admin-input" name="storage_sigla" maxlength="64" value="{{ old('storage_sigla') }}"></label>
+                    <label><span class="admin-label">{{ __('fund_movements.fields.service_point') }}</span><input class="admin-input" name="service_point_code" maxlength="64" value="{{ old('service_point_code') }}"></label>
+                    <label><span class="admin-label">{{ __('fund_movements.fields.shelf_index') }}</span><input class="admin-input" name="shelf_index" maxlength="128" value="{{ old('shelf_index') }}"></label>
+                    <label><span class="admin-label">{{ __('fund_movements.fields.shelf') }}</span><input class="admin-input" name="shelf_location" maxlength="255" value="{{ old('shelf_location') }}"></label>
+                    <label class="lg:col-span-2 xl:col-span-4"><span class="admin-label">{{ __('fund_movements.fields.reason') }}</span><textarea class="admin-input" name="reason" required minlength="5" maxlength="2000">{{ old('reason') }}</textarea></label>
+                </div>
+                <div class="mt-5 flex justify-end"><button class="admin-btn admin-btn-primary" type="submit">{{ __('fund_movements.actions.move') }}</button></div>
+            </form>
+        @endcan
+
+        <form class="admin-card mb-6 grid gap-3 md:grid-cols-4" method="GET">
+            <label class="md:col-span-2"><span class="admin-label">{{ __('fund_movements.fields.search') }}</span><input class="admin-input" name="q" value="{{ $movementFilters['q'] ?? '' }}" maxlength="100" placeholder="{{ __('fund_movements.placeholders.search') }}"></label>
+            <label><span class="admin-label">{{ __('fund_movements.fields.date_from') }}</span><input class="admin-input" type="date" name="date_from" value="{{ $movementFilters['date_from'] ?? '' }}"></label>
+            <label><span class="admin-label">{{ __('fund_movements.fields.date_to') }}</span><input class="admin-input" type="date" name="date_to" value="{{ $movementFilters['date_to'] ?? '' }}"></label>
+            <div class="md:col-span-4 flex gap-2"><button class="admin-btn admin-btn-primary">{{ __('common.actions.search') }}</button><a class="admin-btn admin-btn-secondary" href="{{ route('librarian.workspace.movements') }}">{{ __('common.actions.reset') }}</a></div>
+        </form>
+
+        <section class="admin-card overflow-x-auto">
+            <table class="admin-table min-w-full">
+                <thead><tr><th>{{ __('workspace.fields.date') }}</th><th>{{ __('workspace.fields.operation') }}</th><th>{{ __('workspace.fields.copy') }}</th><th>{{ __('workspace.fields.title') }}</th><th>{{ __('fund_movements.fields.route') }}</th><th>{{ __('workspace.fields.responsible') }}</th></tr></thead>
+                <tbody>
+                @forelse($movements as $movement)
+                    @php($oldPlacement = data_get($movement->details, 'old', []))
+                    @php($newPlacement = data_get($movement->details, 'new', []))
+                    <tr>
+                        <td class="whitespace-nowrap">{{ $movement->occurred_at?->timezone(config('app.library_timezone'))->format('d.m.Y H:i') }}</td>
+                        <td>{{ trans()->has('librarian.copies.events.'.$movement->event_type) ? __('librarian.copies.events.'.$movement->event_type) : __('fund_movements.events.'.$movement->event_type) }}</td>
+                        <td><a class="font-mono font-semibold text-secondary hover:underline" href="{{ $movement->copy ? route('librarian.copies.show', $movement->copy) : '#' }}">{{ $movement->copy?->inventory_number ?? '—' }}</a></td>
+                        <td>{{ $movement->copy?->bibliographicRecord?->title ?? '—' }}</td>
+                        <td class="min-w-64 text-xs text-slate-600">
+                            <div>{{ __('fund_movements.fields.from') }}: {{ collect([$oldPlacement['storage_sigla'] ?? null, $oldPlacement['service_point_code'] ?? null, $oldPlacement['shelf_index'] ?? null, $oldPlacement['shelf_location'] ?? null])->filter()->implode(' / ') ?: '—' }}</div>
+                            <div class="mt-1 font-semibold text-primary">{{ __('fund_movements.fields.to') }}: {{ collect([$newPlacement['storage_sigla'] ?? null, $newPlacement['service_point_code'] ?? null, $newPlacement['shelf_index'] ?? null, $newPlacement['shelf_location'] ?? null])->filter()->implode(' / ') ?: '—' }}</div>
+                        </td>
+                        <td>{{ $movement->actor?->name ?? '—' }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="6" class="py-8 text-center text-slate-500">{{ __('workspace.empty.movements') }}</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+            {{ $movements->links() }}
+        </section>
 
     @elseif($section === 'calendar')
         <form class="admin-card mb-6 flex flex-wrap items-end gap-3"><label><span class="admin-label">{{ __('workspace.fields.month') }}</span><input class="admin-input" type="month" name="month" value="{{ $month }}"></label><button class="admin-btn admin-btn-primary">{{ __('common.actions.open') }}</button></form><ol class="space-y-3">@forelse($events as $event)<li class="admin-card flex gap-4"><time class="font-bold text-secondary">{{ optional($event['at'])->format('d.m H:i') ?: '—' }}</time><div><strong>{{ $event['title'] }}</strong><p class="text-xs text-slate-500">{{ __('workspace.calendar_types.'.$event['type']) }} · {{ trans()->has('workspace.statuses.'.$event['status']) ? __('workspace.statuses.'.$event['status']) : __('analytics.statuses.unknown') }}</p></div></li>@empty<li class="admin-card py-8 text-center text-slate-500">{{ __('workspace.empty.calendar') }}</li>@endforelse</ol>

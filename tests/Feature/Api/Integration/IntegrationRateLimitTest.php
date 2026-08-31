@@ -6,6 +6,13 @@ use Tests\TestCase;
 
 class IntegrationRateLimitTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['services.integration.allowed_tokens' => 'test-integration-token,token-alpha,token-beta']);
+    }
+
     public function test_read_endpoint_returns_rate_limit_headers(): void
     {
         $response = $this

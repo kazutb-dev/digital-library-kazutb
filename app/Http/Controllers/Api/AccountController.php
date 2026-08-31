@@ -240,7 +240,7 @@ class AccountController extends Controller
 
         $request->validate([
             'bookId' => 'nullable|string|uuid',
-            'isbn' => 'nullable|string|max:20',
+            'isbn' => ['nullable', 'string', 'max:20', 'regex:/^(?:97[89][0-9 -]{10,16}|[0-9Xx -]{10,17})$/'],
         ]);
 
         $bookId = $request->input('bookId');
@@ -275,6 +275,14 @@ class AccountController extends Controller
 
     public function cancelReservation(string $reservationId, Request $request, ReaderReservationService $service): JsonResponse
     {
+        // Reject malformed route identifiers before they reach PostgreSQL.
+        // Besides a clearer message for readers, this prevents avoidable
+        // database errors from being written to the librarians' error log.
+        validator(
+            ['reservationId' => $reservationId],
+            ['reservationId' => ['required', 'uuid']],
+        )->validate();
+
         $user = $request->attributes->get('authenticated_reader');
         $crmUserId = $this->resolveCrmUserId($user);
 
@@ -316,7 +324,7 @@ class AccountController extends Controller
 
         $request->validate([
             'bookId' => 'nullable|string|uuid',
-            'isbn' => 'nullable|string|max:20',
+            'isbn' => ['nullable', 'string', 'max:20', 'regex:/^(?:97[89][0-9 -]{10,16}|[0-9Xx -]{10,17})$/'],
         ]);
 
         $bookId = $request->query('bookId');

@@ -122,7 +122,10 @@ class PhysicalInventoryWorkflowTest extends TestCase
         $result = $service->confirmLocation($session, $copy, $this->adminUser, true);
 
         $this->assertTrue($result['corrected']);
-        $this->assertGreaterThanOrEqual(1, $result['resolved']);
+        // A valid branch-backed placement no longer creates a synthetic
+        // copy.location.missing issue, so correction can legitimately resolve
+        // zero DQ rows. The invariant is that no actionable issue remains.
+        $this->assertSame(0, $result['remaining']);
         $this->assertSame('C-04', $copy->fresh()->shelf_location);
         ActivityLog::query()->where('action_type', 'inventory.location_corrected')->where('entity_id', (string) $copy->id)->firstOrFail();
     }
@@ -165,9 +168,9 @@ class PhysicalInventoryWorkflowTest extends TestCase
         $this->assertSame('PILOT-001', $session->items()->with('copy')->get()->pluck('copy.inventory_number')->sort()->first());
     }
 
-    public function test_inventory_screen_exposes_compact_location_profile_and_pilot_controls(): void
+    public function test_inventory_screen_exposes_compact_location_profile_and_pilot_controls_to_creator(): void
     {
-        $staff = $this->makeControlPlaneUser('librarian');
+        $staff = $this->makeControlPlaneUser('senior_librarian');
         $staff->update(['locale' => 'ru']);
 
         $this->signInToLibraryAs($staff)->get(route('librarian.inventory.index', ['lang' => 'ru']))
@@ -176,5 +179,16 @@ class PhysicalInventoryWorkflowTest extends TestCase
             ->assertSee('Нет фонда')
             ->assertSee('Размер pilot')
             ->assertDontSee('librarian.inventory.');
+    }
+
+    public function test_inventory_screen_hides_session_creation_without_create_permission(): void
+    {
+        $staff = $this->makeControlPlaneUser('librarian');
+
+        $this->signInToLibraryAs($staff)->get(route('librarian.inventory.index', ['lang' => 'ru']))
+            ->assertOk()
+            ->assertSee('Проблемы размещения фонда')
+            ->assertDontSee('Размер pilot')
+            ->assertDontSee(__('librarian.inventory.new_session'));
     }
 }

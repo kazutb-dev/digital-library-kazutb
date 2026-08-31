@@ -6,6 +6,8 @@
 .env.*
 !.env.example
 !.env.testing.example
+!.env.dev.example
+!.env.prod.example
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -90,3 +92,23 @@ Thumbs.db
 /kazutb-library-vault/.obsidian/workspace.json
 /kazutb-library-vault/.obsidian/workspace-mobile.json
 /kazutb-library-vault/.obsidian/plugins/*/data.json
+
+# ── Operational artifacts (live in /home/admtutor/library-data, never in Git) ──
+# See docs/operations/PROJECT_FILE_STRUCTURE.md for the full policy.
+/audit/
+/audit-output/
+/imports/
+/backups/
+/tmp/
+/quarantine/
+/staging/
+
+# Database dumps and backups of any kind.
+*.bak
+*.sql.gz
+*.sql.bz2
+*.sql.xz
+
+# MARC migration packages delivered for recovery imports.
+KazUTB_MARC_FULL_*.zip
+KazUTB_MARC_FULL_*.zip.sha256

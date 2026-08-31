@@ -14,6 +14,7 @@ use App\Models\Fund;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\AuditLogger;
+use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +24,7 @@ class IncidentCaseService
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly LibraryNotificationService $notifications,
+        private readonly CopyWriteOffService $writeOffs,
     ) {}
 
     /**
@@ -365,8 +367,10 @@ class IncidentCaseService
         string $resolutionType,
         string $reason,
         bool $waiveFine = false,
+        DateTimeInterface|string|null $writeoffDate = null,
+        ?string $writeoffAct = null,
     ): CirculationIncidentCase {
-        return DB::transaction(function () use ($case, $actor, $resolutionType, $reason, $waiveFine): CirculationIncidentCase {
+        return DB::transaction(function () use ($case, $actor, $resolutionType, $reason, $waiveFine, $writeoffDate, $writeoffAct): CirculationIncidentCase {
             $case = $this->lockOpenCase($case);
             $allowed = ['fine', 'repair', 'write_off', 'monetary_compensation', 'no_charge'];
             if (! in_array($resolutionType, $allowed, true)
@@ -380,34 +384,47 @@ class IncidentCaseService
                 && ! (bool) Setting::valueFor('monetary_compensation_allowed', false)) {
                 throw ValidationException::withMessages(['resolution_type' => __('incidents.errors.monetary_disabled')]);
             }
+            if ($resolutionType === 'write_off'
+                && ($writeoffDate === null || trim((string) $writeoffAct) === '')) {
+                throw ValidationException::withMessages([
+                    'writeoff_act' => __('operations.messages.withdrawal_details_required'),
+                ]);
+            }
 
             $old = $this->caseSnapshot($case);
-            $copy = $case->originalCopy;
+            $copy = BookCopy::query()->whereKey($case->original_copy_id)->lockForUpdate()->firstOrFail();
             $copyStatusBefore = (string) $copy->status;
-            $copyStatus = match ($resolutionType) {
-                'repair' => 'under_repair',
-                'write_off' => 'written_off',
-                default => $copyStatusBefore,
-            };
-            $copy->update(['status' => $copyStatus]);
-            $copy->recordHistory(
-                match ($resolutionType) {
-                    'repair' => 'sent_to_repair',
-                    'write_off' => 'written_off',
-                    default => 'incident_resolved',
-                },
-                $case->reader_id,
-                $actor->getKey(),
-                $case->loan_id,
-                [
-                    'incident_case_id' => $case->getKey(),
-                    'case_number' => $case->case_number,
-                    'resolution_type' => $resolutionType,
-                    'old_status' => $copyStatusBefore,
-                    'new_status' => $copyStatus,
-                    'reason' => $reason,
-                ],
-            );
+            if ($resolutionType === 'write_off') {
+                $this->writeOffs->writeOffByCodes(
+                    [(string) $copy->inventory_number],
+                    $writeoffDate,
+                    (string) $writeoffAct,
+                    $reason,
+                    $actor,
+                    [
+                        'incident_case_id' => $case->getKey(),
+                        'case_number' => $case->case_number,
+                    ],
+                );
+                $copyStatus = (string) $copy->fresh()->status;
+            } else {
+                $copyStatus = $resolutionType === 'repair' ? 'under_repair' : $copyStatusBefore;
+                $copy->update(['status' => $copyStatus]);
+                $copy->recordHistory(
+                    $resolutionType === 'repair' ? 'sent_to_repair' : 'incident_resolved',
+                    $case->reader_id,
+                    $actor->getKey(),
+                    $case->loan_id,
+                    [
+                        'incident_case_id' => $case->getKey(),
+                        'case_number' => $case->case_number,
+                        'resolution_type' => $resolutionType,
+                        'old_status' => $copyStatusBefore,
+                        'new_status' => $copyStatus,
+                        'reason' => $reason,
+                    ],
+                );
+            }
 
             if ($waiveFine && $case->fine_id !== null) {
                 abort_unless($actor->can('fines.waive'), 403);

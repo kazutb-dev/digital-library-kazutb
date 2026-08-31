@@ -31,8 +31,57 @@ class PublicShellIATest extends TestCase
             $response->assertSee('href="'.$href.'?lang=ru"', false);
         }
 
-        // Authenticated landing route.
-        $response->assertSee('href="/dashboard?lang=ru"', false);
+        // A guest is offered sign-in; the dashboard link is rendered only
+        // after authentication and must not be advertised as a public route.
+        $response->assertSee('href="/login?lang=ru"', false);
+        $response->assertDontSee('href="/dashboard?lang=ru"', false);
+    }
+
+    public function test_header_contacts_menu_exposes_contacts_rules_and_leadership(): void
+    {
+        $response = $this->get('/rules?lang=ru');
+
+        $response->assertOk()
+            ->assertSee('class="hdr-disclosure hdr-contact-nav"', false)
+            ->assertSee('Контакты и информация о библиотеке', false)
+            ->assertSee('href="/contacts?lang=ru"', false)
+            ->assertSee('href="/rules?lang=ru"', false)
+            ->assertSee('href="/leadership?lang=ru"', false)
+            ->assertSee('data-library-info-link="rules"', false);
+    }
+
+    public function test_library_information_pages_have_sound_document_structure_in_every_locale(): void
+    {
+        foreach (['contacts', 'rules', 'leadership'] as $page) {
+            foreach (['ru', 'kk', 'en'] as $locale) {
+                $response = $this->get('/'.$page.'?lang='.$locale);
+                $response->assertOk();
+
+                $document = new \DOMDocument();
+                $previous = libxml_use_internal_errors(true);
+                $document->loadHTML($response->getContent());
+                libxml_clear_errors();
+                libxml_use_internal_errors($previous);
+                $xpath = new \DOMXPath($document);
+
+                $this->assertSame(1, $xpath->query('//h1')->length, $page.' '.$locale.' must expose exactly one h1.');
+                $this->assertSame(0, $xpath->query('//*[self::h1 or self::h2 or self::h3][not(normalize-space())]')->length, $page.' '.$locale.' must not expose empty headings.');
+
+                $ids = [];
+                foreach ($xpath->query('//*[@id]') as $node) {
+                    $id = $node->getAttribute('id');
+                    $this->assertArrayNotHasKey($id, $ids, $page.' '.$locale.' contains duplicate id #'.$id.'.');
+                    $ids[$id] = true;
+                }
+
+                foreach ($xpath->query('//a[starts-with(@href, "#")]') as $link) {
+                    $target = ltrim($link->getAttribute('href'), '#');
+                    if ($target !== '') {
+                        $this->assertArrayHasKey($target, $ids, $page.' '.$locale.' links to missing anchor #'.$target.'.');
+                    }
+                }
+            }
+        }
     }
 
     public function test_navbar_no_longer_links_to_legacy_account_route(): void
@@ -49,7 +98,7 @@ class PublicShellIATest extends TestCase
         $response->assertOk()
             ->assertSee('Навигация')
             ->assertSee('Обновления')
-            ->assertSee('Институт')
+            ->assertSee('О библиотеке')
             ->assertSee('Поддержка');
     }
 

@@ -23,12 +23,14 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Tests\Concerns\BuildsAdminControlPlane;
+use Tests\Concerns\UsesIsolatedLocalStorage;
 use Tests\TestCase;
 use ZipArchive;
 
 class OfficialReportArchiveFullStackTest extends TestCase
 {
     use BuildsAdminControlPlane;
+    use UsesIsolatedLocalStorage;
 
     private User $librarian;
 
@@ -45,7 +47,7 @@ class OfficialReportArchiveFullStackTest extends TestCase
         ] as $path) {
             (require base_path($path))->up();
         }
-        Storage::fake('local');
+        $this->fakeIsolatedLocalStorage();
         $this->librarian = $this->makeControlPlaneUser('librarian');
         $this->director = $this->makeControlPlaneUser('director');
     }

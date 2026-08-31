@@ -26,6 +26,29 @@
         };
         $branchNames = $branches->pluck('name', 'id');
         $fundNames = $funds->pluck('name', 'id');
+        $contributorRows = old('contributors');
+        if (! is_array($contributorRows)) {
+            $contributorRows = $contributors->map(static fn ($contributor): array => [
+                'name' => $contributor->name,
+                'role' => $contributor->pivot?->role ?? 'author',
+                'kind' => $contributor->kind ?? 'person',
+                'marc_tag' => $contributor->pivot?->marc_tag,
+            ])->values()->all();
+        }
+        while (count($contributorRows) < min(100, $contributors->count() + 3)) {
+            $contributorRows[] = ['name' => '', 'role' => 'author', 'kind' => 'person', 'marc_tag' => null];
+        }
+        $subjectRows = old('subjects');
+        if (! is_array($subjectRows)) {
+            $subjectRows = $subjects->map(static fn ($subject): array => [
+                'term' => $subject->term,
+                'scheme' => $subject->scheme ?? 'topical',
+                'marc_tag' => $subject->pivot?->marc_tag,
+            ])->values()->all();
+        }
+        while (count($subjectRows) < min(100, $subjects->count() + 3)) {
+            $subjectRows[] = ['term' => '', 'scheme' => 'topical', 'marc_tag' => null];
+        }
         $copyStatusTone = static fn (?string $status): string => match ($status) {
             'available' => 'active',
             'reserved', 'issued', 'in_processing', 'on_display', 'reserved_stock' => 'pending',
@@ -40,7 +63,7 @@
         :title="$record->exists ? __('librarian.catalog.edit') : __('librarian.catalog.new_record')"
         :subtitle="$record->exists ? $record->title : __('librarian.catalog.subtitle')"
     >
-        <a class="admin-btn admin-btn-secondary" href="{{ route('librarian.catalog.index') }}">
+        <a class="admin-btn admin-btn-secondary" href="{{ ($returnTo ?? null) === 'acquisitions' ? route('librarian.acquisitions.index') : route('librarian.catalog.index') }}">
             <span class="material-symbols-outlined text-[19px]">arrow_back</span>
             {{ __('common.actions.back') }}
         </a>
@@ -132,6 +155,9 @@
         @if ($duplicate)
             <input type="hidden" name="confirmed_duplicate" value="1">
         @endif
+        @if (! $record->exists && ($returnTo ?? null) === 'acquisitions')
+            <input type="hidden" name="return_to" value="acquisitions">
+        @endif
         @if ($fromDataQuality)
             <input type="hidden" name="from" value="data-quality">
             <input type="hidden" name="issue" value="{{ $sourceIssue?->id }}">
@@ -221,6 +247,129 @@
                 </div>
             </section>
 
+            <details class="admin-card" open data-section="catalog-recovery-imprint">
+                <summary class="cursor-pointer font-headline text-2xl text-primary">{{ __('catalog_recovery.admin.sections.imprint') }}</summary>
+                <div class="mt-5 grid gap-5 sm:grid-cols-2">
+                    <label class="sm:col-span-2">
+                        <span class="admin-label">{{ __('catalog_recovery.admin.fields.statement_of_responsibility') }}</span>
+                        <input class="admin-input" name="statement_of_responsibility" maxlength="1000" value="{{ old('statement_of_responsibility', $record->statement_of_responsibility) }}">
+                        @error('statement_of_responsibility')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                    </label>
+                    <label>
+                        <span class="admin-label">{{ __('catalog_recovery.admin.fields.publication_place') }}</span>
+                        <input class="admin-input" name="publication_place" maxlength="255" value="{{ old('publication_place', $record->publication_place) }}">
+                        @error('publication_place')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                    </label>
+                    <label>
+                        <span class="admin-label">{{ __('catalog_recovery.admin.fields.edition_statement') }}</span>
+                        <input class="admin-input" name="edition_statement" maxlength="255" value="{{ old('edition_statement', $record->edition_statement) }}">
+                        @error('edition_statement')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                    </label>
+                    @foreach (['issn' => 32, 'bbk_code' => 64, 'local_classification' => 128, 'control_number' => 128, 'country_code' => 8, 'cataloging_language' => 16, 'source_agency' => 128, 'material_designation' => 128] as $recoveryField => $maxLength)
+                        <label>
+                            <span class="admin-label">{{ __('catalog_recovery.admin.fields.'.$recoveryField) }}</span>
+                            <input class="admin-input{{ in_array($recoveryField, ['issn', 'bbk_code', 'control_number', 'country_code'], true) ? ' font-mono' : '' }}" name="{{ $recoveryField }}" maxlength="{{ $maxLength }}" value="{{ old($recoveryField, $record->{$recoveryField}) }}">
+                            @error($recoveryField)<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                        </label>
+                    @endforeach
+                </div>
+            </details>
+
+            <details class="admin-card" open data-section="catalog-recovery-physical">
+                <summary class="cursor-pointer font-headline text-2xl text-primary">{{ __('catalog_recovery.admin.sections.physical') }}</summary>
+                <div class="mt-5 grid gap-5 sm:grid-cols-2">
+                    @foreach (['physical_extent' => 255, 'physical_details' => 255, 'dimensions' => 64, 'accompanying_material' => 255, 'series_title' => 500, 'series_number' => 64, 'volume' => 64, 'issue' => 64, 'part_number' => 64, 'part_title' => 500] as $recoveryField => $maxLength)
+                        <label class="{{ in_array($recoveryField, ['physical_details', 'accompanying_material', 'series_title', 'part_title'], true) ? 'sm:col-span-2' : '' }}">
+                            <span class="admin-label">{{ __('catalog_recovery.admin.fields.'.$recoveryField) }}</span>
+                            <input class="admin-input" name="{{ $recoveryField }}" maxlength="{{ $maxLength }}" value="{{ old($recoveryField, $record->{$recoveryField}) }}">
+                            @error($recoveryField)<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                        </label>
+                    @endforeach
+                </div>
+            </details>
+
+            <details class="admin-card" open data-section="catalog-recovery-academic">
+                <summary class="cursor-pointer font-headline text-2xl text-primary">{{ __('catalog_recovery.admin.sections.academic') }}</summary>
+                <div class="mt-5 grid gap-5 sm:grid-cols-2">
+                    @foreach (['ksu_literature_type' => 128, 'faculty' => 255, 'department' => 255, 'disciplines' => 500, 'specialty' => 1000] as $recoveryField => $maxLength)
+                        <label class="{{ in_array($recoveryField, ['disciplines', 'specialty'], true) ? 'sm:col-span-2' : '' }}">
+                            <span class="admin-label">{{ __('catalog_recovery.admin.fields.'.$recoveryField) }}</span>
+                            <input class="admin-input" name="{{ $recoveryField }}" maxlength="{{ $maxLength }}" value="{{ old($recoveryField, $record->{$recoveryField}) }}">
+                            @error($recoveryField)<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                        </label>
+                    @endforeach
+                    <label>
+                        <span class="admin-label">{{ __('catalog_recovery.admin.fields.record_created_on') }}</span>
+                        <input class="admin-input" type="date" name="record_created_on" value="{{ old('record_created_on', optional($record->record_created_on)->format('Y-m-d')) }}">
+                        @error('record_created_on')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                    </label>
+                </div>
+            </details>
+
+            <details class="admin-card" open data-section="catalog-recovery-contributors">
+                <summary class="cursor-pointer font-headline text-2xl text-primary">{{ __('catalog_recovery.admin.sections.contributors') }}</summary>
+                <p class="mt-2 text-sm text-slate-600">{{ __('catalog_recovery.admin.section_help.contributors') }}</p>
+                <div class="mt-5 space-y-3">
+                    @foreach ($contributorRows as $index => $contributorRow)
+                        <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-12">
+                            <label class="sm:col-span-5">
+                                <span class="admin-label">{{ __('catalog_recovery.admin.fields.contributor_name') }}</span>
+                                <input class="admin-input" name="contributors[{{ $index }}][name]" maxlength="500" value="{{ data_get($contributorRow, 'name') }}">
+                                @error("contributors.$index.name")<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                            </label>
+                            <label class="sm:col-span-3">
+                                <span class="admin-label">{{ __('catalog_recovery.admin.fields.role') }}</span>
+                                <select class="admin-input" name="contributors[{{ $index }}][role]">
+                                    @foreach (\App\Models\Catalog\Contributor::ROLES as $role)
+                                        <option value="{{ $role }}" @selected(data_get($contributorRow, 'role', 'author') === $role)>{{ __('catalog_recovery.admin.roles.'.$role) }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="sm:col-span-3">
+                                <span class="admin-label">{{ __('catalog_recovery.admin.fields.kind') }}</span>
+                                <select class="admin-input" name="contributors[{{ $index }}][kind]">
+                                    @foreach (\App\Models\Catalog\Contributor::KINDS as $kind)
+                                        <option value="{{ $kind }}" @selected(data_get($contributorRow, 'kind', 'person') === $kind)>{{ __('catalog_recovery.admin.kinds.'.$kind) }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="sm:col-span-1">
+                                <span class="admin-label">{{ __('catalog_recovery.admin.fields.marc_tag') }}</span>
+                                <input class="admin-input font-mono" name="contributors[{{ $index }}][marc_tag]" maxlength="8" value="{{ data_get($contributorRow, 'marc_tag') }}">
+                            </label>
+                        </div>
+                    @endforeach
+                </div>
+            </details>
+
+            <details class="admin-card" open data-section="catalog-recovery-subjects">
+                <summary class="cursor-pointer font-headline text-2xl text-primary">{{ __('catalog_recovery.admin.sections.subjects') }}</summary>
+                <p class="mt-2 text-sm text-slate-600">{{ __('catalog_recovery.admin.section_help.subjects') }}</p>
+                <div class="mt-5 space-y-3">
+                    @foreach ($subjectRows as $index => $subjectRow)
+                        <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-12">
+                            <label class="sm:col-span-7">
+                                <span class="admin-label">{{ __('catalog_recovery.admin.fields.subject_term') }}</span>
+                                <input class="admin-input" name="subjects[{{ $index }}][term]" maxlength="500" value="{{ data_get($subjectRow, 'term') }}">
+                                @error("subjects.$index.term")<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
+                            </label>
+                            <label class="sm:col-span-4">
+                                <span class="admin-label">{{ __('catalog_recovery.admin.fields.scheme') }}</span>
+                                <select class="admin-input" name="subjects[{{ $index }}][scheme]">
+                                    @foreach (\App\Models\Catalog\Subject::SCHEMES as $scheme)
+                                        <option value="{{ $scheme }}" @selected(data_get($subjectRow, 'scheme', 'topical') === $scheme)>{{ __('catalog_recovery.admin.schemes.'.$scheme) }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="sm:col-span-1">
+                                <span class="admin-label">{{ __('catalog_recovery.admin.fields.marc_tag') }}</span>
+                                <input class="admin-input font-mono" name="subjects[{{ $index }}][marc_tag]" maxlength="8" value="{{ data_get($subjectRow, 'marc_tag') }}">
+                            </label>
+                        </div>
+                    @endforeach
+                </div>
+            </details>
+
             <section class="admin-card">
                 <h2 class="mb-5 font-headline text-2xl text-primary">{{ __('librarian.catalog.fields.udc_code') }} · {{ __('librarian.catalog.fields.keywords') }}</h2>
 
@@ -257,6 +406,43 @@
                     </label>
                 </div>
             </section>
+
+            @if ($record->exists && auth()->user()?->can('catalog.view_raw_marc'))
+                <details class="admin-card" data-section="catalog-recovery-raw-marc" data-testid="raw-marc-readonly">
+                    <summary class="cursor-pointer font-headline text-2xl text-primary">{{ __('catalog_recovery.admin.sections.raw_marc') }}</summary>
+                    <p class="mt-2 text-sm text-slate-600">{{ __('catalog_recovery.admin.section_help.raw_marc') }}</p>
+                    @forelse ($rawMarcRecords as $rawMarcRecord)
+                        <details class="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                            <summary class="cursor-pointer font-semibold text-primary">
+                                {{ __('catalog_recovery.admin.raw.document') }} #{{ $rawMarcRecord->source_doc_id }}
+                            </summary>
+                            <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                                <div><dt class="text-slate-500">{{ __('catalog_recovery.admin.raw.leader') }}</dt><dd class="break-all font-mono">{{ filled($rawMarcRecord->leader) ? $rawMarcRecord->leader : '—' }}</dd></div>
+                                <div><dt class="text-slate-500">{{ __('catalog_recovery.admin.raw.control_number') }}</dt><dd class="break-all font-mono">{{ filled($rawMarcRecord->control_number) ? $rawMarcRecord->control_number : '—' }}</dd></div>
+                            </dl>
+                            <div class="mt-4 overflow-x-auto">
+                                <table class="admin-table min-w-[720px]">
+                                    <thead><tr><th>MARC</th><th>{{ __('catalog_recovery.admin.raw.indicators') }}</th><th>{{ __('catalog_recovery.admin.raw.subfield') }}</th><th>{{ __('catalog_recovery.admin.raw.value') }}</th></tr></thead>
+                                    <tbody>
+                                        @forelse ($rawMarcRecord->fields as $marcField)
+                                            <tr>
+                                                <td class="font-mono font-semibold">{{ $marcField->tag }}</td>
+                                                <td class="font-mono">{{ ($marcField->indicator1 ?? ' ').($marcField->indicator2 ?? ' ') }}</td>
+                                                <td class="font-mono">{{ $marcField->subfield_code ? '$'.$marcField->subfield_code : '—' }}</td>
+                                                <td class="whitespace-pre-wrap break-words">{{ filled($marcField->value) ? $marcField->value : '—' }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr><td colspan="4" class="py-6 text-center text-slate-500">{{ __('common.empty') }}</td></tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
+                    @empty
+                        <p class="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">{{ __('catalog_recovery.admin.raw.empty') }}</p>
+                    @endforelse
+                </details>
+            @endif
 
             <section class="admin-card" data-section="catalog-translations">
                 <div class="mb-5">

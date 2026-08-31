@@ -89,7 +89,7 @@ class ExternalResourceSeeder extends Seeder
             foreach ([
                 'name_translations', 'short_description_translations', 'description_translations',
                 'instructions_translations', 'content_types', 'contract_starts_at',
-                'contract_ends_at', 'renewal_at',
+                'contract_ends_at', 'renewal_at', 'url',
             ] as $field) {
                 if (array_key_exists($field, $attributes)
                     && ($existing->{$field} === null || $existing->{$field} === '' || $existing->{$field} === [])) {
@@ -98,6 +98,15 @@ class ExternalResourceSeeder extends Seeder
             }
             if ($missing !== []) {
                 $existing->update($missing);
+            }
+
+            // Migrate the former bundled IPR endpoint only when the database
+            // still contains that exact application default. A URL curated by
+            // an administrator remains authoritative and is never replaced.
+            if ($resource['slug'] === 'ipr-smart'
+                && $existing->url === 'https://www.iprbookshop.ru/'
+                && ($resource['url'] ?? null) === 'https://ipr-smart.ru/') {
+                $existing->update(['url' => $resource['url']]);
             }
         }
     }

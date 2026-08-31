@@ -6,12 +6,15 @@ use App\Exceptions\CirculationException;
 use App\Models\Catalog\BookCopy;
 use App\Models\Catalog\InventoryScan;
 use App\Models\Catalog\InventorySession;
+use App\Models\Catalog\InventorySessionItem;
 use App\Models\Fund;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\DataQuality\DataQualityScanner;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class InventoryService
@@ -23,7 +26,9 @@ class InventoryService
 
     public function create(array $data, User $actor): InventorySession
     {
+        $data['scope_type'] = $data['scope_type'] ?? 'branch';
         $this->assertFundBelongsToBranch($data['branch_id'] ?? null, $data['fund_id'] ?? null);
+        $this->assertScopeSelection($data);
 
         return DB::transaction(function () use ($data, $actor): InventorySession {
             $session = InventorySession::query()->create([
@@ -33,7 +38,10 @@ class InventoryService
                 'responsible_id' => $actor->getKey(),
                 'status' => 'draft',
             ]);
-            $this->audit->logRequired('inventory.session_created', 'inventory_session', $session->getKey(), newValues: $session->only(['branch_id', 'fund_id', 'room', 'shelf_range']), scope: 'operational', actor: $actor);
+            $this->audit->logRequired('inventory.session_created', 'inventory_session', $session->getKey(), newValues: $session->only([
+                'scope_type', 'branch_id', 'fund_id', 'storage_sigla', 'service_point_code',
+                'room', 'section', 'shelf_range', 'pilot_limit',
+            ]), scope: 'operational', actor: $actor);
 
             return $session;
         });
@@ -42,35 +50,50 @@ class InventoryService
     public function start(InventorySession $session, User $actor): InventorySession
     {
         return DB::transaction(function () use ($session, $actor): InventorySession {
+            $this->lockSessionStartGate();
             $session = InventorySession::query()->whereKey($session->getKey())->lockForUpdate()->firstOrFail();
             if ($session->status !== 'draft') {
                 throw CirculationException::because('inventory_not_draft');
             }
             $conflict = InventorySession::query()->whereKeyNot($session->getKey())
-                ->where('branch_id', $session->branch_id)->whereIn('status', ['running', 'review'])
-                ->when($session->fund_id, fn ($q) => $q->where('fund_id', $session->fund_id))
-                ->when($session->shelf_range, fn ($q) => $q->where('shelf_range', $session->shelf_range))
-                ->lockForUpdate()->exists();
+                ->whereIn('status', ['running', 'review'])
+                ->lockForUpdate()->get()
+                ->contains(fn (InventorySession $other): bool => $this->scopesOverlap($session, $other));
             if ($conflict) {
                 throw CirculationException::because('inventory_zone_conflict');
             }
 
-            $copies = BookCopy::query()->where('branch_id', $session->branch_id)
-                ->when($session->fund_id, fn ($q) => $q->where('fund_id', $session->fund_id))
-                ->when($session->shelf_range, fn ($q) => $q->where('shelf_location', 'like', $session->shelf_range.'%'))
-                ->when($session->pilot_limit, fn ($q) => $q->where(fn ($copy) => $copy->whereNull('barcode')->orWhere('barcode', '')))
-                ->orderBy('shelf_location')->orderBy('inventory_number')
-                ->when($session->pilot_limit, fn ($q) => $q->limit($session->pilot_limit))
-                ->lockForUpdate()->get();
-            foreach ($copies as $copy) {
-                $session->items()->create([
-                    'copy_id' => $copy->getKey(), 'expected_branch_id' => $copy->branch_id,
-                    'expected_fund_id' => $copy->fund_id, 'expected_shelf' => $copy->shelf_location,
-                    'expected_status' => $copy->status, 'result' => 'missing',
-                ]);
+            $copies = $this->scopeCopies(BookCopy::query(), $session)
+                ->where('status', '!=', 'written_off')
+                ->orderBy('shelf_location')->orderBy('inventory_number')->orderBy('id')
+                ->when($session->pilot_limit, fn (Builder $query) => $query->limit($session->pilot_limit));
+            $expectedCount = 0;
+            $now = now('UTC');
+            // Insert the immutable snapshot in bounded batches. A whole-fund
+            // session can contain tens of thousands of recovered copies.
+            foreach ($copies->get([
+                'id', 'branch_id', 'fund_id', 'shelf_location', 'status',
+            ])->chunk(500) as $copyChunk) {
+                $rows = [];
+                foreach ($copyChunk as $copy) {
+                    $rows[] = [
+                        'inventory_session_id' => $session->getKey(),
+                        'copy_id' => $copy->getKey(),
+                        'expected_branch_id' => $copy->branch_id,
+                        'expected_fund_id' => $copy->fund_id,
+                        'expected_shelf' => $copy->shelf_location,
+                        'expected_status' => $copy->status,
+                        'result' => 'missing',
+                        'inventory_condition' => 'unverified',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+                InventorySessionItem::query()->insert($rows);
+                $expectedCount += count($rows);
             }
             $old = $session->only(['status', 'started_at', 'expected_count', 'missing_count']);
-            $session->update(['status' => 'running', 'started_at' => now(), 'expected_count' => $copies->count(), 'missing_count' => $copies->count()]);
+            $session->update(['status' => 'running', 'started_at' => now(), 'expected_count' => $expectedCount, 'missing_count' => $expectedCount]);
             $this->audit->logRequired(
                 'inventory.started',
                 'inventory_session',
@@ -82,7 +105,20 @@ class InventoryService
             );
 
             return $session->refresh();
-        });
+        }, 3);
+    }
+
+    /**
+     * PostgreSQL row locks cannot protect a query that currently returns no
+     * running sessions. Serialise the short overlap/snapshot decision so two
+     * draft sessions cannot both become active for intersecting scopes.
+     * SQLite already serialises writers and needs no vendor-specific SQL.
+     */
+    private function lockSessionStartGate(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::select('SELECT pg_advisory_xact_lock(?, ?)', [1263752521, 1]);
+        }
     }
 
     public function scan(InventorySession $session, string $code, User $actor): InventoryScan
@@ -97,15 +133,35 @@ class InventoryService
                 throw CirculationException::because('inventory_scan_limit');
             }
             $code = trim($code);
-            $duplicate = $session->scans()->where('code', $code)->exists();
-            $copy = BookCopy::query()->where('barcode', $code)->orWhere('inventory_number', $code)->first();
+            $matches = BookCopy::query()
+                ->where(fn (Builder $query): Builder => $query
+                    ->where('barcode', $code)
+                    ->orWhere('inventory_number', $code))
+                ->orderBy('id')
+                ->limit(2)
+                ->get();
+            if ($matches->count() > 1) {
+                throw ValidationException::withMessages([
+                    'code' => __('librarian.inventory.identifier_ambiguous'),
+                ]);
+            }
+            $copy = $matches->first();
+            $duplicate = $session->scans()
+                ->where(function (Builder $query) use ($code, $copy): void {
+                    $query->where('code', $code);
+                    if ($copy !== null) {
+                        $query->orWhere('copy_id', $copy->getKey());
+                    }
+                })
+                ->exists();
             $item = $copy ? $session->items()->where('copy_id', $copy->getKey())->lockForUpdate()->first() : null;
 
             $classification = match (true) {
                 $duplicate => 'duplicate',
                 $copy === null => 'unknown',
+                $copy->status === 'written_off' || $copy->inventory_status === 'written_off' => 'written_off',
                 $item === null => 'misplaced',
-                in_array($copy->status, ['issued', 'overdue', 'lost', 'written_off'], true) => 'status_conflict',
+                in_array($copy->status, ['issued', 'overdue', 'lost'], true) => 'status_conflict',
                 default => 'found',
             };
             $scan = $session->scans()->create([
@@ -167,8 +223,9 @@ class InventoryService
             $identified = $inventoryCondition === 'visible';
             $classification = match (true) {
                 ! $identified => 'requires_review',
+                $copy->status === 'written_off' || $copy->inventory_status === 'written_off' => 'written_off',
                 ! $inExpectedZone => 'misplaced',
-                in_array($copy->status, ['issued', 'overdue', 'lost', 'written_off'], true) => 'status_conflict',
+                in_array($copy->status, ['issued', 'overdue', 'lost'], true) => 'status_conflict',
                 default => 'found',
             };
             $details = [
@@ -227,6 +284,8 @@ class InventoryService
             $actual = [
                 'branch_id' => $session->branch_id,
                 'fund_id' => $session->fund_id,
+                'storage_sigla' => $session->storage_sigla,
+                'service_point_code' => $session->service_point_code,
                 'room' => $session->room,
                 'section' => $session->section,
                 'shelf_location' => $session->shelf_range,
@@ -337,7 +396,7 @@ class InventoryService
             return;
         }
 
-        if ($branchId === null || $branchId === '' || ! Fund::query()
+        if (($branchId !== null && $branchId !== '') && ! Fund::query()
             ->whereKey((int) $fundId)
             ->where('branch_id', (int) $branchId)
             ->exists()) {
@@ -345,5 +404,57 @@ class InventoryService
                 'fund_id' => __('librarian.inventory.fund_branch_mismatch'),
             ]);
         }
+    }
+
+    /** @param array<string,mixed> $data */
+    private function assertScopeSelection(array $data): void
+    {
+        $scope = (string) ($data['scope_type'] ?? 'branch');
+        $valid = match ($scope) {
+            'all' => true,
+            'branch' => filled($data['branch_id'] ?? null),
+            'fund' => filled($data['fund_id'] ?? null),
+            'sigla' => filled($data['storage_sigla'] ?? null),
+            'service_point' => filled($data['service_point_code'] ?? null),
+            default => false,
+        };
+        if (! $valid) {
+            throw ValidationException::withMessages([
+                'scope_type' => __('librarian.inventory.scope_value_required'),
+            ]);
+        }
+    }
+
+    private function scopeCopies(Builder $query, InventorySession $session): Builder
+    {
+        $scope = $session->scope_type ?: 'branch';
+
+        $query->when($scope === 'branch', fn (Builder $copy) => $copy->where('branch_id', $session->branch_id))
+            ->when($scope === 'fund', fn (Builder $copy) => $copy->where('fund_id', $session->fund_id))
+            ->when($scope === 'sigla', fn (Builder $copy) => $copy->where(function (Builder $sigla) use ($session): void {
+                $sigla->where('storage_sigla', $session->storage_sigla);
+                if (Schema::hasColumn('book_copies', 'sigla_code')) {
+                    $sigla->orWhere('sigla_code', $session->storage_sigla);
+                }
+            }))
+            ->when($scope === 'service_point', fn (Builder $copy) => $copy->where('service_point_code', $session->service_point_code))
+            ->when($session->branch_id, fn (Builder $copy) => $copy->where('branch_id', $session->branch_id))
+            ->when($session->fund_id, fn (Builder $copy) => $copy->where('fund_id', $session->fund_id))
+            ->when($session->room, fn (Builder $copy) => $copy->where('room', $session->room))
+            ->when($session->section, fn (Builder $copy) => $copy->where('section', $session->section))
+            ->when($session->shelf_range, fn (Builder $copy) => $copy->where('shelf_location', 'like', $session->shelf_range.'%'));
+
+        return $query;
+    }
+
+    private function scopesOverlap(InventorySession $left, InventorySession $right): bool
+    {
+        // Different scope kinds may still describe the same physical copies
+        // (for example, a fund inside an active branch session). Compare the
+        // actual canonical scope intersection instead of only the labels.
+        return $this->scopeCopies(
+            $this->scopeCopies(BookCopy::query(), $left),
+            $right,
+        )->where('status', '!=', 'written_off')->exists();
     }
 }

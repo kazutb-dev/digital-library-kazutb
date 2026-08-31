@@ -83,76 +83,7 @@
     @endforeach
     <link rel="alternate" hreflang="x-default" href="{{ $bookUrlForLocale('kk') }}" />
     @include('partials.favicons')
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        'surface-bright': '#f8f9fa',
-                        'inverse-primary': '#afc8f0',
-                        'on-surface-variant': '#43474e',
-                        'inverse-on-surface': '#f0f1f2',
-                        'on-secondary': '#ffffff',
-                        'surface': '#f8f9fa',
-                        'surface-container-low': '#f3f4f5',
-                        'primary-fixed-dim': '#afc8f0',
-                        'on-secondary-fixed': '#002020',
-                        'tertiary-fixed': '#d1e4fb',
-                        'primary-fixed': '#d4e3ff',
-                        'surface-container-highest': '#e1e3e4',
-                        'on-tertiary-fixed-variant': '#36485b',
-                        'surface-tint': '#476083',
-                        'secondary': '#006a6a',
-                        'tertiary': '#000610',
-                        'outline': '#74777f',
-                        'error-container': '#ffdad6',
-                        'on-tertiary-container': '#76889d',
-                        'background': '#f8f9fa',
-                        'on-secondary-fixed-variant': '#004f4f',
-                        'error': '#ba1a1a',
-                        'on-surface': '#191c1d',
-                        'primary': '#000613',
-                        'on-tertiary': '#ffffff',
-                        'surface-variant': '#e1e3e4',
-                        'on-primary': '#ffffff',
-                        'on-error': '#ffffff',
-                        'surface-container-high': '#e7e8e9',
-                        'on-error-container': '#93000a',
-                        'inverse-surface': '#2e3132',
-                        'secondary-fixed-dim': '#76d6d5',
-                        'primary-container': '#001f3f',
-                        'outline-variant': '#c4c6cf',
-                        'on-primary-fixed': '#001c3a',
-                        'surface-container': '#edeeef',
-                        'on-tertiary-fixed': '#091d2e',
-                        'on-background': '#191c1d',
-                        'on-primary-container': '#6f88ad',
-                        'tertiary-fixed-dim': '#b5c8df',
-                        'on-secondary-container': '#006e6e',
-                        'secondary-fixed': '#93f2f2',
-                        'secondary-container': '#90efef',
-                        'surface-container-lowest': '#ffffff',
-                        'on-primary-fixed-variant': '#2f486a',
-                        'surface-dim': '#d9dadb',
-                        'tertiary-container': '#0d2031'
-                    },
-                    borderRadius: {
-                        DEFAULT: '0.125rem',
-                        lg: '0.25rem',
-                        xl: '0.5rem',
-                        full: '0.75rem'
-                    },
-                    fontFamily: {
-                        headline: ['Newsreader', 'serif'],
-                        body: ['Manrope', 'sans-serif'],
-                        label: ['Manrope', 'sans-serif']
-                    }
-                }
-            }
-        }
-    </script>
+    @vite('resources/css/app.css')
     <link rel="stylesheet" href="/fonts/fonts.css">
     <link rel="stylesheet" href="/css/shell.css">
     <style>
@@ -2192,7 +2123,7 @@
         }
     </style>
 </head>
-<body class="site-shell book-detail-shell">
+<body class="site-shell book-detail-shell" data-library-tailwind-radius="compact">
     <a class="skip-link" href="#main-content">{{ ['ru' => 'К основному содержанию', 'kk' => 'Негізгі мазмұнға өту', 'en' => 'Skip to main content'][$lang] }}</a>
     @include('partials.navbar', ['activePage' => 'catalog'])
 
@@ -2287,6 +2218,7 @@
             }
         };
         const BOOK_I18N = BOOK_I18N_MAP[BOOK_LANG] || BOOK_I18N_MAP.ru;
+        const BOOK_RECOVERY_I18N = @json(__('catalog_recovery.public'));
         const BOOK_UDC_LABEL = { ru: 'УДК', kk: 'ӘОЖ', en: 'UDC' }[BOOK_LANG] || 'УДК';
         const BOOK_RESOURCE_TYPE_LABELS = {
             ru: { book: 'Книга', textbook: 'Учебник', study_guide: 'Учебное пособие', methodical: 'Методическое пособие', journal: 'Журнал', periodical: 'Периодическое издание', dissertation: 'Диссертация', abstract: 'Автореферат', article: 'Статья', publication: 'Научная публикация', ebook: 'Электронная книга', digital_document: 'Электронный документ', _default: 'Документ' },
@@ -2462,8 +2394,38 @@
             const rawAuthor = normalizeText(book?.primaryAuthor || BOOK_I18N.unknownAuthor);
             const rawPublisher = normalizeText(book?.publisher?.name || BOOK_I18N.publisherMissing);
             const rawIsbn = normalizeText(book?.isbn?.raw || BOOK_I18N.isbnMissing);
+            const rawIssn = normalizeText(book?.issn?.raw, '');
             const rawYear = normalizeText(book?.publicationYear || BOOK_I18N.yearMissing);
             const rawLanguage = normalizeText(book?.language?.label, BOOK_I18N.languageMissing);
+            const publicationPlace = pickMeaningfulText(book?.publicationPlace);
+            const responsibility = pickMeaningfulText(book?.statementOfResponsibility);
+            const editionStatement = pickMeaningfulText(book?.editionStatement);
+            const physicalDescription = [book?.physicalExtent, book?.physicalDetails, book?.dimensions, book?.accompanyingMaterial]
+                .map((value) => pickMeaningfulText(value))
+                .filter(Boolean)
+                .join(' ; ');
+            const seriesDescription = [book?.seriesTitle, book?.seriesNumber]
+                .map((value) => pickMeaningfulText(value))
+                .filter(Boolean)
+                .join(' ; ');
+            const partDescription = [book?.volume, book?.issue, book?.partNumber, book?.partTitle]
+                .map((value) => pickMeaningfulText(value))
+                .filter(Boolean)
+                .join(' · ');
+            const bbkCode = pickMeaningfulText(book?.bbkCode);
+            const localClassification = pickMeaningfulText(book?.localClassification);
+            const materialDesignation = pickMeaningfulText(book?.materialDesignation);
+            const controlNumber = pickMeaningfulText(book?.controlNumber);
+            const countryCodeRaw = pickMeaningfulText(book?.countryCode);
+            const countryCode = countryCodeRaw
+                ? (BOOK_RECOVERY_I18N?.countries?.[countryCodeRaw.toLowerCase()] || countryCodeRaw.toUpperCase())
+                : '';
+            const ksuLiteratureType = pickMeaningfulText(book?.ksuLiteratureType);
+            const faculty = pickMeaningfulText(book?.faculty);
+            const department = pickMeaningfulText(book?.department);
+            const disciplines = pickMeaningfulText(book?.disciplines);
+            const specialty = pickMeaningfulText(book?.specialty);
+            const recordCreatedOn = pickMeaningfulText(book?.recordCreatedOn);
             // A subtitle is real metadata, but it is not an abstract. Keep the
             // abstract section absent when the source has no annotation.
             const rawDescription = pickMeaningfulText(book?.annotation);
@@ -2471,6 +2433,7 @@
             const issued = Number(book?.copies?.issued || 0);
             const total = Number(book?.copies?.total || 0);
             const authors = Array.isArray(book?.authors) ? book.authors : [];
+            const contributors = Array.isArray(book?.contributors) ? book.contributors : [];
             const authorList = authors
                 .map((author) => normalizeText(author?.name || author?.displayName || ''))
                 .filter(Boolean);
@@ -2495,7 +2458,7 @@
             const udcDescription = normalizeText(book?.udc?.description, '');
             const udcText = normalizeText(book?.udc?.display, '') || udcDescription || udcRaw;
             const isAvailable = available > 0;
-            const editionText = rawSubtitle || BOOK_I18N.editionMissing;
+            const editionText = editionStatement || BOOK_I18N.editionMissing;
             const primaryLocation = locations.length ? formatLocationLabel(locations[0]) : BOOK_I18N.locationsUnavailable;
             const accessSummaryText = total > 0 ? (isAvailable ? BOOK_I18N.physicalAvailable : BOOK_I18N.physicalUnavailable) : BOOK_I18N.noCopies;
             const descriptionText = rawDescription;
@@ -2520,24 +2483,60 @@
                 }
                 segments.push(citePart(book?.title?.display || book?.title?.raw) || BOOK_I18N.untitled);
 
-                const imprint = [citePart(book?.publisherRaw), citePart(book?.publicationYear)]
+                if (citePart(book?.editionStatement)) {
+                    segments.push(citePart(book?.editionStatement));
+                }
+                const publisherStatement = [citePart(book?.publicationPlace), citePart(book?.publisherRaw)]
                     .filter(Boolean)
-                    .join(', ');
+                    .join(': ');
+                const imprint = [publisherStatement, citePart(book?.publicationYear)].filter(Boolean).join(', ');
                 if (imprint) {
                     segments.push(`— ${imprint}`);
                 }
                 if (citePart(book?.isbn?.raw)) {
                     segments.push(`— ISBN ${citePart(book?.isbn?.raw)}`);
                 }
+                if (citePart(book?.issn?.raw)) {
+                    segments.push(`— ISSN ${citePart(book?.issn?.raw)}`);
+                }
 
                 return `${segments.join('. ')}.`;
             })();
+            const contributorText = contributors
+                .map((contributor) => {
+                    const name = normalizeText(contributor?.name, '');
+                    if (!name) return '';
+                    const role = normalizeText(contributor?.role, 'other');
+                    const roleLabel = BOOK_RECOVERY_I18N?.roles?.[role] || BOOK_RECOVERY_I18N?.roles?.other || '';
+                    return roleLabel ? `${name} (${roleLabel})` : name;
+                })
+                .filter(Boolean)
+                .join(' · ');
             const metadataRows = [
                 ...(originalTitle && originalTitle !== rawTitle ? [{ label: BOOK_I18N.originalTitle, value: originalTitle }] : []),
+                ...(responsibility ? [{ label: BOOK_RECOVERY_I18N.responsibility, value: responsibility }] : []),
+                ...(publicationPlace ? [{ label: BOOK_RECOVERY_I18N.publication_place, value: publicationPlace }] : []),
                 { label: BOOK_I18N.publisher, value: rawPublisher },
+                ...(editionStatement ? [{ label: BOOK_RECOVERY_I18N.edition, value: editionStatement }] : []),
                 { label: BOOK_I18N.authors, value: authorList.slice(0, 3).join(' · ') },
+                ...(contributorText ? [{ label: BOOK_RECOVERY_I18N.contributors, value: contributorText }] : []),
                 { label: 'ISBN', value: rawIsbn },
+                ...(rawIssn ? [{ label: 'ISSN', value: rawIssn }] : []),
+                ...(physicalDescription ? [{ label: BOOK_RECOVERY_I18N.physical_description, value: physicalDescription }] : []),
+                ...(seriesDescription ? [{ label: BOOK_RECOVERY_I18N.series, value: seriesDescription }] : []),
+                ...(partDescription ? [{ label: BOOK_RECOVERY_I18N.part, value: partDescription }] : []),
                 ...(udcText ? [{ label: BOOK_UDC_LABEL, value: udcText }] : []),
+                ...(bbkCode ? [{ label: BOOK_RECOVERY_I18N.bbk, value: bbkCode }] : []),
+                ...(localClassification ? [{ label: BOOK_RECOVERY_I18N.local_classification, value: localClassification }] : []),
+                ...(materialDesignation ? [{ label: BOOK_RECOVERY_I18N.material_designation, value: materialDesignation }] : []),
+                ...(controlNumber ? [{ label: BOOK_RECOVERY_I18N.control_number, value: controlNumber }] : []),
+                ...(countryCode ? [{ label: BOOK_RECOVERY_I18N.country_code, value: countryCode }] : []),
+                ...(ksuLiteratureType ? [{ label: BOOK_RECOVERY_I18N.ksu_literature_type, value: ksuLiteratureType }] : []),
+                ...(faculty ? [{ label: BOOK_RECOVERY_I18N.faculty, value: faculty }] : []),
+                ...(department ? [{ label: BOOK_RECOVERY_I18N.department, value: department }] : []),
+                ...(disciplines ? [{ label: BOOK_RECOVERY_I18N.disciplines, value: disciplines }] : []),
+                ...(specialty ? [{ label: BOOK_RECOVERY_I18N.specialty, value: specialty }] : []),
+                ...(recordCreatedOn ? [{ label: BOOK_RECOVERY_I18N.record_created_on, value: recordCreatedOn }] : []),
                 { label: BOOK_I18N.publicationLanguage, value: rawLanguage },
                 { label: BOOK_I18N.resourceType, value: formatResourceType(book?.resourceType) },
                 // 090h is empty in the imported MARC source for all but a

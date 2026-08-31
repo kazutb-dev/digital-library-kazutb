@@ -2,7 +2,59 @@
 
 declare(strict_types=1);
 
-// Imports one stream produced by SQL Server MARC-SQL into PostgreSQL.
+// ============================================================================
+// DEPRECATED — DESTRUCTIVE. DO NOT RUN.
+// ============================================================================
+// This script performed the 2026-08-12 catalogue import and is the confirmed
+// cause of the MARC attribute loss documented in the migration audit:
+//
+//   * It begins by executing DELETE FROM book_copies and
+//     DELETE FROM bibliographic_records — it REPLACES the whole catalogue.
+//   * It maps ~15 fields. Copy-level attributes (barcode, KSU, price,
+//     acquisition source, registration date, fund, shelf, write-off status,
+//     circulation counters) are never written.
+//   * It hard-codes is_draft=false, status='available', condition='new'
+//     and branch_id=1, and synthesises inventory numbers as 'MARC-<INV_ID>',
+//     discarding the real ones.
+//   * It stores only a sha256 of each source row, so the raw MARC is lost.
+//
+// The supported importer is the non-destructive, field-rich Artisan command:
+//
+//     php artisan marc:import-catalog
+//
+// It upserts through marc_import_records and preserves the existing catalogue.
+//
+// This file is retained for forensic reference only. To run it anyway you must
+// set MARC_LEGACY_IMPORTER_ACKNOWLEDGE_DATA_LOSS explicitly (see guard below),
+// on top of the pre-existing confirmation and non-production guards.
+// ============================================================================
+
+$acknowledgement = getenv('MARC_LEGACY_IMPORTER_ACKNOWLEDGE_DATA_LOSS') ?: '';
+if ($acknowledgement !== 'I_KNOW_THIS_SCRIPT_CAUSED_THE_2026_08_12_DATA_LOSS') {
+    fwrite(STDERR, <<<'TXT'
+
+    ============================================================
+     REFUSING TO RUN: deprecated destructive MARC importer
+    ============================================================
+     This script DELETES the entire catalogue before importing and
+     drops most MARC and copy attributes. It caused the 2026-08-12
+     data loss.
+
+     Use the supported importer instead:
+
+         php artisan marc:import-catalog
+
+     If you genuinely need this legacy script, set:
+
+         MARC_LEGACY_IMPORTER_ACKNOWLEDGE_DATA_LOSS=\
+             I_KNOW_THIS_SCRIPT_CAUSED_THE_2026_08_12_DATA_LOSS
+
+    ============================================================
+
+    TXT);
+    exit(3);
+}
+
 // Usage: php import-marcsql-stream.php docs|copies
 
 $mode = $argv[1] ?? '';

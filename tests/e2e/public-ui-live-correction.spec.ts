@@ -21,7 +21,7 @@ const surfaces = [
     container: '.public-container',
     title: '.public-page__title',
     card: '.leadership-page__profile',
-    grid: '.public-card-grid',
+    grid: '.leadership-page__profile',
     section: '.public-page__body',
   },
   {
@@ -36,11 +36,11 @@ const surfaces = [
   {
     name: 'rules',
     route: '/rules?lang=ru',
-    container: '.rules-v2__workspace',
-    title: '.rules-v2 .public-v2__title',
+    container: '.rules-page__workspace',
+    title: '.rules-page .public-page__title',
     card: '.rules-canonical__panel',
-    grid: '.rules-v2__workspace',
-    section: '.rules-v2__hero',
+    grid: '.rules-page__workspace',
+    section: '.rules-page .public-page__intro',
   },
 ] as const;
 

@@ -22,11 +22,16 @@ final class RepositoryUsageRecorder
 
         $role = $user?->getRoleNames()->first();
 
+        $fallbackLocale = (string) config('app.fallback_locale', 'kk');
+        if (! in_array($fallbackLocale, ['kk', 'ru', 'en'], true)) {
+            $fallbackLocale = 'kk';
+        }
+
         $dimensions = [
             'repository_item_id' => $item->getKey(),
             'event_type' => $eventType,
             'role_name' => $user === null ? 'guest' : ($role ?: 'authenticated'),
-            'locale' => in_array($locale, ['kk', 'ru', 'en'], true) ? $locale : 'ru',
+            'locale' => in_array($locale, ['kk', 'ru', 'en'], true) ? $locale : $fallbackLocale,
             'occurred_on' => today('UTC')->toDateString(),
         ];
 

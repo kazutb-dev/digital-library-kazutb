@@ -186,7 +186,11 @@ class InternalCopyMutationTest extends TestCase
 
     public function test_patch_copy_rejects_invalid_uuid(): void
     {
-        $response = $this->withSession($this->staffSession())->patchJson('/api/v1/internal/copies/not-a-uuid', [
+        $response = $this->withoutMiddleware([
+            \App\Http\Middleware\EnsureInternalCirculationStaff::class,
+            \Spatie\Permission\Middleware\PermissionMiddleware::class,
+        ])
+            ->withSession($this->staffSession())->patchJson('/api/v1/internal/copies/not-a-uuid', [
             'needs_review' => true,
         ]);
 

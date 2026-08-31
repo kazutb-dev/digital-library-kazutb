@@ -45,7 +45,12 @@ class AdminDirectoryAndSystemControlPlaneTest extends TestCase
             $mock->shouldReceive('backups')->once()->andReturn([]);
             $mock->shouldNotReceive('restoreToTest');
         });
-        $this->signInToLibraryAs($this->adminUser)->get('/admin/system')->assertOk()->assertSee('pg_dump custom format');
+        $this->signInToLibraryAs($this->adminUser)
+            ->get('/admin/system')
+            ->assertOk()
+            ->assertSee('Тексерілген сақтық көшірмелер', false)
+            ->assertSee('SHA-256', false)
+            ->assertDontSee('pg_dump custom format', false);
         $this->post('/admin/system/backups/sample.dump/restore-test', ['confirmation' => 'WRONG'])->assertSessionHasErrors('confirmation');
 
         $member = $this->makeControlPlaneUser('member');

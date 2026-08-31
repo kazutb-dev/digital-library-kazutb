@@ -41,7 +41,7 @@
         <form method="POST" action="{{ route('librarian.incidents.candidates.review',$candidate) }}" class="mt-5 border-t pt-5">@csrf
             <h3 class="font-bold">{{ __('incidents.review.title') }}</h3><div class="mt-3 grid gap-3 sm:grid-cols-2">
             @foreach([... \App\Models\Catalog\ReplacementCandidate::REQUIRED_CRITERIA,'value_comparable','complete_set'] as $criterion)
-            <label class="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"><span>{{ __('incidents.criteria.'.$criterion) }}</span><select name="{{ $criterion }}" class="rounded border-slate-300 text-sm"><option value="1">{{ __('common.yes') }}</option><option value="0">{{ __('common.no') }}</option></select></label>
+            <label class="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"><span>{{ __('incidents.criteria.'.$criterion) }}</span><select name="{{ $criterion }}" class="rounded border-slate-300 text-sm"><option value="1">{{ __('common.boolean.yes') }}</option><option value="0">{{ __('common.boolean.no') }}</option></select></label>
             @endforeach</div><textarea class="admin-input mt-3" name="reviewer_comment" placeholder="{{ __('incidents.fields.comment') }}"></textarea><button class="admin-btn admin-btn-primary mt-3">{{ __('incidents.actions.save_review') }}</button>
         </form>
         @endif
@@ -61,7 +61,8 @@
     </section>
     @endforeach
 
-    <section class="admin-card"><h2 class="font-headline text-2xl">{{ __('incidents.sections.audit') }}</h2><div class="mt-4 space-y-3">@forelse($auditEvents as $event)<div class="border-l-2 border-secondary pl-4"><strong>{{ $event->action_type }}</strong><div class="text-xs text-slate-500">{{ $event->actor_name }} · {{ $event->occurred_at?->format('d.m.Y H:i') }}</div><p class="text-sm">{{ $event->reason }}</p></div>@empty<p class="text-slate-500">—</p>@endforelse</div></section>
+    @php($auditActionLabels = __('incidents.audit_actions'))
+    <section class="admin-card"><h2 class="font-headline text-2xl">{{ __('incidents.sections.audit') }}</h2><div class="mt-4 space-y-3">@forelse($auditEvents as $event)<div class="border-l-2 border-secondary pl-4"><strong>{{ $auditActionLabels[$event->action_type] ?? $auditActionLabels['other'] }}</strong><div class="text-xs text-slate-500">{{ $event->actor_name }} · {{ $event->occurred_at?->format('d.m.Y H:i') }}</div>@if($event->reason)<p class="text-sm">{{ $event->reason }}</p>@endif</div>@empty<p class="text-slate-500">—</p>@endforelse</div></section>
 </div>
 
 <aside class="space-y-6 xl:col-span-5">
@@ -71,6 +72,8 @@
 <section class="admin-card"><h2 class="font-headline text-2xl">{{ __('incidents.sections.other_resolution') }}</h2>
 <form class="mt-4 space-y-3" method="POST" action="{{ route('librarian.incidents.resolve',$incident) }}">@csrf
 <select class="admin-input" name="resolution_type">@foreach(['fine','repair','write_off','monetary_compensation','no_charge'] as $r)<option value="{{ $r }}">{{ __('incidents.resolutions.'.$r) }}</option>@endforeach</select>
+<label><span class="admin-label">{{ __('copy_lifecycle.fields.writeoff_date') }}</span><input class="admin-input" type="date" name="writeoff_date" value="{{ old('writeoff_date') }}"></label>
+<label><span class="admin-label">{{ __('copy_lifecycle.fields.writeoff_act') }}</span><input class="admin-input" name="writeoff_act" maxlength="128" value="{{ old('writeoff_act') }}"></label>
 <textarea class="admin-input" name="reason" required minlength="5" placeholder="{{ __('incidents.fields.reason') }}"></textarea>
 @can('fines.waive')<label class="flex gap-2 text-sm"><input type="checkbox" name="waive_fine" value="1">{{ __('incidents.actions.waive_fine') }}</label>@endcan
 <button class="admin-btn admin-btn-primary">{{ __('incidents.actions.resolve') }}</button></form>

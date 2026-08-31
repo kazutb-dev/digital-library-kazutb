@@ -56,13 +56,27 @@ class CabinetController extends Controller
     {
         $reader = $this->reader($request);
         $summary = $this->circulation->readerSummary($reader);
+        $capabilities = [
+            'loans' => $reader->can('loans.view_own'),
+            'reservations' => $reader->can('reservation.view_own'),
+            'fines' => $reader->can('fines.view_own'),
+            'incidents' => $reader->can('incidents.view_own'),
+            'notifications' => $reader->can('notifications.view_own'),
+            'collections' => $reader->can('collections.manage_own') || $reader->can('collections.view_public'),
+            'shortlist' => $reader->can('shortlist.manage_own'),
+            'card' => $reader->can('reader_card.view_own'),
+            'messages' => $reader->can('messages.view_own'),
+            'catalog' => $reader->can('catalog.search'),
+        ];
 
-        $activeReservations = $this->reservationQuery($reader)
-            ->active()
-            ->orderByRaw("CASE status WHEN 'ready_for_pickup' THEN 0 WHEN 'in_transit' THEN 1 WHEN 'confirmed' THEN 2 WHEN 'queued' THEN 3 ELSE 4 END")
-            ->orderBy('queue_sequence')
-            ->orderBy('created_at')
-            ->get();
+        $activeReservations = $capabilities['reservations']
+            ? $this->reservationQuery($reader)
+                ->active()
+                ->orderByRaw("CASE status WHEN 'ready_for_pickup' THEN 0 WHEN 'in_transit' THEN 1 WHEN 'confirmed' THEN 2 WHEN 'queued' THEN 3 ELSE 4 END")
+                ->orderBy('queue_sequence')
+                ->orderBy('created_at')
+                ->get()
+            : collect();
         $activeReservations->each(function (Reservation $reservation): void {
             if ($reservation->status === 'queued') {
                 $reservation->setAttribute('queue_position', $this->reservationInsights->queuePosition($reservation));
@@ -70,33 +84,42 @@ class CabinetController extends Controller
         });
 
         /** @var Collection<int, Loan> $openLoans */
-        $openLoans = $summary['open_loans'];
+        $openLoans = $capabilities['loans'] ? $summary['open_loans'] : collect();
+        $restrictions = $this->cabinet->restrictions($reader)->filter(function (array $restriction) use ($capabilities): bool {
+            return match ($restriction['key'] ?? null) {
+                'overdue' => $capabilities['loans'],
+                'fine' => $capabilities['fines'],
+                'incident' => $capabilities['incidents'],
+                default => true,
+            };
+        })->values();
 
         return $this->view($request, 'member.dashboard', [
+            'memberCapabilities' => $capabilities,
             'profile' => $summary['profile'],
             'openLoans' => $openLoans,
             'priorityLoan' => $openLoans->first(),
-            'overdueCount' => $summary['overdue_count'],
-            'maxLoans' => $summary['max_loans'],
-            'loansRemaining' => $summary['loans_remaining'],
+            'overdueCount' => $capabilities['loans'] ? $summary['overdue_count'] : 0,
+            'maxLoans' => $capabilities['loans'] ? $summary['max_loans'] : 0,
+            'loansRemaining' => $capabilities['loans'] ? $summary['loans_remaining'] : 0,
             'blocked' => $summary['blocked'],
-            'overdueBlocked' => $summary['overdue_blocked'],
-            'pendingFinesTotal' => $summary['pending_fines_total'],
-            'pendingFinesCount' => $summary['pending_fines']->count(),
-            'openIncidentsCount' => $summary['open_incident_cases'],
+            'overdueBlocked' => $capabilities['loans'] && $summary['overdue_blocked'],
+            'pendingFinesTotal' => $capabilities['fines'] ? $summary['pending_fines_total'] : 0,
+            'pendingFinesCount' => $capabilities['fines'] ? $summary['pending_fines']->count() : 0,
+            'openIncidentsCount' => $capabilities['incidents'] ? $summary['open_incident_cases'] : 0,
             'dueSoonCount' => $openLoans->filter(fn (Loan $loan): bool => $loan->daysRemaining() >= 0 && $loan->daysRemaining() <= 3)->count(),
             'activeReservations' => $activeReservations,
             'readyReservationsCount' => $activeReservations->where('status', 'ready_for_pickup')->count(),
-            'restrictions' => $this->cabinet->restrictions($reader),
-            'unreadNotifications' => $this->notifications->unreadCountFor($reader),
-            'recentNotifications' => ReaderNotification::query()
-                ->where('user_id', $reader->getKey())
-                ->latest()
-                ->limit(4)
-                ->get(),
-            'shortlistItems' => $this->shortlistItems($request)->take(3),
-            'shortlistTotal' => LiteratureCollection::query()->where('user_id', (string) $reader->getKey())->withCount('items')->get()->sum('items_count'),
-            'recommendations' => $this->recommendationsFor($reader),
+            'restrictions' => $restrictions,
+            'unreadNotifications' => $capabilities['notifications'] ? $this->notifications->unreadCountFor($reader) : 0,
+            'recentNotifications' => $capabilities['notifications']
+                ? ReaderNotification::query()->where('user_id', $reader->getKey())->latest()->limit(4)->get()
+                : collect(),
+            'shortlistItems' => $capabilities['shortlist'] ? $this->shortlistItems($request)->take(3) : collect(),
+            'shortlistTotal' => $capabilities['collections']
+                ? LiteratureCollection::query()->where('user_id', (string) $reader->getKey())->withCount('items')->get()->sum('items_count')
+                : 0,
+            'recommendations' => $capabilities['catalog'] ? $this->recommendationsFor($reader) : collect(),
         ]);
     }
 
@@ -467,9 +490,9 @@ class CabinetController extends Controller
 
         $query = BibliographicRecord::query()
             ->where('is_draft', false)
-            ->whereHas('copies', fn (Builder $copies) => $copies->where('status', 'available'))
+            ->whereHas('copies', fn (Builder $copies) => $copies->availableForCirculation())
             ->when($seenRecordIds->isNotEmpty(), fn (Builder $records) => $records->whereNotIn('id', $seenRecordIds))
-            ->withCount(['copies as available_copies_count' => fn (Builder $copies) => $copies->where('status', 'available')]);
+            ->withCount(['copies as available_copies_count' => fn (Builder $copies) => $copies->availableForCirculation()]);
 
         if ($udcPrefix !== '' || $category !== '') {
             $query->where(function (Builder $records) use ($udcPrefix, $category): void {

@@ -6,84 +6,44 @@ use Tests\TestCase;
 
 class InternalAccessBoundaryTest extends TestCase
 {
-    private function staffSession(string $role = 'librarian'): array
-    {
-        return [
-            'library.user' => [
-                'id' => 'staff-1',
-                'name' => 'Library Staff',
-                'email' => 'staff@example.com',
-                'login' => 'staff01',
-                'ad_login' => 'staff01',
-                'role' => $role,
-            ],
-            'library.crm_token' => 'test-staff-token',
-            'library.authenticated_at' => now()->toIso8601String(),
-        ];
-    }
-
-    public function test_internal_pages_reject_guests(): void
+    public function test_retired_internal_pages_redirect_to_canonical_librarian_workspaces(): void
     {
         foreach ([
-            '/internal/dashboard',
-            '/internal/review',
-            '/internal/stewardship',
-            '/internal/circulation',
-            '/internal/ai-chat',
-        ] as $uri) {
-            $this->get($uri)->assertForbidden();
+            '/internal/dashboard' => '/librarian',
+            '/internal/circulation' => '/librarian/circulation',
+            '/internal/stewardship' => '/librarian/data-cleanup',
+            '/internal/review' => '/librarian/data-cleanup',
+        ] as $legacy => $canonical) {
+            $this->get($legacy)->assertStatus(301)->assertRedirect($canonical);
         }
     }
 
-    public function test_internal_pages_allow_librarian_sessions(): void
+    public function test_remaining_internal_prototypes_reject_guests(): void
     {
-        foreach ([
-            '/internal/dashboard',
-            '/internal/review',
-            '/internal/stewardship',
-            '/internal/circulation',
-            '/internal/ai-chat',
-        ] as $uri) {
-            $this->withSession($this->staffSession('librarian'))->get($uri)->assertOk();
+        foreach (['/internal/ai-chat'] as $uri) {
+            $response = $this->get($uri)->assertRedirect();
+            $this->assertStringContainsString('/login?redirect=', (string) $response->headers->get('Location'));
         }
     }
 
-    public function test_internal_pages_allow_admin_sessions(): void
+    public function test_a_forged_legacy_staff_session_cannot_cross_the_permission_boundary(): void
     {
-        foreach ([
-            '/internal/dashboard',
-            '/internal/review',
-            '/internal/stewardship',
-            '/internal/circulation',
-            '/internal/ai-chat',
-        ] as $uri) {
-            $this->withSession($this->staffSession('admin'))->get($uri)->assertOk();
+        $session = ['library.user' => [
+            'id' => 'not-a-real-user',
+            'name' => 'Forged Staff',
+            'email' => 'forged@example.test',
+            'login' => 'forged',
+            'role' => 'librarian',
+        ]];
+
+        foreach (['/internal/ai-chat'] as $uri) {
+            $this->withSession($session)->get($uri)->assertForbidden();
         }
     }
 
-    public function test_internal_pages_reject_authenticated_sessions_without_staff_role(): void
+    public function test_canonical_librarian_workspace_rejects_guests(): void
     {
-        foreach ([
-            '/internal/dashboard',
-            '/internal/review',
-            '/internal/stewardship',
-            '/internal/circulation',
-            '/internal/ai-chat',
-        ] as $uri) {
-            $this->withSession($this->staffSession(''))->get($uri)->assertForbidden();
-        }
-    }
-
-    public function test_internal_pages_reject_reader_sessions(): void
-    {
-        foreach ([
-            '/internal/dashboard',
-            '/internal/review',
-            '/internal/stewardship',
-            '/internal/circulation',
-            '/internal/ai-chat',
-        ] as $uri) {
-            $this->withSession($this->staffSession('reader'))->get($uri)->assertForbidden();
-        }
+        $response = $this->get('/librarian')->assertRedirect();
+        $this->assertStringContainsString('/login?redirect=', (string) $response->headers->get('Location'));
     }
 }

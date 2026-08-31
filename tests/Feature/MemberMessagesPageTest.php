@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use Database\Seeders\MessageCategorySeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Tests\Concerns\BuildsAdminControlPlane;
@@ -16,15 +15,15 @@ class MemberMessagesPageTest extends TestCase
     {
         parent::setUp();
         $this->setUpAdminControlPlane();
-        (require base_path('database/migrations/2026_08_06_000000_build_message_appeals_workflow.php'))->up();
-        app(MessageCategorySeeder::class)->run();
+        app()->setLocale('ru');
+        config(['app.locale' => 'ru', 'app.fallback_locale' => 'ru']);
         $this->withoutMiddleware([VerifyCsrfToken::class, ValidateCsrfToken::class]);
     }
 
     private function loginAs(string $identitySlug): void
     {
         $role = in_array($identitySlug, ['student', 'teacher'], true) ? 'member' : $identitySlug;
-        $this->signInToLibraryAs($this->makeControlPlaneUser($role));
+        $this->signInToLibraryAs($this->makeControlPlaneUser($role, ['locale' => 'ru']));
     }
 
     public function test_guest_is_redirected_to_login(): void

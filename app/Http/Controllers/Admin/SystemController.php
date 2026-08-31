@@ -41,7 +41,7 @@ final class SystemController extends Controller
         $backup = $backups->create();
         $audit->logRequired('backup.create', 'database_backup', $backup['name'], newValues: ['sha256' => $backup['sha256'], 'size' => $backup['size']], scope: 'system', request: $request);
 
-        return back()->with('success', 'Backup created and TOC verified.');
+        return back()->with('success', __('admin.system.backup_created'));
     }
 
     public function restoreTest(Request $request, string $backup, VerifiedBackupService $backups, AuditLogger $audit): RedirectResponse
@@ -50,6 +50,6 @@ final class SystemController extends Controller
         $result = $backups->restoreToTest($backup);
         $audit->logRequired('backup.restore_test', 'database_backup', $backup, newValues: $result, scope: 'system', request: $request);
 
-        return back()->with('success', 'Restore test verified in '.$result['database'].'.');
+        return back()->with('success', __('admin.system.restore_verified', ['database' => $result['database']]));
     }
 }

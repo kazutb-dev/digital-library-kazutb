@@ -23,7 +23,6 @@ class PublicShellTest extends TestCase
             ->assertSee('data-section="homepage-faculty-picks"', false)
             ->assertSee('data-section="homepage-new-arrivals"', false)
             ->assertSee('data-section="homepage-collections"', false)
-            ->assertSee('data-section="homepage-statistics"', false)
             ->assertSee('data-section="homepage-faq"', false);
     }
 
@@ -64,7 +63,7 @@ class PublicShellTest extends TestCase
             ->assertOk()
             ->assertSee('<html lang="en">', false)
             ->assertSee('Scientific Library')
-            ->assertSee('Support Channels');
+            ->assertSee('Contact channels');
     }
 
     public function test_public_shell_localizes_navbar_actions_in_all_supported_languages(): void

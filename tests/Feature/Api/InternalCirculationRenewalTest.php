@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Api;
 
+use App\Http\Middleware\EnsureInternalCirculationStaff;
 use App\Models\Library\CirculationLoan;
 use App\Services\Library\CirculationLoanWriteService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Tests\TestCase;
 
 class InternalCirculationRenewalTest extends TestCase
@@ -90,6 +92,8 @@ class InternalCirculationRenewalTest extends TestCase
 
     public function test_renew_validates_uuid(): void
     {
+        $this->withoutMiddleware([EnsureInternalCirculationStaff::class, PermissionMiddleware::class]);
+
         $response = $this->withSession($this->staffSession())
             ->postJson('/api/v1/internal/circulation/loans/not-a-uuid/renew');
 

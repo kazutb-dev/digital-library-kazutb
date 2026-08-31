@@ -1,18 +1,21 @@
 @php
   /** @var array|null $memberReader */
   $memberReader = $memberReader ?? session('library.user');
+  $memberUser = auth()->user();
 
   $displayName = $memberReader['display_name'] ?? ($memberReader['name'] ?? ($memberReader['full_name'] ?? ($memberReader['login'] ?? __('roles.names.member'))));
-  $profileType = $memberReader['profile_type'] ?? 'student';
-  $profileLabel = __('shell.member.profile_types.'.(in_array($profileType, ['student', 'teacher', 'employee'], true) ? $profileType : 'student'));
+  $profileType = mb_strtolower(trim((string) ($memberReader['profile_type'] ?? 'member')));
+  $profileLabel = in_array($profileType, ['student', 'teacher', 'employee'], true)
+      ? __('shell.member.profile_types.'.$profileType)
+      : __('roles.names.member');
   $initial = mb_strtoupper(mb_substr((string) $displayName, 0, 1));
 
   // Real unread in-app notification count (Master.md 15.6) for the bell/badge.
   $memberUnreadNotifications = 0;
   $memberAccessibility = [];
-  if (auth()->check() && \Illuminate\Support\Facades\Schema::hasTable('reader_notifications')) {
+  if ($memberUser?->can('notifications.view_own') && \Illuminate\Support\Facades\Schema::hasTable('reader_notifications')) {
       $memberUnreadNotifications = \App\Models\Catalog\ReaderNotification::query()
-          ->where('user_id', auth()->id())
+          ->where('user_id', $memberUser->getKey())
           ->whereNull('read_at')
           ->count();
   }
@@ -30,48 +33,56 @@
           'icon' => 'dashboard',
           'href' => route('member.dashboard'),
           'active' => request()->routeIs('member.dashboard'),
+          'permission' => 'member.dashboard.view',
       ],
       [
           'label' => __('librarian.member_portal.nav.loans'),
           'icon' => 'book',
           'href' => route('member.loans'),
           'active' => request()->routeIs('member.loans'),
+          'permission' => 'loans.view_own',
       ],
       [
           'label' => __('librarian.member_portal.nav.card'),
           'icon' => 'badge',
           'href' => route('member.card'),
           'active' => request()->routeIs('member.card'),
+          'permission' => 'reader_card.view_own',
       ],
       [
           'label' => __('librarian.member_portal.nav.reservations'),
           'icon' => 'book_online',
           'href' => route('member.reservations'),
           'active' => request()->routeIs('member.reservations'),
+          'permission' => 'reservation.view_own',
       ],
       [
           'label' => __('librarian.member_portal.nav.collections'),
           'icon' => 'bookmark',
           'href' => route('member.collections.index'),
           'active' => request()->routeIs('member.collections.*'),
+          'permission' => ['collections.manage_own', 'collections.view_public'],
       ],
       [
           'label' => __('librarian.member_portal.nav.history'),
           'icon' => 'history',
           'href' => route('member.history'),
           'active' => request()->routeIs('member.history'),
+          'permission' => 'circulation.view_own_history',
       ],
       [
           'label' => __('librarian.member_portal.nav.fines'),
           'icon' => 'payments',
           'href' => route('member.fines'),
           'active' => request()->routeIs('member.fines'),
+          'permission' => 'fines.view_own',
       ],
       [
           'label' => __('incidents.nav'),
           'icon' => 'report_problem',
           'href' => route('member.incidents.index'),
           'active' => request()->routeIs('member.incidents.*'),
+          'permission' => 'incidents.view_own',
       ],
       [
           'label' => __('librarian.member_portal.nav.notifications'),
@@ -79,18 +90,21 @@
           'href' => route('member.notifications'),
           'active' => request()->routeIs('member.notifications'),
           'badge' => $memberUnreadNotifications,
+          'permission' => 'notifications.view_own',
       ],
       [
           'label' => __('librarian.member_portal.nav.digital'),
           'icon' => 'devices',
           'href' => route('member.digital-materials'),
           'active' => request()->routeIs('member.digital-materials'),
+          'permission' => 'digital.view_metadata',
       ],
       [
           'label' => __('librarian.member_portal.nav.messages'),
           'icon' => 'chat_bubble',
           'href' => route('member.messages'),
           'active' => request()->routeIs('member.messages'),
+          'permission' => 'messages.view_own',
       ],
       [
           'label' => __('librarian.member_portal.nav.profile'),
@@ -99,6 +113,12 @@
           'active' => request()->routeIs('member.profile*'),
       ],
   ];
+  $memberNav = collect($memberNav)->filter(function (array $item) use ($memberUser): bool {
+      $permissions = \Illuminate\Support\Arr::wrap($item['permission'] ?? []);
+
+      return $permissions === []
+          || ($memberUser !== null && collect($permissions)->contains(fn (string $permission): bool => $memberUser->can($permission)));
+  })->values()->all();
 @endphp
 <!DOCTYPE html>
 <html lang="{{ app()->getLocale() }}" class="h-full">
@@ -109,73 +129,7 @@
   @include('partials.favicons')
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <link rel="stylesheet" href="/fonts/fonts.css" />
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            'surface': '#f8f9fa',
-            'surface-bright': '#f8f9fa',
-            'surface-dim': '#d9dadb',
-            'surface-variant': '#e1e3e4',
-            'surface-container-lowest': '#ffffff',
-            'surface-container-low': '#f3f4f5',
-            'surface-container': '#edeeef',
-            'surface-container-high': '#e7e8e9',
-            'surface-container-highest': '#e1e3e4',
-            'background': '#f8f9fa',
-            'primary': '#000613',
-            'primary-container': '#001f3f',
-            'on-primary': '#ffffff',
-            'on-primary-container': '#6f88ad',
-            'primary-fixed': '#d4e3ff',
-            'primary-fixed-dim': '#afc8f0',
-            'on-primary-fixed': '#001c3a',
-            'secondary': '#006a6a',
-            'on-secondary': '#ffffff',
-            'secondary-container': '#90efef',
-            'on-secondary-container': '#006e6e',
-            'secondary-fixed': '#93f2f2',
-            'secondary-fixed-dim': '#76d6d5',
-            'on-secondary-fixed': '#002020',
-            'on-secondary-fixed-variant': '#004f4f',
-            'tertiary': '#000610',
-            'tertiary-container': '#0d2031',
-            'tertiary-fixed': '#d1e4fb',
-            'tertiary-fixed-dim': '#b5c8df',
-            'on-tertiary-fixed': '#091d2e',
-            'on-tertiary-fixed-variant': '#36485b',
-            'on-tertiary-container': '#76889d',
-            'on-tertiary': '#ffffff',
-            'error': '#ba1a1a',
-            'error-container': '#ffdad6',
-            'on-error': '#ffffff',
-            'on-error-container': '#93000a',
-            'outline': '#74777f',
-            'outline-variant': '#c4c6cf',
-            'on-surface': '#191c1d',
-            'on-surface-variant': '#43474e',
-            'inverse-surface': '#2e3132',
-            'inverse-on-surface': '#f0f1f2',
-            'inverse-primary': '#afc8f0',
-          },
-          borderRadius: {
-            DEFAULT: '0.125rem',
-            lg: '0.25rem',
-            xl: '0.5rem',
-            full: '0.75rem',
-          },
-          fontFamily: {
-            headline: ['Newsreader', 'serif'],
-            body: ['Manrope', 'sans-serif'],
-            label: ['Manrope', 'sans-serif'],
-          },
-        },
-      },
-    };
-  </script>
+  @vite('resources/css/app.css')
   <style>
     .material-symbols-outlined {
       font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
@@ -192,32 +146,38 @@
     .member-high-contrast select:focus-visible { outline: 3px solid #006a6a; outline-offset: 3px; }
   </style>
 </head>
-<body class="{{ $memberAccessibilityClasses }} bg-surface text-on-surface font-body antialiased min-h-screen selection:bg-secondary-container selection:text-on-secondary-container">
+<body class="{{ $memberAccessibilityClasses }} bg-surface text-on-surface font-body antialiased min-h-screen selection:bg-secondary-container selection:text-on-secondary-container" data-library-tailwind-radius="compact">
 
   <!-- Top Navigation -->
   <nav class="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur-lg h-20 flex items-center justify-between px-6 md:px-12 shadow-[0_24px_48px_rgba(0,31,63,0.04)]">
     <div class="flex items-center gap-6 md:gap-12">
       <x-library-brand variant="cabinet" />
-      <form action="{{ route('member.search') }}" method="GET" class="hidden md:flex relative w-80 bg-surface-container-highest h-10 items-center px-4 rounded-t-DEFAULT border-b border-outline-variant/20 focus-within:border-secondary transition-colors">
-        <span class="material-symbols-outlined text-outline mr-3 text-[20px]">search</span>
-        <input name="q" type="search" autocomplete="off" aria-label="{{ __('librarian.member_portal.search.query') }}" placeholder="{{ __('librarian.member_portal.search.placeholder') }}" class="bg-transparent border-none outline-none w-full text-sm text-on-surface-variant font-body placeholder:text-outline placeholder:font-light focus:ring-0" />
-      </form>
+      @can('catalog.search')
+        <form action="{{ route('member.search') }}" method="GET" class="hidden md:flex relative w-80 bg-surface-container-highest h-10 items-center px-4 rounded-t-DEFAULT border-b border-outline-variant/20 focus-within:border-secondary transition-colors">
+          <span class="material-symbols-outlined text-outline mr-3 text-[20px]">search</span>
+          <input name="q" type="search" autocomplete="off" aria-label="{{ __('librarian.member_portal.search.query') }}" placeholder="{{ __('librarian.member_portal.search.placeholder') }}" class="bg-transparent border-none outline-none w-full text-sm text-on-surface-variant font-body placeholder:text-outline placeholder:font-light focus:ring-0" />
+        </form>
+      @endcan
     </div>
     <div class="flex items-center gap-4 md:gap-6">
       <x-locale-switcher variant="light" />
-      <a href="{{ route('member.search') }}" class="hidden md:inline-flex items-center gap-2 text-sm font-body text-on-surface-variant hover:text-secondary transition-colors">
-        <span class="material-symbols-outlined text-[20px]">local_library</span>
-        <span>{{ __('librarian.member_portal.search.title') }}</span>
-      </a>
-      <a href="{{ route('member.notifications') }}"
-         class="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-secondary"
-         title="{{ __('librarian.member.notifications.title') }}"
-         aria-label="{{ $memberUnreadNotifications > 0 ? __('librarian.member.notifications.unread_count', ['count' => $memberUnreadNotifications]) : __('librarian.member.notifications.title') }}">
-        <span class="material-symbols-outlined text-[22px]" @if (request()->routeIs('member.notifications')) style="font-variation-settings: 'FILL' 1;" @endif>notifications</span>
-        @if ($memberUnreadNotifications > 0)
-          <span class="absolute -right-0.5 -top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-secondary px-1 text-[10px] font-bold leading-none text-on-secondary">{{ $memberUnreadNotifications > 99 ? '99+' : $memberUnreadNotifications }}</span>
-        @endif
-      </a>
+      @can('catalog.search')
+        <a href="{{ route('member.search') }}" class="hidden md:inline-flex items-center gap-2 text-sm font-body text-on-surface-variant hover:text-secondary transition-colors">
+          <span class="material-symbols-outlined text-[20px]">local_library</span>
+          <span>{{ __('librarian.member_portal.search.title') }}</span>
+        </a>
+      @endcan
+      @can('notifications.view_own')
+        <a href="{{ route('member.notifications') }}"
+           class="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-secondary"
+           title="{{ __('librarian.member.notifications.title') }}"
+           aria-label="{{ $memberUnreadNotifications > 0 ? __('librarian.member.notifications.unread_count', ['count' => $memberUnreadNotifications]) : __('librarian.member.notifications.title') }}">
+          <span class="material-symbols-outlined text-[22px]" @if (request()->routeIs('member.notifications')) style="font-variation-settings: 'FILL' 1;" @endif>notifications</span>
+          @if ($memberUnreadNotifications > 0)
+            <span class="absolute -right-0.5 -top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-secondary px-1 text-[10px] font-bold leading-none text-on-secondary">{{ $memberUnreadNotifications > 99 ? '99+' : $memberUnreadNotifications }}</span>
+          @endif
+        </a>
+      @endcan
       <div class="flex items-center gap-3">
         <div class="hidden sm:flex w-10 h-10 rounded-full bg-primary-container text-on-primary font-headline text-lg items-center justify-center" aria-hidden="true">{{ $initial }}</div>
         <div class="hidden md:flex flex-col leading-tight">

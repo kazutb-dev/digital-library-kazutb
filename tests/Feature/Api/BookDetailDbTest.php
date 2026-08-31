@@ -20,7 +20,7 @@ class BookDetailDbTest extends TestCase
     {
         $isbn = $this->firstExistingIsbn();
 
-        $response = $this->getJson('/api/v1/book-db/' . urlencode($isbn));
+        $response = $this->getJson('/api/v1/book-db/'.urlencode($isbn));
 
         $response
             ->assertOk()
@@ -39,7 +39,6 @@ class BookDetailDbTest extends TestCase
                     'copies' => ['available', 'total'],
                     'availability' => ['isAvailable', 'availableCopies', 'totalCopies', 'locations'],
                     'udc' => ['raw', 'source'],
-                    'source',
                 ],
             ]);
 

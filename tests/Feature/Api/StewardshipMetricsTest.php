@@ -162,16 +162,11 @@ class StewardshipMetricsTest extends TestCase
         }
     }
 
-    public function test_stewardship_page_renders_dashboard_sections(): void
+    public function test_legacy_stewardship_page_redirects_to_data_cleanup_workspace(): void
     {
         $response = $this->withSession($this->staffSession())
             ->get('/internal/stewardship');
 
-        $response->assertOk();
-        $response->assertSee('Общее здоровье данных');
-        $response->assertSee('Задачи проверки');
-        $response->assertSee('Флаги качества');
-        $response->assertSee('Прогресс по типу сущности');
-        $response->assertSee('stewardship-metrics');
+        $response->assertStatus(301)->assertRedirect('/librarian/data-cleanup');
     }
 }

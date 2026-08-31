@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class DataQualityRuleRegistry
 {
-    public const VERSION = '2026.08.14.1';
+    public const VERSION = '2026.08.29.1';
 
     /** ISO 639 values found in the verified MARC import. */
     public const LEGACY_LANGUAGE_CODES = [
@@ -264,9 +264,18 @@ class DataQualityRuleRegistry
         if (! $recordExists) {
             $issues[] = $this->violation('copy.record.missing', 'bibliographic_record_id', $copy->bibliographic_record_id, 'A valid linked bibliographic record');
         }
-        $hasStoragePosition = trim((string) $copy->shelf_location) !== '' || trim((string) $copy->storage_sigla) !== '';
-        if ($copy->branch_id === null || (! $hasStoragePosition && $copy->fund_id === null)) {
-            $issues[] = $this->violation('copy.location.missing', 'location', json_encode($copy->only(['branch_id', 'fund_id', 'storage_sigla', 'shelf_location'])), 'Library point and a fund, storage sigla or shelf position');
+        // Recovered copies legitimately carry MARC-SQL sigla/shelf evidence
+        // without a normalized branch/fund. That is not a missing location:
+        // T090f and TRACKINDEX remain authoritative until staff classifies it.
+        $hasStoragePosition = collect([
+            $copy->storage_sigla,
+            $copy->sigla_code,
+            $copy->service_point_code,
+            $copy->shelf_index,
+            $copy->shelf_location,
+        ])->contains(static fn (mixed $value): bool => trim((string) $value) !== '');
+        if ($copy->branch_id === null && $copy->fund_id === null && ! $hasStoragePosition) {
+            $issues[] = $this->violation('copy.location.missing', 'location', json_encode($copy->only(['branch_id', 'fund_id', 'storage_sigla', 'sigla_code', 'service_point_code', 'shelf_index', 'shelf_location'])), 'A branch, fund, source-backed sigla, service point or shelf position');
         }
         $branch = $copy->relationLoaded('branch') ? $copy->branch : $copy->branch()->first();
         $fund = $copy->relationLoaded('fund') ? $copy->fund : $copy->fund()->first();
@@ -282,7 +291,7 @@ class DataQualityRuleRegistry
         $hasLoan = array_key_exists('dq_has_active_loan', $copy->getAttributes())
             ? (bool) $copy->getAttribute('dq_has_active_loan')
             : $copy->loans()->whereIn('status', ['active', 'overdue'])->whereNull('returned_at')->exists();
-        if (($copy->status === 'issued') !== $hasLoan || (in_array($copy->status, ['lost', 'written_off'], true) && $hasLoan)) {
+        if (in_array($copy->status, ['issued', 'overdue'], true) !== $hasLoan || (in_array($copy->status, ['lost', 'written_off', 'under_repair'], true) && $hasLoan)) {
             $issues[] = $this->violation('copy.loan_state.conflict', 'status', $copy->status, 'Copy status consistent with its open loan');
         }
         $hasReservation = array_key_exists('dq_has_active_reservation', $copy->getAttributes())

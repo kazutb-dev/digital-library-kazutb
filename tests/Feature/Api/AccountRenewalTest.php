@@ -3,10 +3,13 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Library\CirculationLoan;
+use App\Services\Library\CirculationLoanReadService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Tests\TestCase;
 
 class AccountRenewalTest extends TestCase
@@ -17,6 +20,7 @@ class AccountRenewalTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware(PreventRequestForgery::class);
+        $this->withoutMiddleware(PermissionMiddleware::class);
 
         if ($this->canUseLivePgsql()) {
             $this->useLivePgsql = true;
@@ -39,6 +43,7 @@ class AccountRenewalTest extends TestCase
     {
         try {
             DB::connection('pgsql')->getPdo();
+
             return true;
         } catch (\Throwable) {
             return false;
@@ -181,7 +186,7 @@ class AccountRenewalTest extends TestCase
     private function createTestLoan(string $readerId, array $overrides = []): CirculationLoan
     {
         $copyId = $this->findOrFailTestCopy();
-        $id = (string) \Illuminate\Support\Str::uuid();
+        $id = (string) Str::uuid();
         $now = Carbon::now('UTC');
 
         DB::connection('pgsql')->table('app.circulation_loans')->insert(array_merge([
@@ -227,9 +232,9 @@ class AccountRenewalTest extends TestCase
             return (string) $existing;
         }
 
-        $email = "testrenew-" . substr($readerId, 0, 8) . "@test.local";
+        $email = 'testrenew-'.substr($readerId, 0, 8).'@test.local';
         DB::connection('pgsql')->table('app.reader_contacts')->insert([
-            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'id' => (string) Str::uuid(),
             'reader_id' => $readerId,
             'contact_type' => 'EMAIL',
             'value_raw' => $email,
@@ -295,7 +300,7 @@ class AccountRenewalTest extends TestCase
             'due_at' => Carbon::now('UTC')->addDays(5),
         ]);
 
-        $service = new \App\Services\Library\CirculationLoanReadService();
+        $service = new CirculationLoanReadService;
         $loan = $service->findLoan($context['loanId']);
 
         $this->assertNotNull($loan);
@@ -314,7 +319,7 @@ class AccountRenewalTest extends TestCase
             'due_at' => Carbon::now('UTC')->subDays(5),
         ]);
 
-        $service = new \App\Services\Library\CirculationLoanReadService();
+        $service = new CirculationLoanReadService;
         $loan = $service->findLoan($context['loanId']);
 
         $this->assertNotNull($loan);
@@ -333,7 +338,7 @@ class AccountRenewalTest extends TestCase
             'due_at' => Carbon::now('UTC')->addDays(5),
         ]);
 
-        $service = new \App\Services\Library\CirculationLoanReadService();
+        $service = new CirculationLoanReadService;
         $loan = $service->findLoan($context['loanId']);
 
         $this->assertNotNull($loan);
@@ -353,7 +358,7 @@ class AccountRenewalTest extends TestCase
             'returned_at' => Carbon::now('UTC'),
         ]);
 
-        $service = new \App\Services\Library\CirculationLoanReadService();
+        $service = new CirculationLoanReadService;
         $loan = $service->findLoan($context['loanId']);
 
         $this->assertNotNull($loan);

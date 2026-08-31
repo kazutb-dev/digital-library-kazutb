@@ -2,10 +2,19 @@
 
 namespace Tests\Feature\Api;
 
+use App\Services\Library\AccountSummaryReadService;
+use Mockery;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Tests\TestCase;
 
 class IdentityMappingE2ETest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(PermissionMiddleware::class);
+    }
+
     /**
      * End-to-end test: Simulate full account summary request with audit
      */
@@ -21,6 +30,28 @@ class IdentityMappingE2ETest extends TestCase
             'ad_login' => 'johndoe',
             'role' => 'reader',
         ];
+
+        $service = Mockery::mock(AccountSummaryReadService::class);
+        $service->shouldReceive('summary')
+            ->once()
+            ->with(Mockery::on(fn (array $user): bool => ($user['email'] ?? null) === 'john@example.com'))
+            ->andReturn([
+                'data' => [
+                    'user' => $sessionData,
+                    'reader' => ['linked' => false],
+                    'stats' => ['readerProfilesFound' => 0],
+                ],
+                'matching' => [
+                    'status' => 'no_match',
+                    'matched_by' => 'none',
+                    'has_ambiguity' => false,
+                    'ambiguity_details' => '',
+                    'is_stale' => false,
+                    'stale_reason' => 'no_reader',
+                ],
+                'source' => 'session, app.readers, app.reader_contacts, app.review_tasks',
+            ]);
+        $this->app->instance(AccountSummaryReadService::class, $service);
 
         // 2. Set session data (simulating authenticated request)
         $this->withSession(['library.user' => $sessionData]);

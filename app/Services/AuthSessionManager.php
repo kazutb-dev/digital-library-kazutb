@@ -31,7 +31,7 @@ class AuthSessionManager
 
         $user = DB::transaction(function () use ($user, $request, $guestLocale): ?User {
             $lockedUser = User::query()
-                ->with('roles')
+                ->with(['roles', 'readerProfile'])
                 ->whereKey($user->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -85,6 +85,9 @@ class AuthSessionManager
             'member' => 'reader',
             default => 'librarian',
         };
+        $resolvedProfileType = $canonicalRole === 'member'
+            ? $this->memberProfileType($profileType, $user->readerProfile?->category)
+            : 'staff';
         $externalIdentity = trim((string) $user->external_id);
         $sessionUser = [
             // Existing catalog/reservation code treats `id` as the upstream
@@ -101,7 +104,7 @@ class AuthSessionManager
             'canonical_role' => $canonicalRole,
             'title' => '',
             'phone_extension' => '',
-            'profile_type' => $profileType ?: ($canonicalRole === 'member' ? 'member' : 'staff'),
+            'profile_type' => $resolvedProfileType,
             'locale' => (string) ($user->locale ?: LocaleResolver::DEFAULT),
         ];
 
@@ -158,5 +161,26 @@ class AuthSessionManager
     private function canonicalRole(User $user): string
     {
         return $user->effectiveRole();
+    }
+
+    private function memberProfileType(?string $provided, ?string $stored): string
+    {
+        foreach ([$provided, $stored] as $candidate) {
+            $normalized = mb_strtolower(trim((string) $candidate));
+            $resolved = match ($normalized) {
+                'student', 'bachelor', 'master', 'doctoral' => 'student',
+                'teacher', 'faculty' => 'teacher',
+                'employee', 'staff', 'researcher' => 'employee',
+                default => null,
+            };
+
+            if ($resolved !== null) {
+                return $resolved;
+            }
+        }
+
+        // Unknown is intentionally visible as a generic member; it must never
+        // be silently promoted to faculty or mislabeled as a student.
+        return 'member';
     }
 }

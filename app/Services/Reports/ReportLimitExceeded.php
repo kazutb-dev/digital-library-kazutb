@@ -2,6 +2,7 @@
 
 namespace App\Services\Reports;
 
-use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
-final class ReportLimitExceeded extends RuntimeException {}
+/** A safe client-visible failure for live reports that require narrower filters. */
+final class ReportLimitExceeded extends UnprocessableEntityHttpException {}

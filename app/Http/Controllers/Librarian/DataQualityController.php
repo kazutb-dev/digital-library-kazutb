@@ -23,6 +23,7 @@ use App\Models\RecordMergeOperation;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\DataQuality\BulkCorrectionService;
+use App\Services\DataQuality\DataQualityIssuePresenter;
 use App\Services\DataQuality\DataQualityRuleRegistry;
 use App\Services\DataQuality\DataQualityScanner;
 use App\Services\DataQuality\EncodingInspector;
@@ -30,9 +31,9 @@ use App\Services\DataQuality\ImportStagingService;
 use App\Services\DataQuality\IssueWorkflowService;
 use App\Services\DataQuality\RecordMergeService;
 use App\Support\Csv;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -182,10 +183,14 @@ class DataQualityController extends Controller
         ]);
     }
 
-    public function show(DataQualityIssue $issue, EncodingInspector $encoding): View
+    public function show(DataQualityIssue $issue, EncodingInspector $encoding, DataQualityIssuePresenter $presenter): View
     {
         $issue->load(['assignee', 'comments.author', 'scanRun']);
         $entity = $this->entityFor($issue);
+        $relatedIssues = DataQualityIssue::query()->actionable()
+            ->where('entity_type', $issue->entity_type)->where('entity_id', $issue->entity_id)
+            ->orderByRaw("CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
+            ->get();
 
         return view('librarian.data-quality.show', [
             'issue' => $issue,
@@ -198,10 +203,10 @@ class DataQualityController extends Controller
                 })
                 ->latest('occurred_at')->limit(100)->get(),
             'assignees' => User::permission('data_quality.correct')->orderBy('name')->get(),
-            'relatedIssues' => DataQualityIssue::query()->actionable()
-                ->where('entity_type', $issue->entity_type)->where('entity_id', $issue->entity_id)
-                ->orderByRaw("CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
-                ->get(),
+            'relatedIssues' => $relatedIssues,
+            'presentations' => $relatedIssues->mapWithKeys(fn (DataQualityIssue $finding): array => [
+                $finding->getKey() => $presenter->present($finding, $entity),
+            ]),
             'nextIssue' => DataQualityIssue::query()->actionable()
                 ->whereNotIn('rule_code', collect(app(DataQualityRuleRegistry::class)->catalogue())->filter(fn (array $definition) => ($definition['type'] ?? 'warning') === 'recommendation')->keys())
                 ->where(function ($query) use ($issue): void {
@@ -466,7 +471,13 @@ class DataQualityController extends Controller
             default => null,
         };
 
-        return $class ? $class::query()->find($issue->entity_id) : null;
+        if ($class === null) {
+            return null;
+        }
+
+        return $class === BookCopy::class
+            ? BookCopy::query()->with(['branch', 'fund.branch', 'bibliographicRecord'])->find($issue->entity_id)
+            : $class::query()->find($issue->entity_id);
     }
 
     private function countDistinctObjects(Builder $query): int

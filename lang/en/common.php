@@ -6,11 +6,12 @@ return [
         'author_unknown' => 'Author not specified',
         'publisher_unknown' => 'Publisher not specified',
         'title_unknown' => 'Untitled',
+        'book_not_found' => 'Book not found',
         'fund_unassigned' => 'Fund not specified',
         'branch_unassigned' => 'Library point not specified',
     ],
     'public_landing' => [
-        'title' => 'KazUTB Scientific Library',
+        'title' => 'Kazakh University of Technology and Business named after K. Kulazhanov Scientific Library',
         'description' => 'The library\'s public catalogue, electronic resources, and services.',
         'stats' => [
             'catalog_titles' => 'titles in the electronic catalogue',
@@ -26,6 +27,7 @@ return [
     'unavailable' => 'Unavailable',
     'configured' => 'Configured',
     'not_configured' => 'Not configured',
+    'empty' => 'No data to display.',
     'created_successfully' => 'Record has been created.',
     'updated_successfully' => 'Changes have been saved.',
     'deleted_successfully' => 'Record has been deleted.',

@@ -15,7 +15,7 @@ class BookController extends Controller
 
         if (! $book) {
             return response()->json([
-                'error' => 'Book not found',
+                'error' => (string) __('common.catalog.book_not_found'),
                 'success' => false,
             ], 404);
         }
@@ -29,6 +29,7 @@ class BookController extends Controller
     public function dbShow(Request $request, BookDetailReadService $service): JsonResponse
     {
         $identifier = (string) $request->route('isbn');
+
         return $this->respondWithBook($request, $identifier, $service);
     }
 }
