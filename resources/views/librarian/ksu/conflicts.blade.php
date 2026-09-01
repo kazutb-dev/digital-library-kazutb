@@ -48,8 +48,8 @@
         <form method="GET" action="{{ route('librarian.ksu.conflicts') }}" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_12rem_12rem_12rem_auto]">
             <input type="hidden" name="view" value="{{ $grouped ? 'grouped' : 'individual' }}">
             <label><span class="admin-label">{{ __('operations.common.search') }}</span><input class="admin-input" type="search" name="q" value="{{ request('q') }}"></label>
-            <label><span class="admin-label">{{ __('operations.common.status') }}</span><select class="admin-input" name="status">@foreach(['open','resolved','ignored'] as $status)<option value="{{ $status }}" @selected(request('status', 'open') === $status)>{{ $status }}</option>@endforeach</select></label>
-            <label><span class="admin-label">{{ __('operations.ksu.kind') }}</span><select class="admin-input" name="kind"><option value="">{{ __('operations.common.all') }}</option>@foreach($kinds as $kind)<option value="{{ $kind }}" @selected(request('kind', $grouped ? 'unresolved_link' : '') === $kind)>{{ $kind }}</option>@endforeach</select></label>
+            <label><span class="admin-label">{{ __('operations.common.status') }}</span><select class="admin-input" name="status">@foreach(['open','resolved','ignored'] as $status)<option value="{{ $status }}" @selected(request('status', 'open') === $status)>{{ __('operations.ksu.conflict_statuses.'.$status) }}</option>@endforeach</select></label>
+            <label><span class="admin-label">{{ __('operations.ksu.kind') }}</span><select class="admin-input" name="kind"><option value="">{{ __('operations.common.all') }}</option>@foreach($kinds as $kind)<option value="{{ $kind }}" @selected(request('kind', $grouped ? 'unresolved_link' : '') === $kind)>{{ trans()->has('operations.ksu.conflict_kinds.'.$kind) ? __('operations.ksu.conflict_kinds.'.$kind) : $kind }}</option>@endforeach</select></label>
             <label><span class="admin-label">{{ __('operations.ksu.book') }}</span><select class="admin-input" name="book"><option value="">{{ __('operations.common.all') }}</option>@foreach($books as $book)<option value="{{ $book->id }}" @selected((string) request('book') === (string) $book->id)>{{ $book->code }}</option>@endforeach</select></label>
             <button class="admin-btn admin-btn-secondary self-end" type="submit">{{ __('operations.common.filter') }}</button>
         </form>
@@ -141,7 +141,7 @@
                 <article class="admin-card">
                     <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)]">
                         <div>
-                            <div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">{{ $conflict->kind }}</span><span class="text-xs text-slate-500">#{{ $conflict->id }} · {{ $conflict->book?->code ?: '—' }}</span></div>
+                            <div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">{{ trans()->has('operations.ksu.conflict_kinds.'.$conflict->kind) ? __('operations.ksu.conflict_kinds.'.$conflict->kind) : $conflict->kind }}</span><span class="text-xs text-slate-500">#{{ $conflict->id }} · {{ $conflict->book?->code ?: '—' }}</span></div>
                             <dl class="mt-4 grid gap-3 sm:grid-cols-2"><div><dt class="admin-label">{{ __('operations.ksu.raw_number') }}</dt><dd>{{ $conflict->ksu_number_raw ?: '—' }}</dd></div><div><dt class="admin-label">{{ __('operations.ksu.source_inventory') }}</dt><dd>{{ $conflict->source_inv_id ?: '—' }}</dd></div><div class="sm:col-span-2"><dt class="admin-label">{{ __('operations.ksu.reason') }}</dt><dd class="whitespace-pre-wrap">{{ $conflict->reason ?: '—' }}</dd></div></dl>
                         </div>
                         @if($conflict->status === 'open' && $canManage)
@@ -152,7 +152,7 @@
                                 <div class="mt-3 flex flex-wrap gap-2"><button class="admin-btn admin-btn-primary" name="status" value="resolved" type="submit">{{ __('operations.ksu.resolve') }}</button><button class="admin-btn admin-btn-secondary" name="status" value="ignored" type="submit">{{ __('operations.ksu.ignore') }}</button></div>
                             </form>
                         @else
-                            <div class="rounded-xl bg-slate-50 p-4"><p class="font-semibold">{{ $conflict->status }}</p><p class="mt-2 text-sm text-slate-600">{{ $conflict->resolution_note }}</p></div>
+                            <div class="rounded-xl bg-slate-50 p-4"><p class="font-semibold">{{ trans()->has('operations.ksu.conflict_statuses.'.$conflict->status) ? __('operations.ksu.conflict_statuses.'.$conflict->status) : $conflict->status }}</p><p class="mt-2 text-sm text-slate-600">{{ $conflict->resolution_note }}</p></div>
                         @endif
                     </div>
                 </article>

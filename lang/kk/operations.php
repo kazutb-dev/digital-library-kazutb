@@ -50,7 +50,7 @@ return [
         'historical_strict_hint' => 'Тарихи жазба тек дәл N/YYYY үшін жасалады. 4.05/2026 және 4/02026 сияқты мәндер автоматты түзетілмейді.',
         'invalid_historical_number' => 'Тарихи жазба жасауға болмайды', 'mark_source_error' => 'Дереккөз қатесі деп белгілеу',
         'leave_unresolved' => 'Шешілмеген күйде қалдыру', 'no_groups' => 'Сүзгіге сай топтар табылмады.',
-        'kind' => 'Қайшылық түрі', 'raw_number' => 'Бастапқы нөмір', 'source_inventory' => 'Source Inv ID', 'reason' => 'Себеп',
+        'kind' => 'Қайшылық түрі', 'conflict_kinds' => ['unresolved_link' => 'Байланыспаған жол', 'duplicate_number' => 'Қайталанатын нөмір', 'missing_number' => 'Жетіспейтін нөмір', 'ambiguous_number' => 'Екіұшты нөмір'], 'conflict_statuses' => ['open' => 'Ашық', 'resolved' => 'Шешілді', 'ignored' => 'Еленбеді'], 'entry_statuses' => ['legacy' => 'Тарихи', 'draft' => 'Жоба', 'posted' => 'Тіркелген'], 'raw_number' => 'Бастапқы нөмір', 'source_inventory' => 'Source Inv ID', 'reason' => 'Себеп',
         'copy_id' => 'Дана ID', 'resolution' => 'Шешім', 'resolution_note' => 'Шешім негіздемесі', 'resolve' => 'Шешу',
         'ignore' => 'Негіздемемен елемеу', 'no_conflicts' => 'Сүзгіге сай қайшылық жоқ.', 'last_number' => 'Соңғы нөмір',
         'observed_max' => 'Бақыланған максимум', 'allocation' => 'Нөмір бөлу', 'enabled' => 'Қосулы', 'disabled' => 'Тек айқын растау',

@@ -16,6 +16,13 @@ return [
     'view' => 'Ашу',
     'apply_filters' => 'Сүзгілерді қолдану',
     'clear_filters' => 'Сүзгілерді тазарту',
+    'values' => [
+        'apply_status' => ['pending' => 'Күтуде', 'inserted' => 'Қосылды', 'updated' => 'Жаңартылды', 'conflict' => 'Қайшылық', 'skipped' => 'Өткізілді', 'quarantined' => 'Карантинде'],
+        'mapping_status' => ['canonical_complete' => 'Толық сәйкестендірілген', 'canonical_partial_raw_complete' => 'Ішінара сәйкестендірілген', 'mapped_or_preserved' => 'Сәйкестендірілген немесе сақталған', 'unmapped_preserved' => 'Сәйкестендірілмеген (сақталған)'],
+        'relation_status' => ['linked' => 'Байланысты', 'orphan' => 'Жазбасыз'],
+        'quarantine_kind' => ['orphan_copy' => 'Жазбасыз дана', 'malformed_marc' => 'Бұрыс MARC', 'invalid_date' => 'Жарамсыз күн', 'invalid_price' => 'Жарамсыз баға', 'duplicate_inventory' => 'Инв. нөмір телегейі', 'unknown_marc_tag' => 'Белгісіз MARC тегі'],
+        'quarantine_status' => ['open' => 'Ашық', 'resolved' => 'Шешілді', 'ignored' => 'Еленбеді'],
+    ],
     'nav' => [
         'dashboard' => 'Шолу',
         'raw' => 'Бастапқы MARC',

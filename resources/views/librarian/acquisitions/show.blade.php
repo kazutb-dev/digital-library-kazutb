@@ -27,7 +27,7 @@
     <section class="admin-card overflow-hidden"><h2 class="font-headline text-2xl text-primary">{{ __('operations.acquisitions.generated_copies') }}</h2><div class="mt-4 overflow-x-auto"><table class="admin-table min-w-[700px]"><thead><tr><th>{{ __('operations.acquisitions.record') }}</th><th>{{ __('operations.acquisitions.inventory_number') }}</th><th>{{ __('operations.acquisitions.barcode') }}</th><th>{{ __('operations.common.status') }}</th></tr></thead><tbody>
         @foreach($batch->items as $item)
             @foreach($item->copies as $copy)
-            <tr><td>{{ $item->title_snapshot }}</td><td>{{ $copy->inventory_number }}</td><td>{{ $copy->barcode }}</td><td>{{ $copy->inventory_status }} / {{ $copy->circulation_status }}</td></tr>
+            <tr><td>{{ $item->title_snapshot }}</td><td>{{ $copy->inventory_number }}</td><td>{{ $copy->barcode }}</td><td>{{ $copy->inventory_status ? __('copy_lifecycle.inventory_statuses.'.$copy->inventory_status) : '—' }} / {{ $copy->circulation_status ? __('copy_lifecycle.circulation_statuses.'.$copy->circulation_status) : '—' }}</td></tr>
             @endforeach
         @endforeach
     </tbody></table></div></section>

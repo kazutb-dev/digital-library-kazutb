@@ -5,6 +5,7 @@
 @section('content')
     <x-admin.page-header :title="__('library_recovery.batches.detail_title', ['id' => $batch->id])" :subtitle="$batch->package_name" />
     @include('admin.library-recovery._nav')
+    @php $rv = fn (string $g, ?string $v): string => $v && trans()->has('library_recovery.values.'.$g.'.'.$v) ? __('library_recovery.values.'.$g.'.'.$v) : ($v ?: '—'); @endphp
 
     <section class="admin-card mb-7">
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -40,7 +41,7 @@
     <section class="admin-card mb-7">
         <h2 class="font-headline text-3xl text-primary">{{ __('library_recovery.batches.recent_records') }}</h2>
         <div class="mt-5 overflow-x-auto"><table class="admin-table min-w-[850px]"><thead><tr><th>ID</th><th>{{ __('library_recovery.raw.source_doc_id') }}</th><th>{{ __('library_recovery.raw.control_number') }}</th><th>{{ __('library_recovery.raw.mapping_status') }}</th><th>{{ __('library_recovery.raw.apply_status') }}</th><th>{{ __('library_recovery.raw.source_hash') }}</th><th></th></tr></thead><tbody>
-            @forelse($rawRecords as $record)<tr><td>{{ $record->id }}</td><td>{{ $record->source_doc_id }}</td><td>{{ $record->control_number ?: '—' }}</td><td>{{ $record->mapping_status ?: '—' }}</td><td>{{ $record->apply_status }}</td><td class="max-w-xs break-all font-mono text-[11px]">{{ $record->source_hash }}</td><td><a href="{{ $record->detail_url }}" class="font-bold text-secondary hover:underline">{{ __('library_recovery.view') }}</a></td></tr>@empty<tr><td colspan="7" class="text-center text-slate-500">{{ __('library_recovery.empty') }}</td></tr>@endforelse
+            @forelse($rawRecords as $record)<tr><td>{{ $record->id }}</td><td>{{ $record->source_doc_id }}</td><td>{{ $record->control_number ?: '—' }}</td><td>{{ $rv('mapping_status', $record->mapping_status) }}</td><td>{{ $rv('apply_status', $record->apply_status) }}</td><td class="max-w-xs break-all font-mono text-[11px]">{{ $record->source_hash }}</td><td><a href="{{ $record->detail_url }}" class="font-bold text-secondary hover:underline">{{ __('library_recovery.view') }}</a></td></tr>@empty<tr><td colspan="7" class="text-center text-slate-500">{{ __('library_recovery.empty') }}</td></tr>@endforelse
         </tbody></table></div>
     </section>
 

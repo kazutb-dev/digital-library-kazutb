@@ -50,7 +50,7 @@ return [
         'historical_strict_hint' => 'A historical entry is created only for exact N/YYYY. Values such as 4.05/2026 and 4/02026 are never autocorrected.',
         'invalid_historical_number' => 'Historical entry cannot be created', 'mark_source_error' => 'Mark as source error',
         'leave_unresolved' => 'Leave unresolved', 'no_groups' => 'No groups match the filters.',
-        'kind' => 'Conflict type', 'raw_number' => 'Raw number', 'source_inventory' => 'Source Inv ID', 'reason' => 'Reason',
+        'kind' => 'Conflict type', 'conflict_kinds' => ['unresolved_link' => 'Unlinked row', 'duplicate_number' => 'Duplicate number', 'missing_number' => 'Missing number', 'ambiguous_number' => 'Ambiguous number'], 'conflict_statuses' => ['open' => 'Open', 'resolved' => 'Resolved', 'ignored' => 'Ignored'], 'entry_statuses' => ['legacy' => 'Legacy', 'draft' => 'Draft', 'posted' => 'Posted'], 'raw_number' => 'Raw number', 'source_inventory' => 'Source Inv ID', 'reason' => 'Reason',
         'copy_id' => 'Copy ID', 'resolution' => 'Resolution', 'resolution_note' => 'Resolution rationale', 'resolve' => 'Resolve',
         'ignore' => 'Ignore with rationale', 'no_conflicts' => 'No conflicts match the filters.', 'last_number' => 'Last number',
         'observed_max' => 'Observed maximum', 'allocation' => 'Allocation', 'enabled' => 'Enabled', 'disabled' => 'Explicit confirmation only',

@@ -16,6 +16,13 @@ return [
     'view' => 'Открыть',
     'apply_filters' => 'Применить фильтры',
     'clear_filters' => 'Сбросить фильтры',
+    'values' => [
+        'apply_status' => ['pending' => 'Ожидает', 'inserted' => 'Добавлена', 'updated' => 'Обновлена', 'conflict' => 'Конфликт', 'skipped' => 'Пропущена', 'quarantined' => 'В карантине'],
+        'mapping_status' => ['canonical_complete' => 'Полностью сопоставлено', 'canonical_partial_raw_complete' => 'Частично сопоставлено', 'mapped_or_preserved' => 'Сопоставлено или сохранено', 'unmapped_preserved' => 'Не сопоставлено (сохранено)'],
+        'relation_status' => ['linked' => 'Связано', 'orphan' => 'Без записи'],
+        'quarantine_kind' => ['orphan_copy' => 'Экземпляр без записи', 'malformed_marc' => 'Некорректный MARC', 'invalid_date' => 'Некорректная дата', 'invalid_price' => 'Некорректная цена', 'duplicate_inventory' => 'Дубликат инв. номера', 'unknown_marc_tag' => 'Неизвестный MARC-тег'],
+        'quarantine_status' => ['open' => 'Открыт', 'resolved' => 'Решён', 'ignored' => 'Игнорирован'],
+    ],
     'nav' => [
         'dashboard' => 'Обзор',
         'raw' => 'Исходный MARC',

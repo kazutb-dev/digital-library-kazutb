@@ -230,6 +230,7 @@ class IntegrationController extends Controller
         return [
             ['key' => 'https', 'ok' => request()->isSecure(), 'severity' => 'blocker'],
             ['key' => 'demo_login_disabled', 'ok' => ! $demoLoginEnabled, 'severity' => 'blocker'],
+            ['key' => 'break_glass_disabled', 'ok' => ! (bool) config('auth.break_glass.enabled'), 'severity' => 'blocker'],
             ['key' => 'debug_disabled', 'ok' => ! (bool) config('app.debug'), 'severity' => 'blocker'],
             ['key' => 'backup_provider', 'ok' => trim((string) config('admin.backup.provider')) !== '', 'severity' => 'blocker'],
             ['key' => 'ldap_configured', 'ok' => $adConfigured, 'severity' => 'warning'],

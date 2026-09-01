@@ -33,6 +33,10 @@ class LibraryAuthenticator
         string $deviceName = 'web',
     ): array {
         $identifier = trim($identifier);
+        $breakGlass = $this->authenticateWithBreakGlass($request, $identifier, $password);
+        if ($breakGlass !== null) {
+            return $breakGlass;
+        }
         if ((bool) config('active_directory.enabled')) {
             return $this->authenticateWithActiveDirectory($request, $identifier, $password);
         }
@@ -91,6 +95,46 @@ class LibraryAuthenticator
             'session_user' => $sessionUser,
             'landing' => $this->sessions->landing($user),
         ];
+    }
+
+    /**
+     * Emergency/local password login for accounts explicitly flagged with
+     * auth_source = 'local_break_glass'. Returns null (defer to the normal
+     * provider) when the feature is off or no break-glass identity matches;
+     * a matching identity with a wrong password is rejected outright.
+     *
+     * @return array{user: User, session_user: array<string,mixed>, landing: string}|null
+     */
+    private function authenticateWithBreakGlass(Request $request, string $identifier, string $password): ?array
+    {
+        if (! (bool) config('auth.break_glass.enabled') || $identifier === '') {
+            return null;
+        }
+
+        $needle = mb_strtolower($identifier);
+        $user = User::query()
+            ->where('auth_source', 'local_break_glass')
+            ->where(function ($query) use ($needle): void {
+                $query->whereRaw('LOWER(email) = ?', [$needle])
+                    ->orWhereRaw('LOWER(COALESCE(ad_login, \'\')) = ?', [$needle]);
+            })
+            ->first();
+
+        if ($user === null) {
+            return null;
+        }
+
+        if ($user->is_active === false
+            || $user->password === null
+            || ! Hash::check($password, (string) $user->password)) {
+            $this->failed($identifier, 'break_glass_invalid_credentials', $request, ['provider' => 'break_glass']);
+
+            throw new LibraryAuthenticationException(__('auth.invalid_credentials'), 401);
+        }
+
+        $sessionUser = $this->sessions->login($request, $user);
+
+        return ['user' => $user, 'session_user' => $sessionUser, 'landing' => $this->sessions->landing($user)];
     }
 
     /** @return array{user: User, session_user: array<string,mixed>, landing: string} */

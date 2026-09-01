@@ -22,6 +22,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Break-glass local login
+    |--------------------------------------------------------------------------
+    |
+    | Emergency/local password login for accounts explicitly flagged with
+    | auth_source = 'local_break_glass'. Disabled by default: with the flag off
+    | the code path is inert and every login still goes through Active Directory
+    | (or the CRM provider). Enable only for controlled testing or when AD is
+    | unreachable, and disable again afterwards.
+    |
+    */
+
+    'break_glass' => [
+        'enabled' => (bool) env('BREAK_GLASS_LOGIN_ENABLED', false),
+    ],
+
+
+    /*
+    |--------------------------------------------------------------------------
     | Authentication Guards
     |--------------------------------------------------------------------------
     |

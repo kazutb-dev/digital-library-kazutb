@@ -587,6 +587,8 @@ return [
             'https_hint' => 'The connection is not secure: traffic and session cookies travel in plain text.',
             'demo_login_disabled' => 'Demo sign-in disabled',
             'demo_login_disabled_hint' => 'Demo sign-in with fixed passwords is enabled — disable APP_DEMO_LOGIN_ENABLED before production.',
+            'break_glass_disabled' => 'Break-glass login disabled',
+            'break_glass_disabled_hint' => 'Local break-glass password login is enabled — disable BREAK_GLASS_LOGIN_ENABLED after testing.',
             'debug_disabled' => 'Debug mode disabled',
             'debug_disabled_hint' => 'APP_DEBUG is on: technical error details and configuration may be exposed to visitors.',
             'backup_provider' => 'Backups configured',

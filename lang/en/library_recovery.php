@@ -16,6 +16,13 @@ return [
     'view' => 'View',
     'apply_filters' => 'Apply filters',
     'clear_filters' => 'Clear filters',
+    'values' => [
+        'apply_status' => ['pending' => 'Pending', 'inserted' => 'Inserted', 'updated' => 'Updated', 'conflict' => 'Conflict', 'skipped' => 'Skipped', 'quarantined' => 'Quarantined'],
+        'mapping_status' => ['canonical_complete' => 'Fully mapped', 'canonical_partial_raw_complete' => 'Partially mapped', 'mapped_or_preserved' => 'Mapped or preserved', 'unmapped_preserved' => 'Unmapped (preserved)'],
+        'relation_status' => ['linked' => 'Linked', 'orphan' => 'Orphan'],
+        'quarantine_kind' => ['orphan_copy' => 'Copy without a record', 'malformed_marc' => 'Malformed MARC', 'invalid_date' => 'Invalid date', 'invalid_price' => 'Invalid price', 'duplicate_inventory' => 'Duplicate inventory number', 'unknown_marc_tag' => 'Unknown MARC tag'],
+        'quarantine_status' => ['open' => 'Open', 'resolved' => 'Resolved', 'ignored' => 'Ignored'],
+    ],
     'nav' => [
         'dashboard' => 'Dashboard',
         'raw' => 'Raw MARC',

@@ -156,9 +156,18 @@ class CopyController extends Controller
         if ($invoice = trim((string) ($filters['invoice'] ?? ''))) {
             $query->where(function (Builder $builder) use ($invoice): void {
                 $this->applyLike($builder, 'supplier_name', $invoice);
+                // The acquisition document in this system is the КСУ entry
+                // (number/act) or the acquisition batch, not a free-text invoice.
                 if (Schema::hasColumn('book_copies', 'ksu_entry_id')) {
                     $builder->orWhereHas('ksuEntry', fn (Builder $entry) => $entry
-                        ->where(fn (Builder $inner) => $this->applyLike($inner, 'act_number', $invoice)));
+                        ->where(function (Builder $inner) use ($invoice): void {
+                            $this->applyLike($inner, 'entry_number', $invoice);
+                            $inner->orWhere(fn (Builder $act) => $this->applyLike($act, 'act_number', $invoice));
+                        }));
+                }
+                if (Schema::hasColumn('book_copies', 'acquisition_batch_id')) {
+                    $builder->orWhereHas('acquisitionBatch', fn (Builder $batch) => $batch
+                        ->where(fn (Builder $inner) => $this->applyLike($inner, 'batch_number', $invoice)));
                 }
             });
         }
